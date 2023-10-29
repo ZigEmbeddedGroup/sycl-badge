@@ -8,7 +8,7 @@ pub const atsamd51j19 = .{
         .atdf = .{ .path = "./board/ATSAMD51J19A.atdf" },
     },
     .memory_regions = &.{
-        .{ .kind = .flash, .offset = 0x00000000, .length = 512 * 1024 }, // Embedded Flash
+        .{ .kind = .flash, .offset = 0x00004000, .length = 512 * 1024 }, // Embedded Flash
         .{ .kind = .ram, .offset = 0x20000000, .length = 192 * 1024 }, // Embedded SRAM
         .{ .kind = .ram, .offset = 0x47000000, .length = 8 * 1024 }, // Backup SRAM
         .{ .kind = .flash, .offset = 0x00804000, .length = 512 }, // NVM User Row

@@ -39,6 +39,5 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "src/main.zig" },
     });
     microzig.installFirmware(b, firmware, .{});
-    microzig.installFirmware(b, firmware, .{ .format = .elf });
     microzig.installFirmware(b, firmware, .{ .format = .{ .uf2 = .SAMD51 } });
 }

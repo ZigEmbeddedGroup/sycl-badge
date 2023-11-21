@@ -1,8 +1,8 @@
 const builtin = @import("builtin");
 const io = microzig.chip.peripherals;
 const io_types = microzig.chip.types.peripherals;
-const led_pad = 1 << 23;
 const microzig = @import("microzig");
+const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
 
@@ -13,6 +13,85 @@ pub const std_options = struct {
     };
     pub const logFn = log;
 };
+
+pub const microzig_options = struct {
+    const interrupts = .{
+        .EIC_EIC_EXTINT_0 = .{ .C = &buttonInterruptTest },
+    };
+};
+
+const GCLK = struct {
+    const PCH = struct {
+        const OSCCTRL_DFLL48 = 0;
+        const OSCCTRL_FDPLL0 = 1;
+        const OSCCTRL_FDPLL1 = 2;
+        const OSCCTRL_FDPLL0_32K = 3;
+        const OSCCTRL_FDPLL1_32K = 3;
+        const SDHC0_SLOW = 3;
+        const SDHC1_SLOW = 3;
+        const SERCOM0_SLOW = 3;
+        const SERCOM1_SLOW = 3;
+        const SERCOM2_SLOW = 3;
+        const SERCOM3_SLOW = 3;
+        const SERCOM4_SLOW = 3;
+        const SERCOM5_SLOW = 3;
+        const SERCOM6_SLOW = 3;
+        const SERCOM7_SLOW = 3;
+        const EIC = 4;
+        const FREQM_MSR = 5;
+        const FREQM_REF = 6;
+        const SERCOM0_CORE = 7;
+        const SERCOM1_CORE = 8;
+        const TC0 = 9;
+        const TC1 = 9;
+        const USB = 10;
+        const EVSYS0 = 11;
+        const EVSYS1 = 12;
+        const EVSYS2 = 13;
+        const EVSYS3 = 14;
+        const EVSYS4 = 15;
+        const EVSYS5 = 16;
+        const EVSYS6 = 17;
+        const EVSYS7 = 18;
+        const EVSYS8 = 19;
+        const EVSYS9 = 20;
+        const EVSYS10 = 21;
+        const EVSYS11 = 22;
+        const SERCOM2_CORE = 23;
+        const SERCOM3_CORE = 24;
+        const TCC0_CORE = 25;
+        const TCC1_CORE = 25;
+        const TC2 = 26;
+        const TC3 = 26;
+        const CAN0 = 27;
+        const CAN1 = 28;
+        const TCC2 = 29;
+        const TCC3 = 29;
+        const TC4 = 30;
+        const TC5 = 30;
+        const PDEC = 31;
+        const AC = 32;
+        const CCL = 33;
+        const SERCOM4_CORE = 34;
+        const SERCOM5_CORE = 35;
+        const SERCOM6_CORE = 36;
+        const SERCOM7_CORE = 37;
+        const TCC4 = 38;
+        const TC6 = 39;
+        const TC7 = 39;
+        const ADC0 = 40;
+        const ADC1 = 41;
+        const DAC = 42;
+        const I2C = .{ 43, 44 };
+        const SDHC0 = 45;
+        const SDHC1 = 46;
+        const CM4_TRACE = 47;
+    };
+};
+
+fn buttonInterruptTest() callconv(.C) void {
+    std.log.scoped(.interrupt).info("buttonInterruptTest();", .{});
+}
 
 const InOutError = error{NoConnection};
 pub const in: std.io.Reader(void, InOutError, struct {
@@ -46,16 +125,6 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
-fn blink(count: usize, comptime on_time: comptime_int, comptime off_time: comptime_int) void {
-    io.PORT.GROUP[0].DIR.write(.{ .DIR = 1 << 23 });
-    for (0..count) |_| {
-        io.PORT.GROUP[0].OUT.write(.{ .OUT = 1 << 23 });
-        sleep(on_time);
-        io.PORT.GROUP[0].OUT.write(.{ .OUT = 0 });
-        sleep(off_time);
-    }
-}
-
 //:lib/samd51/include/samd51j19a.h
 const HSRAM = struct {
     const ADDR: *align(4) [SIZE]u8 = @ptrFromInt(0x20000000);
@@ -73,16 +142,6 @@ const NVMCTRL = struct {
     const SW7: *volatile [4]u32 = @ptrFromInt(0x008000F0); // (NVMCTRL) SW7 Base Address
 };
 
-//:lib/samd51/include/pio/samd51j19a.h
-const PIN = struct {
-    const PA24H_USB_DM = 24;
-    const PA25H_USB_DP = 25;
-};
-const MUX = struct {
-    const PA24H_USB_DM = 7;
-    const PA25H_USB_DP = 7;
-};
-
 const USB = struct {
     //:lib/samd51/include/component/nvmctrl.h
     const FUSES: *volatile microzig.mmio.Mmio(packed struct(u32) {
@@ -91,9 +150,6 @@ const USB = struct {
         TRIM: u3,
         reserved: u19,
     }) = @ptrCast(&NVMCTRL.SW0[1]);
-
-    //:lib/samd51/include/instance/usb.h
-    const GCLK_ID = 10;
 };
 
 //:src/init_samd51.c
@@ -209,8 +265,34 @@ pub fn main() !void {
     microzig.cpu.dmb();
     usb.init();
 
-    io.PORT.GROUP[0].DIR.write(.{ .DIR = led_pad });
-    io.PORT.GROUP[0].OUT.write(.{ .OUT = 0 });
+    // ID detection
+    const id_port = Port.D13;
+    id_port.setDir(.out);
+    id_port.write(true);
+    id_port.configPtr().write(.{
+        .PMUXEN = 0,
+        .INEN = 1,
+        .PULLEN = 1,
+        .reserved6 = 0,
+        .DRVSTR = 0,
+        .padding = 0,
+    });
+
+    // button testing
+    Port.BUTTON_OUT.setDir(.in);
+    Port.BUTTON_OUT.configPtr().write(.{
+        .PMUXEN = 0,
+        .INEN = 1,
+        .PULLEN = 0,
+        .reserved6 = 0,
+        .DRVSTR = 0,
+        .padding = 0,
+    });
+    Port.BUTTON_CLK.setDir(.out);
+    Port.BUTTON_CLK.write(true);
+    Port.BUTTON_LATCH.setDir(.out);
+    Port.BUTTON_LATCH.write(false);
+    io.MCLK.APBAMASK.modify(.{ .EIC_ = 1 });
 
     var was_ready = false;
     while (true) {
@@ -231,9 +313,83 @@ pub fn main() !void {
             if (data.len > 0) for (data) |c| switch (c) {
                 else => out.writeByte(c) catch break :input,
                 'B' - '@' => utils.resetIntoBootloader(),
+                'C' - '@' => {
+                    // Use generator 11 as reference
+                    io.GCLK.GENCTRL[11].write(.{
+                        .SRC = .{ .value = .OSCULP32K },
+                        .reserved8 = 0,
+                        .GENEN = 1,
+                        .IDC = 0,
+                        .OOV = 0,
+                        .OE = 0,
+                        .DIVSEL = .{ .value = .DIV2 },
+                        .RUNSTDBY = 0,
+                        .reserved16 = 0,
+                        .DIV = 8,
+                    });
+                    io.GCLK.PCHCTRL[GCLK.PCH.FREQM_REF].write(.{
+                        .GEN = .{ .value = .GCLK11 },
+                        .reserved6 = 0,
+                        .CHEN = 1,
+                        .WRTLOCK = 0,
+                        .padding = 0,
+                    });
+
+                    // Measure generator 10
+                    io.GCLK.GENCTRL[10].write(.{
+                        .SRC = .{ .value = .XOSC32K },
+                        .reserved8 = 0,
+                        .GENEN = 1,
+                        .IDC = 0,
+                        .OOV = 0,
+                        .OE = 0,
+                        .DIVSEL = .{ .value = .DIV1 },
+                        .RUNSTDBY = 0,
+                        .reserved16 = 0,
+                        .DIV = 0,
+                    });
+                    io.GCLK.PCHCTRL[GCLK.PCH.FREQM_MSR].write(.{
+                        .GEN = .{ .value = .GCLK10 },
+                        .reserved6 = 0,
+                        .CHEN = 1,
+                        .WRTLOCK = 0,
+                        .padding = 0,
+                    });
+
+                    // Reset Frequency Meter
+                    io.MCLK.APBAMASK.modify(.{ .FREQM_ = 1 });
+                    io.FREQM.CTRLA.write(.{
+                        .SWRST = 1,
+                        .ENABLE = 0,
+                        .padding = 0,
+                    });
+                    while (io.FREQM.SYNCBUSY.read().SWRST != 0) {}
+
+                    // Run Frequency Meter
+                    io.FREQM.CFGA.write(.{
+                        .REFNUM = 8,
+                        .padding = 0,
+                    });
+                    io.FREQM.CTRLA.write(.{
+                        .SWRST = 0,
+                        .ENABLE = 1,
+                        .padding = 0,
+                    });
+                    while (io.FREQM.SYNCBUSY.read().ENABLE != 0) {}
+                    io.FREQM.CTRLB.write(.{
+                        .START = 1,
+                        .padding = 0,
+                    });
+                    while (io.FREQM.STATUS.read().BUSY != 0) {}
+                    if (io.FREQM.STATUS.read().OVF == 0) {
+                        std.log.info("{}Hz", .{(io.FREQM.VALUE.read().VALUE + 1) * 8});
+                    }
+                },
                 '\r' => out.writeByte('\n') catch break :input,
                 'P' - '@' => @panic("user"),
                 'R' - '@' => utils.resetIntoApp(),
+                'S' - '@' => for (0.., &io.PORT.GROUP) |group_i, *group|
+                    std.log.info("IN{d} = 0x{X:0>8}", .{ group_i, group.IN.read().IN }),
                 0x7f => out.writeAll("\x1B[D\x1B[K") catch break :input,
             };
         }
@@ -403,17 +559,10 @@ const usb = struct {
 
     //:src/cdc_enumerate.c
     fn AT91F_InitUSB() void {
-        const DM_PIN = PIN.PA24H_USB_DM;
-        const DM_MUX = MUX.PA24H_USB_DM;
-        const DP_PIN = PIN.PA25H_USB_DP;
-        const DP_MUX = MUX.PA25H_USB_DP;
+        Port.@"D-".setMux(.H);
+        Port.@"D+".setMux(.H);
 
-        io.PORT.GROUP[0].PINCFG[DM_PIN].modify(.{ .PMUXEN = 1 });
-        io.PORT.GROUP[0].PMUX[@divExact(DM_PIN ^ 0b0, 2)].modify(.{ .PMUXE = .{ .raw = DM_MUX } });
-        io.PORT.GROUP[0].PINCFG[DP_PIN].modify(.{ .PMUXEN = 1 });
-        io.PORT.GROUP[0].PMUX[@divExact(DP_PIN ^ 0b1, 2)].modify(.{ .PMUXO = .{ .raw = DP_MUX } });
-
-        io.GCLK.PCHCTRL[USB.GCLK_ID].write(.{
+        io.GCLK.PCHCTRL[GCLK.PCH.USB].write(.{
             .GEN = .{ .value = .GCLK0 },
             .reserved6 = 0,
             .CHEN = 1,
@@ -477,9 +626,6 @@ const usb = struct {
     fn tick() void {
         // Check for End Of Reset flag
         if (io.USB.DEVICE.INTFLAG.read().EORST != 0) {
-            // Toggle LED
-            //io.PORT.GROUP[0].OUT.write(.{ .OUT = 0 });
-
             // Clear the flag
             io.USB.DEVICE.INTFLAG.write(.{
                 .SUSPEND = 0,
@@ -565,9 +711,6 @@ const usb = struct {
 
         // Check for End Of SETUP flag
         if (io.USB.DEVICE.DEVICE_ENDPOINT[0].DEVICE.EPINTFLAG.read().RXSTP != 0) setup: {
-            // Toggle LED
-            //io.PORT.GROUP[0].OUT.write(.{ .OUT = led_pad });
-
             // Clear the Received Setup flag
             io.USB.DEVICE.DEVICE_ENDPOINT[0].DEVICE.EPINTFLAG.write(.{
                 .TRCPT0 = 0,
@@ -863,8 +1006,7 @@ const usb = struct {
                 setup.bRequest == @intFromEnum(Setup.standard.Request.GET_DESCRIPTOR) and
                 setup.wValue >> 8 == @intFromEnum(Setup.standard.DescriptorType.DEVICE_QUALIFIER))
             {} else {
-                blink(setup.bRequest, 200_000, 100_000);
-                sleep(500_000);
+                std.log.scoped(.usb).err("Unhandled request: 0x{X:0<2}", .{setup.bRequest});
             }
         }
     }

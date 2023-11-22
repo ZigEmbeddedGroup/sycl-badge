@@ -5,6 +5,7 @@ const microzig = @import("microzig");
 const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
+const utils = @import("utils.zig");
 
 pub const std_options = struct {
     pub const log_level = switch (builtin.mode) {
@@ -21,6 +22,20 @@ pub const microzig_options = struct {
 };
 
 const GCLK = struct {
+    const GEN = struct {
+        fn Gen(comptime id: u4) type {
+            const tag = std.fmt.comptimePrint("GCLK{d}", .{id});
+            return struct {
+                const ID = id;
+                const SYNCBUSY_GENCTRL = @intFromEnum(@field(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL, tag));
+                const PCHCTRL_GEN = @field(io_types.GCLK.GCLK_PCHCTRL__GEN, tag);
+            };
+        }
+        const @"120MHz" = Gen(0);
+        const @"48MHz" = Gen(2);
+        const @"1MHz" = Gen(3);
+        const @"64KHz" = Gen(11);
+    };
     const PCH = struct {
         const OSCCTRL_DFLL48 = 0;
         const OSCCTRL_FDPLL0 = 1;
@@ -89,6 +104,10 @@ const GCLK = struct {
     };
 };
 
+const NVMCTRL = struct {
+    const SW0: *volatile io_types.FUSES.SW0_FUSES = @ptrFromInt(0x00800080);
+};
+
 fn buttonInterruptTest() callconv(.C) void {
     std.log.scoped(.interrupt).info("buttonInterruptTest();", .{});
 }
@@ -125,146 +144,21 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
-//:lib/samd51/include/samd51j19a.h
-const HSRAM = struct {
-    const ADDR: *align(4) [SIZE]u8 = @ptrFromInt(0x20000000);
-    const SIZE = 0x00030000;
-};
+pub fn main() !void {
+    io.MCLK.AHBMASK.modify(.{ .CMCC_ = 1 });
+    io.CMCC.CTRL.write(.{
+        .CEN = 1,
+        .padding = 0,
+    });
 
-const NVMCTRL = struct {
-    const SW0: *volatile [4]u32 = @ptrFromInt(0x00800080); // (NVMCTRL) SW0 Base Address
-    const SW1: *volatile [4]u32 = @ptrFromInt(0x00800090); // (NVMCTRL) SW1 Base Address
-    const SW2: *volatile [4]u32 = @ptrFromInt(0x008000A0); // (NVMCTRL) SW2 Base Address
-    const SW3: *volatile [4]u32 = @ptrFromInt(0x008000B0); // (NVMCTRL) SW3 Base Address
-    const SW4: *volatile [4]u32 = @ptrFromInt(0x008000C0); // (NVMCTRL) SW4 Base Address
-    const SW5: *volatile [4]u32 = @ptrFromInt(0x008000D0); // (NVMCTRL) SW5 Base Address
-    const SW6: *volatile [4]u32 = @ptrFromInt(0x008000E0); // (NVMCTRL) SW6 Base Address
-    const SW7: *volatile [4]u32 = @ptrFromInt(0x008000F0); // (NVMCTRL) SW7 Base Address
-};
-
-const USB = struct {
-    //:lib/samd51/include/component/nvmctrl.h
-    const FUSES: *volatile microzig.mmio.Mmio(packed struct(u32) {
-        TRANSN: u5,
-        TRANSP: u5,
-        TRIM: u3,
-        reserved: u19,
-    }) = @ptrCast(&NVMCTRL.SW0[1]);
-};
-
-//:src/init_samd51.c
-fn system_init() void {
-    // Automatic wait states.
     io.NVMCTRL.CTRLA.modify(.{ .AUTOWS = 1 });
 
-    // Software reset the module to ensure it is re-initialized correctly
     io.GCLK.CTRLA.write(.{ .SWRST = 1, .padding = 0 });
-    // wait for reset to complete
     while (io.GCLK.SYNCBUSY.read().SWRST != 0) {}
 
-    // Temporarily switch the CPU to the internal 32k oscillator while we
-    // reconfigure the DFLL.
-    io.GCLK.GENCTRL[0].write(.{
-        .SRC = .{ .value = .OSCULP32K },
-        .reserved8 = 0,
-        .GENEN = 1,
-        .IDC = 0,
-        .OOV = 0,
-        .OE = 1,
-        .DIVSEL = .{ .value = .DIV1 },
-        .RUNSTDBY = 0,
-        .reserved16 = 0,
-        .DIV = 0,
-    });
-    // Wait for synchronization
-    while ((io.GCLK.SYNCBUSY.read().GENCTRL.raw & @intFromEnum(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL.GCLK0)) != 0) {}
-
-    // Configure the DFLL for USB clock recovery.
-    io.OSCCTRL.DFLLCTRLA.write(.{
-        .reserved1 = 0,
-        .ENABLE = 0,
-        .reserved6 = 0,
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-    });
-    io.OSCCTRL.DFLLMUL.write(.{
-        .MUL = 0xBB80,
-        .FSTEP = 1,
-        .reserved26 = 0,
-        .CSTEP = 1,
-    });
-    // Wait for synchronization
-    while (io.OSCCTRL.DFLLSYNC.read().DFLLMUL != 0) {}
-
-    io.OSCCTRL.DFLLCTRLB.write(.{
-        .MODE = 0,
-        .STABLE = 0,
-        .LLAW = 0,
-        .USBCRM = 0,
-        .CCDIS = 0,
-        .QLDIS = 0,
-        .BPLCKC = 0,
-        .WAITLOCK = 0,
-    });
-    // Wait for synchronization
-    while (io.OSCCTRL.DFLLSYNC.read().DFLLCTRLB != 0) {}
-
-    io.OSCCTRL.DFLLCTRLA.write(.{
-        .reserved1 = 0,
-        .ENABLE = 1,
-        .reserved6 = 0,
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-    });
-    // Wait for synchronization
-    while (io.OSCCTRL.DFLLSYNC.read().ENABLE != 0) {}
-
-    io.OSCCTRL.DFLLVAL.modify(.{});
-    // Wait for synchronization
-    while (io.OSCCTRL.DFLLSYNC.read().DFLLVAL != 0) {}
-
-    io.OSCCTRL.DFLLCTRLB.write(.{
-        .MODE = 0,
-        .STABLE = 0,
-        .LLAW = 0,
-        .USBCRM = 1,
-        .CCDIS = 1,
-        .QLDIS = 0,
-        .BPLCKC = 0,
-        .WAITLOCK = 1,
-    });
-    // Wait for synchronization
-    while (io.OSCCTRL.STATUS.read().DFLLRDY == 0) {}
-
-    // 5) Switch Generic Clock Generator 0 to DFLL48M. CPU will run at 48MHz.
-    io.GCLK.GENCTRL[0].write(.{
-        .SRC = .{ .value = .DFLL },
-        .reserved8 = 0,
-        .GENEN = 1,
-        .IDC = 1,
-        .OOV = 0,
-        .OE = 1,
-        .DIVSEL = .{ .value = .DIV1 },
-        .RUNSTDBY = 0,
-        .reserved16 = 0,
-        .DIV = 0,
-    });
-    // Wait for synchronization
-    while ((io.GCLK.SYNCBUSY.read().GENCTRL.raw & @intFromEnum(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL.GCLK0)) != 0) {}
-
-    // Now that all system clocks are configured, we can set CLKDIV.
-    // These values are normally the ones present after Reset.
-    io.MCLK.CPUDIV.write(.{ .DIV = .{ .value = .DIV1 } });
-
-    //SysTick_Config(1000);
-}
-
-//:src/main.c
-pub fn main() !void {
-    system_init();
     microzig.cpu.dmb();
-    usb.init();
 
+    usb.init();
     // ID detection
     const id_port = Port.D13;
     id_port.setDir(.out);
@@ -277,6 +171,7 @@ pub fn main() !void {
         .DRVSTR = 0,
         .padding = 0,
     });
+    usb.reinitMode(.DEVICE);
 
     // button testing
     Port.BUTTON_OUT.setDir(.in);
@@ -307,15 +202,19 @@ pub fn main() !void {
                 break :input;
             }];
             if (!was_ready) {
-                std.log.info("Hello, {s}!", .{"world"});
+                std.log.info("Ready!", .{});
                 was_ready = true;
             }
             if (data.len > 0) for (data) |c| switch (c) {
                 else => out.writeByte(c) catch break :input,
                 'B' - '@' => utils.resetIntoBootloader(),
-                'C' - '@' => {
-                    // Use generator 11 as reference
-                    io.GCLK.GENCTRL[11].write(.{
+                'C' - '@' => { // Debug clock frequencies
+                    const clock_log = std.log.scoped(.clock);
+
+                    io.MCLK.APBAMASK.modify(.{ .FREQM_ = 1 });
+
+                    // Use OSCULP32K / 512 as reference
+                    io.GCLK.GENCTRL[GCLK.GEN.@"64KHz".ID].write(.{
                         .SRC = .{ .value = .OSCULP32K },
                         .reserved8 = 0,
                         .GENEN = 1,
@@ -328,61 +227,108 @@ pub fn main() !void {
                         .DIV = 8,
                     });
                     io.GCLK.PCHCTRL[GCLK.PCH.FREQM_REF].write(.{
-                        .GEN = .{ .value = .GCLK11 },
+                        .GEN = .{ .value = GCLK.GEN.@"64KHz".PCHCTRL_GEN },
                         .reserved6 = 0,
                         .CHEN = 1,
                         .WRTLOCK = 0,
                         .padding = 0,
                     });
 
-                    // Measure generator 10
-                    io.GCLK.GENCTRL[10].write(.{
-                        .SRC = .{ .value = .XOSC32K },
-                        .reserved8 = 0,
-                        .GENEN = 1,
-                        .IDC = 0,
-                        .OOV = 0,
-                        .OE = 0,
-                        .DIVSEL = .{ .value = .DIV1 },
-                        .RUNSTDBY = 0,
-                        .reserved16 = 0,
-                        .DIV = 0,
-                    });
+                    for (0.., &io.GCLK.GENCTRL) |gen_id, *gen_ctrl| {
+                        if (gen_id == GCLK.GEN.@"64KHz".ID) continue;
+                        const config = gen_ctrl.read();
+                        if (config.GENEN == 0) continue;
+
+                        io.GCLK.PCHCTRL[GCLK.PCH.FREQM_MSR].write(.{
+                            .GEN = .{ .raw = @intCast(gen_id) },
+                            .reserved6 = 0,
+                            .CHEN = 1,
+                            .WRTLOCK = 0,
+                            .padding = 0,
+                        });
+
+                        // Reset Frequency Meter
+                        io.FREQM.CTRLA.write(.{
+                            .SWRST = 1,
+                            .ENABLE = 0,
+                            .padding = 0,
+                        });
+                        while (io.FREQM.SYNCBUSY.read().SWRST != 0) {}
+
+                        // Run Frequency Meter
+                        io.FREQM.CFGA.write(.{
+                            .REFNUM = 8,
+                            .padding = 0,
+                        });
+                        io.FREQM.CTRLA.write(.{
+                            .SWRST = 0,
+                            .ENABLE = 1,
+                            .padding = 0,
+                        });
+                        while (io.FREQM.SYNCBUSY.read().ENABLE != 0) {}
+                        io.FREQM.CTRLB.write(.{
+                            .START = 1,
+                            .padding = 0,
+                        });
+                        while (io.FREQM.STATUS.read().BUSY != 0) {}
+                        if (io.FREQM.STATUS.read().OVF == 0) {
+                            const freq = (@as(u32, io.FREQM.VALUE.read().VALUE) + 1) * 8;
+                            const div = switch (config.DIVSEL.value) {
+                                .DIV1 => switch (config.DIV) {
+                                    0 => 1,
+                                    else => |div| div,
+                                },
+                                .DIV2 => @as(u32, 1) << @min(config.DIV + 1, @as(u5, switch (gen_id) {
+                                    else => 9,
+                                    1 => 17,
+                                })),
+                            };
+                            switch (gen_id) {
+                                0 => {
+                                    const hs_div = @min(io.MCLK.HSDIV.read().DIV.raw, 1);
+                                    clock_log.info(
+                                        "High-Speed Clock ({s} / {d}): {d} Hz",
+                                        .{ @tagName(config.SRC.value), div * hs_div, freq / hs_div },
+                                    );
+                                    const cpu_div = @min(io.MCLK.CPUDIV.read().DIV.raw, 1);
+                                    clock_log.info(
+                                        "CPU Clock ({s} / {d}): {d} Hz",
+                                        .{ @tagName(config.SRC.value), div * cpu_div, freq / cpu_div },
+                                    );
+                                },
+                                else => {},
+                            }
+                            clock_log.info(
+                                "Generator #{d} ({s} / {d}): {d} Hz",
+                                .{ gen_id, @tagName(config.SRC.value), div, freq },
+                            );
+                        } else clock_log.warn("Unable to measure generator #{d}", .{gen_id});
+                    }
+
                     io.GCLK.PCHCTRL[GCLK.PCH.FREQM_MSR].write(.{
-                        .GEN = .{ .value = .GCLK10 },
+                        .GEN = .{ .raw = 0 },
                         .reserved6 = 0,
-                        .CHEN = 1,
+                        .CHEN = 0,
+                        .WRTLOCK = 0,
+                        .padding = 0,
+                    });
+                    io.GCLK.PCHCTRL[GCLK.PCH.FREQM_REF].write(.{
+                        .GEN = .{ .raw = 0 },
+                        .reserved6 = 0,
+                        .CHEN = 0,
                         .WRTLOCK = 0,
                         .padding = 0,
                     });
 
-                    // Reset Frequency Meter
-                    io.MCLK.APBAMASK.modify(.{ .FREQM_ = 1 });
-                    io.FREQM.CTRLA.write(.{
-                        .SWRST = 1,
-                        .ENABLE = 0,
-                        .padding = 0,
-                    });
-                    while (io.FREQM.SYNCBUSY.read().SWRST != 0) {}
+                    io.MCLK.APBAMASK.modify(.{ .FREQM_ = 0 });
 
-                    // Run Frequency Meter
-                    io.FREQM.CFGA.write(.{
-                        .REFNUM = 8,
-                        .padding = 0,
-                    });
-                    io.FREQM.CTRLA.write(.{
-                        .SWRST = 0,
-                        .ENABLE = 1,
-                        .padding = 0,
-                    });
-                    while (io.FREQM.SYNCBUSY.read().ENABLE != 0) {}
-                    io.FREQM.CTRLB.write(.{
-                        .START = 1,
-                        .padding = 0,
-                    });
-                    while (io.FREQM.STATUS.read().BUSY != 0) {}
-                    if (io.FREQM.STATUS.read().OVF == 0) {
-                        std.log.info("{}Hz", .{(io.FREQM.VALUE.read().VALUE + 1) * 8});
+                    for (0.., &io.GCLK.PCHCTRL) |pch_id, *pch_ctrl| {
+                        const config = pch_ctrl.read();
+                        if (config.CHEN == 0) continue;
+                        clock_log.info(
+                            "Peripheral Channel #{d}: Generator #{d}",
+                            .{ pch_id, config.GEN.raw },
+                        );
                     }
                 },
                 '\r' => out.writeByte('\n') catch break :input,
@@ -400,15 +346,7 @@ const usb = struct {
     var endpoint_buffer: [8][2][64]u8 align(4) = .{.{.{0} ** 64} ** 2} ** 8;
     const setup = std.mem.bytesAsValue(Setup, endpoint_buffer[0][0][0..8]);
 
-    var endpoint_table: [8]io_types.USB.USB_DESCRIPTOR align(4) = .{.{ .DEVICE = .{
-        .DEVICE_DESC_BANK = .{.{ .DEVICE = .{
-            .ADDR = .{ .raw = 0 },
-            .PCKSIZE = .{ .raw = 0 },
-            .EXTREG = .{ .raw = 0 },
-            .STATUS_BK = .{ .raw = 0 },
-            .padding = .{0} ** 5,
-        } }} ** 2,
-    } }} ** 8;
+    var endpoint_table: [8]io_types.USB.USB_DESCRIPTOR align(4) = undefined;
     const endpoint_table_addr: *align(4) volatile [8]io_types.USB.USB_DESCRIPTOR = &endpoint_table;
 
     var current_configuration: u8 = 0;
@@ -557,70 +495,309 @@ const usb = struct {
         };
     };
 
-    //:src/cdc_enumerate.c
-    fn AT91F_InitUSB() void {
+    /// One-time initialization
+    fn init() void {
         Port.@"D-".setMux(.H);
         Port.@"D+".setMux(.H);
+        io.MCLK.AHBMASK.modify(.{ .USB_ = 1 });
+        io.MCLK.APBBMASK.modify(.{ .USB_ = 1 });
+    }
 
+    /// Reinitialize into the specified mode
+    fn reinitMode(mode: io_types.USB.USB_CTRLA__MODE) void {
+        // Change the main clock to OSCULP32K while doing clock stuff
+        io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
+            .SRC = .{ .value = .OSCULP32K },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
+        });
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL != 0)
+        {}
+        io.MCLK.HSDIV.write(.{ .DIV = .{ .value = .DIV1 } });
+        io.MCLK.CPUDIV.write(.{ .DIV = .{ .value = .DIV1 } });
+        io.OSCCTRL.DPLL[0].DPLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 0,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0_32K].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.GENCTRL[GCLK.GEN.@"1MHz".ID].write(.{
+            .SRC = .{ .raw = 0 },
+            .reserved8 = 0,
+            .GENEN = 0,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .raw = 0 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
+        });
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL != 0)
+        {}
+
+        // Disable USB
         io.GCLK.PCHCTRL[GCLK.PCH.USB].write(.{
-            .GEN = .{ .value = .GCLK0 },
+            .GEN = .{ .value = GCLK.GEN.@"120MHz".PCHCTRL_GEN },
             .reserved6 = 0,
             .CHEN = 1,
             .WRTLOCK = 0,
             .padding = 0,
         });
-        io.MCLK.AHBMASK.modify(.{ .USB_ = 1 });
-        io.MCLK.APBBMASK.modify(.{ .USB_ = 1 });
-        while ((io.GCLK.SYNCBUSY.read().GENCTRL.raw & @intFromEnum(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL.GCLK0)) != 0) {}
-
-        // Reset
-        io.USB.DEVICE.CTRLA.modify(.{ .SWRST = 1 });
-        // Sync wait
+        io.USB.DEVICE.CTRLA.write(.{
+            .SWRST = 1,
+            .ENABLE = 0,
+            .RUNSTDBY = 0,
+            .reserved7 = 0,
+            .MODE = .{ .raw = 0 },
+        });
         while (io.USB.DEVICE.SYNCBUSY.read().SWRST != 0) {}
 
+        // Disable 48MHz Generator
+        io.GCLK.PCHCTRL[GCLK.PCH.USB].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.GENCTRL[GCLK.GEN.@"48MHz".ID].write(.{
+            .SRC = .{ .raw = 0 },
+            .reserved8 = 0,
+            .GENEN = 0,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .raw = 0 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
+        });
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"48MHz".SYNCBUSY_GENCTRL != 0)
+        {}
+
+        // Switch the DFLL48M to open loop mode
+        io.OSCCTRL.DFLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 0,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DFLLSYNC.read().ENABLE != 0) {}
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_DFLL48].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.OSCCTRL.DFLLMUL.write(.{
+            .MUL = 48_000_000 / 1_000,
+            .FSTEP = 1,
+            .reserved26 = 0,
+            .CSTEP = 1,
+        });
+        while (io.OSCCTRL.DFLLSYNC.read().DFLLMUL != 0) {}
+        io.OSCCTRL.DFLLCTRLB.write(.{
+            .MODE = 0,
+            .STABLE = 0,
+            .LLAW = 0,
+            .USBCRM = 0,
+            .CCDIS = 0,
+            .QLDIS = 0,
+            .BPLCKC = 0,
+            .WAITLOCK = 0,
+        });
+        while (io.OSCCTRL.DFLLSYNC.read().DFLLCTRLB != 0) {}
+        io.OSCCTRL.DFLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 1,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DFLLSYNC.read().ENABLE != 0) {}
+        while (io.OSCCTRL.STATUS.read().DFLLRDY == 0) {}
+
+        // Change the reference clock
+        // Switch the DFLL48M to close loop mode
+        io.OSCCTRL.DFLLCTRLB.write(.{
+            .MODE = 1,
+            .STABLE = 0,
+            .LLAW = 0,
+            .USBCRM = 1,
+            .CCDIS = 1,
+            .QLDIS = 0,
+            .BPLCKC = 0,
+            .WAITLOCK = 0,
+        });
+        while (io.OSCCTRL.DFLLSYNC.read().DFLLCTRLB != 0) {}
+        while (io.OSCCTRL.STATUS.read().DFLLRDY == 0) {}
+
         // Load Pad Calibration
-        const pads = USB.FUSES.read();
+        const pads = NVMCTRL.SW0.SW0_WORD_1.read();
         io.USB.DEVICE.PADCAL.write(.{
-            .TRANSP = switch (pads.TRANSP) {
-                0...std.math.maxInt(u5) - 1 => |transn| transn,
+            .TRANSP = switch (pads.USB_TRANSP) {
+                0...std.math.maxInt(u5) - 1 => |transp| transp,
                 std.math.maxInt(u5) => 29,
             },
             .reserved6 = 0,
-            .TRANSN = switch (pads.TRANSN) {
+            .TRANSN = switch (pads.USB_TRANSN) {
                 0...std.math.maxInt(u5) - 1 => |transn| transn,
                 std.math.maxInt(u5) => 5,
             },
             .reserved12 = 0,
-            .TRIM = switch (pads.TRIM) {
-                0...std.math.maxInt(u3) - 1 => |transn| transn,
+            .TRIM = switch (pads.USB_TRIM) {
+                0...std.math.maxInt(u3) - 1 => |trim| trim,
                 std.math.maxInt(u3) => 3,
             },
             .padding = 0,
         });
 
-        // Set the configuration
-        // Set mode to Device mode
-        // Enable Run in Standby
-        io.USB.DEVICE.CTRLA.modify(.{
-            .MODE = .{ .value = .DEVICE },
-            .RUNSTDBY = 1,
+        // Enable 48MHz Generator
+        io.GCLK.GENCTRL[GCLK.GEN.@"48MHz".ID].write(.{
+            .SRC = .{ .value = .DFLL },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
         });
-        // Set the descriptor address
-        io.USB.DEVICE.DESCADD.write(.{
-            .DESCADD = @intFromPtr(&endpoint_table),
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"48MHz".SYNCBUSY_GENCTRL != 0)
+        {}
+        io.GCLK.PCHCTRL[GCLK.PCH.USB].write(.{
+            .GEN = .{ .value = GCLK.GEN.@"48MHz".PCHCTRL_GEN },
+            .reserved6 = 0,
+            .CHEN = 1,
+            .WRTLOCK = 0,
+            .padding = 0,
         });
-        // Set speed configuration to Full speed
-        // Attach to the USB host
-        io.USB.DEVICE.CTRLB.modify(.{
-            .SPDCONF = .{ .value = .FS },
-            .DETACH = 0,
-        });
-    }
 
-    pub fn init() void {
-        // Initialize USB
-        AT91F_InitUSB();
-        io.USB.HOST.CTRLA.modify(.{ .ENABLE = 1 });
+        // Enable USB
+        @memset(std.mem.sliceAsBytes(endpoint_table_addr), 0x00);
+        io.USB.DEVICE.DESCADD.write(.{ .DESCADD = @intFromPtr(endpoint_table_addr) });
+        io.USB.DEVICE.CTRLA.write(.{
+            .SWRST = 0,
+            .ENABLE = 0,
+            .RUNSTDBY = 0,
+            .reserved7 = 0,
+            .MODE = .{ .value = mode },
+        });
+        switch (mode) {
+            .DEVICE => io.USB.DEVICE.CTRLB.modify(.{
+                .SPDCONF = .{ .value = .FS },
+                .DETACH = 0,
+            }),
+            .HOST => io.USB.HOST.CTRLB.modify(.{
+                .SPDCONF = .{ .value = .NORMAL },
+            }),
+        }
+        io.USB.DEVICE.CTRLA.write(.{
+            .SWRST = 0,
+            .ENABLE = 1,
+            .RUNSTDBY = 0,
+            .reserved7 = 0,
+            .MODE = .{ .value = mode },
+        });
+        while (io.USB.DEVICE.SYNCBUSY.read().ENABLE != 0) {}
+
+        // Reinitialize main clock
+        io.GCLK.GENCTRL[GCLK.GEN.@"1MHz".ID].write(.{
+            .SRC = .{ .value = .DFLL },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 48,
+        });
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL != 0)
+        {}
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
+            .GEN = .{ .value = GCLK.GEN.@"1MHz".PCHCTRL_GEN },
+            .reserved6 = 0,
+            .CHEN = 1,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.OSCCTRL.DPLL[0].DPLLCTRLB.write(.{
+            .FILTER = .{ .value = .FILTER1 },
+            .WUF = 0,
+            .REFCLK = .{ .value = .GCLK },
+            .LTIME = .{ .value = .DEFAULT },
+            .LBYPASS = 0,
+            .DCOFILTER = .{ .raw = 0 },
+            .DCOEN = 0,
+            .DIV = 0,
+            .padding = 0,
+        });
+        io.OSCCTRL.DPLL[0].DPLLRATIO.write(.{
+            .LDR = 120 - 2,
+            .reserved16 = 0,
+            .LDRFRAC = 0,
+            .padding = 0,
+        });
+        while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().DPLLRATIO != 0) {}
+        io.OSCCTRL.DPLL[0].DPLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 1,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+        while (io.OSCCTRL.DPLL[0].DPLLSTATUS.read().CLKRDY == 0) {}
+        io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
+            .SRC = .{ .value = .DPLL0 },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
+        });
+        while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
+            GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL != 0)
+        {}
     }
 
     fn tick() void {
@@ -1078,36 +1255,5 @@ const usb = struct {
         });
         // Wait for transfer to complete
         while (ep_ctrl.EPINTFLAG.read().TRCPT1 == 0) {}
-    }
-};
-
-//:src/utils.c
-const utils = struct {
-    const DBL_TAP_PTR: *volatile u32 = std.mem.bytesAsValue(u32, HSRAM.ADDR[HSRAM.ADDR.len - 4 ..]);
-    const DBL_TAP_MAGIC = 0xf01669ef;
-    const DBL_TAP_MAGIC_QUICK_BOOT = 0xf02669ef;
-
-    pub fn resetIntoApp() noreturn {
-        DBL_TAP_PTR.* = DBL_TAP_MAGIC_QUICK_BOOT;
-        NVIC_SystemReset();
-    }
-
-    pub fn resetIntoBootloader() noreturn {
-        DBL_TAP_PTR.* = DBL_TAP_MAGIC;
-        NVIC_SystemReset();
-    }
-
-    fn NVIC_SystemReset() noreturn {
-        microzig.cpu.dsb();
-        microzig.cpu.peripherals.SCB.AIRCR.write(.{
-            .reserved1 = 0,
-            .VECTCLRACTIVE = 0,
-            .SYSRESETREQ = 1,
-            .reserved15 = 0,
-            .ENDIANESS = 0,
-            .VECTKEY = 0x5FA,
-        });
-        microzig.cpu.dsb();
-        microzig.hang();
     }
 };

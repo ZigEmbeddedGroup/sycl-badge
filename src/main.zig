@@ -1,10 +1,14 @@
 const builtin = @import("builtin");
+const GCLK = @import("chip.zig").GCLK;
 const io = microzig.chip.peripherals;
 const io_types = microzig.chip.types.peripherals;
 const microzig = @import("microzig");
+const lcd = @import("lcd.zig");
+const NVMCTRL = @import("chip.zig").NVMCTRL;
 const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
+const timer = @import("timer.zig");
 const utils = @import("utils.zig");
 
 pub const std_options = struct {
@@ -15,102 +19,15 @@ pub const std_options = struct {
     pub const logFn = log;
 };
 
-pub const microzig_options = struct {
-    const interrupts = .{
-        .EIC_EIC_EXTINT_0 = .{ .C = &buttonInterruptTest },
-    };
-};
-
-const GCLK = struct {
-    const GEN = struct {
-        fn Gen(comptime id: u4) type {
-            const tag = std.fmt.comptimePrint("GCLK{d}", .{id});
-            return struct {
-                const ID = id;
-                const SYNCBUSY_GENCTRL = @intFromEnum(@field(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL, tag));
-                const PCHCTRL_GEN = @field(io_types.GCLK.GCLK_PCHCTRL__GEN, tag);
-            };
-        }
-        const @"120MHz" = Gen(0);
-        const @"48MHz" = Gen(2);
-        const @"1MHz" = Gen(3);
-        const @"64KHz" = Gen(11);
-    };
-    const PCH = struct {
-        const OSCCTRL_DFLL48 = 0;
-        const OSCCTRL_FDPLL0 = 1;
-        const OSCCTRL_FDPLL1 = 2;
-        const OSCCTRL_FDPLL0_32K = 3;
-        const OSCCTRL_FDPLL1_32K = 3;
-        const SDHC0_SLOW = 3;
-        const SDHC1_SLOW = 3;
-        const SERCOM0_SLOW = 3;
-        const SERCOM1_SLOW = 3;
-        const SERCOM2_SLOW = 3;
-        const SERCOM3_SLOW = 3;
-        const SERCOM4_SLOW = 3;
-        const SERCOM5_SLOW = 3;
-        const SERCOM6_SLOW = 3;
-        const SERCOM7_SLOW = 3;
-        const EIC = 4;
-        const FREQM_MSR = 5;
-        const FREQM_REF = 6;
-        const SERCOM0_CORE = 7;
-        const SERCOM1_CORE = 8;
-        const TC0 = 9;
-        const TC1 = 9;
-        const USB = 10;
-        const EVSYS0 = 11;
-        const EVSYS1 = 12;
-        const EVSYS2 = 13;
-        const EVSYS3 = 14;
-        const EVSYS4 = 15;
-        const EVSYS5 = 16;
-        const EVSYS6 = 17;
-        const EVSYS7 = 18;
-        const EVSYS8 = 19;
-        const EVSYS9 = 20;
-        const EVSYS10 = 21;
-        const EVSYS11 = 22;
-        const SERCOM2_CORE = 23;
-        const SERCOM3_CORE = 24;
-        const TCC0_CORE = 25;
-        const TCC1_CORE = 25;
-        const TC2 = 26;
-        const TC3 = 26;
-        const CAN0 = 27;
-        const CAN1 = 28;
-        const TCC2 = 29;
-        const TCC3 = 29;
-        const TC4 = 30;
-        const TC5 = 30;
-        const PDEC = 31;
-        const AC = 32;
-        const CCL = 33;
-        const SERCOM4_CORE = 34;
-        const SERCOM5_CORE = 35;
-        const SERCOM6_CORE = 36;
-        const SERCOM7_CORE = 37;
-        const TCC4 = 38;
-        const TC6 = 39;
-        const TC7 = 39;
-        const ADC0 = 40;
-        const ADC1 = 41;
-        const DAC = 42;
-        const I2C = .{ 43, 44 };
-        const SDHC0 = 45;
-        const SDHC1 = 46;
-        const CM4_TRACE = 47;
-    };
-};
-
-const NVMCTRL = struct {
-    const SW0: *volatile io_types.FUSES.SW0_FUSES = @ptrFromInt(0x00800080);
-};
-
-fn buttonInterruptTest() callconv(.C) void {
-    std.log.scoped(.interrupt).info("buttonInterruptTest();", .{});
-}
+//pub const microzig_options = struct {
+//    const interrupts = .{
+//        .EIC_EIC_EXTINT_0 = .{ .C = &buttonInterruptTest },
+//    };
+//};
+//
+//fn buttonInterruptTest() callconv(.C) void {
+//    std.log.scoped(.interrupt).info("buttonInterruptTest();", .{});
+//}
 
 const InOutError = error{NoConnection};
 pub const in: std.io.Reader(void, InOutError, struct {
@@ -144,6 +61,23 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
+fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
+    switch (@typeInfo(@typeInfo(@TypeOf(pointer)).Pointer.child)) {
+        .Int => {
+            logger.info("[0x{X}] " ++ prefix ++ " = 0x{X}", .{ @intFromPtr(pointer), pointer.* });
+        },
+        .Struct => |*info| inline for (info.fields) |field| {
+            if (comptime std.mem.startsWith(u8, field.name, "reserved")) continue;
+            if (comptime std.mem.eql(u8, field.name, "padding")) continue;
+            dumpPeripheral(logger, prefix ++ "." ++ field.name, &@field(pointer, field.name));
+        },
+        .Array => inline for (0.., pointer) |index, *elem| {
+            dumpPeripheral(logger, std.fmt.comptimePrint("{s}[{d}]", .{ prefix, index }), elem);
+        },
+        else => @compileError("Unhandled type: " ++ @typeName(@TypeOf(pointer))),
+    }
+}
+
 pub fn main() !void {
     io.MCLK.AHBMASK.modify(.{ .CMCC_ = 1 });
     io.CMCC.CTRL.write(.{
@@ -173,6 +107,9 @@ pub fn main() !void {
     });
     usb.reinitMode(.DEVICE);
 
+    timer.init();
+    lcd.init(.bpp24);
+
     // button testing
     Port.BUTTON_OUT.setDir(.in);
     Port.BUTTON_OUT.configPtr().write(.{
@@ -187,9 +124,10 @@ pub fn main() !void {
     Port.BUTTON_CLK.write(true);
     Port.BUTTON_LATCH.setDir(.out);
     Port.BUTTON_LATCH.write(false);
-    io.MCLK.APBAMASK.modify(.{ .EIC_ = 1 });
+    //io.MCLK.APBAMASK.modify(.{ .EIC_ = 1 });
 
     var was_ready = false;
+    var color: enum { red, green, blue } = .red;
     while (true) {
         usb.tick();
 
@@ -331,23 +269,62 @@ pub fn main() !void {
                         );
                     }
                 },
+                'F' - '@' => if (true) {
+                    lcd.fill24(switch (color) {
+                        .red => lcd.red24,
+                        .green => lcd.green24,
+                        .blue => lcd.blue24,
+                    });
+                    lcd.blit24();
+                    color = switch (color) {
+                        .red => .green,
+                        .green => .blue,
+                        .blue => .red,
+                    };
+                },
+                'G' - '@' => if (true) {
+                    lcd.rect24(.{
+                        .x = 0,
+                        .y = 0,
+                        .width = lcd.width,
+                        .height = lcd.height,
+                    }, lcd.red24, lcd.green24);
+                    lcd.rect24(.{
+                        .x = 32,
+                        .y = 32,
+                        .width = lcd.width - 64,
+                        .height = lcd.height - 64,
+                    }, lcd.blue24, lcd.black24);
+                    lcd.blit24();
+                },
+                'I' - '@' => if (true) lcd.invert(),
                 '\r' => out.writeByte('\n') catch break :input,
                 'P' - '@' => @panic("user"),
                 'R' - '@' => utils.resetIntoApp(),
                 'S' - '@' => for (0.., &io.PORT.GROUP) |group_i, *group|
                     std.log.info("IN{d} = 0x{X:0>8}", .{ group_i, group.IN.read().IN }),
+                'T' - '@' => { // Debug timer delay
+                    const timer_log = std.log.scoped(.timer);
+                    timer_log.info("start...", .{});
+                    for (0..10) |i| {
+                        if (i > 0) timer_log.info("{d}", .{i});
+                        timer.delay(std.time.us_per_s);
+                    }
+                    timer_log.info("done!", .{});
+                },
                 0x7f => out.writeAll("\x1B[D\x1B[K") catch break :input,
             };
         }
     }
 }
 
-const usb = struct {
-    var endpoint_buffer: [8][2][64]u8 align(4) = .{.{.{0} ** 64} ** 2} ** 8;
+pub const usb = struct {
+    var endpoint_buffer_storage: [8][2][64]u8 align(4) = .{.{.{0} ** 64} ** 2} ** 8;
+    const endpoint_buffer: *align(4) volatile [8][2][64]u8 = &endpoint_buffer_storage;
     const setup = std.mem.bytesAsValue(Setup, endpoint_buffer[0][0][0..8]);
 
-    var endpoint_table: [8]io_types.USB.USB_DESCRIPTOR align(4) = undefined;
-    const endpoint_table_addr: *align(4) volatile [8]io_types.USB.USB_DESCRIPTOR = &endpoint_table;
+    var endpoint_table_storage: [8]io_types.USB.USB_DESCRIPTOR align(4) = undefined;
+    const endpoint_table: *align(4) volatile [8]io_types.USB.USB_DESCRIPTOR = &endpoint_table_storage;
 
     var current_configuration: u8 = 0;
 
@@ -706,8 +683,9 @@ const usb = struct {
         });
 
         // Enable USB
-        @memset(std.mem.sliceAsBytes(endpoint_table_addr), 0x00);
-        io.USB.DEVICE.DESCADD.write(.{ .DESCADD = @intFromPtr(endpoint_table_addr) });
+        @memset(std.mem.sliceAsBytes(endpoint_table), 0x00);
+        microzig.cpu.dmb();
+        io.USB.DEVICE.DESCADD.write(.{ .DESCADD = @intFromPtr(endpoint_table) });
         io.USB.DEVICE.CTRLA.write(.{
             .SWRST = 0,
             .ENABLE = 0,
@@ -870,6 +848,7 @@ const usb = struct {
             endpoint_table[0].DEVICE.DEVICE_DESC_BANK[1].DEVICE.ADDR.write(.{
                 .ADDR = @intFromPtr(&endpoint_buffer[0][1]),
             });
+            microzig.cpu.dmb();
             io.USB.DEVICE.DEVICE_ENDPOINT[0].DEVICE.EPSTATUSCLR.write(.{
                 .DTGLOUT = 0,
                 .DTGLIN = 0,
@@ -912,6 +891,7 @@ const usb = struct {
                 .BK1RDY = 0,
             });
 
+            microzig.cpu.dmb();
             switch (setup.bmRequestType.kind) {
                 .standard => switch (setup.bmRequestType.recipient) {
                     .device => switch (setup.bmRequestType.dir) {
@@ -946,6 +926,7 @@ const usb = struct {
                                             endpoint_table[1].DEVICE.DEVICE_DESC_BANK[1].DEVICE.ADDR.write(.{
                                                 .ADDR = @intFromPtr(&endpoint_buffer[1][1]),
                                             });
+                                            microzig.cpu.dmb();
                                             io.USB.DEVICE.DEVICE_ENDPOINT[1].DEVICE.EPSTATUSCLR.write(.{
                                                 .DTGLOUT = 0,
                                                 .DTGLIN = 0,
@@ -972,6 +953,7 @@ const usb = struct {
                                             endpoint_table[2].DEVICE.DEVICE_DESC_BANK[0].DEVICE.ADDR.write(.{
                                                 .ADDR = @intFromPtr(&endpoint_buffer[2][0]),
                                             });
+                                            microzig.cpu.dmb();
                                             io.USB.DEVICE.DEVICE_ENDPOINT[2].DEVICE.EPSTATUSSET.write(.{
                                                 .DTGLOUT = 0,
                                                 .DTGLIN = 0,
@@ -991,6 +973,7 @@ const usb = struct {
                                             endpoint_table[2].DEVICE.DEVICE_DESC_BANK[1].DEVICE.ADDR.write(.{
                                                 .ADDR = @intFromPtr(&endpoint_buffer[2][1]),
                                             });
+                                            microzig.cpu.dmb();
                                             io.USB.DEVICE.DEVICE_ENDPOINT[2].DEVICE.EPSTATUSCLR.write(.{
                                                 .DTGLOUT = 0,
                                                 .DTGLIN = 0,
@@ -1195,6 +1178,7 @@ const usb = struct {
         const ep_ctrl = &io.USB.DEVICE.DEVICE_ENDPOINT[ep].DEVICE;
 
         if (ep_ctrl.EPSTATUS.read().BK0RDY != 0) {
+            microzig.cpu.dmb();
             const len = ep_desc.PCKSIZE.read().BYTE_COUNT;
             @memcpy(data[0..len], ep_buffer[0..len]);
             ep_ctrl.EPSTATUSCLR.write(.{
@@ -1219,6 +1203,7 @@ const usb = struct {
     fn write(ep: u3, data: []const u8) void {
         const ep_buffer = &endpoint_buffer[ep][1];
         @memcpy(ep_buffer[0..data.len], data);
+        microzig.cpu.dmb();
 
         const ep_descs: *volatile [8]io_types.USB.USB_DESCRIPTOR = @ptrFromInt(io.USB.DEVICE.DESCADD.read().DESCADD);
         // Set the buffer address for ep data

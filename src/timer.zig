@@ -134,7 +134,7 @@ pub fn init() void {
     while (io.TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
 }
 
-pub fn delay(us: u32) void {
+pub fn startDelay(us: u32) void {
     io.TC0.COUNT32.COUNT.write(.{ .COUNT = us });
     while (io.TC0.COUNT32.SYNCBUSY.read().COUNT != 0) {}
     io.TC0.COUNT32.CTRLBSET.write(.{
@@ -145,7 +145,15 @@ pub fn delay(us: u32) void {
         .CMD = .{ .value = .RETRIGGER },
     });
     while (io.TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
-    while (io.TC0.COUNT32.STATUS.read().STOP == 0) {}
+}
+
+pub fn finishDelay() void {
+    while (io.TC0.COUNT32.STATUS.read().STOP != 1) {}
+}
+
+pub fn delay(us: u32) void {
+    startDelay(us);
+    finishDelay();
 }
 
 const GCLK = @import("chip.zig").GCLK;

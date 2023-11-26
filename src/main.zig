@@ -1,3 +1,4 @@
+const audio = @import("audio.zig");
 const builtin = @import("builtin");
 const GCLK = @import("chip.zig").GCLK;
 const io = microzig.chip.peripherals;
@@ -19,15 +20,50 @@ pub const std_options = struct {
     pub const logFn = log;
 };
 
-//pub const microzig_options = struct {
-//    const interrupts = .{
-//        .EIC_EIC_EXTINT_0 = .{ .C = &buttonInterruptTest },
-//    };
-//};
-//
-//fn buttonInterruptTest() callconv(.C) void {
-//    std.log.scoped(.interrupt).info("buttonInterruptTest();", .{});
-//}
+pub const microzig_options = struct {
+    pub const interrupts = struct {
+        const interrupt_log = std.log.scoped(.interrupt);
+
+        pub const NonMaskableInt = unhandled("NonMaskableInt");
+        pub fn HardFault() void {
+            interrupt_log.info("[HardFault] HFSR = 0x{x}", .{io.SystemControl.HFSR.raw});
+            microzig.hang();
+        }
+        pub fn MemoryManagement() void {
+            interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}", .{
+                io.SystemControl.CFSR.raw,
+                io.SystemControl.MMFAR.raw,
+            });
+            microzig.hang();
+        }
+        pub fn BusFault() void {
+            interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}", .{
+                io.SystemControl.CFSR.raw,
+                io.SystemControl.BFAR.raw,
+            });
+            microzig.hang();
+        }
+        pub fn UsageFault() void {
+            interrupt_log.info("[UsageFault] CFSR = 0x{x}", .{io.SystemControl.CFSR.raw});
+            microzig.hang();
+        }
+        pub const SVCall = unhandled("SVCall");
+        pub const DebugMonitor = unhandled("DebugMonitor");
+        pub const PendSV = unhandled("PendSV");
+        pub const SysTick = unhandled("SysTick");
+        pub fn DMAC_DMAC_1() void {
+            audio.mix();
+        }
+        fn unhandled(comptime name: []const u8) fn () callconv(.C) void {
+            return struct {
+                fn handler() callconv(.C) void {
+                    interrupt_log.info(name, .{});
+                    microzig.hang();
+                }
+            }.handler;
+        }
+    };
+};
 
 const InOutError = error{NoConnection};
 pub const in: std.io.Reader(void, InOutError, struct {
@@ -61,10 +97,10 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
-fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
+pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
     switch (@typeInfo(@typeInfo(@TypeOf(pointer)).Pointer.child)) {
         .Int => {
-            logger.info("[0x{X}] " ++ prefix ++ " = 0x{X}", .{ @intFromPtr(pointer), pointer.* });
+            logger.info("[0x{x}] " ++ prefix ++ " = 0x{x}", .{ @intFromPtr(pointer), pointer.* });
         },
         .Struct => |*info| inline for (info.fields) |field| {
             if (comptime std.mem.startsWith(u8, field.name, "reserved")) continue;
@@ -79,6 +115,18 @@ fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype
 }
 
 pub fn main() !void {
+    io.SystemControl.SHCSR.modify(.{
+        .MEMFAULTENA = 1,
+        .BUSFAULTENA = 1,
+        .USGFAULTENA = 1,
+    });
+    io.SystemControl.CPACR.write(.{
+        .reserved20 = 0,
+        .CP10 = .{ .value = .PRIV },
+        .CP11 = .{ .value = .PRIV },
+        .padding = 0,
+    });
+
     io.MCLK.AHBMASK.modify(.{ .CMCC_ = 1 });
     io.CMCC.CTRL.write(.{
         .CEN = 1,
@@ -109,6 +157,7 @@ pub fn main() !void {
 
     timer.init();
     lcd.init(.bpp24);
+    audio.init();
 
     // button testing
     Port.BUTTON_OUT.setDir(.in);
@@ -145,6 +194,138 @@ pub fn main() !void {
             }
             if (data.len > 0) for (data) |c| switch (c) {
                 else => out.writeByte(c) catch break :input,
+                'A' - '@' => {
+                    timer.delay(std.time.us_per_s);
+                    const tempo = 0.78;
+                    audio.play(&.{
+                        &.{
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Bb4 },
+                            .{ .duration = tempo * 3.00, .frequency = audio.Note.C5 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Gb5 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 1.50, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo * 0.80, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 0.20, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.D5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo / 7.0, .frequency = audio.Note.Gb5 },
+                            //
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Bb4 },
+                            .{ .duration = tempo * 3.00, .frequency = audio.Note.C5 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Gb5 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 1.50, .frequency = audio.Note.F5 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Eb5 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Db5 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C5 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db5 },
+                        },
+                        &.{
+                            .{ .duration = tempo * 8.00, .frequency = 0 },
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.Gb4 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Bb4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 2.00, .frequency = 0 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.F4 },
+                            .{ .duration = tempo * 0.50, .frequency = 0 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Gb4 },
+                            .{ .duration = tempo * 7.50, .frequency = 0 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.F4 },
+                            .{ .duration = tempo * 0.50, .frequency = 0 },
+                            .{ .duration = tempo * 0.75, .frequency = audio.Note.Gb4 },
+                            .{ .duration = tempo * 0.25, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 2.00, .frequency = audio.Note.Bb4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Ab4 },
+                            .{ .duration = tempo * 2.00, .frequency = 0 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.F4 },
+                            .{ .duration = tempo * 0.50, .frequency = 0 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.F4 },
+                        },
+                        &.{
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Bb3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Gb4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            //
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Bb3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 1.00, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.C4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Gb4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Db4 },
+                            .{ .duration = tempo * 0.50, .frequency = audio.Note.Ab3 },
+                        },
+                    });
+                },
                 'B' - '@' => utils.resetIntoBootloader(),
                 'C' - '@' => { // Debug clock frequencies
                     const clock_log = std.log.scoped(.clock);
@@ -482,7 +663,7 @@ pub const usb = struct {
 
     /// Reinitialize into the specified mode
     fn reinitMode(mode: io_types.USB.USB_CTRLA__MODE) void {
-        // Change the main clock to OSCULP32K while doing clock stuff
+        // Tear down clocks
         io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
             .SRC = .{ .value = .OSCULP32K },
             .reserved8 = 0,
@@ -495,8 +676,21 @@ pub const usb = struct {
             .reserved16 = 0,
             .DIV = 0,
         });
+        io.GCLK.GENCTRL[GCLK.GEN.@"8.4672MHz".ID].write(.{
+            .SRC = .{ .raw = 0 },
+            .reserved8 = 0,
+            .GENEN = 0,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .raw = 0 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
+        });
         while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
-            GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL != 0)
+            (GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL |
+            GCLK.GEN.@"8.4672MHz".SYNCBUSY_GENCTRL) != 0)
         {}
         io.MCLK.HSDIV.write(.{ .DIV = .{ .value = .DIV1 } });
         io.MCLK.CPUDIV.write(.{ .DIV = .{ .value = .DIV1 } });
@@ -508,7 +702,22 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+        io.OSCCTRL.DPLL[1].DPLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 0,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().ENABLE != 0) {}
         io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL1].write(.{
             .GEN = .{ .raw = 0 },
             .reserved6 = 0,
             .CHEN = 0,
@@ -521,6 +730,25 @@ pub const usb = struct {
             .CHEN = 0,
             .WRTLOCK = 0,
             .padding = 0,
+        });
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL1_32K].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.GENCTRL[GCLK.GEN.@"76.8KHz".ID].write(.{
+            .SRC = .{ .raw = 0 },
+            .reserved8 = 0,
+            .GENEN = 0,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .raw = 0 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 0,
         });
         io.GCLK.GENCTRL[GCLK.GEN.@"1MHz".ID].write(.{
             .SRC = .{ .raw = 0 },
@@ -535,7 +763,8 @@ pub const usb = struct {
             .DIV = 0,
         });
         while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
-            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL != 0)
+            (GCLK.GEN.@"76.8KHz".SYNCBUSY_GENCTRL |
+            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL) != 0)
         {}
 
         // Disable USB
@@ -711,7 +940,19 @@ pub const usb = struct {
         });
         while (io.USB.DEVICE.SYNCBUSY.read().ENABLE != 0) {}
 
-        // Reinitialize main clock
+        // Reinitialize clocks
+        io.GCLK.GENCTRL[GCLK.GEN.@"76.8KHz".ID].write(.{
+            .SRC = .{ .value = .DFLL },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 1,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 625,
+        });
         io.GCLK.GENCTRL[GCLK.GEN.@"1MHz".ID].write(.{
             .SRC = .{ .value = .DFLL },
             .reserved8 = 0,
@@ -725,10 +966,11 @@ pub const usb = struct {
             .DIV = 48,
         });
         while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
-            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL != 0)
+            (GCLK.GEN.@"76.8KHz".SYNCBUSY_GENCTRL |
+            GCLK.GEN.@"1MHz".SYNCBUSY_GENCTRL) != 0)
         {}
         io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
-            .GEN = .{ .value = GCLK.GEN.@"1MHz".PCHCTRL_GEN },
+            .GEN = .{ .value = GCLK.GEN.@"76.8KHz".PCHCTRL_GEN },
             .reserved6 = 0,
             .CHEN = 1,
             .WRTLOCK = 0,
@@ -745,10 +987,14 @@ pub const usb = struct {
             .DIV = 0,
             .padding = 0,
         });
+        const dpll0_factor = 12;
+        const dpll0_frequency = 8_467_200 * dpll0_factor;
+        comptime std.debug.assert(dpll0_frequency >= 96_000_000 and dpll0_frequency <= 200_000_000);
+        const dpll0_ratio = @divExact(dpll0_frequency * 32, 76_800);
         io.OSCCTRL.DPLL[0].DPLLRATIO.write(.{
-            .LDR = 120 - 2,
+            .LDR = dpll0_ratio / 32 - 1,
             .reserved16 = 0,
-            .LDRFRAC = 0,
+            .LDRFRAC = dpll0_ratio % 32,
             .padding = 0,
         });
         while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().DPLLRATIO != 0) {}
@@ -760,8 +1006,46 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+        io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL1].write(.{
+            .GEN = .{ .value = GCLK.GEN.@"1MHz".PCHCTRL_GEN },
+            .reserved6 = 0,
+            .CHEN = 1,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.OSCCTRL.DPLL[1].DPLLCTRLB.write(.{
+            .FILTER = .{ .value = .FILTER1 },
+            .WUF = 0,
+            .REFCLK = .{ .value = .GCLK },
+            .LTIME = .{ .value = .DEFAULT },
+            .LBYPASS = 0,
+            .DCOFILTER = .{ .raw = 0 },
+            .DCOEN = 0,
+            .DIV = 0,
+            .padding = 0,
+        });
+        const dpll1_factor = 1;
+        const dpll1_frequency = 120_000_000 * dpll1_factor;
+        comptime std.debug.assert(dpll1_frequency >= 96_000_000 and dpll1_frequency <= 200_000_000);
+        const dpll1_ratio = @divExact(dpll1_frequency * 32, 1_000_000);
+        io.OSCCTRL.DPLL[1].DPLLRATIO.write(.{
+            .LDR = dpll1_ratio / 32 - 1,
+            .reserved16 = 0,
+            .LDRFRAC = dpll1_ratio % 32,
+            .padding = 0,
+        });
+        while (io.OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().DPLLRATIO != 0) {}
+        io.OSCCTRL.DPLL[1].DPLLCTRLA.write(.{
+            .reserved1 = 0,
+            .ENABLE = 1,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+        });
+        while (io.OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().ENABLE != 0) {}
         while (io.OSCCTRL.DPLL[0].DPLLSTATUS.read().CLKRDY == 0) {}
-        io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
+        while (io.OSCCTRL.DPLL[1].DPLLSTATUS.read().CLKRDY == 0) {}
+        io.GCLK.GENCTRL[GCLK.GEN.@"8.4672MHz".ID].write(.{
             .SRC = .{ .value = .DPLL0 },
             .reserved8 = 0,
             .GENEN = 1,
@@ -771,10 +1055,23 @@ pub const usb = struct {
             .DIVSEL = .{ .value = .DIV1 },
             .RUNSTDBY = 0,
             .reserved16 = 0,
-            .DIV = 0,
+            .DIV = dpll0_factor,
+        });
+        io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
+            .SRC = .{ .value = .DPLL1 },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV1 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = dpll1_factor,
         });
         while (io.GCLK.SYNCBUSY.read().GENCTRL.raw &
-            GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL != 0)
+            (GCLK.GEN.@"8.4672MHz".SYNCBUSY_GENCTRL |
+            GCLK.GEN.@"120MHz".SYNCBUSY_GENCTRL) != 0)
         {}
     }
 

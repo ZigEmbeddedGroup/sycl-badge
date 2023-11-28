@@ -14,9 +14,16 @@ fn NVIC_SystemReset() noreturn {
 }
 
 //adafruit/uf2-samdx1:lib/samd51/include/samd51j19a.h
-const HSRAM = struct {
-    const ADDR: *align(4) [SIZE]u8 = @ptrFromInt(0x20000000);
-    const SIZE = 0x00030000;
+pub const HSRAM = struct {
+    pub const SIZE: usize = 0x00030000; // 192 kB
+    pub const ADDR: *align(SIZE / 3) volatile [SIZE]u8 = @ptrFromInt(0x20000000);
+};
+pub const FLASH = struct {
+    pub const SIZE: usize = 0x00080000; // 512 kB
+    pub const PAGE_SIZE = 512;
+    pub const NB_OF_PAGES = 1024;
+    pub const USER_PAGE_SIZE = 512;
+    pub const ADDR: *allowzero align(PAGE_SIZE) volatile [SIZE]u8 = @ptrFromInt(0x00000000);
 };
 
 //adafruit/uf2-samdx1:inc/uf2.h

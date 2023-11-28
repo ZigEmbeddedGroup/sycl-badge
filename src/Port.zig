@@ -61,23 +61,25 @@ group: Group,
 pin: u5,
 
 pub const Group = enum { A, B };
+pub const Direction = enum { in, out };
+pub const Level = enum { low, high };
 
-pub inline fn setDir(port: Port, dir: enum { in, out }) void {
+pub inline fn setDir(port: Port, dir: Direction) void {
     switch (dir) {
         .in => port.groupPtr().DIRCLR.write(.{ .DIRCLR = @as(u32, 1) << port.pin }),
         .out => port.groupPtr().DIRSET.write(.{ .DIRSET = @as(u32, 1) << port.pin }),
     }
 }
 
-pub inline fn write(port: Port, value: bool) void {
-    switch (value) {
-        false => port.groupPtr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
-        true => port.groupPtr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
+pub inline fn write(port: Port, level: Level) void {
+    switch (level) {
+        .low => port.groupPtr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
+        .high => port.groupPtr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
     }
 }
 
-pub inline fn read(port: Port) bool {
-    return port.groupPtr().IN.read() & @as(u32, 1) << port.pin != 0;
+pub inline fn read(port: Port) Level {
+    return @enumFromInt(port.groupPtr().IN.read().IN >> port.pin & 1);
 }
 
 pub const Mux = enum(u4) { A, B, C, D, E, F, G, H, I, J, K, L, M, N };

@@ -1,11 +1,13 @@
 const audio = @import("audio.zig");
 const builtin = @import("builtin");
+const cart = @import("cart.zig");
 const GCLK = @import("chip.zig").GCLK;
 const io = microzig.chip.peripherals;
 const io_types = microzig.chip.types.peripherals;
-const microzig = @import("microzig");
 const lcd = @import("lcd.zig");
+const microzig = @import("microzig");
 const NVMCTRL = @import("chip.zig").NVMCTRL;
+const options = @import("options");
 const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
@@ -23,37 +25,150 @@ pub const std_options = struct {
 pub const microzig_options = struct {
     pub const interrupts = struct {
         const interrupt_log = std.log.scoped(.interrupt);
+        const Context = extern struct {
+            R0: u32,
+            R1: u32,
+            R2: u32,
+            R3: u32,
+            R12: u32,
+            LR: u32,
+            ReturnAddress: u32,
+            xPSR: u32,
+        };
 
         pub const NonMaskableInt = unhandled("NonMaskableInt");
-        pub fn HardFault() void {
-            interrupt_log.info("[HardFault] HFSR = 0x{x}", .{io.SystemControl.HFSR.raw});
-            microzig.hang();
+        pub const HardFault = withContext(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.HFSR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler);
+        pub const MemoryManagement = withContext(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    io.SystemControl.MMFAR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler);
+        pub const BusFault = withContext(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    io.SystemControl.BFAR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler);
+        pub const UsageFault = withContext(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler);
+        pub fn SVCall() callconv(.Naked) void {
+            asm volatile (
+                \\ mvns r0, lr, lsl #31 - 2
+                \\ bcc 1f
+                \\ ite mi
+                \\ movmi r1, sp
+                \\ mrspl r1, psp
+                \\ ldr r2, [r1, #6 * 4]
+                \\ subs r2, #2
+                \\ ldrb r3, [r2, #1 * 1]
+                \\ cmp r3, #0xDF
+                \\ bne 1f
+                \\ ldrb r3, [r2, #0 * 1]
+                \\ cmp r3, #12
+                \\ bhi 1f
+                \\ tbb [pc, r3]
+                \\0:
+                \\ .byte (0f - 0b) / 2
+                \\ .byte (9f - 0b) / 2
+                \\ .byte (9f - 0b) / 2
+                \\ .byte (2f - 0b) / 2
+                \\ .byte (3f - 0b) / 2
+                \\ .byte (4f - 0b) / 2
+                \\ .byte (5f - 0b) / 2
+                \\ .byte (6f - 0b) / 2
+                \\ .byte (7f - 0b) / 2
+                \\ .byte (8f - 0b) / 2
+                \\ .byte (8f - 0b) / 2
+                \\ .byte (10f - 0b) / 2
+                \\1:
+                \\ .byte (11f - 0b) / 2
+                \\ .byte 0xDE
+                \\ .align 1
+                \\0:
+                \\ ldm r1, {r0-r3}
+                \\ b %[blit:P]
+                \\2:
+                \\ ldm r1, {r0-r3}
+                \\ b %[oval:P]
+                \\3:
+                \\ ldm r1, {r0-r3}
+                \\ b %[rect:P]
+                \\4:
+                \\ ldm r1, {r0-r3}
+                \\ b %[text:P]
+                \\5:
+                \\ ldm r1, {r0-r2}
+                \\ b %[vline:P]
+                \\6:
+                \\ ldm r1, {r0-r2}
+                \\ b %[hline:P]
+                \\7:
+                \\ ldm r1, {r0-r3}
+                \\ b %[tone:P]
+                \\8:
+                \\ movs r0, #0
+                \\ str r0, [r1, #0 * 4]
+                \\9:
+                \\ bx lr
+                \\10:
+                \\ ldm r1, {r0-r1}
+                \\ b %[trace:P]
+                \\11:
+                \\ lsrs r0, #31
+                \\ msr control, r0
+                \\ it eq
+                \\ popeq {r3, r5-r11, pc}
+                \\ subs r0, #1 - 0xFFFFFFFD
+                \\ push {r4-r11, lr}
+                \\ movs r4, #0
+                \\ movs r5, #0
+                \\ movs r6, #0
+                \\ movs r7, #0
+                \\ mov r8, r4
+                \\ mov r9, r5
+                \\ mov r10, r6
+                \\ mov r11, r7
+                \\ bx r0
+                :
+                : [blit] "X" (&cart.blit),
+                  [oval] "X" (&cart.oval),
+                  [rect] "X" (&cart.rect),
+                  [text] "X" (&cart.text),
+                  [vline] "X" (&cart.vline),
+                  [hline] "X" (&cart.hline),
+                  [tone] "X" (&cart.tone),
+                  [trace] "X" (&cart.trace),
+            );
         }
-        pub fn MemoryManagement() void {
-            interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}", .{
-                io.SystemControl.CFSR.raw,
-                io.SystemControl.MMFAR.raw,
-            });
-            microzig.hang();
-        }
-        pub fn BusFault() void {
-            interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}", .{
-                io.SystemControl.CFSR.raw,
-                io.SystemControl.BFAR.raw,
-            });
-            microzig.hang();
-        }
-        pub fn UsageFault() void {
-            interrupt_log.info("[UsageFault] CFSR = 0x{x}", .{io.SystemControl.CFSR.raw});
-            microzig.hang();
-        }
-        pub const SVCall = unhandled("SVCall");
         pub const DebugMonitor = unhandled("DebugMonitor");
         pub const PendSV = unhandled("PendSV");
         pub const SysTick = unhandled("SysTick");
-        pub fn DMAC_DMAC_1() void {
-            audio.mix();
-        }
+        pub const DMAC_DMAC_1 = audio.mix;
+
         fn unhandled(comptime name: []const u8) fn () callconv(.C) void {
             return struct {
                 fn handler() callconv(.C) void {
@@ -61,6 +176,21 @@ pub const microzig_options = struct {
                     microzig.hang();
                 }
             }.handler;
+        }
+        fn withContext(comptime handler: fn (*Context) void) fn () callconv(.Naked) void {
+            return struct {
+                fn interrupt() callconv(.Naked) void {
+                    asm volatile (
+                        \\ tst lr, #1 << 2
+                        \\ ite eq
+                        \\ moveq r0, sp
+                        \\ mrsne r0, psp
+                        \\ b %[handler:P]
+                        :
+                        : [handler] "X" (&handler),
+                    );
+                }
+            }.interrupt;
         }
     };
 };
@@ -115,6 +245,17 @@ pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: any
 }
 
 pub fn main() !void {
+    io.SystemControl.CCR.modify(.{
+        .NONBASETHRDENA = 0,
+        .USERSETMPEND = 0,
+        .reserved3 = 0,
+        .UNALIGN_TRP = .{ .value = .VALUE_0 }, // TODO
+        .DIV_0_TRP = 1,
+        .reserved8 = 0,
+        .BFHFNMIGN = 0,
+        .STKALIGN = .{ .value = .VALUE_1 },
+        .padding = 0,
+    });
     io.SystemControl.SHCSR.modify(.{
         .MEMFAULTENA = 1,
         .BUSFAULTENA = 1,
@@ -122,8 +263,8 @@ pub fn main() !void {
     });
     io.SystemControl.CPACR.write(.{
         .reserved20 = 0,
-        .CP10 = .{ .value = .PRIV },
-        .CP11 = .{ .value = .PRIV },
+        .CP10 = .{ .value = .FULL },
+        .CP11 = .{ .value = .FULL },
         .padding = 0,
     });
 
@@ -144,7 +285,7 @@ pub fn main() !void {
     // ID detection
     const id_port = Port.D13;
     id_port.setDir(.out);
-    id_port.write(true);
+    id_port.write(.high);
     id_port.configPtr().write(.{
         .PMUXEN = 0,
         .INEN = 1,
@@ -159,23 +300,77 @@ pub fn main() !void {
     lcd.init(.bpp24);
     audio.init();
 
-    // button testing
-    Port.BUTTON_OUT.setDir(.in);
-    Port.BUTTON_OUT.configPtr().write(.{
-        .PMUXEN = 0,
-        .INEN = 1,
-        .PULLEN = 0,
-        .reserved6 = 0,
-        .DRVSTR = 0,
+    io.MPU.RBAR.write(.{
+        .REGION = 0,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.FLASH.ADDR) >> 5,
+    });
+    io.MPU.RASR.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(utils.FLASH.SIZE) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(utils.FLASH.SIZE) - 1) >> 1),
+        .SRD = if (options.have_cart) 0b00000111 else 0b00000000,
+        .B = 0,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b000,
+        .reserved24 = 0,
+        .AP = 0b010,
+        .reserved28 = 0,
+        .XN = 0,
         .padding = 0,
     });
-    Port.BUTTON_CLK.setDir(.out);
-    Port.BUTTON_CLK.write(true);
-    Port.BUTTON_LATCH.setDir(.out);
-    Port.BUTTON_LATCH.write(false);
-    //io.MCLK.APBAMASK.modify(.{ .EIC_ = 1 });
+    io.MPU.RBAR_A1.write(.{
+        .REGION = 1,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR) >> 5,
+    });
+    io.MPU.RASR_A1.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) >> 1),
+        .SRD = if (options.have_cart) 0b11110000 else 0b00000000,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    io.MPU.RBAR_A2.write(.{
+        .REGION = 2,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR[@divExact(utils.HSRAM.SIZE, 3) * 2 ..]) >> 5,
+    });
+    io.MPU.RASR_A2.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) >> 1),
+        .SRD = 0b11001111,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    io.MPU.CTRL.write(.{
+        .ENABLE = 1,
+        .HFNMIENA = 0,
+        .PRIVDEFENA = 1,
+        .padding = 0,
+    });
+
+    cart.init();
 
     var was_ready = false;
+    var cart_running = false;
     var color: enum { red, green, blue } = .red;
     while (true) {
         usb.tick();
@@ -190,14 +385,16 @@ pub fn main() !void {
             }];
             if (!was_ready) {
                 std.log.info("Ready!", .{});
+                cart.start();
                 was_ready = true;
+                cart_running = true;
             }
             if (data.len > 0) for (data) |c| switch (c) {
                 else => out.writeByte(c) catch break :input,
                 'A' - '@' => {
                     timer.delay(std.time.us_per_s);
                     const tempo = 0.78;
-                    audio.play(&.{
+                    audio.playSong(&.{
                         &.{
                             .{ .duration = tempo * 0.75, .frequency = audio.Note.F5 },
                             .{ .duration = tempo * 0.25, .frequency = audio.Note.Db5 },
@@ -493,9 +690,12 @@ pub fn main() !void {
                     }
                     timer_log.info("done!", .{});
                 },
+                'U' - '@' => cart_running = !cart_running,
                 0x7f => out.writeAll("\x1B[D\x1B[K") catch break :input,
             };
         }
+
+        if (cart_running) cart.tick();
     }
 }
 
@@ -655,6 +855,8 @@ pub const usb = struct {
 
     /// One-time initialization
     fn init() void {
+        @setCold(true);
+
         Port.@"D-".setMux(.H);
         Port.@"D+".setMux(.H);
         io.MCLK.AHBMASK.modify(.{ .USB_ = 1 });
@@ -663,6 +865,8 @@ pub const usb = struct {
 
     /// Reinitialize into the specified mode
     fn reinitMode(mode: io_types.USB.USB_CTRLA__MODE) void {
+        @setCold(true);
+
         // Tear down clocks
         io.GCLK.GENCTRL[GCLK.GEN.@"120MHz".ID].write(.{
             .SRC = .{ .value = .OSCULP32K },

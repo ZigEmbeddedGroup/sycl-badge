@@ -10,8 +10,8 @@
 
     .dependencies = .{
         .microzig = .{
-            .url = "https://github.com/ZigEmbeddedGroup/microzig/archive/c3baa4a2777634a2b5cd366b87b453e9b72b4b26.tar.gz",
-            .hash = "122081c44c02c5d6534cad430371a0301169432b04240ca93335e16e16532dd61f06",
+            .url = "https://github.com/ZigEmbeddedGroup/microzig/archive/57e4379062e396b354d70d5b924d5da2e8905bd4.tar.gz",
+            .hash = "1220b8b04be6b97020eb19fca51b3cb44c33f5a619c3e36fc48faab8b15261dfff2a",
         },
         .atsam = .{
             .url = "https://github.com/ZigEmbeddedGroup/microchip-atsam/archive/93ddffbcbe7a0b849cca610ee933210280d731b4.tar.gz",

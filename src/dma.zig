@@ -1,6 +1,8 @@
 pub const enable = true;
 
 pub fn initLcd(bpp: lcd.Bpp) void {
+    @setCold(true);
+
     init();
     io.DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.write(.{
         .SWRST = 0,
@@ -80,6 +82,8 @@ pub fn stopLcd() void {
 }
 
 pub fn initAudio() void {
+    @setCold(true);
+
     init();
     io.DMAC.CHANNEL[CHANNEL.AUDIO].CHCTRLA.write(.{
         .SWRST = 0,
@@ -185,6 +189,8 @@ pub fn waitAudio(i: usize) void {
 }
 
 fn init() void {
+    @setCold(true);
+
     if (initialized) return;
     io.MCLK.AHBMASK.modify(.{ .DMAC_ = 1 });
     io.DMAC.CTRL.write(.{

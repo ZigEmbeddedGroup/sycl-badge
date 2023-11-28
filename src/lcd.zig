@@ -7,12 +7,12 @@ pub const FrameBuffer = union {
 };
 pub const Bpp = std.meta.FieldEnum(FrameBuffer);
 pub const Color12 = extern struct {
-    r0_g0: packed struct(u8) { r0: u4, g0: u4 },
-    b0_r1: packed struct(u8) { b0: u4, r1: u4 },
-    g1_b1: packed struct(u8) { g1: u4, b1: u4 },
+    b0_g0: packed struct(u8) { b0: u4, g0: u4 },
+    r0_b1: packed struct(u8) { r0: u4, b1: u4 },
+    g1_r1: packed struct(u8) { g1: u4, r1: u4 },
 };
-pub const Color16 = packed struct(u16) { r: u5, g: u6, b: u5 };
-pub const Color24 = extern struct { r: u8, g: u8, b: u8 };
+pub const Color16 = packed struct(u16) { b: u5, g: u6, r: u5 };
+pub const Color24 = extern struct { b: u8, g: u8, r: u8 };
 pub const Rect = struct { x: u8, y: u8, width: u8, height: u8 };
 
 pub const width = 160;
@@ -31,6 +31,8 @@ pub const blue24: Color24 = .{ .r = 0x00, .g = 0x00, .b = 0xff };
 pub const white24: Color24 = .{ .r = 0xff, .g = 0xff, .b = 0xff };
 
 pub fn init(bpp: Bpp) void {
+    @setCold(true);
+
     Port.TFT_RST.setDir(.out);
     Port.TFT_LITE.setDir(.out);
     Port.TFT_DC.setDir(.out);
@@ -38,15 +40,15 @@ pub fn init(bpp: Bpp) void {
     Port.TFT_SCK.setDir(.out);
     Port.TFT_MOSI.setDir(.out);
 
-    Port.TFT_CS.write(true);
-    Port.TFT_DC.write(true);
-    Port.TFT_SCK.write(true);
-    Port.TFT_MOSI.write(true);
+    Port.TFT_CS.write(.high);
+    Port.TFT_DC.write(.high);
+    Port.TFT_SCK.write(.high);
+    Port.TFT_MOSI.write(.high);
 
-    Port.TFT_LITE.write(true);
-    Port.TFT_RST.write(false);
+    Port.TFT_LITE.write(.high);
+    Port.TFT_RST.write(.low);
     timer.delay(20 * std.time.ms_per_s);
-    Port.TFT_RST.write(true);
+    Port.TFT_RST.write(.high);
     timer.delay(20 * std.time.ms_per_s);
 
     io.MCLK.APBDMASK.modify(.{ .SERCOM4_ = 1 });
@@ -109,11 +111,11 @@ pub fn init(bpp: Bpp) void {
     }))}, 1);
     sendCmd(ST7735.MADCTL, &.{@as(u8, @bitCast(ST7735.MADCTL_PARAM0{
         .MH = .LEFT_TO_RIGHT,
-        .RGB = .RGB,
+        .RGB = .BGR,
         .ML = .TOP_TO_BOTTOM,
         .MV = false,
         .MX = false,
-        .MY = false,
+        .MY = true,
     }))}, 1);
     sendCmd(ST7735.GMCTRP1, &.{
         0x02, 0x1c, 0x07, 0x12,
@@ -126,7 +128,7 @@ pub fn init(bpp: Bpp) void {
     sendCmd(ST7735.RAMWR, &.{}, 1);
 
     if (dma.enable) {
-        Port.TFT_CS.write(false);
+        Port.TFT_CS.write(.low);
         timer.delay(1);
         dma.initLcd(bpp);
     }
@@ -192,27 +194,27 @@ pub fn blit24() void {
 
 fn sendCmd(cmd: u8, params: []const u8, delay_us: u32) void {
     timer.delay(1);
-    Port.TFT_CS.write(false);
-    Port.TFT_DC.write(false);
+    Port.TFT_CS.write(.low);
+    Port.TFT_DC.write(.low);
     timer.delay(1);
     io.SERCOM4.SPIM.DATA.write(.{ .DATA = cmd });
     while (io.SERCOM4.SPIM.INTFLAG.read().TXC == 0) {}
     timer.delay(1);
-    Port.TFT_DC.write(true);
+    Port.TFT_DC.write(.high);
     for (params) |param| {
         while (io.SERCOM4.SPIM.INTFLAG.read().DRE == 0) {}
         io.SERCOM4.SPIM.DATA.write(.{ .DATA = param });
     }
     while (io.SERCOM4.SPIM.INTFLAG.read().TXC == 0) {}
     timer.delay(1);
-    Port.TFT_CS.write(true);
+    Port.TFT_CS.write(.high);
     timer.delay(delay_us);
 }
 
 fn start() void {
     if (dma.enable) {
         sendCmd(ST7735.RAMWR, &.{}, 1);
-        Port.TFT_CS.write(false);
+        Port.TFT_CS.write(.low);
         timer.delay(1);
         dma.startLcd();
     }
@@ -222,7 +224,7 @@ fn stop() void {
     if (dma.enable) {
         dma.stopLcd();
         timer.delay(1);
-        Port.TFT_CS.write(true);
+        Port.TFT_CS.write(.high);
         timer.delay(1);
     }
 }

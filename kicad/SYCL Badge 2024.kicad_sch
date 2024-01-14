@@ -16947,7 +16947,7 @@
     )
     (pin "1" (uuid 4b0e20e4-02eb-4473-b793-392d66da47a1))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR050") (unit 1)
         )
@@ -16972,7 +16972,7 @@
     )
     (pin "1" (uuid 003df83b-127e-48d2-964d-6d321f693a6d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR036") (unit 1)
         )
@@ -16997,7 +16997,7 @@
     )
     (pin "1" (uuid 9c7c57d0-a9c1-4993-aa3f-2f91818ec790))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR019") (unit 1)
         )
@@ -17022,7 +17022,7 @@
     )
     (pin "1" (uuid fdfcac2e-2719-44b9-986a-4256a9d7fb83))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR06") (unit 1)
         )
@@ -17046,7 +17046,7 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "H4") (unit 1)
         )
@@ -17071,7 +17071,7 @@
     )
     (pin "1" (uuid 33e23ae4-f498-4b39-9ce1-d2eafbd4eb2b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR033") (unit 1)
         )
@@ -17096,7 +17096,7 @@
     )
     (pin "1" (uuid d44ca0bc-d412-4d4b-a3ed-7430a5dab38d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V015") (unit 1)
         )
@@ -17121,7 +17121,7 @@
     )
     (pin "1" (uuid c2545907-0a11-4f7d-92b9-e43d281bd49b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR024") (unit 1)
         )
@@ -17212,7 +17212,7 @@
     (pin "8" (uuid 71b9568b-c7ec-4d4c-b092-02626acdac8a))
     (pin "9" (uuid 24cfe2f1-a3e2-4cab-9546-e8f5790f9683))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U6") (unit 1)
         )
@@ -17241,7 +17241,7 @@
     (pin "1" (uuid d99688cd-46fb-435b-89cd-4a3ce21b6148))
     (pin "2" (uuid 2cfed083-27dc-4b2b-8592-ac369052f70f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R6") (unit 1)
         )
@@ -17269,7 +17269,7 @@
     (pin "3" (uuid 69fef8c7-b1a8-4d9f-817f-f51bcd0cafbd))
     (pin "4" (uuid 4cf038fd-3737-4156-b1fc-eab937c9e376))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D4") (unit 1)
         )
@@ -17298,7 +17298,7 @@
     (pin "1" (uuid aa790b4a-82e4-4d99-8645-84271c820771))
     (pin "2" (uuid 22dc37c3-1079-4ee6-b2ec-728a2a444ff0))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C3") (unit 1)
         )
@@ -17323,7 +17323,7 @@
     )
     (pin "1" (uuid 3f3ba1e6-e9e5-4051-a1db-ca1d5c9fe35d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR034") (unit 1)
         )
@@ -17352,7 +17352,7 @@
     (pin "1" (uuid 4b03e84a-02f1-48fe-ad2f-4b33e93049a7))
     (pin "2" (uuid 828a7735-d230-4282-ac66-62446a40c869))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C15") (unit 1)
         )
@@ -17377,7 +17377,7 @@
     )
     (pin "1" (uuid 94b5d408-8e23-42ba-aa5a-d23e429604e1))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR039") (unit 1)
         )
@@ -17410,7 +17410,7 @@
     (pin "5" (uuid 7ee55383-01a9-43b0-9250-dfd87b6f8e5b))
     (pin "6" (uuid e14ade5e-35a3-427b-bd62-7d1c9ad81879))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U3") (unit 1)
         )
@@ -17439,7 +17439,7 @@
     (pin "1" (uuid f5cc5fb6-f2d3-4cfc-816e-ea5d0618c15b))
     (pin "2" (uuid 512ca5be-94ed-4a20-8185-695284217195))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R12") (unit 1)
         )
@@ -17464,7 +17464,7 @@
     )
     (pin "1" (uuid fefb7e2c-c36a-4d7d-b7f2-d52afd366a4d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+05") (unit 1)
         )
@@ -17493,7 +17493,7 @@
     (pin "1" (uuid 07c39344-3151-41f4-8bff-d212e92fea78))
     (pin "2" (uuid 3d6c55e9-a247-48ad-9a0c-e816a053d3bb))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R17") (unit 1)
         )
@@ -17522,7 +17522,7 @@
     (pin "1" (uuid e77a3ce2-b24c-4ec1-9114-cc6270c8e1fd))
     (pin "2" (uuid f1c4f73b-f818-4980-85ec-442d7ea57ea5))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R9") (unit 1)
         )
@@ -17547,7 +17547,7 @@
     )
     (pin "1" (uuid ec7a99c9-631c-4319-bf20-1aeef95a9cf8))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+07") (unit 1)
         )
@@ -17576,7 +17576,7 @@
     (pin "1" (uuid c8de5403-ce62-4f45-be08-9448107d25f6))
     (pin "2" (uuid 300900e2-b85d-4b0d-ba4f-a1e36b6d9d65))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R25") (unit 1)
         )
@@ -17605,7 +17605,7 @@
     (pin "1" (uuid 30407eab-7c85-43ac-9aa5-065635dbdc13))
     (pin "2" (uuid acd34701-8f10-49d9-9efd-40a6faad1353))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R10") (unit 1)
         )
@@ -17637,7 +17637,7 @@
     (pin "4" (uuid a4823478-40e1-40dc-87cf-5a9729b8ebad))
     (pin "5" (uuid 7de863a1-5eed-4f15-9c68-eda4567b96ed))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U2") (unit 1)
         )
@@ -17662,7 +17662,7 @@
     )
     (pin "1" (uuid bad67d02-5cf4-45b2-872f-009bd8c0e368))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR028") (unit 1)
         )
@@ -17691,7 +17691,7 @@
     (pin "1" (uuid 1fc14fb9-f401-4154-a0e1-4c9dc98b135a))
     (pin "2" (uuid 02d56075-6a08-496b-a097-5da6b9c4a7d0))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C2") (unit 1)
         )
@@ -17720,7 +17720,7 @@
     (pin "1" (uuid 41aab891-d4f6-4a26-9c1b-28332f0fe20d))
     (pin "2" (uuid 21541827-4dc2-4a6f-9ba3-5f8c2acb1934))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C10") (unit 1)
         )
@@ -17749,7 +17749,7 @@
     (pin "1" (uuid 528c4b53-4f28-4f60-9f3a-e91f230a7671))
     (pin "2" (uuid 2b55286e-5dfc-4f6e-a395-d94ed1480729))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R19") (unit 1)
         )
@@ -17774,7 +17774,7 @@
     )
     (pin "1" (uuid d3ae10b7-e94e-419b-8824-c45c113e2ec6))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR01") (unit 1)
         )
@@ -17803,7 +17803,7 @@
     (pin "1" (uuid 6c4ac6ee-d805-406a-af56-dee5fbdf78f3))
     (pin "2" (uuid c4871034-b267-48cf-a962-d5e3e87fd085))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R8") (unit 1)
         )
@@ -17835,7 +17835,7 @@
     (pin "4" (uuid 6900f22e-ce01-45f7-a83b-64aba6df4a05))
     (pin "5" (uuid dc75f679-4ec4-4407-acdc-7de311fde82b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U5") (unit 1)
         )
@@ -17874,7 +17874,7 @@
     (pin "8" (uuid 11e49de2-28af-42e5-8326-bfa632f9075f))
     (pin "9" (uuid 70bd1180-d3ff-4554-83b5-ee4d708f3ea3))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "LCD1") (unit 1)
         )
@@ -17899,7 +17899,7 @@
     )
     (pin "1" (uuid ba72b917-1e91-417a-adfe-445a3e063b8d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR012") (unit 1)
         )
@@ -17928,7 +17928,7 @@
     (pin "1" (uuid 401baf6d-a913-49dd-981b-98328c835986))
     (pin "2" (uuid 917b1af2-6051-4fb1-b941-e2b41525d9a9))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D7") (unit 1)
         )
@@ -17957,7 +17957,7 @@
     (pin "1" (uuid 83f2be2e-fb06-49b0-ab87-07b499ee92cd))
     (pin "2" (uuid e404a11c-eebe-49d2-84a6-abe856e27b4c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C9") (unit 1)
         )
@@ -17986,7 +17986,7 @@
     (pin "1" (uuid de5fa852-6bd7-41d6-90e8-884dbd1d7ba7))
     (pin "2" (uuid 5d0c8ae0-33ce-429a-9a50-3e15085e283f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "J1") (unit 1)
         )
@@ -18011,7 +18011,7 @@
     )
     (pin "1" (uuid 610dd2c6-a3d3-4a3f-b8e6-4b797f7b87d4))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V013") (unit 1)
         )
@@ -18040,7 +18040,7 @@
     (pin "1" (uuid 0a675c64-ef18-46be-af65-9adc947d9c3f))
     (pin "2" (uuid aae5bc34-49d2-478c-9834-130e861a16c8))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R4") (unit 1)
         )
@@ -18065,7 +18065,7 @@
     )
     (pin "1" (uuid 305d4d9b-7453-42ff-9c79-313c05e2b3e9))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR015") (unit 1)
         )
@@ -18094,7 +18094,7 @@
     (pin "1" (uuid f80cc73e-523a-40c2-af55-6b9803736a7d))
     (pin "2" (uuid dc8988a5-e56a-4b8a-ad57-c16445032be7))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R3") (unit 1)
         )
@@ -18119,7 +18119,7 @@
     )
     (pin "1" (uuid 6c5781f7-d4a3-4168-9991-bcddd43097f4))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V01") (unit 1)
         )
@@ -18148,7 +18148,7 @@
     (pin "1" (uuid d477ed59-d23b-4aac-acbe-cb1aa9765003))
     (pin "2" (uuid 39215363-bacd-4a71-b64f-80382777dec1))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R16") (unit 1)
         )
@@ -18173,7 +18173,7 @@
     )
     (pin "1" (uuid 29660099-124f-4ddd-ae7f-940543cd3f0a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR040") (unit 1)
         )
@@ -18198,7 +18198,7 @@
     )
     (pin "1" (uuid ddf9b712-9883-4a5e-835a-4dffc2532b96))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V012") (unit 1)
         )
@@ -18226,7 +18226,7 @@
     (pin "3" (uuid 45a98017-0da5-4086-a37f-64e147aad5a7))
     (pin "4" (uuid cfe6cf8e-3e8d-4372-bb0e-a918514e9f53))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D5") (unit 1)
         )
@@ -18251,7 +18251,7 @@
     )
     (pin "1" (uuid 2b88a45a-04aa-43c1-8954-5c12d2baa782))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V010") (unit 1)
         )
@@ -18278,7 +18278,7 @@
     (pin "2" (uuid 512ff5b0-52b8-43d8-b765-8e1e42aec0fc))
     (pin "3" (uuid 03067a7e-3a1e-4996-a383-e4f4c622ef7a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "Q2") (unit 1)
         )
@@ -18303,7 +18303,7 @@
     )
     (pin "1" (uuid 590b853a-e24f-46fd-8023-40d8081336c4))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V05") (unit 1)
         )
@@ -18332,7 +18332,7 @@
     (pin "1" (uuid e54a5dbe-39cc-4f28-87d5-9487138a46c5))
     (pin "2" (uuid 3802c49e-e90d-4925-9927-0b4aa93eedac))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R14") (unit 1)
         )
@@ -18356,7 +18356,7 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "H1") (unit 1)
         )
@@ -18381,7 +18381,7 @@
     )
     (pin "1" (uuid 7a6336ba-0886-4c44-b3f1-82a389b8f20c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR046") (unit 1)
         )
@@ -18406,7 +18406,7 @@
     )
     (pin "1" (uuid d36bbeef-9da2-446c-a80f-bf1e684f1741))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+01") (unit 1)
         )
@@ -18431,7 +18431,7 @@
     )
     (pin "1" (uuid 795b114c-5a08-43c4-98dc-2fa5a6c43d99))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V014") (unit 1)
         )
@@ -18456,7 +18456,7 @@
     )
     (pin "1" (uuid 72ec6178-99f8-4dd6-9b0b-740d2ac61957))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR017") (unit 1)
         )
@@ -18481,7 +18481,7 @@
     )
     (pin "1" (uuid c131b524-cb54-425b-9bb7-322863912b26))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+06") (unit 1)
         )
@@ -18506,7 +18506,7 @@
     )
     (pin "1" (uuid 3b3cc254-d50c-4d7f-8c1b-5355a5efa7bc))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V04") (unit 1)
         )
@@ -18531,7 +18531,7 @@
     )
     (pin "1" (uuid 303a643f-d66e-455c-8866-8b22ad431e13))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR043") (unit 1)
         )
@@ -18555,7 +18555,7 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#U$1") (unit 1)
         )
@@ -18580,7 +18580,7 @@
     )
     (pin "1" (uuid ab1550d6-cd0d-49b8-bcd5-1d89d1197461))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR010") (unit 1)
         )
@@ -18605,7 +18605,7 @@
     )
     (pin "1" (uuid 8d0447f0-ddda-4dcc-abd3-40453a2d4bed))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V011") (unit 1)
         )
@@ -18630,7 +18630,7 @@
     )
     (pin "1" (uuid 330bf7a2-168f-4f19-9be8-4e499d6b7ae6))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR016") (unit 1)
         )
@@ -18659,7 +18659,7 @@
     (pin "1" (uuid f2079a04-13fc-46d9-9223-b1455c3f6dad))
     (pin "2" (uuid 4238cc66-82eb-4fd5-ad1b-30c156150504))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R22") (unit 1)
         )
@@ -18684,7 +18684,7 @@
     )
     (pin "1" (uuid 1346b2d7-fece-42ba-8b99-278cfda80bec))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR045") (unit 1)
         )
@@ -18710,7 +18710,7 @@
     (pin "1" (uuid a17b044b-0cc7-4a78-beec-44dcb32a3ace))
     (pin "2" (uuid 3a6fa1da-7d33-42ad-9c99-2f5c170ae31a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R13") (unit 1)
         )
@@ -18739,7 +18739,7 @@
     (pin "1" (uuid fe5fb291-f69e-490f-8e1f-60c15de4d838))
     (pin "2" (uuid d5ebe7f7-7efc-4582-85b7-2e70e51d24ba))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R24") (unit 1)
         )
@@ -18764,7 +18764,7 @@
     )
     (pin "1" (uuid ee0c8f6a-890f-457a-a1fd-0a0e78db9aec))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR030") (unit 1)
         )
@@ -18789,7 +18789,7 @@
     )
     (pin "1" (uuid 51c33b3f-18b1-449f-883a-b384d3516f1c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR018") (unit 1)
         )
@@ -18820,7 +18820,7 @@
     (pin "B" (uuid cecb5049-9925-46fa-bf95-96966292ed83))
     (pin "B'" (uuid 67764931-b83c-4b3f-88a5-9bf447f01dcd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "SELECT1") (unit 1)
         )
@@ -18848,7 +18848,7 @@
     (pin "3" (uuid 0d71dbda-9267-4194-a8a8-bbf2e1f8362c))
     (pin "4" (uuid 1ff25279-fe78-4f56-8193-566871bd63af))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D1") (unit 1)
         )
@@ -18878,7 +18878,7 @@
     (pin "2" (uuid dc6d5cc8-2081-46ed-bd80-daa6e55dc272))
     (pin "3" (uuid 5fd2c277-a73a-49b8-8767-a1dd4577c936))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "SW1") (unit 1)
         )
@@ -18903,7 +18903,7 @@
     )
     (pin "1" (uuid afe8d8d2-b96a-4942-9046-98f843ee2fe0))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR03") (unit 1)
         )
@@ -18933,7 +18933,7 @@
     (pin "2" (uuid ec29fbce-1daf-40ea-a556-4ccceaf8ec61))
     (pin "3" (uuid 7bc42f07-6949-43fc-9778-7226eee9f332))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "Q3") (unit 1)
         )
@@ -18962,7 +18962,7 @@
     (pin "+" (uuid eac484c4-e652-4289-995d-dc7f649cb276))
     (pin "-" (uuid d7551930-7ef0-4081-9909-42e913019e3f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "SP1") (unit 1)
         )
@@ -18987,7 +18987,7 @@
     )
     (pin "1" (uuid 520d74e5-fdc5-4797-84cb-35410334b2ab))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR08") (unit 1)
         )
@@ -19012,7 +19012,7 @@
     )
     (pin "1" (uuid 2aae5597-0e47-42d4-b51d-27fe7b8769a0))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR014") (unit 1)
         )
@@ -19037,7 +19037,7 @@
     )
     (pin "1" (uuid 8881e431-1436-44e7-bd45-188706c095c3))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V08") (unit 1)
         )
@@ -19066,7 +19066,7 @@
     (pin "1" (uuid e219b825-19da-49fa-aa4e-d6ff2bdbc6cb))
     (pin "2" (uuid 44888b10-87e2-459a-a007-106c74a35c55))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "FB1") (unit 1)
         )
@@ -19090,7 +19090,7 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "H2") (unit 1)
         )
@@ -19115,7 +19115,7 @@
     )
     (pin "1" (uuid f95f8894-f139-44f5-95ac-3a57701ff419))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR049") (unit 1)
         )
@@ -19144,7 +19144,7 @@
     (pin "1" (uuid ad76926c-e856-4a25-9622-da8a286d0b85))
     (pin "2" (uuid bacb943c-cb86-486f-a4e4-3599e7b5ed7a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D8") (unit 1)
         )
@@ -19173,7 +19173,7 @@
     (pin "1" (uuid 951963ae-da4a-40aa-9eff-ebff706ce2ac))
     (pin "2" (uuid bb35b35a-88b0-45ab-afe5-aafe9a5f89d9))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C6") (unit 1)
         )
@@ -19198,7 +19198,7 @@
     )
     (pin "1" (uuid af360da9-15f7-4b5c-b56c-b812e70f0c84))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR038") (unit 1)
         )
@@ -19227,7 +19227,7 @@
     (pin "1" (uuid 08964c61-243c-4714-8bc2-237837ee9cbd))
     (pin "2" (uuid 63954e4e-923c-4798-b7ab-98f2c2e14075))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C1") (unit 1)
         )
@@ -19256,7 +19256,7 @@
     (pin "1" (uuid c017ec7a-bd10-40e9-ba66-3e2b04603c97))
     (pin "2" (uuid 8fd6e550-bba4-4702-8b62-b81e87ecce2c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R5") (unit 1)
         )
@@ -19285,7 +19285,7 @@
     (pin "1" (uuid 283e0916-afb1-4a24-9a77-c453ba1df61d))
     (pin "2" (uuid c910bf7a-8432-439d-8fbc-493d78e383b9))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C18") (unit 1)
         )
@@ -19310,7 +19310,7 @@
     )
     (pin "1" (uuid ea61aa4b-8c0e-40da-8099-77f4be22cc25))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR032") (unit 1)
         )
@@ -19339,7 +19339,7 @@
     (pin "1" (uuid c69afe31-a7ab-42f2-9af0-83bedcd288d0))
     (pin "2" (uuid 06496d26-ad40-401b-b631-3fee37e9dc1b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C8") (unit 1)
         )
@@ -19368,7 +19368,7 @@
     (pin "1" (uuid 8b05dc40-6f04-4800-9a26-ff0660ed57ae))
     (pin "2" (uuid c3900080-a29e-44ff-84f0-fb4a7c2fc291))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D6") (unit 1)
         )
@@ -19402,7 +19402,7 @@
     (pin "8" (uuid c840ea78-fc4b-4d77-8243-d21f5fed4d63))
     (pin "9" (uuid 2b3faf1e-7fef-445e-b91f-33b01d29da77))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "J2") (unit 1)
         )
@@ -19427,7 +19427,7 @@
     )
     (pin "1" (uuid b98f4412-209d-410d-912d-9534854f3e10))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR031") (unit 1)
         )
@@ -19452,7 +19452,7 @@
     )
     (pin "1" (uuid fa8cfa98-748d-4c6d-bbf2-fc72918508dd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR052") (unit 1)
         )
@@ -19481,7 +19481,7 @@
     (pin "1" (uuid 5306b3d1-180c-49f8-ae30-88493c73f681))
     (pin "2" (uuid 8b1ef166-683c-420b-8cad-e323e0496e28))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C7") (unit 1)
         )
@@ -19506,7 +19506,7 @@
     )
     (pin "1" (uuid 14a767da-1559-4484-b86c-e93c69e17cb4))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR07") (unit 1)
         )
@@ -19535,7 +19535,7 @@
     (pin "1" (uuid d46de1ff-f9ca-46c4-ad7b-2e23f0065110))
     (pin "2" (uuid 01f0eaf3-1782-45c6-9e68-35e4e4bfeaba))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R18") (unit 1)
         )
@@ -19560,7 +19560,7 @@
     )
     (pin "1" (uuid 553cea60-9ad5-44e3-a8e2-da10d61e14b1))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR023") (unit 1)
         )
@@ -19585,7 +19585,7 @@
     )
     (pin "1" (uuid 2bfb07e6-f17a-42a2-b37b-6d3171cb4a88))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR054") (unit 1)
         )
@@ -19614,7 +19614,7 @@
     (pin "1_E" (uuid 17799e6d-14bc-4037-a647-82fb73be8ec9))
     (pin "2_C" (uuid 4101cd6d-3f7b-450c-8eda-4d478c200cbd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U4") (unit 1)
         )
@@ -19643,7 +19643,7 @@
     (pin "1" (uuid 90335ec2-c233-45b0-97bb-58c6f7dbe054))
     (pin "2" (uuid cd6fa342-a192-4c4e-bcec-587e256cc3fd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R20") (unit 1)
         )
@@ -19668,7 +19668,7 @@
     )
     (pin "1" (uuid 731aaaf8-b476-4c9a-b437-e79a5dd10443))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR013") (unit 1)
         )
@@ -19697,7 +19697,7 @@
     (pin "1" (uuid f0fab974-c4c0-4952-adae-8e8ec327fcdc))
     (pin "2" (uuid 6daa7eda-dbf1-4bdc-842d-5c4e04c85c0b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C16") (unit 1)
         )
@@ -19722,7 +19722,7 @@
     )
     (pin "1" (uuid 638c64fa-a224-44d2-9584-0768c4f623e5))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V02") (unit 1)
         )
@@ -19747,7 +19747,7 @@
     )
     (pin "1" (uuid 8101cf65-1c85-417a-ad7c-1be2f6c4ae34))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR048") (unit 1)
         )
@@ -19775,7 +19775,7 @@
     (pin "3" (uuid 15ec777f-f8e6-49af-9cd7-55d2fad976e2))
     (pin "4" (uuid e3ccbb79-e40c-4fdf-b32c-d8525ae03f28))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D3") (unit 1)
         )
@@ -19800,7 +19800,7 @@
     )
     (pin "1" (uuid c74fbd35-c01f-4479-860a-59ba64543a7e))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR029") (unit 1)
         )
@@ -19825,7 +19825,7 @@
     )
     (pin "1" (uuid 80466568-a564-480a-b405-755534338cd0))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+02") (unit 1)
         )
@@ -19850,7 +19850,7 @@
     )
     (pin "1" (uuid 3dc329aa-ed1b-4ec8-be1d-486276453f03))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR047") (unit 1)
         )
@@ -19881,7 +19881,7 @@
     (pin "B" (uuid c267bbea-332a-49d9-a8c9-60dfc4a3c731))
     (pin "B'" (uuid 5f65d627-c4d9-4158-a38b-88efaaa4de6a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "A1") (unit 1)
         )
@@ -19910,7 +19910,7 @@
     (pin "1" (uuid 4766c595-8a71-438f-81cb-f6fd59859b82))
     (pin "2" (uuid 51aaa602-f7b6-4909-9317-ba8722efd80f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C14") (unit 1)
         )
@@ -19939,7 +19939,7 @@
     (pin "1" (uuid fa71ee59-2979-4ba5-a6dc-9f0610b3121b))
     (pin "2" (uuid 7967f8b9-3b22-4afd-9ea3-4bd3748c8f38))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C11") (unit 1)
         )
@@ -19968,7 +19968,7 @@
     (pin "1" (uuid 1fb9b9ca-bd2f-4fe2-941b-b57e9ab5b26a))
     (pin "2" (uuid 699e0470-b682-4b9a-b7ee-1d4e13b53259))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "SW2") (unit 1)
         )
@@ -19993,7 +19993,7 @@
     )
     (pin "1" (uuid d7c7fc3d-4fec-41cc-850f-c643d527c24d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR026") (unit 1)
         )
@@ -20028,7 +20028,7 @@
     (pin "7" (uuid 21889489-8e11-4438-bf77-04cbd4649174))
     (pin "8" (uuid 24aa98d1-1474-4bdb-81b2-c0e84f5de673))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U1") (unit 1)
         )
@@ -20053,7 +20053,7 @@
     )
     (pin "1" (uuid d23a0ea3-239a-4252-aeae-0f9f32a4b2c2))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V016") (unit 1)
         )
@@ -20082,7 +20082,7 @@
     (pin "1" (uuid a2dbdf6a-f641-4e12-bc01-235c887a2df3))
     (pin "2" (uuid 161fd6be-6cbb-45dc-8e47-97e4cc2aa585))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C12") (unit 1)
         )
@@ -20107,7 +20107,7 @@
     )
     (pin "1" (uuid 11bbd318-6710-404f-8594-c4d77c40ae84))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V07") (unit 1)
         )
@@ -20132,7 +20132,7 @@
     )
     (pin "1" (uuid 3bc3b598-dd6d-4a53-a8e3-b9faa40bb132))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR021") (unit 1)
         )
@@ -20161,7 +20161,7 @@
     (pin "1" (uuid 33cfc00c-5619-4a5f-813d-d24d7a0081d2))
     (pin "2" (uuid 0033afae-2911-4c52-9491-6efe6340d29d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C17") (unit 1)
         )
@@ -20186,7 +20186,7 @@
     )
     (pin "1" (uuid 81653122-a5d6-4755-9685-00f4f150bdca))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR044") (unit 1)
         )
@@ -20214,7 +20214,7 @@
     (pin "3" (uuid 98f54b84-c3e5-416c-a68f-cc3f4f0a667e))
     (pin "4" (uuid c07744ed-12d9-4fd3-9667-f271ae6c63eb))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "D2") (unit 1)
         )
@@ -20243,7 +20243,7 @@
     (pin "1" (uuid 40de493f-4c02-4a5b-8b16-24fe393377af))
     (pin "2" (uuid a0d3a382-c71c-4c83-86d0-59fd6445f669))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R11") (unit 1)
         )
@@ -20268,7 +20268,7 @@
     )
     (pin "1" (uuid 37bd1106-c04f-499a-85b8-27171b19b892))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR027") (unit 1)
         )
@@ -20297,7 +20297,7 @@
     (pin "1" (uuid e77578ed-43c8-4345-bb73-296ef3f487f5))
     (pin "2" (uuid 82643ac6-9903-4e4d-a0bc-281606e4f6db))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R21") (unit 1)
         )
@@ -20326,7 +20326,7 @@
     (pin "1" (uuid f9a60b40-0f9a-4900-814b-75b2406444f2))
     (pin "2" (uuid ed159118-d3b3-4f63-a3e4-620a5f973827))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C4") (unit 1)
         )
@@ -20351,7 +20351,7 @@
     )
     (pin "1" (uuid 68395f3d-13b8-4bd7-a40d-73d75127c08b))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR035") (unit 1)
         )
@@ -20380,7 +20380,7 @@
     (pin "1" (uuid 4123effa-199f-4e92-bc6a-6445d3c31c2f))
     (pin "2" (uuid d30e9a87-0cae-4d8f-9feb-440b741db7e1))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C13") (unit 1)
         )
@@ -20404,7 +20404,7 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "H3") (unit 1)
         )
@@ -20429,7 +20429,7 @@
     )
     (pin "1" (uuid 73c4e2f8-90d2-4bd0-9772-3df7832259fd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR053") (unit 1)
         )
@@ -20454,7 +20454,7 @@
     )
     (pin "1" (uuid bce1d63e-a24c-46e1-8459-f823ba4eba8c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR020") (unit 1)
         )
@@ -20479,7 +20479,7 @@
     )
     (pin "1" (uuid 8ee341e1-f5c5-4102-96ca-7cd95ed99b88))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR051") (unit 1)
         )
@@ -20504,7 +20504,7 @@
     )
     (pin "1" (uuid 7ed6e3b2-01e6-4d37-a8b3-155e40bce508))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+04") (unit 1)
         )
@@ -20535,7 +20535,7 @@
     (pin "B" (uuid 8dfec87c-8445-473b-a994-2c13f79e9dff))
     (pin "B'" (uuid 883aa410-a084-4d5e-91fa-508ce152262f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "START1") (unit 1)
         )
@@ -20564,7 +20564,7 @@
     (pin "1" (uuid 09d74ddf-df73-4a3d-919a-7f1182a8f4d4))
     (pin "2" (uuid 2d3ac533-d1a8-4053-a85d-6515c929079a))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "C5") (unit 1)
         )
@@ -20589,7 +20589,7 @@
     )
     (pin "1" (uuid 103e3e3f-73cb-4ffe-a662-b4ce7308e1b2))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR02") (unit 1)
         )
@@ -20614,7 +20614,7 @@
     )
     (pin "1" (uuid 4a789a6c-b052-4318-afb6-cbdb5efda64d))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+08") (unit 1)
         )
@@ -20639,7 +20639,7 @@
     )
     (pin "1" (uuid a92e03c5-04ef-41bd-b6d2-ffda7bba8988))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR022") (unit 1)
         )
@@ -20664,7 +20664,7 @@
     )
     (pin "1" (uuid 0f6da714-f91e-4f9f-bfb2-0a7786a4b730))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#P+03") (unit 1)
         )
@@ -20689,7 +20689,7 @@
     )
     (pin "1" (uuid cbc8f10c-81d1-43c1-b5c9-1067feecd410))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR011") (unit 1)
         )
@@ -20718,7 +20718,7 @@
     (pin "1" (uuid 067a83c9-4377-4e92-95dd-939901a5dff1))
     (pin "2" (uuid 3dc9cd27-64e4-4bfa-ad43-c1eabe8437c7))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R23") (unit 1)
         )
@@ -20747,7 +20747,7 @@
     (pin "1" (uuid 94bed42b-6217-4285-a12d-cdd1f28f3a30))
     (pin "2" (uuid 064be65f-cff8-4fb2-8a4b-d374fcde948c))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R7") (unit 1)
         )
@@ -20772,7 +20772,7 @@
     )
     (pin "1" (uuid 00dafc64-4853-4a0d-8b28-5c9fafcbdc05))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V03") (unit 1)
         )
@@ -20801,7 +20801,7 @@
     (pin "1" (uuid b7c5e59b-0a2e-44bc-b675-b5a6960d6284))
     (pin "2" (uuid 415c6aff-c0ed-4259-89c6-4554f96b21c3))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R2") (unit 1)
         )
@@ -20832,7 +20832,7 @@
     (pin "B" (uuid 97e0c3f0-e508-4d87-97b6-875d07f5ed46))
     (pin "B'" (uuid dd5a6307-07e6-4c6e-991e-ab2201cdc4dd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "B1") (unit 1)
         )
@@ -20865,7 +20865,7 @@
     (pin "5" (uuid 31a4280d-fcf9-4b6c-929c-5c9ea82fa96f))
     (pin "6" (uuid 9b330202-a438-43cc-9fbf-906af3c561e3))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "U7") (unit 1)
         )
@@ -20890,7 +20890,7 @@
     )
     (pin "1" (uuid 027f0f29-18ca-4bed-b077-d4f4eef30f95))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V06") (unit 1)
         )
@@ -20915,7 +20915,7 @@
     )
     (pin "1" (uuid 4141e823-8ecc-47af-99e4-0d79df6f64cd))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR05") (unit 1)
         )
@@ -20942,7 +20942,7 @@
     (pin "2" (uuid 95ef9343-8ceb-46ed-a22b-54c63e81a005))
     (pin "3" (uuid b6802a47-32d4-4c23-a1ea-e2c6658ae8d2))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "Q1") (unit 1)
         )
@@ -20967,7 +20967,7 @@
     )
     (pin "1" (uuid 090e0eb2-e4eb-4618-b972-cc6a6b8412ca))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR025") (unit 1)
         )
@@ -20996,7 +20996,7 @@
     (pin "1" (uuid d50ca81f-ffe0-4273-9b5a-7863cf508dba))
     (pin "2" (uuid cca53a1d-a93a-40ce-be7e-a57dca57e04f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R15") (unit 1)
         )
@@ -21021,7 +21021,7 @@
     )
     (pin "1" (uuid 31ddc4d8-79f3-4038-82aa-ec5496d1ce34))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#+3V09") (unit 1)
         )
@@ -21046,7 +21046,7 @@
     )
     (pin "1" (uuid 1f0c7495-5f4a-4083-a16d-1e837920e809))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR037") (unit 1)
         )
@@ -21071,7 +21071,7 @@
     )
     (pin "1" (uuid 89fb9f92-0d09-4d74-8d44-16c38cf4af26))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR09") (unit 1)
         )
@@ -21096,7 +21096,7 @@
     )
     (pin "1" (uuid 9e1d2998-3862-4e62-a37f-cdf5c829d90f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR041") (unit 1)
         )
@@ -21121,7 +21121,7 @@
     )
     (pin "1" (uuid 0c5a3456-14f2-456e-8564-c7143c152c5f))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR042") (unit 1)
         )
@@ -21165,7 +21165,7 @@
     (pin "B9" (uuid 4326f40b-9a75-44c8-ac49-af05f9e788b9))
     (pin "S1" (uuid de84fb1f-ca70-4d8e-b569-8cc388c26220))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "J3") (unit 1)
         )
@@ -21190,7 +21190,7 @@
     )
     (pin "1" (uuid 0facc2e1-36a7-4c30-991f-6d2e03551a14))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "#PWR04") (unit 1)
         )
@@ -21219,7 +21219,7 @@
     (pin "1" (uuid c304216e-0576-4fef-ae24-10854d8107c3))
     (pin "2" (uuid 9c24b1bc-36ac-4908-818d-dd8bb6084ed4))
     (instances
-      (project "Adafruit PyBadge"
+      (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
           (reference "R1") (unit 1)
         )

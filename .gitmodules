@@ -1,0 +1,3 @@
+[submodule "deps/zware"]
+	path = deps/zware
+	url = https://github.com/malcolmstill/zware.git

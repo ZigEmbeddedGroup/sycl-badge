@@ -5270,8 +5270,8 @@
     (property "Package" "0603" (at 38.1 209.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid 4b03e84a-02f1-48fe-ad2f-4b33e93049a7))
-    (pin "2" (uuid 828a7735-d230-4282-ac66-62446a40c869))
+    (pin "1" (uuid 83094f17-87f8-41eb-9d35-3c4a5bb43d63))
+    (pin "2" (uuid a57cb554-eaf2-4192-8ec1-73da1c37b355))
     (instances
       (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
@@ -7512,8 +7512,8 @@
     (property "Package" "0603" (at 40.005 228.6 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid 283e0916-afb1-4a24-9a77-c453ba1df61d))
-    (pin "2" (uuid c910bf7a-8432-439d-8fbc-493d78e383b9))
+    (pin "1" (uuid f36e496c-573b-4fa1-86e2-438d637dd0f3))
+    (pin "2" (uuid 4091f3f3-b248-4ac0-93ec-279a7f8e8b79))
     (instances
       (project "SYCL Badge 2024"
         (path "/270f9e40-8c49-4ca4-8093-db6f728721f5"

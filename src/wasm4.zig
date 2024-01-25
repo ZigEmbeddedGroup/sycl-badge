@@ -72,6 +72,10 @@ else
         }
     };
 
+comptime {
+    _ = platform_specific;
+}
+
 /// Copies pixels to the framebuffer.
 pub inline fn blit(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: u32) void {
     if (comptime builtin.target.isWasm()) {

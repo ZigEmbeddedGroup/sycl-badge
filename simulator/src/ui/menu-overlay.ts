@@ -148,20 +148,15 @@ export class MenuOverlay extends LitElement {
     }
 
     resetInput () {
-        this.app.inputState.gamepad[0] = 0;
+        this.app.controls = 0;
     }
 
     applyInput () {
-        // Mix all player's gamepads together for the purposes of menu input
-        let gamepad = 0;
-        for (const player of this.app.inputState.gamepad) {
-            gamepad |= player;
-        }
+        const controls = this.app.controls;
+        const pressedThisFrame = controls & (controls ^ this.lastGamepad);
+        this.lastGamepad = controls;
 
-        const pressedThisFrame = gamepad & (gamepad ^ this.lastGamepad);
-        this.lastGamepad = gamepad;
-
-        if (pressedThisFrame & (constants.BUTTON_X | constants.BUTTON_Z)) {
+        if (pressedThisFrame & (constants.CONTROLS_SELECT)) {
             if(this.optionContext === optionContext.DEFAULT) {
                 switch (this.selectedIdx) {
                     case this.optionIndex.CONTINUE:
@@ -209,10 +204,10 @@ export class MenuOverlay extends LitElement {
             }
         }
 
-        if (pressedThisFrame & constants.BUTTON_DOWN) {
+        if (pressedThisFrame & constants.CONTROLS_DOWN) {
             this.selectedIdx++;
         }
-        if (pressedThisFrame & constants.BUTTON_UP) {
+        if (pressedThisFrame & constants.CONTROLS_UP) {
             this.selectedIdx--;
         }
         this.selectedIdx = (this.selectedIdx + this.options.length) % this.options.length;

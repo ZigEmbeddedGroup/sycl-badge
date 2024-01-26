@@ -17,33 +17,33 @@ pub const screen_height: u32 = 128;
 
 const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 
-pub const Color = packed struct(u16) {
-    red: u5,
-    green: u6,
-    blue: u5,
+pub const Color = packed struct(u16) { blue: u5, green: u6, red: u5 };
+pub const Controls = packed struct(u16) {
+    /// START button
+    start: bool,
+    /// SELECT button
+    select: bool,
+    /// A button
+    a: bool,
+    /// B button
+    b: bool,
+
+    /// Tactile click
+    click: bool,
+    /// Tactile up
+    up: bool,
+    /// Tactile down
+    down: bool,
+    /// Tactile left
+    left: bool,
+    /// Tactile right
+    right: bool,
+
+    padding: u7,
 };
 
-pub const draw_colors: *[4]Color = @ptrFromInt(base + 0x04);
-pub const gamepad1: *const u8 = @ptrFromInt(base + 0x16);
-pub const gamepad2: *const u8 = @ptrFromInt(base + 0x17);
-pub const gamepad3: *const u8 = @ptrFromInt(base + 0x18);
-pub const gamepad4: *const u8 = @ptrFromInt(base + 0x19);
-pub const mouse_x: *const i16 = @ptrFromInt(base + 0x1a);
-pub const mouse_y: *const i16 = @ptrFromInt(base + 0x1c);
-pub const mouse_buttons: *const u8 = @ptrFromInt(base + 0x1e);
-pub const system_flags: *u8 = @ptrFromInt(base + 0x1f);
-pub const framebuffer: *[screen_width * screen_height]Color = @ptrFromInt(base + 0xa0);
-
-pub const button_1: u8 = 1;
-pub const button_2: u8 = 2;
-pub const button_left: u8 = 16;
-pub const button_right: u8 = 32;
-pub const button_up: u8 = 64;
-pub const button_down: u8 = 128;
-
-pub const mouse_left: u8 = 1;
-pub const mouse_right: u8 = 2;
-pub const mouse_middle: u8 = 4;
+pub const controls: *const Controls = @ptrFromInt(base + 0x04);
+pub const framebuffer: *[screen_width * screen_height]Color = @ptrFromInt(base + 0x06);
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │

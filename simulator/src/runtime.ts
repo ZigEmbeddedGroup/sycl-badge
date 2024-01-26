@@ -71,14 +71,8 @@ export class Runtime {
         await this.apu.init();
     }
 
-    setMouse (x: number, y: number, buttons: number) {
-        this.data.setInt16(constants.ADDR_MOUSE_X, x, true);
-        this.data.setInt16(constants.ADDR_MOUSE_Y, y, true);
-        this.data.setUint8(constants.ADDR_MOUSE_BUTTONS, buttons);
-    }
-
-    setGamepad (idx: number, buttons: number) {
-        this.data.setUint8(constants.ADDR_GAMEPAD1 + idx, buttons);
+    setControls (controls: number) {
+        this.data.setUint16(constants.ADDR_CONTROLS, controls, true);
     }
 
     getSystemFlag (mask: number) {
@@ -100,8 +94,6 @@ export class Runtime {
             mem32.fill(0);
         }
         this.pauseState &= ~constants.PAUSE_CRASHED;
-        mem32.set(constants.COLORS, constants.ADDR_PALETTE >> 2);
-        this.data.setUint16(constants.ADDR_DRAW_COLORS, 0x1203, true);
 
         // Initialize the mouse off screen
         this.data.setInt16(constants.ADDR_MOUSE_X, 0x7fff, true);
@@ -262,7 +254,7 @@ export class Runtime {
         this.pauseState |= constants.PAUSE_CRASHED;
 
         const blue = pack565(0, 0, 31);
-        const grey = pack565(20, 50, 20);
+        const grey = pack565(25, 50, 25);
 
         const toCharArr = (s: string) => [...s].map(x => x.charCodeAt(0));
 

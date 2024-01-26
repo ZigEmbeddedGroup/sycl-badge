@@ -10,13 +10,6 @@ import { State } from "../state";
 import { MenuOverlay } from "./menu-overlay";
 import { Notifications } from "./notifications";
 
-class InputState {
-    gamepad = [0, 0, 0, 0];
-    mouseX = 0;
-    mouseY = 0;
-    mouseButtons = 0;
-}
-
 @customElement("wasm4-app")
 export class App extends LitElement {
     static styles = css`
@@ -74,7 +67,7 @@ export class App extends LitElement {
 
     private savedGameState?: State;
 
-    readonly inputState = new InputState();
+    controls: number = 0;
     private readonly gamepadUnavailableWarned = new Set<string>();
 
     private readonly diskPrefix: string;
@@ -176,22 +169,6 @@ export class App extends LitElement {
             }, 4000);
         }
 
-        const onMouseEvent = (event: PointerEvent) => {
-            // Unhide the cursor if it was hidden by the keyboard handler
-            document.body.style.cursor = "";
-
-            if (event.isPrimary) {
-                const bounds = canvas.getBoundingClientRect();
-                const input = this.inputState;
-                input.mouseX = Math.fround(constants.WIDTH * (event.clientX - bounds.left) / bounds.width);
-                input.mouseY = Math.fround(constants.HEIGHT * (event.clientY - bounds.top) / bounds.height);
-                input.mouseButtons = event.buttons & 0b111;
-            }
-        };
-        window.addEventListener("pointerdown", onMouseEvent);
-        window.addEventListener("pointerup", onMouseEvent);
-        window.addEventListener("pointermove", onMouseEvent);
-
         canvas.addEventListener("contextmenu", event => {
             event.preventDefault();
         });
@@ -236,76 +213,26 @@ export class App extends LitElement {
             let playerIdx = 0;
             let mask = 0;
             switch (event.code) {
-            // Player 1
-            case "KeyX": case "KeyV": case "Space": case "Period":
-                mask = constants.BUTTON_X;
+            case "Space":
+                mask |= constants.CONTROLS_START;
                 break;
-            case "KeyZ": case "KeyC": case "Comma":
-                mask = constants.BUTTON_Z;
+            case "Enter":
+                mask |= constants.CONTROLS_SELECT;
                 break;
-            case "ArrowUp":
-                mask = constants.BUTTON_UP;
+            case "ShiftLeft": case "ShiftRight":
+                mask |= constants.CONTROLS_SELECT;
                 break;
-            case "ArrowDown":
-                mask = constants.BUTTON_DOWN;
+            case "ArrowUp": case "KeyW":
+                mask |= constants.CONTROLS_UP;
                 break;
-            case "ArrowLeft":
-                mask = constants.BUTTON_LEFT;
+            case "ArrowDown": case "KeyS":
+                mask |= constants.CONTROLS_DOWN;
                 break;
-            case "ArrowRight":
-                mask = constants.BUTTON_RIGHT;
+            case "ArrowLeft": case "KeyA":
+                mask |= constants.CONTROLS_LEFT;
                 break;
-
-            // Player 2
-            case "KeyA": case "KeyQ":
-                playerIdx = 1;
-                mask = constants.BUTTON_X;
-                break;
-            case "ShiftLeft": case "Tab":
-                playerIdx = 1;
-                mask = constants.BUTTON_Z;
-                break;
-            case "KeyE":
-                playerIdx = 1;
-                mask = constants.BUTTON_UP;
-                break;
-            case "KeyD":
-                playerIdx = 1;
-                mask = constants.BUTTON_DOWN;
-                break;
-            case "KeyS":
-                playerIdx = 1;
-                mask = constants.BUTTON_LEFT;
-                break;
-            case "KeyF":
-                playerIdx = 1;
-                mask = constants.BUTTON_RIGHT;
-                break;
-
-            // Player 3
-            case "NumpadMultiply": case "NumpadDecimal":
-                playerIdx = 2;
-                mask = constants.BUTTON_X;
-                break;
-            case "NumpadSubtract": case "NumpadEnter":
-                playerIdx = 2;
-                mask = constants.BUTTON_Z;
-                break;
-            case "Numpad8":
-                playerIdx = 2;
-                mask = constants.BUTTON_UP;
-                break;
-            case "Numpad5":
-                playerIdx = 2;
-                mask = constants.BUTTON_DOWN;
-                break;
-            case "Numpad4":
-                playerIdx = 2;
-                mask = constants.BUTTON_LEFT;
-                break;
-            case "Numpad6":
-                playerIdx = 2;
-                mask = constants.BUTTON_RIGHT;
+            case "ArrowRight": case "KeyD":
+                mask |= constants.CONTROLS_RIGHT;
                 break;
             }
 
@@ -313,11 +240,10 @@ export class App extends LitElement {
                 event.preventDefault();
 
                 // Set or clear the button bit from the next input state
-                const gamepad = this.inputState.gamepad;
                 if (down) {
-                    gamepad[playerIdx] |= mask;
+                    this.controls |= mask;
                 } else {
-                    gamepad[playerIdx] &= ~mask;
+                    this.controls &= ~mask;
                 }
             }
         };
@@ -335,53 +261,54 @@ export class App extends LitElement {
         }
 
         const pollPhysicalGamepads = () => {
-            if (!navigator.getGamepads) {
-                return; // Browser doesn't support gamepads
-            }
+            // TODO
+            // if (!navigator.getGamepads) {
+            //     return; // Browser doesn't support gamepads
+            // }
 
-            for (const gamepad of navigator.getGamepads()) {
-                if (gamepad == null) {
-                    continue; // Disconnected gamepad
-                } else if (gamepad.mapping != "standard") {
-                    // The gamepad is available, but nonstandard, so we don't actually know how to read it.
-                    // Let's warn once, and not use this gamepad afterwards.
-                    if (!this.gamepadUnavailableWarned.has(gamepad.id)) {
-                        this.gamepadUnavailableWarned.add(gamepad.id);
-                        this.notifications.show("Unsupported gamepad: " + gamepad.id);
-                    }
-                    continue;
-                }
+            // for (const gamepad of navigator.getGamepads()) {
+            //     if (gamepad == null) {
+            //         continue; // Disconnected gamepad
+            //     } else if (gamepad.mapping != "standard") {
+            //         // The gamepad is available, but nonstandard, so we don't actually know how to read it.
+            //         // Let's warn once, and not use this gamepad afterwards.
+            //         if (!this.gamepadUnavailableWarned.has(gamepad.id)) {
+            //             this.gamepadUnavailableWarned.add(gamepad.id);
+            //             this.notifications.show("Unsupported gamepad: " + gamepad.id);
+            //         }
+            //         continue;
+            //     }
 
-                // https://www.w3.org/TR/gamepad/#remapping
-                const buttons = gamepad.buttons;
-                const axes = gamepad.axes;
+            //     // https://www.w3.org/TR/gamepad/#remapping
+            //     const buttons = gamepad.buttons;
+            //     const axes = gamepad.axes;
 
-                let mask = 0;
-                if (buttons[12].pressed || axes[1] < -0.5) {
-                    mask |= constants.BUTTON_UP;
-                }
-                if (buttons[13].pressed || axes[1] > 0.5) {
-                    mask |= constants.BUTTON_DOWN;
-                }
-                if (buttons[14].pressed || axes[0] < -0.5) {
-                    mask |= constants.BUTTON_LEFT;
-                }
-                if (buttons[15].pressed || axes[0] > 0.5) {
-                    mask |= constants.BUTTON_RIGHT;
-                }
-                if (buttons[0].pressed || buttons[3].pressed || buttons[5].pressed || buttons[7].pressed) {
-                    mask |= constants.BUTTON_X;
-                }
-                if (buttons[1].pressed || buttons[2].pressed || buttons[4].pressed || buttons[6].pressed) {
-                    mask |= constants.BUTTON_Z;
-                }
+            //     let mask = 0;
+            //     if (buttons[12].pressed || axes[1] < -0.5) {
+            //         mask |= constants.BUTTON_UP;
+            //     }
+            //     if (buttons[13].pressed || axes[1] > 0.5) {
+            //         mask |= constants.BUTTON_DOWN;
+            //     }
+            //     if (buttons[14].pressed || axes[0] < -0.5) {
+            //         mask |= constants.BUTTON_LEFT;
+            //     }
+            //     if (buttons[15].pressed || axes[0] > 0.5) {
+            //         mask |= constants.BUTTON_RIGHT;
+            //     }
+            //     if (buttons[0].pressed || buttons[3].pressed || buttons[5].pressed || buttons[7].pressed) {
+            //         mask |= constants.BUTTON_X;
+            //     }
+            //     if (buttons[1].pressed || buttons[2].pressed || buttons[4].pressed || buttons[6].pressed) {
+            //         mask |= constants.BUTTON_Z;
+            //     }
 
-                if (buttons[9].pressed) {
-                    this.showMenu = true;
-                }
+            //     if (buttons[9].pressed) {
+            //         this.showMenu = true;
+            //     }
 
-                this.inputState.gamepad[gamepad.index % 4] = mask;
-            }
+            //     this.inputState.gamepad[gamepad.index % 4] = mask;
+            // }
         }
 
         // When we should perform the next update
@@ -393,7 +320,6 @@ export class App extends LitElement {
             requestAnimationFrame(onFrame);
 
             pollPhysicalGamepads();
-            let input = this.inputState;
 
             if (this.menuOverlay != null) {
                 this.menuOverlay.applyInput();
@@ -412,10 +338,7 @@ export class App extends LitElement {
                 timeNextUpdate += 1000/60;
 
                 // Pass inputs into runtime memory
-                for (let playerIdx = 0; playerIdx < 4; ++playerIdx) {
-                    runtime.setGamepad(playerIdx, input.gamepad[playerIdx]);
-                }
-                runtime.setMouse(input.mouseX, input.mouseY, input.mouseButtons);
+                runtime.setControls(this.controls);
                 runtime.update();
                 calledUpdate = true;
             }
@@ -436,7 +359,7 @@ export class App extends LitElement {
     onMenuButtonPressed () {
         if (this.showMenu) {
             // If the pause menu is already open, treat it as an X button
-            this.inputState.gamepad[0] |= constants.BUTTON_X;
+            this.controls |= constants.CONTROLS_SELECT;
         } else {
             this.showMenu = true;
         }
@@ -445,12 +368,7 @@ export class App extends LitElement {
     closeMenu () {
         if (this.showMenu) {
             this.showMenu = false;
-
-            // Kind of a hack to prevent the button press to close the menu from being passed
-            // through to the game
-            for (let playerIdx = 0; playerIdx < 4; ++playerIdx) {
-                this.inputState.gamepad[playerIdx] = 0;
-            }
+            this.controls = 0;
         }
     }
 

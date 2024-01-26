@@ -17,8 +17,13 @@ pub const screen_height: u32 = 128;
 
 const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 
-pub const palette: *[4]u32 = @ptrFromInt(base + 0x04);
-pub const draw_colors: *u16 = @ptrFromInt(base + 0x14);
+pub const Color = packed struct(u16) {
+    red: u5,
+    green: u6,
+    blue: u5,
+};
+
+pub const draw_colors: *[4]Color = @ptrFromInt(base + 0x04);
 pub const gamepad1: *const u8 = @ptrFromInt(base + 0x16);
 pub const gamepad2: *const u8 = @ptrFromInt(base + 0x17);
 pub const gamepad3: *const u8 = @ptrFromInt(base + 0x18);
@@ -27,7 +32,7 @@ pub const mouse_x: *const i16 = @ptrFromInt(base + 0x1a);
 pub const mouse_y: *const i16 = @ptrFromInt(base + 0x1c);
 pub const mouse_buttons: *const u8 = @ptrFromInt(base + 0x1e);
 pub const system_flags: *u8 = @ptrFromInt(base + 0x1f);
-pub const framebuffer: *[6400]u8 = @ptrFromInt(base + 0xa0);
+pub const framebuffer: *[screen_width * screen_height]Color = @ptrFromInt(base + 0xa0);
 
 pub const button_1: u8 = 1;
 pub const button_2: u8 = 2;
@@ -39,9 +44,6 @@ pub const button_down: u8 = 128;
 pub const mouse_left: u8 = 1;
 pub const mouse_right: u8 = 2;
 pub const mouse_middle: u8 = 4;
-
-pub const system_preserve_framebuffer: u8 = 1;
-pub const system_hide_gamepad_overlay: u8 = 2;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │

@@ -14,8 +14,6 @@ export const COLORS = [
 ];
 
 // Memory layout
-export const ADDR_PALETTE = 0x04;
-export const ADDR_DRAW_COLORS = 0x14;
 export const ADDR_GAMEPAD1 = 0x16;
 export const ADDR_GAMEPAD2 = 0x17;
 export const ADDR_GAMEPAD3 = 0x18;
@@ -38,9 +36,6 @@ export const BUTTON_DOWN = 128;
 export const MOUSE_LEFT = 1;
 export const MOUSE_RIGHT = 2;
 export const MOUSE_MIDDLE = 4;
-
-export const SYSTEM_PRESERVE_FRAMEBUFFER = 1;
-export const SYSTEM_HIDE_GAMEPAD_OVERLAY = 2;
 
 // Flags for Runtime.pauseState
 export const PAUSE_CRASHED = 1;

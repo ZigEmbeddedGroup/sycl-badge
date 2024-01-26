@@ -3,27 +3,21 @@ import {
     WIDTH,
     HEIGHT,
     ADDR_FRAMEBUFFER,
-    ADDR_DRAW_COLORS
 } from "./constants";
 
 export class Framebuffer {
-    drawColors: Uint16Array;
-    bytes: Uint8Array;
+    bytes: Uint16Array;
 
     constructor (memory: ArrayBuffer) {
-        this.bytes = new Uint8Array(memory, ADDR_FRAMEBUFFER, WIDTH * HEIGHT >>> 2);
-        this.drawColors = new Uint16Array(memory, ADDR_DRAW_COLORS, 1);
+        this.bytes = new Uint16Array(memory, ADDR_FRAMEBUFFER, WIDTH * HEIGHT);
     }
 
-    clear (): void {
-        this.bytes.fill(0);
+    fillScreen (color: number): void {
+        this.bytes.fill(color);
     }
 
     drawPoint (color: number, x: number, y: number) {
-        const idx = (WIDTH * y + x) >>> 2;
-        const shift = (x & 0x3) << 1;
-        const mask = 0x3 << shift;
-        this.bytes[idx] = (color << shift) | (this.bytes[idx] & ~mask);
+        this.bytes[WIDTH * y + x] = color;
     }
 
     drawPointUnclipped (color: number, x: number, y: number) {
@@ -33,25 +27,8 @@ export class Framebuffer {
     }
 
     drawHLineFast(color: number, startX: number, y: number, endX: number) {
-        const fillEnd = endX - (endX & 3);
-        const fillStart = Math.min((startX + 3) & ~3, fillEnd);
-
-        if (fillEnd - fillStart > 3) {
-            for (let xx = startX; xx < fillStart; xx++) {
-                this.drawPoint(color, xx, y);
-            }
-
-            const from = (WIDTH * y + fillStart) >>> 2;
-            const to = (WIDTH * y + fillEnd) >>> 2;
-            const fillColor = color * 0b01010101;
-
-            this.bytes.fill(fillColor, from, to);
-            startX = fillEnd;
-        }
-
-        for (let xx = startX; xx < endX; xx++) {
-            this.drawPoint(color, xx, y);
-        }
+        const yOff = WIDTH * y;
+        this.bytes.fill(color, yOff + startX, yOff + endX);
     }
 
     drawHLineUnclipped(color: number, startX: number, y: number, endX: number) {
@@ -68,14 +45,8 @@ export class Framebuffer {
         }
     }
 
-    drawHLine(x: number, y: number, len: number) {
-        const dc0 = this.drawColors[0] & 0xf;
-        if (dc0 == 0) {
-            return;
-        }
-
-        const strokeColor = (dc0 - 1) & 0x3;
-        this.drawHLineUnclipped(strokeColor, x, y, x + len);
+    drawHLine(color: number, x: number, y: number, len: number) {
+        this.drawHLineUnclipped(color, x, y, x + len);
     }
 
     drawVLine(x: number, y: number, len: number) {
@@ -276,7 +247,7 @@ export class Framebuffer {
         }
     }
 
-    drawText (charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number) {
+    drawText (charColor: number, backgroundColor: number, charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number) {
         let currentX = x;
         for (let ii = 0, len = charArray.length; ii < len; ++ii) {
             const charCode = charArray[ii];
@@ -286,7 +257,7 @@ export class Framebuffer {
                 y += 8;
                 currentX = x;
             } else if (charCode >= 32 && charCode <= 255) {
-                this.blit(FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
+                this.blit([charColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
                 currentX += 8;
             } else {
                 currentX += 8;
@@ -295,18 +266,16 @@ export class Framebuffer {
     }
 
     blit (
+        colors: [number, number] | [number, number, number, number],
         sprite: Uint8Array,
         dstX: number, dstY: number,
         width: number, height: number,
         srcX: number, srcY: number,
         srcStride: number,
-        bpp2: number | boolean = false,
         flipX: number | boolean = false,
         flipY: number | boolean = false,
         rotate: number | boolean = false
     ) {
-        const drawColors = this.drawColors[0];
-
         // Clip rectangle to screen
         let clipXMin, clipYMin, clipXMax, clipYMax;
         if (rotate) {
@@ -336,7 +305,7 @@ export class Framebuffer {
                 // Sample the sprite to get a color index
                 let colorIdx;
                 const bitIndex = sy * srcStride + sx;
-                if (bpp2) {
+                if (colors.length === 4) {
                     const byte = sprite[bitIndex >>> 2];
                     const shift = 6 - ((bitIndex & 0x03) << 1);
                     colorIdx = (byte >>> shift) & 0b11;
@@ -346,12 +315,7 @@ export class Framebuffer {
                     colorIdx = (byte >>> shift) & 0b1;
                 }
 
-                // Get the final color using the drawColors indirection
-                // TODO(2021-08-11): Use a lookup table here?
-                const dc = (drawColors >>> (colorIdx << 2)) & 0x0f;
-                if (dc !== 0) {
-                    this.drawPoint((dc - 1) & 0x03, tx, ty);
-                }
+                this.drawPoint(colors[colorIdx], tx, ty);
             }
         }
     }

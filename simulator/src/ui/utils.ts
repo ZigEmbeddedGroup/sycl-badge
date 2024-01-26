@@ -36,3 +36,13 @@ export function requestFullscreen () {
         }
     }
 }
+
+/**
+ * @param red `0-31`
+ * @param green `0-63`
+ * @param blue `0-31`
+ * @returns RGB565 representation
+ */
+export function pack565(red: number, green: number, blue: number): number {
+    return blue | (green << 5) | (red << 11);
+}

@@ -3,6 +3,7 @@ import * as z85 from "./z85";
 import { APU } from "./apu";
 import { Framebuffer } from "./framebuffer";
 import { WebGLCompositor } from "./compositor";
+import { pack565 } from "./ui/utils";
 
 export class Runtime {
     canvas: HTMLCanvasElement;
@@ -27,7 +28,7 @@ export class Runtime {
         canvas.height = constants.HEIGHT;
         this.canvas = canvas;
 
-        const gl = canvas.getContext("webgl", {
+        const gl = canvas.getContext("webgl2", {
             alpha: false,
             depth: false,
             antialias: false,
@@ -251,10 +252,6 @@ export class Runtime {
             return;
         }
 
-        if (!this.getSystemFlag(constants.SYSTEM_PRESERVE_FRAMEBUFFER)) {
-            this.framebuffer.clear();
-        }
-
         let update_function = this.wasm!.exports["update"];
         if (typeof update_function === "function") {
             this.bluescreenOnError(update_function);
@@ -264,12 +261,8 @@ export class Runtime {
     blueScreen (text: string) {
         this.pauseState |= constants.PAUSE_CRASHED;
 
-        const COLORS = [
-            0x1111ee, // blue
-            0x86c06c,
-            0xaaaaaa, // grey
-            0xffffff, // white
-        ];
+        const blue = pack565(0, 0, 31);
+        const grey = pack565(20, 50, 20);
 
         const toCharArr = (s: string) => [...s].map(x => x.charCodeAt(0));
 
@@ -281,22 +274,17 @@ export class Runtime {
         const messageX = 9;
         const messageY = 60;
 
-        const mem32 = new Uint32Array(this.memory.buffer);
-        mem32.set(COLORS, constants.ADDR_PALETTE >> 2);
-        this.data.setUint16(constants.ADDR_DRAW_COLORS, 0x1203, true);
-        this.framebuffer.clear();
-        this.framebuffer.drawHLine(headerX, headerY-1, headerWidth);
-        this.data.setUint16(constants.ADDR_DRAW_COLORS, 0x1131, true);
-        this.framebuffer.drawText(toCharArr(headerTitle), headerX, headerY);
-        this.data.setUint16(constants.ADDR_DRAW_COLORS, 0x1203, true);
-        this.framebuffer.drawText(toCharArr(text), messageX, messageY);
+        this.framebuffer.fillScreen(blue);
+        
+        this.framebuffer.drawHLine(grey, headerX, headerY-1, headerWidth);
+        this.framebuffer.drawText(blue, grey, toCharArr(headerTitle), headerX, headerY);
+        this.framebuffer.drawText(grey, blue, toCharArr(text), messageX, messageY);
+
         this.composite();
     }
 
     composite () {
-        const palette = new Uint32Array(this.memory.buffer, constants.ADDR_PALETTE, 4);
-
-        this.compositor.composite(palette, this.framebuffer);
+        this.compositor.composite(this.framebuffer);
     }
 }
 

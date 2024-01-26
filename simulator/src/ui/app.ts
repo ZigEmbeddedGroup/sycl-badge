@@ -67,7 +67,6 @@ export class App extends LitElement {
 
     private readonly runtime: Runtime;
 
-    @state() private hideGamepadOverlay = false;
     @state() private showMenu = false;
 
     @query("wasm4-menu-overlay") private menuOverlay?: MenuOverlay;
@@ -422,8 +421,6 @@ export class App extends LitElement {
             }
 
             if (calledUpdate) {
-                this.hideGamepadOverlay = !!runtime.getSystemFlag(constants.SYSTEM_HIDE_GAMEPAD_OVERLAY);
-
                 runtime.composite();
 
                 // if (import.meta.env.DEV) {
@@ -623,7 +620,7 @@ export class App extends LitElement {
                     ${this.runtime.canvas}
                 </div>
             </div>
-            ${!this.hideGamepadOverlay ? html`<wasm4-virtual-gamepad .app=${this} />` : ""}
+            <wasm4-virtual-gamepad .app=${this} />
         `;
     }
 }

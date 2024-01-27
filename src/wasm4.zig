@@ -1,3 +1,4 @@
+const std = @import("std");
 const builtin = @import("builtin");
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
@@ -17,7 +18,20 @@ pub const screen_height: u32 = 128;
 
 const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 
-pub const Color = packed struct(u16) { blue: u5, green: u6, red: u5 };
+/// RGB888, true color
+pub const NeopixelColor = packed struct(u24) { blue: u8, green: u8, red: u8 };
+
+/// RGB565, high color
+pub const DisplayColor = packed struct(u16) { blue: u5, green: u6, red: u5 };
+const OptionalDisplayColor = enum(u32) {
+    none = std.math.maxInt(u32),
+    _,
+
+    inline fn from(color: ?DisplayColor) OptionalDisplayColor {
+        return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
+    }
+};
+
 pub const Controls = packed struct(u16) {
     /// START button
     start: bool,
@@ -43,7 +57,11 @@ pub const Controls = packed struct(u16) {
 };
 
 pub const controls: *const Controls = @ptrFromInt(base + 0x04);
-pub const framebuffer: *[screen_width * screen_height]Color = @ptrFromInt(base + 0x06);
+pub const light_level: *const u12 = @ptrFromInt(base + 0x06);
+/// 5 24-bit color LEDs
+pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
+pub const red_led: *bool = @ptrFromInt(base + 0x1c);
+pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt(base + 0x1e);
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -58,13 +76,13 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn line(x1: i32, y1: i32, x2: i32, y2: i32) void;
         extern fn oval(x: i32, y: i32, width: u32, height: u32) void;
         extern fn rect(x: i32, y: i32, width: u32, height: u32) void;
-        extern fn text(strPtr: [*]const u8, strLen: usize, x: i32, y: i32) void;
+        extern fn text(str_ptr: [*]const u8, str_len: usize, x: i32, y: i32, foreground_color: OptionalDisplayColor, background_color: OptionalDisplayColor) void;
         extern fn vline(x: i32, y: i32, len: u32) void;
         extern fn hline(x: i32, y: i32, len: u32) void;
         extern fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void;
         extern fn diskr(dest: [*]u8, size: u32) u32;
         extern fn diskw(src: [*]const u8, size: u32) u32;
-        extern fn trace(strPtr: [*]const u8, strLen: usize) void;
+        extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
     struct {
@@ -189,18 +207,19 @@ pub inline fn rect(x: i32, y: i32, width: u32, height: u32) void {
 }
 
 /// Draws text using the built-in system font.
-pub inline fn text(str: []const u8, x: i32, y: i32) void {
+pub inline fn text(str: []const u8, x: i32, y: i32, foreground_color: ?DisplayColor, background_color: ?DisplayColor) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.text(str.ptr, str.len, x, y);
+        platform_specific.text(str.ptr, str.len, x, y, OptionalDisplayColor.from(foreground_color), OptionalDisplayColor.from(background_color));
     } else {
-        asm volatile (" svc #5"
-            :
-            : [str_ptr] "{r0}" (str.ptr),
-              [str_len] "{r1}" (str.len),
-              [x] "{r2}" (x),
-              [y] "{r3}" (y),
-            : "memory"
-        );
+        @compileError("TODO");
+        // asm volatile (" svc #5"
+        //     :
+        //     : [str_ptr] "{r0}" (str.ptr),
+        //       [str_len] "{r1}" (str.len),
+        //       [x] "{r2}" (x),
+        //       [y] "{r3}" (y),
+        //     : "memory"
+        // );
     }
 }
 

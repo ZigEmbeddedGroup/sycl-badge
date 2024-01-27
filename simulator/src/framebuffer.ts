@@ -4,6 +4,7 @@ import {
     HEIGHT,
     ADDR_FRAMEBUFFER,
 } from "./constants";
+import { unpack565 } from "./ui/utils";
 
 export class Framebuffer {
     bytes: Uint16Array;
@@ -251,9 +252,7 @@ export class Framebuffer {
         let currentX = x;
         for (let ii = 0, len = charArray.length; ii < len; ++ii) {
             const charCode = charArray[ii];
-            if (charCode === 0) {
-                return;
-            } else if (charCode === 10) {
+            if (charCode === 10) {
                 y += 8;
                 currentX = x;
             } else if (charCode >= 32 && charCode <= 255) {

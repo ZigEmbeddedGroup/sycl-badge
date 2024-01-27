@@ -3,7 +3,7 @@ import * as z85 from "./z85";
 import { APU } from "./apu";
 import { Framebuffer } from "./framebuffer";
 import { WebGLCompositor } from "./compositor";
-import { pack565 } from "./ui/utils";
+import { pack565, unpack565 } from "./ui/utils";
 
 export class Runtime {
     canvas: HTMLCanvasElement;
@@ -74,9 +74,24 @@ export class Runtime {
     setControls (controls: number) {
         this.data.setUint16(constants.ADDR_CONTROLS, controls, true);
     }
+    
+    setLightLevel (value: number) {
+        this.data.setUint16(constants.ADDR_LIGHT_LEVEL, value, true);
+    }
 
-    getSystemFlag (mask: number) {
-        return this.data.getUint8(constants.ADDR_SYSTEM_FLAGS) & mask;
+    getNeopixels (): [number, number, number, number, number] {
+        const mem32 = new Uint32Array(this.data.buffer, constants.ADDR_NEOPIXELS);
+        return [
+            mem32[0] & 0b1111_1111_1111_1111_1111_1111,
+            mem32[1] & 0b1111_1111_1111_1111_1111_1111,
+            mem32[2] & 0b1111_1111_1111_1111_1111_1111,
+            mem32[3] & 0b1111_1111_1111_1111_1111_1111,
+            mem32[4] & 0b1111_1111_1111_1111_1111_1111
+        ];
+    }
+
+    getRedLed(): boolean {
+        return this.data.getUint8(constants.ADDR_RED_LED) !== 0;
     }
 
     unlockAudio () {
@@ -94,10 +109,6 @@ export class Runtime {
             mem32.fill(0);
         }
         this.pauseState &= ~constants.PAUSE_CRASHED;
-
-        // Initialize the mouse off screen
-        this.data.setInt16(constants.ADDR_MOUSE_X, 0x7fff, true);
-        this.data.setInt16(constants.ADDR_MOUSE_Y, 0x7fff, true);
     }
 
     async load (wasmBuffer: Uint8Array, enforceSizeLimit = true) {
@@ -163,9 +174,9 @@ export class Runtime {
         }
     }
 
-    text (textPtr: number, byteLength: number, x: number, y: number) {
+    text (textPtr: number, byteLength: number, x: number, y: number, foregroundColor: number, backgroundColor: number) {
         const text = new Uint8Array(this.memory.buffer, textPtr, byteLength);
-        this.framebuffer.drawText(text, x, y);
+        this.framebuffer.drawText(foregroundColor, backgroundColor, text, x, y);
     }
 
     blit (spritePtr: number, x: number, y: number, width: number, height: number, flags: number) {

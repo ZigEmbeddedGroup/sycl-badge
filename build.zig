@@ -62,7 +62,7 @@ pub fn build(b: *Build) void {
         lib.initial_memory = 65536;
         lib.max_memory = 65536;
         lib.stack_size = 14752;
-        lib.global_base = 160 * 128 * 2 + 0x06;
+        lib.global_base = 160 * 128 * 2 + 0x1e;
 
         // Export WASM-4 symbols
         lib.export_symbol_names = &[_][]const u8{ "start", "update" };

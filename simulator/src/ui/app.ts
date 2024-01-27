@@ -9,6 +9,7 @@ import { State } from "../state";
 
 import { MenuOverlay } from "./menu-overlay";
 import { Notifications } from "./notifications";
+import { HardwareComponents } from "./hardware-components";
 
 @customElement("wasm4-app")
 export class App extends LitElement {
@@ -64,10 +65,13 @@ export class App extends LitElement {
 
     @query("wasm4-menu-overlay") private menuOverlay?: MenuOverlay;
     @query("wasm4-notifications") private notifications!: Notifications;
+    @query("wasm4-hardware-components") private hardwareComponents!: HardwareComponents;
 
     private savedGameState?: State;
 
-    controls: number = 0;
+    public controls: number = 0;
+    public lightLevel: number = 0;
+
     private readonly gamepadUnavailableWarned = new Set<string>();
 
     private readonly diskPrefix: string;
@@ -181,7 +185,7 @@ export class App extends LitElement {
             "F9": takeScreenshot,
             "F10": recordVideo,
             "F11": utils.requestFullscreen,
-            "Enter": this.onMenuButtonPressed.bind(this),
+            "Escape": this.onMenuButtonPressed.bind(this),
         };
 
         const onKeyboardEvent = (event: KeyboardEvent) => {
@@ -198,9 +202,6 @@ export class App extends LitElement {
             // Poke WebAudio
             runtime.unlockAudio();
 
-            // We're using the keyboard now, hide the mouse cursor for extra immersion
-            document.body.style.cursor = "none";
-
             if (down) {
                 const hotkeyFn = HOTKEYS[event.key];
                 if (hotkeyFn) {
@@ -210,7 +211,6 @@ export class App extends LitElement {
                 }
             }
 
-            let playerIdx = 0;
             let mask = 0;
             switch (event.code) {
             case "Space":
@@ -220,7 +220,7 @@ export class App extends LitElement {
                 mask |= constants.CONTROLS_SELECT;
                 break;
             case "ShiftLeft": case "ShiftRight":
-                mask |= constants.CONTROLS_SELECT;
+                mask |= constants.CONTROLS_CLICK;
                 break;
             case "ArrowUp": case "KeyW":
                 mask |= constants.CONTROLS_UP;
@@ -339,8 +339,12 @@ export class App extends LitElement {
 
                 // Pass inputs into runtime memory
                 runtime.setControls(this.controls);
+                runtime.setLightLevel(this.lightLevel);
                 runtime.update();
                 calledUpdate = true;
+
+                this.hardwareComponents.neopixels = runtime.getNeopixels();
+                this.hardwareComponents.redLed = runtime.getRedLed();
             }
 
             if (calledUpdate) {
@@ -531,14 +535,15 @@ export class App extends LitElement {
 
     render () {
         return html`
+            <wasm4-hardware-components .app=${this}></wasm4-hardware-components>
             <div class="content">
-                ${this.showMenu ? html`<wasm4-menu-overlay .app=${this} />`: ""}
+                ${this.showMenu ? html`<wasm4-menu-overlay .app=${this}></wasm4-menu-overlay>`: ""}
                 <wasm4-notifications></wasm4-notifications>
                 <div class="canvas-wrapper">
                     ${this.runtime.canvas}
                 </div>
             </div>
-            <wasm4-virtual-gamepad .app=${this} />
+            <wasm4-virtual-gamepad .app=${this}></wasm4-virtual-gamepad>
         `;
     }
 }

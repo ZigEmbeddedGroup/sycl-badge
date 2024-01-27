@@ -44,5 +44,15 @@ export fn update() void {
         };
     }
 
-    wasm4.text(fbs.getWritten(), 0, 0, .{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 });
+    // TODO: blit, blitSub
+
+    wasm4.line(.{ .red = 0, .green = 63, .blue = 0 }, 50, 50, 70, 70);
+
+    wasm4.hline(.{ .red = 31, .green = 0, .blue = 0 }, 30, 30, 20);
+    wasm4.vline(.{ .red = 31, .green = 0, .blue = 0 }, 30, 30, 20);
+
+    wasm4.oval(.{ .red = 0, .green = 0, .blue = 31 }, .{ .red = 31, .green = 0, .blue = 31 }, 80, 80, 10, 10);
+    wasm4.rect(.{ .red = 31, .green = 31, .blue = 31 }, .{ .red = 0, .green = 63, .blue = 31 }, 100, 100, 10, 10);
+
+    wasm4.text(.{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 }, fbs.getWritten(), 0, 0);
 }

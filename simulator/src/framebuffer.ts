@@ -3,6 +3,7 @@ import {
     WIDTH,
     HEIGHT,
     ADDR_FRAMEBUFFER,
+    OPTIONAL_COLOR_NONE,
 } from "./constants";
 import { unpack565 } from "./ui/utils";
 
@@ -50,25 +51,24 @@ export class Framebuffer {
         this.drawHLineUnclipped(color, x, y, x + len);
     }
 
-    drawVLine(x: number, y: number, len: number) {
+    drawVLine(color: number, x: number, y: number, len: number) {
         if (y + len <= 0 || x < 0 || x >= WIDTH) {
-            return;
-        }
-
-        const dc0 = this.drawColors[0] & 0xf;
-        if (dc0 == 0) {
             return;
         }
 
         const startY = Math.max(0, y);
         const endY = Math.min(HEIGHT, y + len);
-        const strokeColor = (dc0 - 1) & 0x3;
+
         for (let yy = startY; yy < endY; yy++) {
-            this.drawPoint(strokeColor, x, yy);
+            this.drawPoint(color, x, yy);
         }
     }
 
-    drawRect(x: number, y: number, width: number, height: number) {
+    drawRect(strokeColor: number, fillColor: number, x: number, y: number, width: number, height: number) {
+        if (strokeColor === OPTIONAL_COLOR_NONE && fillColor === OPTIONAL_COLOR_NONE) {
+            return;
+        }
+
         const startX = Math.max(0, x);
         const startY = Math.max(0, y);
         const endXUnclamped = x + width;
@@ -76,20 +76,13 @@ export class Framebuffer {
         const endX = Math.min(endXUnclamped, WIDTH);
         const endY = Math.min(endYUnclamped, HEIGHT);
 
-        const drawColors = this.drawColors[0];
-        const dc0 = drawColors & 0xf;
-        const dc1 = (drawColors >>> 4) & 0xf;
-
-        if (dc0 !== 0) {
-            const fillColor = (dc0 - 1) & 0x3;
+        if (fillColor !== OPTIONAL_COLOR_NONE) {
             for (let yy = startY; yy < endY; ++yy) {
                 this.drawHLineFast(fillColor, startX, yy, endX);
             }
         }
 
-        if (dc1 !== 0) {
-            const strokeColor = (dc1 - 1) & 0x3;
-
+        if (strokeColor !== OPTIONAL_COLOR_NONE) {
             // Left edge
             if (x >= 0 && x < WIDTH) {
                 for (let yy = startY; yy < endY; ++yy) {
@@ -129,18 +122,11 @@ export class Framebuffer {
     // There are a lot of details to get correct while implementing this algorithm,
     // so ensure the edge cases are covered when changing it. Long, thin ellipses
     // are particularly susceptible to being drawn incorrectly.
-    drawOval (x: number, y: number, width: number, height: number) {
-        const drawColors = this.drawColors[0];
-        const dc0 = drawColors & 0xf;
-        const dc1 = (drawColors >>> 4) & 0xf;
-
-        if (dc1 === 0xf) {
+    drawOval (strokeColor: number, fillColor: number, x: number, y: number, width: number, height: number) {
+        if (strokeColor === OPTIONAL_COLOR_NONE && fillColor === OPTIONAL_COLOR_NONE) {
             return;
         }
-
-        const strokeColor = (dc1 - 1) & 0x3;
-        const fillColor = (dc0 - 1) & 0x3;
-
+        
         let a = width - 1;
         const b = height - 1;
         let b1 = b % 2; // Compensates for precision loss when dividing
@@ -165,15 +151,17 @@ export class Framebuffer {
         b1 = 8 * b2;
 
         do {
-            this.drawPointUnclipped(strokeColor, east, north); /*   I. Quadrant     */
-            this.drawPointUnclipped(strokeColor, west, north); /*   II. Quadrant    */
-            this.drawPointUnclipped(strokeColor, west, south); /*   III. Quadrant   */
-            this.drawPointUnclipped(strokeColor, east, south); /*   IV. Quadrant    */
+            if (strokeColor !== OPTIONAL_COLOR_NONE) {
+                this.drawPointUnclipped(strokeColor, east, north); /*   I. Quadrant     */
+                this.drawPointUnclipped(strokeColor, west, north); /*   II. Quadrant    */
+                this.drawPointUnclipped(strokeColor, west, south); /*   III. Quadrant   */
+                this.drawPointUnclipped(strokeColor, east, south); /*   IV. Quadrant    */
+            }
 
             const start = west + 1;
             const len = east - start;
 
-            if (dc0 !== 0 && len > 0) { // Only draw fill if the length from west to east is not 0
+            if (fillColor !== OPTIONAL_COLOR_NONE && len > 0) { // Only draw fill if the length from west to east is not 0
                 this.drawHLineUnclipped(fillColor, start, north, east); /*   I and III. Quadrant */
                 this.drawHLineUnclipped(fillColor, start, south, east); /*  II and IV. Quadrant */
             }
@@ -197,26 +185,21 @@ export class Framebuffer {
             }
         } while (west <= east);
 
-        // Make sure north and south have moved the entire way so top/bottom aren't missing
-        while (north - south < height) {
-            this.drawPointUnclipped(strokeColor, west - 1, north); /*   II. Quadrant    */
-            this.drawPointUnclipped(strokeColor, east + 1, north); /*   I. Quadrant     */
-            north += 1;
-            this.drawPointUnclipped(strokeColor, west - 1, south); /*   III. Quadrant   */
-            this.drawPointUnclipped(strokeColor, east + 1, south); /*   IV. Quadrant    */
-            south -= 1;
+        if (strokeColor !== OPTIONAL_COLOR_NONE) {
+            // Make sure north and south have moved the entire way so top/bottom aren't missing
+            while (north - south < height) {
+                this.drawPointUnclipped(strokeColor, west - 1, north); /*   II. Quadrant    */
+                this.drawPointUnclipped(strokeColor, east + 1, north); /*   I. Quadrant     */
+                north += 1;
+                this.drawPointUnclipped(strokeColor, west - 1, south); /*   III. Quadrant   */
+                this.drawPointUnclipped(strokeColor, east + 1, south); /*   IV. Quadrant    */
+                south -= 1;
+            }
         }
     }
 
     // From https://github.com/nesbox/TIC-80/blob/master/src/core/draw.c
-    drawLine (x1: number, y1: number, x2: number, y2: number) {
-        const drawColors = this.drawColors[0];
-        const dc0 = drawColors & 0xf;
-        if (dc0 === 0) {
-            return;
-        }
-        const strokeColor = (dc0 - 1) & 0x3;
-
+    drawLine (color: number, x1: number, y1: number, x2: number, y2: number) {
         if (y1 > y2) {
             let swap = x1;
             x1 = x2;
@@ -232,7 +215,7 @@ export class Framebuffer {
         let err = (dx > dy ? dx : -dy) / 2, e2;
 
         for (;;) {
-            this.drawPointUnclipped(strokeColor, x1, y1);
+            this.drawPointUnclipped(color, x1, y1);
             if (x1 === x2 && y1 === y2) {
                 break;
             }
@@ -248,7 +231,7 @@ export class Framebuffer {
         }
     }
 
-    drawText (charColor: number, backgroundColor: number, charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number) {
+    drawText (textColor: number, backgroundColor: number, charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number) {
         let currentX = x;
         for (let ii = 0, len = charArray.length; ii < len; ++ii) {
             const charCode = charArray[ii];
@@ -256,7 +239,7 @@ export class Framebuffer {
                 y += 8;
                 currentX = x;
             } else if (charCode >= 32 && charCode <= 255) {
-                this.blit([charColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
+                this.blit([textColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
                 currentX += 8;
             } else {
                 currentX += 8;
@@ -314,7 +297,9 @@ export class Framebuffer {
                     colorIdx = (byte >>> shift) & 0b1;
                 }
 
-                this.drawPoint(colors[colorIdx], tx, ty);
+                if (colors[colorIdx] !== OPTIONAL_COLOR_NONE) {
+                    this.drawPoint(colors[colorIdx], tx, ty);
+                }
             }
         }
     }

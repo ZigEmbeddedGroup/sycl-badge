@@ -1,6 +1,8 @@
-const atsam = @import("atsam");
-const MicroZig = @import("microzig");
 const std = @import("std");
+const Build = std.Build;
+
+const MicroZig = @import("microzig/build");
+const atsam = @import("microzig/bsp/microchip/atsam");
 
 pub const py_badge: MicroZig.Target = .{
     .preferred_format = .elf,
@@ -8,8 +10,8 @@ pub const py_badge: MicroZig.Target = .{
     .hal = null,
 };
 
-pub fn build(b: *std.Build) void {
-    const mz = MicroZig.init(b, "microzig");
+pub fn build(b: *Build) void {
+    const mz = MicroZig.init(b, .{});
     const optimize = b.standardOptimizeOption(.{});
 
     const fw_options = b.addOptions();
@@ -25,16 +27,16 @@ pub fn build(b: *std.Build) void {
     var modified_py_badge = py_badge;
     modified_py_badge.chip.memory_regions = modified_memory_regions;
 
-    const fw = mz.addFirmware(b, .{
+    const fw = mz.add_firmware(b, .{
         .name = "pybadge-io",
         .target = modified_py_badge,
         .optimize = optimize,
         .source_file = .{ .path = "src/main.zig" },
     });
     fw.artifact.step.dependOn(&fw_options.step);
-    fw.modules.app.dependencies.put("options", fw_options.createModule()) catch @panic("out of memory");
-    mz.installFirmware(b, fw, .{});
-    mz.installFirmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
+    fw.modules.app.addImport("options", fw_options.createModule());
+    mz.install_firmware(b, fw, .{});
+    mz.install_firmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }
 
 pub const Cart = struct {
@@ -45,12 +47,12 @@ pub const Cart = struct {
 pub const CartOptions = struct {
     name: []const u8,
     optimize: std.builtin.OptimizeMode,
-    source_file: std.Build.LazyPath,
+    source_file: Build.LazyPath,
 };
 
-pub fn addCart(
-    d: *std.Build.Dependency,
-    b: *std.Build,
+pub fn add_cart(
+    d: *Build.Dependency,
+    b: *Build,
     options: CartOptions,
 ) *Cart {
     const cart_lib = b.addStaticLibrary(.{
@@ -85,7 +87,7 @@ pub fn addCart(
     return cart;
 }
 
-pub fn installCart(b: *std.Build, cart: *Cart) void {
-    cart.mz.installFirmware(b, cart.fw, .{});
-    cart.mz.installFirmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+pub fn install_cart(b: *Build, cart: *Cart) void {
+    cart.mz.install_firmware(b, cart.fw, .{});
+    cart.mz.install_firmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }

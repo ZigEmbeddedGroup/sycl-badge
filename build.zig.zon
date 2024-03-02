@@ -9,13 +9,11 @@
     },
 
     .dependencies = .{
-        .microzig = .{
-            .url = "https://github.com/ZigEmbeddedGroup/microzig/archive/57e4379062e396b354d70d5b924d5da2e8905bd4.tar.gz",
-            .hash = "1220b8b04be6b97020eb19fca51b3cb44c33f5a619c3e36fc48faab8b15261dfff2a",
+        .@"microzig/build" = .{
+            .path = "../microzig/build",
         },
-        .atsam = .{
-            .url = "https://github.com/ZigEmbeddedGroup/microchip-atsam/archive/93ddffbcbe7a0b849cca610ee933210280d731b4.tar.gz",
-            .hash = "12209a965a8aaf3a80b224fc3b796b7a21af86e3550373227db86615b6fa09b642cf",
+        .@"microzig/bsp/microchip/atsam" = .{
+            .path = "../microzig/bsp/microchip/atsam",
         },
     },
 }

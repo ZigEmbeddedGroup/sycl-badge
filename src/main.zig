@@ -14,171 +14,21 @@ const std = @import("std");
 const timer = @import("timer.zig");
 const utils = @import("utils.zig");
 
-pub const std_options = struct {
-    pub const log_level = switch (builtin.mode) {
-        .Debug => .debug,
-        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
-    };
-    pub const logFn = log;
-};
-
-pub const microzig_options = struct {
-    pub const interrupts = struct {
-        const interrupt_log = std.log.scoped(.interrupt);
-        const Context = extern struct {
-            R0: u32,
-            R1: u32,
-            R2: u32,
-            R3: u32,
-            R12: u32,
-            LR: u32,
-            ReturnAddress: u32,
-            xPSR: u32,
-        };
-
-        pub const NonMaskableInt = unhandled("NonMaskableInt");
-        pub const HardFault = withContext(struct {
-            fn handler(ctx: *Context) void {
-                interrupt_log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
-                    io.SystemControl.HFSR.raw,
-                    ctx.ReturnAddress,
-                });
-                microzig.hang();
-            }
-        }.handler);
-        pub const MemoryManagement = withContext(struct {
-            fn handler(ctx: *Context) void {
-                interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
-                    io.SystemControl.CFSR.raw,
-                    io.SystemControl.MMFAR.raw,
-                    ctx.ReturnAddress,
-                });
-                microzig.hang();
-            }
-        }.handler);
-        pub const BusFault = withContext(struct {
-            fn handler(ctx: *Context) void {
-                interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
-                    io.SystemControl.CFSR.raw,
-                    io.SystemControl.BFAR.raw,
-                    ctx.ReturnAddress,
-                });
-                microzig.hang();
-            }
-        }.handler);
-        pub const UsageFault = withContext(struct {
-            fn handler(ctx: *Context) void {
-                interrupt_log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
-                    io.SystemControl.CFSR.raw,
-                    ctx.ReturnAddress,
-                });
-                microzig.hang();
-            }
-        }.handler);
-        pub fn SVCall() callconv(.Naked) void {
-            asm volatile (
-                \\ mvns r0, lr, lsl #31 - 2
-                \\ bcc 1f
-                \\ ite mi
-                \\ movmi r1, sp
-                \\ mrspl r1, psp
-                \\ ldr r2, [r1, #6 * 4]
-                \\ subs r2, #2
-                \\ ldrb r3, [r2, #1 * 1]
-                \\ cmp r3, #0xDF
-                \\ bne 1f
-                \\ ldrb r3, [r2, #0 * 1]
-                \\ cmp r3, #12
-                \\ bhi 1f
-                \\ tbb [pc, r3]
-                \\0:
-                \\ .byte (0f - 0b) / 2
-                \\ .byte (9f - 0b) / 2
-                \\ .byte (9f - 0b) / 2
-                \\ .byte (2f - 0b) / 2
-                \\ .byte (3f - 0b) / 2
-                \\ .byte (4f - 0b) / 2
-                \\ .byte (5f - 0b) / 2
-                \\ .byte (6f - 0b) / 2
-                \\ .byte (7f - 0b) / 2
-                \\ .byte (8f - 0b) / 2
-                \\ .byte (8f - 0b) / 2
-                \\ .byte (10f - 0b) / 2
-                \\1:
-                \\ .byte (11f - 0b) / 2
-                \\ .byte 0xDE
-                \\ .align 1
-                \\0:
-                \\ ldm r1, {r0-r3}
-                \\ b %[blit:P]
-                \\2:
-                \\ ldm r1, {r0-r3}
-                \\ b %[oval:P]
-                \\3:
-                \\ ldm r1, {r0-r3}
-                \\ b %[rect:P]
-                \\4:
-                \\ ldm r1, {r0-r3}
-                \\ b %[text:P]
-                \\5:
-                \\ ldm r1, {r0-r2}
-                \\ b %[vline:P]
-                \\6:
-                \\ ldm r1, {r0-r2}
-                \\ b %[hline:P]
-                \\7:
-                \\ ldm r1, {r0-r3}
-                \\ b %[tone:P]
-                \\8:
-                \\ movs r0, #0
-                \\ str r0, [r1, #0 * 4]
-                \\9:
-                \\ bx lr
-                \\10:
-                \\ ldm r1, {r0-r1}
-                \\ b %[trace:P]
-                \\11:
-                \\ lsrs r0, #31
-                \\ msr control, r0
-                \\ it eq
-                \\ popeq {r3, r5-r11, pc}
-                \\ subs r0, #1 - 0xFFFFFFFD
-                \\ push {r4-r11, lr}
-                \\ movs r4, #0
-                \\ movs r5, #0
-                \\ movs r6, #0
-                \\ movs r7, #0
-                \\ mov r8, r4
-                \\ mov r9, r5
-                \\ mov r10, r6
-                \\ mov r11, r7
-                \\ bx r0
-                :
-                : [blit] "X" (&cart.blit),
-                  [oval] "X" (&cart.oval),
-                  [rect] "X" (&cart.rect),
-                  [text] "X" (&cart.text),
-                  [vline] "X" (&cart.vline),
-                  [hline] "X" (&cart.hline),
-                  [tone] "X" (&cart.tone),
-                  [trace] "X" (&cart.trace),
-            );
-        }
-        pub const DebugMonitor = unhandled("DebugMonitor");
-        pub const PendSV = unhandled("PendSV");
-        pub const SysTick = unhandled("SysTick");
-        pub const DMAC_DMAC_1 = audio.mix;
-
-        fn unhandled(comptime name: []const u8) fn () callconv(.C) void {
-            return struct {
+const interrupt = struct {
+    fn unhandled(comptime name: []const u8) microzig.interrupt.Handler {
+        return .{
+            .C = struct {
                 fn handler() callconv(.C) void {
-                    interrupt_log.info(name, .{});
+                    interrupt.log.info(name, .{});
                     microzig.hang();
                 }
-            }.handler;
-        }
-        fn withContext(comptime handler: fn (*Context) void) fn () callconv(.Naked) void {
-            return struct {
+            }.handler,
+        };
+    }
+
+    fn with_context(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
+        return microzig.interrupt.Handler{
+            .Naked = struct {
                 fn interrupt() callconv(.Naked) void {
                     asm volatile (
                         \\ tst lr, #1 << 2
@@ -190,9 +40,166 @@ pub const microzig_options = struct {
                         : [handler] "X" (&handler),
                     );
                 }
-            }.interrupt;
-        }
+            }.interrupt,
+        };
+    }
+    const log = std.log.scoped(.interrupt);
+    const Context = extern struct {
+        R0: u32,
+        R1: u32,
+        R2: u32,
+        R3: u32,
+        R12: u32,
+        LR: u32,
+        ReturnAddress: u32,
+        xPSR: u32,
     };
+};
+
+pub const microzig_options = .{
+    .log_level = switch (builtin.mode) {
+        .Debug => .debug,
+        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
+    },
+    .logFn = log,
+    .interrupts = .{
+        .NonMaskableInt = interrupt.unhandled("NonMaskableInt"),
+        .HardFault = interrupt.with_context(struct {
+            fn handler(ctx: *interrupt.Context) void {
+                interrupt.log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.HFSR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler),
+        .MemoryManagement = interrupt.with_context(struct {
+            fn handler(ctx: *interrupt.Context) void {
+                interrupt.log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    io.SystemControl.MMFAR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler),
+        .BusFault = interrupt.with_context(struct {
+            fn handler(ctx: *interrupt.Context) void {
+                interrupt.log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    io.SystemControl.BFAR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler),
+        .UsageFault = interrupt.with_context(struct {
+            fn handler(ctx: *interrupt.Context) void {
+                interrupt.log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+                    io.SystemControl.CFSR.raw,
+                    ctx.ReturnAddress,
+                });
+                microzig.hang();
+            }
+        }.handler),
+        .DebugMonitor = interrupt.unhandled("DebugMonitor"),
+        .PendSV = interrupt.unhandled("PendSV"),
+        .SysTick = interrupt.unhandled("SysTick"),
+        .DMAC_DMAC_1 = .{ .C = audio.mix },
+        .SVCall = .{
+            .Naked = struct {
+                fn SVCall() callconv(.Naked) void {
+                    asm volatile (
+                        \\ mvns r0, lr, lsl #31 - 2
+                        \\ bcc 1f
+                        \\ ite mi
+                        \\ movmi r1, sp
+                        \\ mrspl r1, psp
+                        \\ ldr r2, [r1, #6 * 4]
+                        \\ subs r2, #2
+                        \\ ldrb r3, [r2, #1 * 1]
+                        \\ cmp r3, #0xDF
+                        \\ bne 1f
+                        \\ ldrb r3, [r2, #0 * 1]
+                        \\ cmp r3, #12
+                        \\ bhi 1f
+                        \\ tbb [pc, r3]
+                        \\0:
+                        \\ .byte (0f - 0b) / 2
+                        \\ .byte (9f - 0b) / 2
+                        \\ .byte (9f - 0b) / 2
+                        \\ .byte (2f - 0b) / 2
+                        \\ .byte (3f - 0b) / 2
+                        \\ .byte (4f - 0b) / 2
+                        \\ .byte (5f - 0b) / 2
+                        \\ .byte (6f - 0b) / 2
+                        \\ .byte (7f - 0b) / 2
+                        \\ .byte (8f - 0b) / 2
+                        \\ .byte (8f - 0b) / 2
+                        \\ .byte (10f - 0b) / 2
+                        \\1:
+                        \\ .byte (11f - 0b) / 2
+                        \\ .byte 0xDE
+                        \\ .align 1
+                        \\0:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[blit:P]
+                        \\2:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[oval:P]
+                        \\3:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[rect:P]
+                        \\4:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[text:P]
+                        \\5:
+                        \\ ldm r1, {r0-r2}
+                        \\ b %[vline:P]
+                        \\6:
+                        \\ ldm r1, {r0-r2}
+                        \\ b %[hline:P]
+                        \\7:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[tone:P]
+                        \\8:
+                        \\ movs r0, #0
+                        \\ str r0, [r1, #0 * 4]
+                        \\9:
+                        \\ bx lr
+                        \\10:
+                        \\ ldm r1, {r0-r1}
+                        \\ b %[trace:P]
+                        \\11:
+                        \\ lsrs r0, #31
+                        \\ msr control, r0
+                        \\ it eq
+                        \\ popeq {r3, r5-r11, pc}
+                        \\ subs r0, #1 - 0xFFFFFFFD
+                        \\ push {r4-r11, lr}
+                        \\ movs r4, #0
+                        \\ movs r5, #0
+                        \\ movs r6, #0
+                        \\ movs r7, #0
+                        \\ mov r8, r4
+                        \\ mov r9, r5
+                        \\ mov r10, r6
+                        \\ mov r11, r7
+                        \\ bx r0
+                        :
+                        : [blit] "X" (&cart.blit),
+                          [oval] "X" (&cart.oval),
+                          [rect] "X" (&cart.rect),
+                          [text] "X" (&cart.text),
+                          [vline] "X" (&cart.vline),
+                          [hline] "X" (&cart.hline),
+                          [tone] "X" (&cart.tone),
+                          [trace] "X" (&cart.trace),
+                    );
+                }
+            }.SVCall,
+        },
+    },
 };
 
 const InOutError = error{NoConnection};
@@ -227,7 +234,7 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
-pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
+pub fn dump_peripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
     switch (@typeInfo(@typeInfo(@TypeOf(pointer)).Pointer.child)) {
         .Int => {
             logger.info("[0x{x}] " ++ prefix ++ " = 0x{x}", .{ @intFromPtr(pointer), pointer.* });
@@ -235,10 +242,10 @@ pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: any
         .Struct => |*info| inline for (info.fields) |field| {
             if (comptime std.mem.startsWith(u8, field.name, "reserved")) continue;
             if (comptime std.mem.eql(u8, field.name, "padding")) continue;
-            dumpPeripheral(logger, prefix ++ "." ++ field.name, &@field(pointer, field.name));
+            dump_peripheral(logger, prefix ++ "." ++ field.name, &@field(pointer, field.name));
         },
         .Array => inline for (0.., pointer) |index, *elem| {
-            dumpPeripheral(logger, std.fmt.comptimePrint("{s}[{d}]", .{ prefix, index }), elem);
+            dump_peripheral(logger, std.fmt.comptimePrint("{s}[{d}]", .{ prefix, index }), elem);
         },
         else => @compileError("Unhandled type: " ++ @typeName(@TypeOf(pointer))),
     }
@@ -284,9 +291,9 @@ pub fn main() !void {
     usb.init();
     // ID detection
     const id_port = Port.D13;
-    id_port.setDir(.out);
+    id_port.set_dir(.out);
     id_port.write(.high);
-    id_port.configPtr().write(.{
+    id_port.config_ptr().write(.{
         .PMUXEN = 0,
         .INEN = 1,
         .PULLEN = 1,
@@ -294,7 +301,7 @@ pub fn main() !void {
         .DRVSTR = 0,
         .padding = 0,
     });
-    usb.reinitMode(.DEVICE);
+    usb.reinit_mode(.DEVICE);
 
     timer.init();
     lcd.init(.bpp24);
@@ -394,7 +401,7 @@ pub fn main() !void {
                 'A' - '@' => {
                     timer.delay(std.time.us_per_s);
                     const tempo = 0.78;
-                    audio.playSong(&.{
+                    audio.play_song(&.{
                         &.{
                             .{ .duration = tempo * 0.75, .frequency = audio.Note.F5 },
                             .{ .duration = tempo * 0.25, .frequency = audio.Note.Db5 },
@@ -523,7 +530,7 @@ pub fn main() !void {
                         },
                     });
                 },
-                'B' - '@' => utils.resetIntoBootloader(),
+                'B' - '@' => utils.reset_into_bootloader(),
                 'C' - '@' => { // Debug clock frequencies
                     const clock_log = std.log.scoped(.clock);
 
@@ -678,7 +685,7 @@ pub fn main() !void {
                 'I' - '@' => if (true) lcd.invert(),
                 '\r' => out.writeByte('\n') catch break :input,
                 'P' - '@' => @panic("user"),
-                'R' - '@' => utils.resetIntoApp(),
+                'R' - '@' => utils.reset_into_app(),
                 'S' - '@' => for (0.., &io.PORT.GROUP) |group_i, *group|
                     std.log.info("IN{d} = 0x{X:0>8}", .{ group_i, group.IN.read().IN }),
                 'T' - '@' => { // Debug timer delay
@@ -857,14 +864,14 @@ pub const usb = struct {
     fn init() void {
         @setCold(true);
 
-        Port.@"D-".setMux(.H);
-        Port.@"D+".setMux(.H);
+        Port.@"D-".set_mux(.H);
+        Port.@"D+".set_mux(.H);
         io.MCLK.AHBMASK.modify(.{ .USB_ = 1 });
         io.MCLK.APBBMASK.modify(.{ .USB_ = 1 });
     }
 
     /// Reinitialize into the specified mode
-    fn reinitMode(mode: io_types.USB.USB_CTRLA__MODE) void {
+    fn reinit_mode(mode: io_types.USB.USB_CTRLA__MODE) void {
         @setCold(true);
 
         // Tear down clocks
@@ -1399,14 +1406,14 @@ pub const usb = struct {
                         .out => switch (@as(Setup.standard.Request, @enumFromInt(setup.bRequest))) {
                             .SET_ADDRESS => if (setup.wIndex == 0 and setup.wLength == 0) {
                                 if (std.math.cast(u7, setup.wValue)) |addr| {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     io.USB.DEVICE.DADD.write(.{ .DADD = addr, .ADDEN = 1 });
                                     break :setup;
                                 }
                             },
                             .SET_CONFIGURATION => {
                                 if (std.math.cast(u8, setup.wValue)) |config| {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     current_configuration = config;
                                     cdc.current_connection = 0;
                                     switch (config) {
@@ -1497,7 +1504,7 @@ pub const usb = struct {
                             .GET_DESCRIPTOR => {
                                 switch (@as(Setup.standard.DescriptorType, @enumFromInt(setup.wValue >> 8))) {
                                     .DEVICE => if (@as(u8, @truncate(setup.wValue)) == 0 and setup.wIndex == 0) {
-                                        writeControl(&[0x12]u8{
+                                        write_control(&[0x12]u8{
                                             0x12, @intFromEnum(Setup.standard.DescriptorType.DEVICE), //
                                             0x00, 0x02, //
                                             0xef, 0x02, 0x01, //
@@ -1513,7 +1520,7 @@ pub const usb = struct {
                                     .CONFIGURATION => if (setup.wIndex == 0) {
                                         switch (@as(u8, @truncate(setup.wValue))) {
                                             0 => {
-                                                writeControl(&[0x003e]u8{
+                                                write_control(&[0x003e]u8{
                                                     0x09, @intFromEnum(Setup.standard.DescriptorType.CONFIGURATION), //
                                                     0x3e, 0x00, //
                                                     0x02, 0x01, 0x00, //
@@ -1558,7 +1565,7 @@ pub const usb = struct {
                                     .STRING => switch (@as(u8, @truncate(setup.wValue))) {
                                         0 => switch (setup.wIndex) {
                                             0 => {
-                                                writeControl(&[4]u8{
+                                                write_control(&[4]u8{
                                                     4, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     0x09, 0x04, // English (United States)
                                                 });
@@ -1568,7 +1575,7 @@ pub const usb = struct {
                                         },
                                         1 => switch (setup.wIndex) {
                                             0x0409 => { // English (United States)
-                                                writeControl(&[38]u8{
+                                                write_control(&[38]u8{
                                                     38, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     'Z', 0x00, //
                                                     'i', 0x00, //
@@ -1595,7 +1602,7 @@ pub const usb = struct {
                                         },
                                         2 => switch (setup.wIndex) {
                                             0x0409 => { // English (United States)
-                                                writeControl(&[16]u8{
+                                                write_control(&[16]u8{
                                                     16, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     'B', 0x00, //
                                                     'a', 0x00, //
@@ -1628,13 +1635,13 @@ pub const usb = struct {
                         0 => switch (setup.bmRequestType.dir) {
                             .out => switch (@as(Setup.cdc.Request, @enumFromInt(setup.bRequest))) {
                                 .SET_LINE_CODING => if (setup.wValue == 0) {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     break :setup;
                                 },
                                 .SET_CONTROL_LINE_STATE => if (setup.wLength == 0) {
                                     if (std.math.cast(u8, setup.wValue)) |conn| {
                                         cdc.current_connection = conn;
-                                        writeControl(&[0]u8{});
+                                        write_control(&[0]u8{});
                                         break :setup;
                                     }
                                 },
@@ -1697,7 +1704,7 @@ pub const usb = struct {
         return data[0..0];
     }
 
-    fn writeControl(data: []const u8) void {
+    fn write_control(data: []const u8) void {
         write(0, data[0..@min(data.len, setup.wLength)]);
     }
 

@@ -1,8 +1,8 @@
 pub fn init() void {
     @setCold(true);
 
-    Port.BUTTON_OUT.setDir(.in);
-    Port.BUTTON_OUT.configPtr().write(.{
+    Port.BUTTON_OUT.set_dir(.in);
+    Port.BUTTON_OUT.config_ptr().write(.{
         .PMUXEN = 0,
         .INEN = 1,
         .PULLEN = 0,
@@ -10,12 +10,12 @@ pub fn init() void {
         .DRVSTR = 0,
         .padding = 0,
     });
-    Port.BUTTON_CLK.setDir(.out);
+    Port.BUTTON_CLK.set_dir(.out);
     Port.BUTTON_CLK.write(.high);
-    Port.BUTTON_LATCH.setDir(.out);
+    Port.BUTTON_LATCH.set_dir(.out);
     Port.BUTTON_LATCH.write(.high);
 
-    timer.initFrameSync();
+    timer.init_frame_sync();
 
     @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
 
@@ -51,7 +51,7 @@ pub fn start() void {
 }
 
 pub fn tick() void {
-    if (!timer.checkFrameReady()) return;
+    if (!timer.check_frame_ready()) return;
 
     {
         var gamepad: u8 = 0;
@@ -162,7 +162,7 @@ pub fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struc
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u1 = @truncate(sprite[sprite_index >> 3].load() >>
                     (7 - @as(u3, @truncate(sprite_index))));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -174,7 +174,7 @@ pub fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struc
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u2 = @truncate(sprite[sprite_index >> 2].load() >>
                     (6 - (@as(u3, @as(u2, @truncate(sprite_index))) << 1)));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -212,18 +212,18 @@ pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
                 hline(mid_x -| cur_y, mid_y -| cur_x, cur_y << 1);
                 hline(mid_x -| cur_y, mid_y +| cur_x, cur_y << 1);
                 if (stroke_palette_index) |palette_index| {
-                    clipDrawPalette(mid_x -| cur_x, mid_y -| cur_y, palette_index);
-                    clipDrawPalette(mid_x +| cur_x, mid_y -| cur_y, palette_index);
-                    clipDrawPalette(mid_x -| cur_y, mid_y -| cur_x, palette_index);
-                    clipDrawPalette(mid_x +| cur_y, mid_y -| cur_x, palette_index);
-                    clipDrawPalette(mid_x -| cur_y, mid_y +| cur_x, palette_index);
-                    clipDrawPalette(mid_x +| cur_y, mid_y +| cur_x, palette_index);
-                    clipDrawPalette(mid_x -| cur_x, mid_y +| cur_y, palette_index);
-                    clipDrawPalette(mid_x +| cur_x, mid_y +| cur_y, palette_index);
+                    clip_draw_palette(mid_x -| cur_x, mid_y -| cur_y, palette_index);
+                    clip_draw_palette(mid_x +| cur_x, mid_y -| cur_y, palette_index);
+                    clip_draw_palette(mid_x -| cur_y, mid_y -| cur_x, palette_index);
+                    clip_draw_palette(mid_x +| cur_y, mid_y -| cur_x, palette_index);
+                    clip_draw_palette(mid_x -| cur_y, mid_y +| cur_x, palette_index);
+                    clip_draw_palette(mid_x +| cur_y, mid_y +| cur_x, palette_index);
+                    clip_draw_palette(mid_x -| cur_x, mid_y +| cur_y, palette_index);
+                    clip_draw_palette(mid_x +| cur_x, mid_y +| cur_y, palette_index);
                 }
                 cur_x += 1;
                 err += cur_x;
-                var temp = err - cur_y;
+                const temp = err - cur_y;
                 if (temp >= 0) {
                     err = temp;
                     cur_y -= 1;
@@ -255,7 +255,7 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     if (stroke_palette_index) |palette_index| {
         if (y >= 0 and y < SCREEN_SIZE) {
             for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-                drawPalette(@intCast(cur_x), @intCast(y), palette_index);
+                draw_palette(@intCast(cur_x), @intCast(y), palette_index);
             }
         }
     }
@@ -263,19 +263,19 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
         for (@max(y + 1, 0)..@intCast(@min(end_y - 1, SCREEN_SIZE))) |cur_y| {
             if (stroke_palette_index) |palette_index| {
                 if (x >= 0 and x < SCREEN_SIZE) {
-                    drawPalette(@intCast(x), @intCast(cur_y), palette_index);
+                    draw_palette(@intCast(x), @intCast(cur_y), palette_index);
                 }
             }
             if (fill_palette_index) |palette_index| {
                 if (width > 2) {
                     for (@max(x + 1, 0)..@intCast(@min(end_x - 1, SCREEN_SIZE))) |cur_x| {
-                        drawPalette(@intCast(cur_x), @intCast(cur_y), palette_index);
+                        draw_palette(@intCast(cur_x), @intCast(cur_y), palette_index);
                     }
                 }
             }
             if (stroke_palette_index) |palette_index| {
                 if (width > 1 and end_x - 1 >= 0 and end_x - 1 < SCREEN_SIZE) {
-                    drawPalette(@intCast(end_x - 1), @intCast(cur_y), palette_index);
+                    draw_palette(@intCast(end_x - 1), @intCast(cur_y), palette_index);
                 }
             }
         }
@@ -283,7 +283,7 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     if (stroke_palette_index) |palette_index| {
         if (height > 1 and end_y - 1 >= 0 and end_y - 1 < SCREEN_SIZE) {
             for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-                drawPalette(@intCast(cur_x), @intCast(end_y - 1), palette_index);
+                draw_palette(@intCast(cur_x), @intCast(end_y - 1), palette_index);
             }
         }
     }
@@ -300,7 +300,7 @@ pub fn text(str: [*]const User(u8), len: usize, x: i32, y: i32) callconv(.C) voi
         },
         ' '...0xFF => |char| {
             const glyph = &font[char - ' '];
-            blitUnsafe(glyph, cur_x, cur_y, 8, 8, BLIT_1BPP);
+            blit_unsafe(glyph, cur_x, cur_y, 8, 8, BLIT_1BPP);
             cur_x +|= 8;
         },
     };
@@ -316,7 +316,7 @@ pub fn vline(x: i32, y: i32, len: u32) callconv(.C) void {
     const palette_index: u2 = @truncate(draw_color - 1);
 
     for (@max(y, 0)..@intCast(@min(end_y, SCREEN_SIZE))) |cur_y| {
-        drawPalette(@intCast(x), @intCast(cur_y), palette_index);
+        draw_palette(@intCast(x), @intCast(cur_y), palette_index);
     }
 }
 
@@ -330,7 +330,7 @@ pub fn hline(x: i32, y: i32, len: u32) callconv(.C) void {
     const palette_index: u2 = @truncate(draw_color - 1);
 
     for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-        drawPalette(@intCast(cur_x), @intCast(y), palette_index);
+        draw_palette(@intCast(cur_x), @intCast(y), palette_index);
     }
 }
 
@@ -414,11 +414,11 @@ pub fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) callconv(.C)
         },
     }
 
-    audio.setChannel(@intFromEnum(channel), state);
+    audio.set_channel(@intFromEnum(channel), state);
 }
 
 pub fn trace(str: [*]const User(u8), len: usize) callconv(.C) void {
-    std.log.scoped(.trace).info("{}", .{fmtUserString(str[0..len])});
+    std.log.scoped(.trace).info("{}", .{fmt_user_string(str[0..len])});
 }
 
 fn call(func: *const fn () callconv(.C) void) void {
@@ -440,14 +440,14 @@ fn call(func: *const fn () callconv(.C) void) void {
     );
 }
 
-fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: u32) void {
+fn blit_unsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: u32) void {
     switch (flags) {
         BLIT_1BPP => for (0..height) |sprite_y| {
             for (0..width) |sprite_x| {
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u1 = @truncate(sprite[sprite_index >> 3] >>
                     (7 - @as(u3, @truncate(sprite_index))));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -459,7 +459,7 @@ fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flag
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u2 = @truncate(sprite[sprite_index >> 2] >>
                     (6 - (@as(u3, @as(u2, @truncate(sprite_index))) << 1)));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -470,24 +470,24 @@ fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flag
     }
 }
 
-inline fn clipDraw(x: i32, y: i32, draw_color_index: u2) void {
+inline fn clip_draw(x: i32, y: i32, draw_color_index: u2) void {
     if (x < 0 or x >= SCREEN_SIZE or y < 0 or y >= SCREEN_SIZE) return;
     draw(@intCast(x), @intCast(y), draw_color_index);
 }
 
-inline fn clipDrawPalette(x: i32, y: i32, palette_index: u2) void {
+inline fn clip_draw_palette(x: i32, y: i32, palette_index: u2) void {
     if (x < 0 or x >= SCREEN_SIZE or y < 0 or y >= SCREEN_SIZE) return;
-    drawPalette(@intCast(x), @intCast(y), palette_index);
+    draw_palette(@intCast(x), @intCast(y), palette_index);
 }
 
 inline fn draw(x: u8, y: u8, draw_color_index: u2) void {
     const draw_color: u4 = @truncate(DRAW_COLORS.* >> (@as(u4, draw_color_index) << 2));
     if (draw_color == 0) return;
     const palette_index: u2 = @truncate(draw_color - 1);
-    drawPalette(x, y, palette_index);
+    draw_palette(x, y, palette_index);
 }
 
-inline fn drawPalette(x: u8, y: u8, palette_index: u2) void {
+inline fn draw_palette(x: u8, y: u8, palette_index: u2) void {
     std.debug.assert(x < SCREEN_SIZE and y < SCREEN_SIZE);
     const buffer_index = x + SCREEN_SIZE * y;
     const shift = @as(u3, @as(u2, @truncate(buffer_index))) << 1;
@@ -495,10 +495,10 @@ inline fn drawPalette(x: u8, y: u8, palette_index: u2) void {
     byte.* = (byte.* & ~(@as(u8, 0b11) << shift)) | @as(u8, palette_index) << shift;
 }
 
-fn formatUserString(bytes: []const User(u8), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+fn format_user_string(bytes: []const User(u8), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
     for (bytes) |*byte| try writer.writeByte(byte.load());
 }
-inline fn fmtUserString(bytes: []const User(u8)) std.fmt.Formatter(formatUserString) {
+inline fn fmt_user_string(bytes: []const User(u8)) std.fmt.Formatter(format_user_string) {
     return .{ .data = bytes };
 }
 

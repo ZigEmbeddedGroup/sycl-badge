@@ -70,7 +70,7 @@ pub inline fn blit(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32,
 }
 
 /// Copies a subregion within a larger sprite atlas to the framebuffer.
-pub inline fn blitSub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: u32) void {
+pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: u32) void {
     const rest: extern struct {
         width: u32,
         height: u32,

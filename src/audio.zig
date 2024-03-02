@@ -24,9 +24,9 @@ pub const Channel = struct {
 pub fn init() void {
     @setCold(true);
 
-    Port.A0.setDir(.out);
-    Port.AVCC.setDir(.in);
-    Port.SPKR_EN.setDir(.out);
+    Port.A0.set_dir(.out);
+    Port.AVCC.set_dir(.in);
+    Port.SPKR_EN.set_dir(.out);
     Port.SPKR_EN.write(.low);
 
     io.MCLK.APBDMASK.modify(.{ .DAC_ = 1 });
@@ -39,8 +39,8 @@ pub fn init() void {
     });
     io.DAC.CTRLA.write(.{ .SWRST = 1, .ENABLE = 0, .padding = 0 });
     while (io.DAC.SYNCBUSY.read().SWRST != 0) {}
-    Port.A0.setMux(.B);
-    Port.AVCC.setMux(.B);
+    Port.A0.set_mux(.B);
+    Port.AVCC.set_mux(.B);
     io.DAC.CTRLB.write(.{ .DIFF = 0, .REFSEL = .{ .value = .VREFPU }, .padding = 0 });
     io.DAC.EVCTRL.write(.{
         .STARTEI0 = 1,
@@ -208,16 +208,16 @@ pub fn init() void {
     });
     io.EVSYS.USER[EVSYS.USER.DAC_START0].write(.{ .CHANNEL = EVSYS.CHANNEL.AUDIO + 1, .padding = 0 });
 
-    dma.initAudio();
+    dma.init_audio();
     while (io.DAC.STATUS.read().READY0 != 1) {}
     Port.SPKR_EN.write(.high);
     io.NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-pub fn mix() void {
+pub fn mix() callconv(.C) void {
     var local_channels = channels.*;
     for (&sample_buffer[
-        (dma.getAudioPart() + sample_buffer.len - 1) % sample_buffer.len
+        (dma.get_audio_part() + sample_buffer.len - 1) % sample_buffer.len
     ]) |*out_sample| {
         var sample: i32 = 0;
         inline for (&local_channels) |*channel| {
@@ -262,18 +262,18 @@ pub fn mix() void {
         out_sample.* = @intCast((sample >> 16) - std.math.minInt(i16));
     }
     channels.* = local_channels;
-    dma.ackAudio();
+    dma.ack_audio();
 }
 
-pub fn setChannel(channel: usize, state: Channel) void {
+pub fn set_channel(channel: usize, state: Channel) void {
     io.NVIC.ICER[32 / 32].write(.{ .CLRENA = 1 << 32 % 32 });
     channels[channel] = state;
     io.NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-pub fn playNote(channel: usize, note: Note) void {
+pub fn play_note(channel: usize, note: Note) void {
     const sample_rate: f32 = 44100.0;
-    setChannel(channel, .{
+    set_channel(channel, .{
         .duty = 1 << 31,
         .phase = 0,
         .phase_step = @intFromFloat(0x1p32 / sample_rate * note.frequency + 0.5),
@@ -295,7 +295,7 @@ pub fn playNote(channel: usize, note: Note) void {
     });
 }
 
-pub fn playSong(channels_notes: []const []const Note) void {
+pub fn play_song(channels_notes: []const []const Note) void {
     var time: f32 = 0.0;
     var channels_note_index = [1]usize{0} ** channels.len;
     var channels_note_start = [1]f32{0.0} ** channels.len;
@@ -317,7 +317,7 @@ pub fn playSong(channels_notes: []const []const Note) void {
                 if (note_index.* > notes.len) continue;
                 const note = notes[note_index.* - 1];
                 note_start.* = next_note_time;
-                playNote(channel_index, .{
+                play_note(channel_index, .{
                     .duration = @max(note.duration - 0.04, 0.0),
                     .frequency = note.frequency,
                 });

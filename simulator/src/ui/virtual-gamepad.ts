@@ -233,8 +233,8 @@ export class VirtualGamepad extends LitElement {
         return html`
             <div class="menu" @pointerdown="${this.onMenuButtonPressed}"></div>
             <div class="dpad"></div>
-            <div class="action1">X</div>
-            <div class="action2">Z</div>
+            <div class="action1">A</div>
+            <div class="action2">B</div>
         `;
     }
 }

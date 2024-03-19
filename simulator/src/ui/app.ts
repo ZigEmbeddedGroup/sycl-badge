@@ -102,7 +102,7 @@ export class App extends LitElement {
 
         const canvas = runtime.canvas;
 
-        runtime.blueScreen("TODO improve devex\nload cart in menu");        
+        runtime.blueScreen("TODO improve devex\nload cart in menu");
 
         // await runtime.load(await loadCartWasm());
 
@@ -543,8 +543,8 @@ export class App extends LitElement {
                     ${this.runtime.canvas}
                 </div>
             </div>
-            <wasm4-virtual-gamepad .app=${this}></wasm4-virtual-gamepad>
         `;
+        // <wasm4-virtual-gamepad .app=${this}></wasm4-virtual-gamepad>
     }
 }
 

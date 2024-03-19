@@ -1,7 +1,8 @@
 export const WIDTH = 160;
 export const HEIGHT = 128;
 
-export const STORAGE_SIZE = 1024;
+export const FLASH_PAGE_SIZE = 256;
+export const FLASH_PAGE_COUNT = 8000;
 
 export const CRASH_TITLE = "SYCL BADGE SIM";
 

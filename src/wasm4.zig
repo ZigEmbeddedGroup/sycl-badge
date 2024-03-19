@@ -70,16 +70,16 @@ pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt
 const platform_specific = if (builtin.target.isWasm())
     struct {
         extern fn blit(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: BlitFlags) void;
-        extern fn blitSub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void;
+        extern fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void;
         extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
         extern fn oval(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
         extern fn rect(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
         extern fn text(text_color: DisplayColor, background_color: OptionalDisplayColor, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
-        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void;
-        extern fn diskr(dest: [*]u8, size: u32) u32;
-        extern fn diskw(src: [*]const u8, size: u32) u32;
+        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void;
+        extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
+        extern fn write_flash_page(page: u32, src: [*]const u8) void;
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
@@ -95,11 +95,12 @@ comptime {
 }
 
 pub const BitsPerPixel = enum(u1) { one, two };
-pub const BlitFlags = packed struct {
+pub const BlitFlags = packed struct(u32) {
     bits_per_pixel: BitsPerPixel = .one,
     flip_x: bool = false,
     flip_y: bool = false,
     rotate: bool = false,
+    padding: u28 = undefined,
 };
 
 /// Copies pixels to the framebuffer.
@@ -138,7 +139,7 @@ pub inline fn blit(colors: [*]const DisplayColor, sprite: [*]const u8, x: i32, y
 /// TODO: this is super unsafe also blit is just a basic wrapper over blitSub
 pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.blitSub(sprite, x, y, width, height, src_x, src_y, stride, flags);
+        platform_specific.blit_sub(sprite, x, y, width, height, src_x, src_y, stride, flags);
     } else {
         @compileError("TODO");
         // const rest: extern struct {
@@ -267,6 +268,33 @@ pub inline fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void {
     }
 }
 
+pub const ToneFlags = packed struct(u32) {
+    pub const Channel = enum(u2) {
+        pulse1,
+        pulse2,
+        triangle,
+        noise,
+    };
+
+    pub const DutyCycle = enum(u2) {
+        @"1/8",
+        @"1/4",
+        @"1/2",
+        @"3/4",
+    };
+
+    pub const Panning = enum(u2) {
+        stereo,
+        left,
+        right,
+    };
+
+    channel: Channel,
+    duty_cycle: DutyCycle,
+    panning: Panning,
+    padding: u26 = undefined,
+};
+
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Sound Functions                                                           │
@@ -274,30 +302,20 @@ pub inline fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void {
 // └───────────────────────────────────────────────────────────────────────────┘
 
 /// Plays a sound tone.
-pub inline fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void {
+pub inline fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.tone(frequency, duration, volume, flags);
     } else {
-        asm volatile (" svc #8"
-            :
-            : [frequency] "{r0}" (frequency),
-              [duration] "{r1}" (duration),
-              [volume] "{r2}" (volume),
-              [flags] "{r3}" (flags),
-        );
+        @compileError("TODO");
+        // asm volatile (" svc #8"
+        //     :
+        //     : [frequency] "{r0}" (frequency),
+        //       [duration] "{r1}" (duration),
+        //       [volume] "{r2}" (volume),
+        //       [flags] "{r3}" (flags),
+        // );
     }
 }
-
-pub const tone_pulse1: u32 = 0;
-pub const tone_pulse2: u32 = 1;
-pub const tone_triangle: u32 = 2;
-pub const tone_noise: u32 = 3;
-pub const tone_mode1: u32 = 0;
-pub const tone_mode2: u32 = 4;
-pub const tone_mode3: u32 = 8;
-pub const tone_mode4: u32 = 12;
-pub const tone_pan_left: u32 = 16;
-pub const tone_pan_right: u32 = 32;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -305,29 +323,28 @@ pub const tone_pan_right: u32 = 32;
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-/// Reads up to `size` bytes from persistent storage into the pointer `dest`.
-pub inline fn diskr(dest: [*]u8, size: u32) u32 {
+pub const flash_page_size = 256;
+pub const flash_page_count = 8000;
+
+/// Attempts to fill `dst`, returns the amount of bytes actually read
+pub inline fn read_flash(offset: u32, dst: []u8) u32 {
     if (comptime builtin.target.isWasm()) {
-        return platform_specific.diskr(dest, size);
+        return platform_specific.read_flash(offset, dst.ptr, dst.len);
     } else {
-        return asm volatile (" svc #9"
-            : [result] "={r0}" (-> u32),
-            : [dest] "{r0}" (dest),
-              [size] "{r1}" (size),
-        );
+        @compileError("TODO");
     }
 }
 
-/// Writes up to `size` bytes from the pointer `src` into persistent storage.
-pub inline fn diskw(src: [*]const u8, size: u32) u32 {
+pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
     if (comptime builtin.target.isWasm()) {
-        return platform_specific.diskw(src, size);
+        return platform_specific.write_flash_page(page, &src);
     } else {
-        return asm volatile (" svc #10"
-            : [result] "={r0}" (-> u32),
-            : [src] "{r0}" (src),
-              [size] "{r1}" (size),
-        );
+        @compileError("TODO");
+        // return asm volatile (" svc #10"
+        //     : [result] "={r0}" (-> u32),
+        //     : [src] "{r0}" (src),
+        //       [size] "{r1}" (size),
+        // );
     }
 }
 

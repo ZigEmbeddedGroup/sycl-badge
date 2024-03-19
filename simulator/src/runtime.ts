@@ -18,11 +18,9 @@ export class Runtime {
     wasm: WebAssembly.Instance | null = null;
     warnedFileSize = false;
 
-    diskName: string;
-    diskBuffer: ArrayBuffer;
-    diskSize: number;
+    flashBuffer: ArrayBuffer;
 
-    constructor (diskName: string) {
+    constructor () {
         const canvas = document.createElement("canvas");
         canvas.width = constants.WIDTH;
         canvas.height = constants.HEIGHT;
@@ -42,19 +40,7 @@ export class Runtime {
         
         this.apu = new APU();
 
-        this.diskName = diskName;
-        this.diskBuffer = new ArrayBuffer(constants.STORAGE_SIZE);
-
-        // Try to load from localStorage
-        let str;
-        try {
-            str = localStorage.getItem(diskName);
-        } catch (error) {
-            console.error("Error reading disk", error);
-        }
-        this.diskSize = (str != null)
-            ? z85.decode(str, new Uint8Array(this.diskBuffer))
-            : 0;
+        this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
 
         this.memory = new WebAssembly.Memory({initial: 1, maximum: 1});
         this.data = new DataView(this.memory.buffer);
@@ -137,12 +123,12 @@ export class Runtime {
             text: this.text.bind(this),
 
             blit: this.blit.bind(this),
-            blitSub: this.blitSub.bind(this),
+            blit_sub: this.blitSub.bind(this),
 
             tone: this.apu.tone.bind(this.apu),
 
-            diskr: this.diskr.bind(this),
-            diskw: this.diskw.bind(this),
+            read_flash: this.read_flash.bind(this),
+            write_flash_page: this.write_flash_page.bind(this),
 
             trace: this.trace.bind(this),
         };
@@ -195,32 +181,22 @@ export class Runtime {
         this.framebuffer.blit(bpp2 ? [colors[0], colors[1], colors[2], colors[3]] : [colors[0], colors[1]], sprite, x, y, width, height, srcX, srcY, stride, flipX, flipY, rotate);
     }
 
-    diskr (destPtr: number, size: number): number {
-        const bytesRead = Math.min(size, this.diskSize);
-        const src = new Uint8Array(this.diskBuffer, 0, bytesRead);
-        const dest = new Uint8Array(this.memory.buffer, destPtr);
+    read_flash (offset: number, dstPtr: number, length: number): number {
+        const src = new Uint8Array(this.flashBuffer, offset, length);
+        const dst = new Uint8Array(this.memory.buffer, dstPtr, length);
 
-        dest.set(src);
-        return bytesRead;
+        dst.set(src);
+
+        return src.length;
     }
 
-    diskw (srcPtr: number, size: number): number {
-        const bytesWritten = Math.min(size, constants.STORAGE_SIZE);
-        const src = new Uint8Array(this.memory.buffer, srcPtr, bytesWritten);
-        const dest = new Uint8Array(this.diskBuffer);
+    write_flash_page (page: number, srcPtr: number) {
+        // TODO: Make dangerous write crash!!
 
-        // Try to save to localStorage
-        const str = z85.encode(src);
-        try {
-            localStorage.setItem(this.diskName, str);
-        } catch (error) {
-            // TODO(2022-02-13): Show a warning to the user that storage is not persisted
-            console.error("Error writing disk", error);
-        }
+        const src = new Uint8Array(this.memory.buffer, srcPtr, constants.FLASH_PAGE_SIZE);
+        const dst = new Uint8Array(this.flashBuffer, page * constants.FLASH_PAGE_SIZE, constants.FLASH_PAGE_SIZE);
 
-        dest.set(src);
-        this.diskSize = bytesWritten;
-        return bytesWritten;
+        dst.set(src);
     }
 
     getCString (ptr: number) {

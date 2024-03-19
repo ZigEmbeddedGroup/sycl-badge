@@ -5,9 +5,36 @@ export fn start() void {}
 
 var green_565: u6 = 0;
 
+var offset: u16 = 0;
+
+fn read_stored_number() u64 {
+    var dst: u64 = undefined;
+    std.debug.assert(wasm4.read_flash(0, std.mem.asBytes(&dst)) == @sizeOf(u64));
+    return dst;
+}
+
+fn write_stored_number(number: u64) void {
+    var page: [wasm4.flash_page_size]u8 = undefined;
+    // @as(*u64, @alignCast(@ptrCast(page[0..8]))).* = number;
+    std.mem.bytesAsSlice(u64, &page)[0] = number;
+    wasm4.write_flash_page(0, page);
+}
+
 export fn update() void {
+    if (offset % (60 * 2) == 0) {
+        wasm4.tone(440, 20, 20, .{
+            .channel = .pulse1,
+            .duty_cycle = .@"1/8",
+            .panning = .left,
+        });
+    }
+
+    offset +%= 1;
+
     var inputs_buf: [128]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&inputs_buf);
+
+    fbs.writer().print("{d}\n", .{read_stored_number()}) catch unreachable;
 
     inline for (std.meta.fields(wasm4.Controls)) |control| {
         if (comptime !std.mem.eql(u8, control.name, "padding")) {
@@ -22,6 +49,12 @@ export fn update() void {
         green_565 +%= 1;
     } else if (wasm4.controls.down) {
         green_565 -%= 1;
+    }
+
+    if (wasm4.controls.left) {
+        write_stored_number(read_stored_number() -| 1);
+    } else if (wasm4.controls.right) {
+        write_stored_number(read_stored_number() +| 1);
     }
 
     wasm4.red_led.* = wasm4.controls.click;

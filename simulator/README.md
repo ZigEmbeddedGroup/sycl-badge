@@ -15,9 +15,13 @@ Simulate your badge on the interwebz.
 - [x] 160x128 RGB screen
 - [x] 5x RGB LEDs
 - [x] 1x Red LED on the back
-- [ ] Speaker
+- [x] Speaker
 - [x] Start/Option buttons
 - [x] A/B buttons
 - [x] A navstick with up/down/left/right. Unsure up/left will both be activated on diagonal
 - [x] Navstick is pressable too
-- [ ] 2MB flash separate from the microcontroller's flash
+- [x] 2MB flash separate from the microcontroller's flash
+
+## Additional Features
+
+- [ ] Live reload

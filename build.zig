@@ -23,7 +23,7 @@ pub fn build(b: *Build) void {
     // const fw_options = b.addOptions();
     // fw_options.addOption(bool, "have_cart", false);
 
-    const wasm4_module = b.addModule("wasm4", .{ .source_file = .{ .path = "src/wasm4.zig" } });
+    const wasm4_module = b.addModule("wasm4", .{ .root_source_file = .{ .path = "src/wasm4.zig" } });
 
     // const modified_memory_regions = b.allocator.dupe(MicroZig.MemoryRegion, py_badge.chip.memory_regions) catch @panic("out of memory");
     // for (modified_memory_regions) |*memory_region| {
@@ -50,14 +50,18 @@ pub fn build(b: *Build) void {
         const name = sample[0];
         const source = sample[1];
 
-        const lib = b.addSharedLibrary(.{
+        const lib = b.addExecutable(.{
             .name = "sample-" ++ name,
             .root_source_file = .{ .path = "samples/" ++ source },
-            .target = .{ .cpu_arch = .wasm32, .os_tag = .freestanding },
+            .target = b.resolveTargetQuery(.{
+                .cpu_arch = .wasm32,
+                .os_tag = .freestanding,
+            }),
             .optimize = optimize,
         });
         const install_step = b.addInstallArtifact(lib, .{});
 
+        lib.entry = .disabled;
         lib.import_memory = true;
         lib.initial_memory = 65536;
         lib.max_memory = 65536;
@@ -65,9 +69,10 @@ pub fn build(b: *Build) void {
         lib.global_base = 160 * 128 * 2 + 0x1e;
 
         // Export WASM-4 symbols
-        lib.export_symbol_names = &[_][]const u8{ "start", "update" };
+        // lib.export_symbol_names = &[_][]const u8{ "start", "update" };
+        lib.rdynamic = true;
 
-        lib.addModule("wasm4", wasm4_module);
+        lib.root_module.addImport("wasm4", wasm4_module);
 
         const step = b.step("sample-" ++ name, "Build sample '" ++ name ++ "'");
         step.dependOn(&install_step.step);

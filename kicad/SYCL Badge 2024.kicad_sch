@@ -9448,7 +9448,7 @@
     (property "Value" "GD25Q16" (at 209.55 62.23 0)
       (effects (font (size 1.778 1.5113)) (justify left bottom))
     )
-    (property "Footprint" "Package_SO:SOIC-8W_5.3x5.3mm_P1.27mm" (at 222.25 52.07 0)
+    (property "Footprint" "Package_SO:SOP-8_3.76x4.96mm_P1.27mm" (at 222.25 52.07 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "" (at 222.25 52.07 0)

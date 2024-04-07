@@ -22,7 +22,7 @@ fn write_stored_number(number: u64) void {
 
 export fn update() void {
     if (offset % (60 * 2) == 0) {
-        wasm4.tone(440, 20, 20, .{
+        wasm4.tone(440, 20, 10, .{
             .channel = .pulse1,
             .duty_cycle = .@"1/8",
             .panning = .left,

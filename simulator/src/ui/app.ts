@@ -71,6 +71,7 @@ export class App extends LitElement {
 
     public controls: number = 0;
     public lightLevel: number = 0;
+    private cartPath: string = "";
 
     private readonly gamepadUnavailableWarned = new Set<string>();
 
@@ -98,24 +99,19 @@ export class App extends LitElement {
 
         const canvas = runtime.canvas;
 
-        runtime.blueScreen("TODO improve devex\nload cart in menu");
-
-        // await runtime.load(await loadCartWasm());
-
-        // runtime.start();
+        this.cartPath = location.search ? location.search.slice(1) : "cart.wasm";
+        await this.resetCart(new Uint8Array(await (await fetch(this.cartPath)).arrayBuffer()), false);
         
-        // if (import.meta.env.DEV) {
-        //     devkit.websocket?.addEventListener("message", async event => {
-        //         switch (event.data) {
-        //         case "reload":
-        //             this.resetCart(await loadCartWasm());
-        //             break;
-        //         case "hotswap":
-        //             this.resetCart(await loadCartWasm(), true);
-        //             break;
-        //         }
-        //     });
-        // }
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        ws.onopen = w => {
+            setInterval(() => {
+                ws.send("spam");
+            }, 1000);
+        }
+
+        ws.onmessage = async m => {
+            await this.resetCart(new Uint8Array(await (await fetch(this.cartPath)).arrayBuffer()), false);
+        }
 
         function takeScreenshot () {
             // We need to render a frame first

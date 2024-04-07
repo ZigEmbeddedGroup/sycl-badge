@@ -10,18 +10,44 @@ pub const py_badge: MicroZig.Target = .{
     .hal = null,
 };
 
-const samples = .{
-    .{ "feature-test", "feature_test.zig" },
-};
-
 pub fn build(b: *Build) void {
     const mz = MicroZig.init(b, .{});
     _ = mz; // autofix
 
+    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     // const fw_options = b.addOptions();
     // fw_options.addOption(bool, "have_cart", false);
+
+    const simulator = b.addExecutable(.{
+        .name = "simulator",
+        .root_source_file = .{ .path = "src/simulator/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    simulator.root_module.addImport("ws", b.dependency("ws", .{}).module("websocket"));
+    simulator.root_module.addImport("mime", b.dependency("mime", .{}).module("mime"));
+    b.installArtifact(simulator);
+
+    const simulator_run_cmd = b.addRunArtifact(simulator);
+    simulator_run_cmd.step.dependOn(b.getInstallStep());
+
+    simulator_run_cmd.addArgs(&.{
+        "serve",
+        b.graph.zig_exe,
+        "-p",
+        "5500",
+        "--zig-out-bin-dir",
+        b.pathJoin(&.{ b.install_path, "bin" }),
+        "--simulator-dist-dir",
+        b.pathFromRoot("simulator/dist"),
+        "--input-dir",
+        b.pathFromRoot("samples"),
+    });
+
+    const simulator_step = b.step("simulator", "serve smth");
+    simulator_step.dependOn(&simulator_run_cmd.step);
 
     const wasm4_module = b.addModule("wasm4", .{ .root_source_file = .{ .path = "src/wasm4.zig" } });
 
@@ -46,37 +72,33 @@ pub fn build(b: *Build) void {
     // mz.installFirmware(b, fw, .{});
     // mz.installFirmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
 
-    inline for (samples) |sample| {
-        const name = sample[0];
-        const source = sample[1];
+    const lib = b.addExecutable(.{
+        .name = "cart",
+        .root_source_file = .{ .path = "samples/feature_test.zig" },
+        .target = b.resolveTargetQuery(.{
+            .cpu_arch = .wasm32,
+            .os_tag = .freestanding,
+        }),
+        .optimize = optimize,
+    });
+    const install_step = b.addInstallArtifact(lib, .{});
 
-        const lib = b.addExecutable(.{
-            .name = "sample-" ++ name,
-            .root_source_file = .{ .path = "samples/" ++ source },
-            .target = b.resolveTargetQuery(.{
-                .cpu_arch = .wasm32,
-                .os_tag = .freestanding,
-            }),
-            .optimize = optimize,
-        });
-        const install_step = b.addInstallArtifact(lib, .{});
+    lib.entry = .disabled;
+    lib.import_memory = true;
+    lib.initial_memory = 65536;
+    lib.max_memory = 65536;
+    lib.stack_size = 14752;
+    lib.global_base = 160 * 128 * 2 + 0x1e;
 
-        lib.entry = .disabled;
-        lib.import_memory = true;
-        lib.initial_memory = 65536;
-        lib.max_memory = 65536;
-        lib.stack_size = 14752;
-        lib.global_base = 160 * 128 * 2 + 0x1e;
+    // Export WASM-4 symbols
+    // lib.export_symbol_names = &[_][]const u8{ "start", "update" };
+    lib.rdynamic = true;
 
-        // Export WASM-4 symbols
-        // lib.export_symbol_names = &[_][]const u8{ "start", "update" };
-        lib.rdynamic = true;
+    lib.root_module.addImport("wasm4", wasm4_module);
 
-        lib.root_module.addImport("wasm4", wasm4_module);
+    const step = b.step("cart-wasm", "Build cart");
+    step.dependOn(&install_step.step);
 
-        const step = b.step("sample-" ++ name, "Build sample '" ++ name ++ "'");
-        step.dependOn(&install_step.step);
-    }
     // var modified_py_badge = py_badge;
     // modified_py_badge.chip.memory_regions = modified_memory_regions;
 

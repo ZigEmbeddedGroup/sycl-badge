@@ -48,7 +48,7 @@ pub fn onInputChange(self: *Reloader, path: []const u8, name: []const u8) void {
     log.debug("re-building!", .{});
     const result = std.ChildProcess.run(.{
         .allocator = self.gpa,
-        .argv = &.{ self.zig_exe, "build", "cart-wasm" },
+        .argv = &.{ self.zig_exe, "build" },
     }) catch |err| {
         log.err("unable to run zig build: {s}", .{@errorName(err)});
         return;
@@ -105,10 +105,12 @@ pub fn onOutputChange(self: *Reloader, path: []const u8, name: []const u8) void 
     if (std.mem.indexOfScalar(u8, name, '.') == null) {
         return;
     }
-    log.debug("re-load: {s}/{s}!", .{ path, name });
+    log.debug("reload: {s}/{s}!", .{ path, name });
 
     self.clients_lock.lock();
     defer self.clients_lock.unlock();
+
+    std.log.info("{d}", .{self.clients.entries.len});
 
     var idx: usize = 0;
     while (idx < self.clients.entries.len) {
@@ -145,6 +147,7 @@ pub fn onOutputChange(self: *Reloader, path: []const u8, name: []const u8) void 
 pub fn handleWs(self: *Reloader, stream: std.net.Stream, h: [20]u8) void {
     var buf =
         ("HTTP/1.1 101 Switching Protocols\r\n" ++
+        "Access-Control-Allow-Origin: *\r\n" ++
         "Upgrade: websocket\r\n" ++
         "Connection: upgrade\r\n" ++
         "Sec-Websocket-Accept: 0000000000000000000000000000\r\n\r\n").*;

@@ -49,7 +49,7 @@ export class Runtime {
 
         this.reset();
 
-        this.pauseState = 0;
+        this.pauseState = constants.PAUSE_REBOOTING;
         this.wasmBufferByteLen = 0;
     }
 
@@ -242,7 +242,7 @@ export class Runtime {
     blueScreen (text: string) {
         this.pauseState |= constants.PAUSE_CRASHED;
 
-        const blue = pack565(0, 0, 31);
+        const blue = pack565(5, 10, 5);
         const grey = pack565(25, 50, 25);
 
         const toCharArr = (s: string) => [...s].map(x => x.charCodeAt(0));

@@ -24,11 +24,9 @@ var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
 
 const Server = struct {
     watcher: *Reloader,
-    simulator_dist_dir: std.fs.Dir,
     zig_out_bin_dir: std.fs.Dir,
 
     fn deinit(s: *Server) void {
-        s.simulator_dist_dir.close();
         s.zig_out_bin_dir.close();
         s.* = undefined;
     }
@@ -87,9 +85,7 @@ const Server = struct {
         const mime_type = mime.extension_map.get(ext) orelse
             .@"application/octet-stream";
 
-        const dir = if (std.mem.eql(u8, ext, ".wasm")) s.zig_out_bin_dir else s.simulator_dist_dir;
-
-        const file = dir.openFile(path[1..], .{}) catch |err| switch (err) {
+        const file = s.zig_out_bin_dir.openFile(path[1..], .{}) catch |err| switch (err) {
             error.FileNotFound => {
                 if (std.mem.endsWith(u8, req.head.target, "/")) {
                     try req.respond(not_found_html, .{
@@ -97,6 +93,7 @@ const Server = struct {
                         .extra_headers = &.{
                             .{ .name = "content-type", .value = "text/html" },
                             .{ .name = "connection", .value = "close" },
+                            .{ .name = "access-control-allow-origin", .value = "*" },
                         },
                     });
                     log.debug("not found\n", .{});
@@ -119,6 +116,7 @@ const Server = struct {
                     .extra_headers = &.{
                         .{ .name = "content-type", .value = "text/html" },
                         .{ .name = "connection", .value = "close" },
+                        .{ .name = "access-control-allow-origin", .value = "*" },
                     },
                 });
                 log.debug("error: {s}\n", .{@errorName(err)});
@@ -140,6 +138,7 @@ const Server = struct {
             .extra_headers = &.{
                 .{ .name = "content-type", .value = @tagName(mime_type) },
                 .{ .name = "connection", .value = "close" },
+                .{ .name = "access-control-allow-origin", .value = "*" },
             },
         });
         log.debug("sent file\n", .{});
@@ -162,6 +161,7 @@ fn appendSlashRedirect(
             .{ .name = "location", .value = location },
             .{ .name = "content-type", .value = "text/html" },
             .{ .name = "connection", .value = "close" },
+            .{ .name = "access-control-allow-origin", .value = "*" },
         },
     });
     log.debug("append final slash redirect\n", .{});
@@ -190,9 +190,7 @@ fn fatal(comptime format: []const u8, args: anytype) noreturn {
 }
 
 fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
-    var listen_port: u16 = 0;
     var zig_out_bin_path: ?[]const u8 = null;
-    var simulator_dist_path: ?[]const u8 = null;
     var input_dirs: std.ArrayListUnmanaged([]const u8) = .{};
     const zig_exe = args[0];
 
@@ -200,20 +198,10 @@ fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
         var i: usize = 1;
         while (i < args.len) : (i += 1) {
             const arg = args[i];
-            if (std.mem.eql(u8, arg, "-p")) {
-                i += 1;
-                if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
-                listen_port = std.fmt.parseInt(u16, args[i], 10) catch |err| {
-                    fatal("unable to parse port '{s}': {s}", .{ args[i], @errorName(err) });
-                };
-            } else if (std.mem.eql(u8, arg, "--zig-out-bin-dir")) {
+            if (std.mem.eql(u8, arg, "--zig-out-bin-dir")) {
                 i += 1;
                 if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
                 zig_out_bin_path = args[i];
-            } else if (std.mem.eql(u8, arg, "--simulator-dist-dir")) {
-                i += 1;
-                if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
-                simulator_dist_path = args[i];
             } else if (std.mem.eql(u8, arg, "--input-dir")) {
                 i += 1;
                 if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
@@ -232,15 +220,10 @@ fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
         fatal("unable to open directory '{s}': {s}", .{ zig_out_bin_path.?, @errorName(e) });
     defer zig_out_bin_dir.close();
 
-    var simulator_dist_dir: fs.Dir = fs.cwd().openDir(simulator_dist_path.?, .{ .iterate = true }) catch |e|
-        fatal("unable to open directory '{s}': {s}", .{ simulator_dist_path.?, @errorName(e) });
-    defer simulator_dist_dir.close();
-
     var watcher = try Reloader.init(gpa, zig_exe, zig_out_bin_path.?, input_dirs.items);
 
     var server: Server = .{
         .watcher = &watcher,
-        .simulator_dist_dir = simulator_dist_dir,
         .zig_out_bin_dir = zig_out_bin_dir,
     };
     defer server.deinit();
@@ -248,7 +231,7 @@ fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
     const watch_thread = try std.Thread.spawn(.{}, Reloader.listen, .{&watcher});
     watch_thread.detach();
 
-    try serve(&server, listen_port);
+    try serve(&server, 2468);
 }
 
 fn serve(s: *Server, listen_port: u16) !void {
@@ -260,7 +243,9 @@ fn serve(s: *Server, listen_port: u16) !void {
     defer tcp_server.deinit();
 
     const server_port = tcp_server.listen_address.in.getPort();
-    std.debug.print("\x1b[2K\rListening at http://127.0.0.1:{d}/\n", .{server_port});
+    std.debug.assert(server_port == listen_port);
+
+    std.debug.print("\x1b[2K\rSimulator live! Go to [link] to test your cartridge.\n", .{});
 
     var buffer: [1024]u8 = undefined;
     accept: while (true) {

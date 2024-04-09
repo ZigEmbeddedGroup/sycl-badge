@@ -9,7 +9,8 @@ import { State } from "../state";
 
 import { MenuOverlay } from "./menu-overlay";
 import { Notifications } from "./notifications";
-import { HardwareComponents } from "./hardware-components";
+import { LEDs } from "./leds";
+import { LightSensor } from "./light-sensor";
 
 @customElement("wasm4-app")
 export class App extends LitElement {
@@ -65,13 +66,12 @@ export class App extends LitElement {
 
     @query("wasm4-menu-overlay") private menuOverlay?: MenuOverlay;
     @query("wasm4-notifications") private notifications!: Notifications;
-    @query("wasm4-hardware-components") private hardwareComponents!: HardwareComponents;
+    @query("wasm4-leds") private hardwareComponents!: LEDs;
 
     private savedGameState?: State;
 
     public controls: number = 0;
     public lightLevel: number = 0;
-    private cartPath: string = "";
 
     private readonly gamepadUnavailableWarned = new Set<string>();
 
@@ -99,10 +99,13 @@ export class App extends LitElement {
 
         const canvas = runtime.canvas;
 
-        this.cartPath = location.search ? location.search.slice(1) : "cart.wasm";
-        await this.resetCart(new Uint8Array(await (await fetch(this.cartPath)).arrayBuffer()), false);
-        
-        const ws = new WebSocket(`ws://${location.host}/ws`);
+        fetch("http://localhost:2468/cart.wasm").then(async res => {
+            await this.resetCart(new Uint8Array(await (res).arrayBuffer()), false);
+        }).catch(() => {
+            runtime.blueScreen("Watcher not found.\n\nStart and reload.");
+        });
+
+        const ws = new WebSocket(`ws://localhost:2468/ws`);
         ws.onopen = w => {
             setInterval(() => {
                 ws.send("spam");
@@ -110,7 +113,7 @@ export class App extends LitElement {
         }
 
         ws.onmessage = async m => {
-            await this.resetCart(new Uint8Array(await (await fetch(this.cartPath)).arrayBuffer()), false);
+            await this.resetCart(new Uint8Array(await (await fetch("http://localhost:2468/cart.wasm")).arrayBuffer()), false);
         }
 
         function takeScreenshot () {
@@ -454,7 +457,7 @@ export class App extends LitElement {
 
     render () {
         return html`
-            <wasm4-hardware-components .app=${this}></wasm4-hardware-components>
+            <wasm4-light-sensor .app=${this}></wasm4-light-sensor>
             <div class="content">
                 ${this.showMenu ? html`<wasm4-menu-overlay .app=${this}></wasm4-menu-overlay>`: ""}
                 <wasm4-notifications></wasm4-notifications>
@@ -462,6 +465,7 @@ export class App extends LitElement {
                     ${this.runtime.canvas}
                 </div>
             </div>
+            <wasm4-leds .app=${this}></wasm4-leds>
         `;
         // <wasm4-virtual-gamepad .app=${this}></wasm4-virtual-gamepad>
     }

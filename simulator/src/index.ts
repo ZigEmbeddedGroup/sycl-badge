@@ -5,4 +5,5 @@ export * from "./ui/menu-overlay";
 // TODO
 // export * from "./ui/virtual-gamepad";
 export * from "./ui/notifications";
-export * from "./ui/hardware-components";
+export * from "./ui/leds";
+export * from "./ui/light-sensor";

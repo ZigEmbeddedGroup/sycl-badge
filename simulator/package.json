@@ -1,0 +1,19 @@
+{
+  "name": "wasm4-runtime",
+  "private": true,
+  "scripts": {
+    "lint": "eslint src --fix",
+    "dev": "parcel index.html",
+    "build": "parcel build index.html --no-optimize"
+  },
+  "dependencies": {
+    "lit": "^2.2.0"
+  },
+  "devDependencies": {
+    "@parcel/transformer-worklet": "^2.11.0",
+    "@types/audioworklet": "0.0.23",
+    "@types/node": "^16.11.10",
+    "eslint": "^8.11.0",
+    "parcel": "^2.11.0"
+  }
+}

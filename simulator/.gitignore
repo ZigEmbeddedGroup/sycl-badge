@@ -1,0 +1,5 @@
+/dist
+public/cart.wasm
+src/**/*.generated.js
+/.parcel-cache
+node_modules

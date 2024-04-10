@@ -1,7 +1,9 @@
 name: Publish Simulator
 on:
   push:
-    branches: [main]
+    paths:
+        - simulator/**
+  pull_request:
     paths:
         - simulator/**
 
@@ -20,6 +22,7 @@ jobs:
       - name: Build simulator
         run: |
           cd simulator
+          npm ci
           npm run build
           touch dist/.nojekyll
 
@@ -27,9 +30,10 @@ jobs:
         uses: actions/upload-pages-artifact@v1
         with:
           # this should match the `pages` option in your adapter-static options
-          path: "dist/"
+          path: "simulator/dist/"
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
 

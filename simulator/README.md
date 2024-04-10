@@ -24,4 +24,4 @@ Simulate your badge on the interwebz.
 
 ## Additional Features
 
-- [ ] Live reload
+- [x] Live reload

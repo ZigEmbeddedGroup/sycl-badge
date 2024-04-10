@@ -214,6 +214,12 @@ export class App extends LitElement {
             case "Enter":
                 mask |= constants.CONTROLS_SELECT;
                 break;
+            case "KeyQ":
+                mask |= constants.CONTROLS_A;
+                break;
+            case "KeyE":
+                mask |= constants.CONTROLS_B;
+                break;
             case "ShiftLeft": case "ShiftRight":
                 mask |= constants.CONTROLS_CLICK;
                 break;

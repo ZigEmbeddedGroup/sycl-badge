@@ -10,59 +10,84 @@ pub const py_badge: MicroZig.Target = .{
     .hal = null,
 };
 
+pub const sycl_badge_2024 = MicroZig.Target{
+    .preferred_format = .elf,
+    .chip = atsam.chips.atsamd51j19.chip,
+    .hal = .{
+        .root_source_file = .{ .cwd_relative = "src/hal.zig" },
+    },
+    .board = .{
+        .name = "SYCL Badge 2024",
+        .root_source_file = .{ .cwd_relative = "src/board.zig" },
+    },
+};
+
 pub fn build(b: *Build) void {
     const mz = MicroZig.init(b, .{});
-    _ = mz; // autofix
+
+    const optimize = b.standardOptimizeOption(.{});
 
     _ = b.addModule("wasm4", .{ .root_source_file = .{ .path = "src/wasm4.zig" } });
 
     var dep: std.Build.Dependency = .{ .builder = b };
     const cart = add_cart(&dep, b, .{
         .name = "sample",
-        .optimize = b.standardOptimizeOption(.{}),
+        .optimize = optimize,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&cart.watch_run_cmd.step);
 
-    // const fw_options = b.addOptions();
-    // fw_options.addOption(bool, "have_cart", false);
+    //const modified_memory_regions = b.allocator.dupe(MicroZig.MemoryRegion, py_badge.chip.memory_regions) catch @panic("out of memory");
+    //for (modified_memory_regions) |*memory_region| {
+    //    if (memory_region.kind != .ram) continue;
+    //    memory_region.offset += 0x19A0;
+    //    memory_region.length -= 0x19A0;
+    //    break;
+    //}
+    //var modified_py_badge = py_badge;
+    //modified_py_badge.chip.memory_regions = modified_memory_regions;
 
-    // const modified_memory_regions = b.allocator.dupe(MicroZig.MemoryRegion, py_badge.chip.memory_regions) catch @panic("out of memory");
-    // for (modified_memory_regions) |*memory_region| {
-    //     if (memory_region.kind != .ram) continue;
-    //     memory_region.offset += 0x19A0;
-    //     memory_region.length -= 0x19A0;
-    //     break;
-    // }
-    // var modified_py_badge = py_badge;
-    // modified_py_badge.chip.memory_regions = modified_memory_regions;
+    //const fw = mz.add_firmware(b, .{
+    //    .name = "pybadge-io",
+    //    .target = modified_py_badge,
+    //    .optimize = optimize,
+    //    .source_file = .{ .path = "src/main.zig" },
+    //});
+    //fw.artifact.step.dependOn(&fw_options.step);
+    //fw.modules.app.addImport("options", fw_options.createModule());x
+    //mz.install_firmware(b, fw, .{});
+    //mz.install_firmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
 
-    // const fw = mz.addFirmware(b, .{
-    //     .name = "pybadge-io",
-    //     .target = modified_py_badge,
-    //     .optimize = optimize,
-    //     .source_file = .{ .path = "src/main.zig" },
-    // });
-    // fw.artifact.step.dependOn(&fw_options.step);
-    // fw.modules.app.dependencies.put("options", fw_options.createModule()) catch @panic("out of memory");
-    // mz.installFirmware(b, fw, .{});
-    // mz.installFirmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
+    const badge = mz.add_firmware(b, .{
+        .name = "badge",
+        .target = sycl_badge_2024,
+        .optimize = optimize,
+        .root_source_file = .{ .path = "src/badge.zig" },
+    });
+    mz.install_firmware(b, badge, .{});
 
-    // var modified_py_badge = py_badge;
-    // modified_py_badge.chip.memory_regions = modified_memory_regions;
-
-    // const fw = mz.add_firmware(b, .{
-    //     .name = "pybadge-io",
-    //     .target = modified_py_badge,
-    //     .optimize = optimize,
-    //     .source_file = .{ .path = "src/main.zig" },
-    // });
-    // fw.artifact.step.dependOn(&fw_options.step);
-    // fw.modules.app.addImport("options", fw_options.createModule());
-    // mz.install_firmware(b, fw, .{});
-    // mz.install_firmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
+    inline for (.{
+        "blinky",
+        "blinky_timer",
+        "usb_cdc",
+        "usb_storage",
+        "buttons",
+        "lcd",
+        "audio",
+        "light_sensor",
+        "neopixels",
+        "qspi",
+    }) |name| {
+        const mvp = mz.add_firmware(b, .{
+            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+            .target = sycl_badge_2024,
+            .optimize = optimize,
+            .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
+        });
+        mz.install_firmware(b, mvp, .{});
+    }
 }
 
 pub const Cart = struct {
@@ -148,6 +173,7 @@ pub fn add_cart(
     // fw_options.addOption(bool, "have_cart", true);
 
     // const mz = MicroZig.init(d.builder, "microzig");
+
     // const fw = mz.addFirmware(d.builder, .{
     //     .name = options.name,
     //     .target = py_badge,

@@ -20,6 +20,7 @@ jobs:
       - name: Build simulator
         run: |
           cd simulator
+          npm ci
           npm run build
           touch dist/.nojekyll
 

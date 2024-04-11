@@ -270,7 +270,9 @@ export class App extends LitElement {
         window.addEventListener("dragover", e => e.preventDefault());
         window.addEventListener("drop", e => {
             e.preventDefault();
-            this.loadCartFromFile(e.dataTransfer.files[0]);
+            if (e.dataTransfer?.files?.[0]) {
+                this.loadCartFromFile(e.dataTransfer.files[0]);
+            }
         });
 
         const pollPhysicalGamepads = () => {
@@ -426,7 +428,9 @@ export class App extends LitElement {
         input.multiple = false;
 
         input.addEventListener("change", async () => {
-            this.loadCartFromFile(input.files[0]);
+            if (input.files?.[0]) {
+                this.loadCartFromFile(input.files[0]);
+            }
         });
 
         document.body.appendChild(input);

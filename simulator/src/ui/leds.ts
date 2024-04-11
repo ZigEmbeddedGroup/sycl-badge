@@ -6,12 +6,6 @@ import { unpack888 } from "./utils";
 @customElement("wasm4-leds")
 export class LEDs extends LitElement {
     static styles = css`
-        :host {
-            position: absolute;
-
-            bottom: 20px;
-        }
-
         .leds {
             display: flex;
             gap: 40px;

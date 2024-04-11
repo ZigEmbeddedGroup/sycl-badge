@@ -19,8 +19,6 @@ export class App extends LitElement {
             width: 100%;
             height: 100%;
             display: flex;
-            align-items: center;
-            justify-content: center;
 
             touch-action: none;
             user-select: none;
@@ -31,9 +29,16 @@ export class App extends LitElement {
         }
 
         .content {
-            width: 100vmin;
-            height: 100vmin;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
             overflow: hidden;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            box-sizing: border-box;
         }
 
         /** Nudge the game upwards a bit in portrait to make space for the virtual gamepad. */
@@ -44,19 +49,17 @@ export class App extends LitElement {
             }
         }
 
-        .canvas-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
-
         canvas {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: contain;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+        }
+
+        .help {
+            font-size: 0.9em;
+            color: #aaa;
         }
     `;
 
@@ -267,7 +270,9 @@ export class App extends LitElement {
         window.addEventListener("dragover", e => e.preventDefault());
         window.addEventListener("drop", e => {
             e.preventDefault();
-            this.loadCartFromFile(e.dataTransfer.files[0]);
+            if (e.dataTransfer?.files?.[0]) {
+                this.loadCartFromFile(e.dataTransfer.files[0]);
+            }
         });
 
         const pollPhysicalGamepads = () => {
@@ -423,7 +428,9 @@ export class App extends LitElement {
         input.multiple = false;
 
         input.addEventListener("change", async () => {
-            this.loadCartFromFile(input.files[0]);
+            if (input.files?.[0]) {
+                this.loadCartFromFile(input.files[0]);
+            }
         });
 
         document.body.appendChild(input);
@@ -471,15 +478,16 @@ export class App extends LitElement {
 
     render () {
         return html`
-            <wasm4-light-sensor .app=${this}></wasm4-light-sensor>
             <div class="content">
                 ${this.showMenu ? html`<wasm4-menu-overlay .app=${this}></wasm4-menu-overlay>`: ""}
                 <wasm4-notifications></wasm4-notifications>
-                <div class="canvas-wrapper">
-                    ${this.runtime.canvas}
+                <wasm4-light-sensor .app=${this}></wasm4-light-sensor>
+                ${this.runtime.canvas}
+                <wasm4-leds .app=${this}></wasm4-leds>
+                <div class="help">
+                    Controls: Arrows/WASD, Z/K, X/J, Enter/Y, Backspace/T, Escape
                 </div>
             </div>
-            <wasm4-leds .app=${this}></wasm4-leds>
         `;
         // <wasm4-virtual-gamepad .app=${this}></wasm4-virtual-gamepad>
     }

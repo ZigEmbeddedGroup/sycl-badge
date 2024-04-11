@@ -102,7 +102,9 @@ export class App extends LitElement {
         fetch("http://localhost:2468/cart.wasm").then(async res => {
             await this.resetCart(new Uint8Array(await (res).arrayBuffer()), false);
         }).catch(() => {
-            runtime.blueScreen("Watcher not found.\n\nStart and reload.");
+            if (!this.runtime.wasmBuffer) {
+                runtime.blueScreen("Watcher not found.\n\nStart and reload.");
+            }
         });
 
         const ws = new WebSocket(`ws://localhost:2468/ws`);
@@ -261,6 +263,13 @@ export class App extends LitElement {
             }
         }
 
+        // Drag and drop handlers for loading carts
+        window.addEventListener("dragover", e => e.preventDefault());
+        window.addEventListener("drop", e => {
+            e.preventDefault();
+            this.loadCartFromFile(e.dataTransfer.files[0]);
+        });
+
         const pollPhysicalGamepads = () => {
             // TODO
             // if (!navigator.getGamepads) {
@@ -397,8 +406,15 @@ export class App extends LitElement {
         }
     }
 
+    loadCartFromFile (file: File) {
+        let reader = new FileReader();
+        reader.addEventListener("load", () => {
+            this.resetCart(new Uint8Array(reader.result as ArrayBuffer), false);
+        });
+        reader.readAsArrayBuffer(file);
+    }
+
     importCart () {
-        const app = this;
         const input = document.createElement("input");
 
         input.style.display = "none";
@@ -406,16 +422,8 @@ export class App extends LitElement {
         input.accept = ".wasm";
         input.multiple = false;
 
-        input.addEventListener("change", () => {
-            const files = input.files as FileList;
-            let reader = new FileReader();
-            
-            reader.addEventListener("load", () => {
-                this.resetCart(new Uint8Array(reader.result as ArrayBuffer), false);
-                app.closeMenu();
-            });
-
-            reader.readAsArrayBuffer(files[0]);
+        input.addEventListener("change", async () => {
+            this.loadCartFromFile(input.files[0]);
         });
 
         document.body.appendChild(input);

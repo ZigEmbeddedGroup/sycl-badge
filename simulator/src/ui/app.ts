@@ -208,16 +208,16 @@ export class App extends LitElement {
 
             let mask = 0;
             switch (event.code) {
-            case "Space":
+            case "Enter": case "KeyY":
                 mask |= constants.CONTROLS_START;
                 break;
-            case "Enter":
+            case "Backspace": case "KeyT":
                 mask |= constants.CONTROLS_SELECT;
                 break;
-            case "KeyQ":
+            case "KeyZ": case "KeyK":
                 mask |= constants.CONTROLS_A;
                 break;
-            case "KeyE":
+            case "KeyX": case "KeyJ":
                 mask |= constants.CONTROLS_B;
                 break;
             case "ShiftLeft": case "ShiftRight":

@@ -5,12 +5,6 @@ import { App } from "./app";
 @customElement("wasm4-light-sensor")
 export class LightSensor extends LitElement {
     static styles = css`
-        :host {
-            position: absolute;
-
-            top: 30px;
-        }
-
         input[type="range"] {
             position: relative;
             -webkit-appearance: none;

@@ -15,6 +15,8 @@ export class Notifications extends LitElement {
 
             display: flex;
             flex-direction: column;
+
+            z-index: 99;
         }
 
         .notification {

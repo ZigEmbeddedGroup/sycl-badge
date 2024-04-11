@@ -4,10 +4,13 @@ Simulate your badge on the interwebz.
 
 ## Controls
 
-- Escape: open menu
-- WASD/Arrow Keys + Shift: 4 direction pad + click
-- Space: start
-- Enter: select
+- Joystick: Arrow keys/WASD
+- Joystick click: Shift
+- A: Z/K
+- B: X/J
+- Start: Enter/Y
+- Select: Backspace/T
+- Open system menu: Escape
 
 ## Supported Hardware Components
 

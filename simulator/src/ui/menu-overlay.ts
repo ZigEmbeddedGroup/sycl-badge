@@ -156,7 +156,7 @@ export class MenuOverlay extends LitElement {
         const pressedThisFrame = controls & (controls ^ this.lastGamepad);
         this.lastGamepad = controls;
 
-        if (pressedThisFrame & (constants.CONTROLS_SELECT)) {
+        if (pressedThisFrame & (constants.CONTROLS_START | constants.CONTROLS_A)) {
             if(this.optionContext === optionContext.DEFAULT) {
                 switch (this.selectedIdx) {
                     case this.optionIndex.CONTINUE:

@@ -88,4 +88,6 @@ export fn update() void {
     wasm4.rect(.{ .red = 31, .green = 31, .blue = 31 }, .{ .red = 0, .green = 63, .blue = 31 }, 100, 100, 10, 10);
 
     wasm4.text(.{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 }, fbs.getWritten(), 0, 0);
+
+    wasm4.text(.{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 }, "\x80\x81\x82\x83\x84\x85\x86\x87\x88", 0, 120);
 }

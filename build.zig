@@ -88,6 +88,24 @@ pub fn build(b: *Build) void {
         });
         mz.install_firmware(b, mvp, .{});
     }
+
+    const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
+    font_export_step.makeFn = struct {
+        fn make(_: *std.Build.Step, _: *std.Progress.Node) anyerror!void {
+            const font = @import("src/font.zig").font;
+            var file = try std.fs.cwd().createFile("simulator/src/font.ts", .{});
+            try file.writer().writeAll("export const FONT = Uint8Array.of(\n");
+            for (font) |char| {
+                try file.writer().writeAll("   ");
+                for (char) |byte| {
+                    try file.writer().print(" 0x{X:0>2},", .{byte});
+                }
+                try file.writer().writeByte('\n');
+            }
+            try file.writer().writeAll(");\n");
+            file.close();
+        }
+    }.make;
 }
 
 pub const Cart = struct {

@@ -1,11 +1,10 @@
 import {
-    FONT,
     WIDTH,
     HEIGHT,
     ADDR_FRAMEBUFFER,
     OPTIONAL_COLOR_NONE,
 } from "./constants";
-import { unpack565 } from "./ui/utils";
+import { FONT } from "./font";
 
 export class Framebuffer {
     bytes: Uint16Array;

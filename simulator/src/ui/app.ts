@@ -50,8 +50,8 @@ export class App extends LitElement {
         }
 
         canvas {
-            width: 100%;
-            height: 100%;
+            flex: 1;
+            max-width: 100%;
             object-fit: contain;
             image-rendering: pixelated;
             image-rendering: crisp-edges;

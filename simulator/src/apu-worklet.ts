@@ -27,6 +27,9 @@ class Channel {
     /** Time the tone should end. */
     releaseTime = 0;
 
+    /** The tick the tone should end. */
+    endTick = 0;
+
     /** Sustain volume level. */
     sustainVolume = 0;
 
@@ -65,27 +68,38 @@ function polyblep (phase: number, phaseInc: number) {
     }
 }
 
+function midiFreq (note: number, bend: number) {
+    return Math.pow(2, (note - 69 + bend / 256) / 12) * 440;
+}
+
 class APUProcessor extends AudioWorkletProcessor {
     time: number;
+    ticks: number;
     channels: Channel[];
 
     constructor () {
         super();
 
         this.time = 0;
+        this.ticks = 0;
         this.channels = new Array(4);
         for (let ii = 0; ii < 4; ++ii) {
             this.channels[ii] = new Channel();
         }
 
         if (this.port != null) {
-            this.port.onmessage = (event: MessageEvent<[number, number, number, number]>) => {
-                this.tone(...event.data);
+            this.port.onmessage = (event: MessageEvent<"tick" | [number, number, number, number]>) => {
+                if (event.data == "tick") {
+                    this.tick();
+                } else {
+                    this.tone(...event.data);
+                }
             };
         }
     }
 
     ramp (value1: number, value2: number, time1: number, time2: number) {
+        if (this.time >= time2) return value2;
         const t = (this.time - time1) / (time2 - time1);
         return lerp(value1, value2, t);
     }
@@ -100,7 +114,7 @@ class APUProcessor extends AudioWorkletProcessor {
 
     getCurrentVolume (channel: Channel) {
         const time = this.time;
-        if (time >= channel.sustainTime) {
+        if (time >= channel.sustainTime && channel.releaseTime != channel.sustainTime) {
             // Release
             return this.ramp(channel.sustainVolume, 0, channel.sustainTime, channel.releaseTime);
         } else if (time >= channel.decayTime) {
@@ -113,6 +127,10 @@ class APUProcessor extends AudioWorkletProcessor {
             // Attack
             return this.ramp(0, channel.peakVolume, channel.startTime, channel.attackTime);
         }
+    }
+
+    tick () {
+        this.ticks++;
     }
 
     tone (frequency: number, duration: number, volume: number, flags: number) {
@@ -130,21 +148,28 @@ class APUProcessor extends AudioWorkletProcessor {
         const channelIdx = flags & 0x3;
         const mode = (flags >> 2) & 0x3;
         const pan = (flags >> 4) & 0x3;
+        const noteMode = flags & 0x40;
 
         const channel = this.channels[channelIdx];
 
         // Restart the phase if this channel wasn't already playing
-        if (this.time > channel.releaseTime) {
+        if (this.time > channel.releaseTime && this.ticks != channel.endTick) {
             channel.phase = (channelIdx == 2) ? 0.25 : 0;
         }
 
-        channel.freq1 = freq1;
-        channel.freq2 = freq2;
+        if (noteMode) {
+            channel.freq1 = midiFreq(freq1 & 0xff, freq1 >> 8);
+            channel.freq2 = (freq2 == 0) ? 0 : midiFreq(freq2 & 0xff, freq2 >> 8);
+        } else {
+            channel.freq1 = freq1;
+            channel.freq2 = freq2;
+        }
         channel.startTime = this.time;
         channel.attackTime = channel.startTime + ((SAMPLE_RATE*attack/60) >>> 0);
         channel.decayTime = channel.attackTime + ((SAMPLE_RATE*decay/60) >>> 0);
         channel.sustainTime = channel.decayTime + ((SAMPLE_RATE*sustain/60) >>> 0);
         channel.releaseTime = channel.sustainTime + ((SAMPLE_RATE*release/60) >>> 0);
+        channel.endTick = this.ticks + attack + decay + sustain + release;
         channel.pan = pan;
 
         const maxVolume = (channelIdx == 2) ? MAX_VOLUME_TRIANGLE : MAX_VOLUME;
@@ -179,7 +204,7 @@ class APUProcessor extends AudioWorkletProcessor {
             for (let channelIdx = 0; channelIdx < 4; ++channelIdx) {
                 const channel = this.channels[channelIdx];
 
-                if (this.time < channel.releaseTime) {
+                if (this.time < channel.releaseTime || this.ticks == channel.endTick) {
                     const freq = this.getCurrentFrequency(channel);
                     const volume = this.getCurrentVolume(channel);
                     let sample;

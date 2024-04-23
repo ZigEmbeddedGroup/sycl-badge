@@ -148,14 +148,20 @@ pub fn add_cart(
 
     lib.root_module.addImport("wasm4", d.module("wasm4"));
 
+    const host_target = b.resolveTargetQuery(.{});
     const watch = d.builder.addExecutable(.{
         .name = "watch",
         .root_source_file = .{ .path = "src/watch/main.zig" },
-        .target = b.resolveTargetQuery(.{}),
+        .target = host_target,
         .optimize = options.optimize,
     });
     watch.root_module.addImport("ws", d.builder.dependency("ws", .{}).module("websocket"));
     watch.root_module.addImport("mime", d.builder.dependency("mime", .{}).module("mime"));
+
+    if (host_target.result.os.tag == .macos) {
+        watch.linkFramework("CoreFoundation");
+        watch.linkFramework("CoreServices");
+    }
 
     const watch_run_cmd = b.addRunArtifact(watch);
     watch_run_cmd.step.dependOn(b.getInstallStep());

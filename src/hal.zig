@@ -1,7 +1,7 @@
 pub const adc = @import("hal/adc.zig");
 pub const port = @import("hal/port.zig");
 pub const nvm = @import("hal/nvm.zig");
-pub const usb = @import("hal/usb.zig");
+//pub const usb = @import("hal/usb.zig");
 pub const gclk = @import("hal/gclk.zig");
 pub const mclk = @import("hal/mclk.zig");
 pub const pins = @import("hal/pins.zig");

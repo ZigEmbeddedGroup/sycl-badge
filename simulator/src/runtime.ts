@@ -42,7 +42,7 @@ export class Runtime {
 
         this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
 
-        this.memory = new WebAssembly.Memory({initial: 1, maximum: 1});
+        this.memory = new WebAssembly.Memory({initial: 2, maximum: 2});
         this.data = new DataView(this.memory.buffer);
 
         this.framebuffer = new Framebuffer(this.memory.buffer);

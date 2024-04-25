@@ -25,19 +25,31 @@ pub const sycl_badge_2024 = MicroZig.Target{
 pub fn build(b: *Build) void {
     const mz = MicroZig.init(b, .{});
 
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
     const optimize = b.standardOptimizeOption(.{});
 
     _ = b.addModule("wasm4", .{ .root_source_file = .{ .path = "src/wasm4.zig" } });
 
     var dep: std.Build.Dependency = .{ .builder = b };
-    const cart = add_cart(&dep, b, .{
-        .name = "sample",
-        .optimize = optimize,
-        .root_source_file = .{ .path = "samples/feature_test.zig" },
+    // const sample_cart = add_cart(&dep, b, .{
+    //     .name = "sample",
+    //     .target = wasm_target,
+    //     .optimize = .ReleaseSmall,
+    //     .root_source_file = .{ .path = "samples/feature_test.zig" },
+    // });
+    const zeroman_cart = add_cart(&dep, b, .{
+        .name = "zeroman",
+        .target = wasm_target,
+        .optimize = .ReleaseSmall,
+        .root_source_file = .{ .path = "samples/zeroman/main.zig" },
     });
+    add_zeroman_assets_step(b, zeroman_cart);
 
     const watch_step = b.step("watch", "");
-    watch_step.dependOn(&cart.watch_run_cmd.step);
+    watch_step.dependOn(&zeroman_cart.watch_run_cmd.step);
 
     //const modified_memory_regions = b.allocator.dupe(MicroZig.MemoryRegion, py_badge.chip.memory_regions) catch @panic("out of memory");
     //for (modified_memory_regions) |*memory_region| {
@@ -112,11 +124,14 @@ pub const Cart = struct {
     // mz: *MicroZig,
     // fw: *MicroZig.Firmware,
 
+    options: CartOptions,
+    lib: *std.Build.Step.Compile,
     watch_run_cmd: *std.Build.Step.Run,
 };
 
 pub const CartOptions = struct {
     name: []const u8,
+    target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     root_source_file: Build.LazyPath,
 };
@@ -129,10 +144,7 @@ pub fn add_cart(
     const lib = b.addExecutable(.{
         .name = "cart",
         .root_source_file = options.root_source_file,
-        .target = b.resolveTargetQuery(.{
-            .cpu_arch = .wasm32,
-            .os_tag = .freestanding,
-        }),
+        .target = options.target,
         .optimize = options.optimize,
     });
     b.installArtifact(lib);
@@ -177,6 +189,8 @@ pub fn add_cart(
 
     const cart: *Cart = b.allocator.create(Cart) catch @panic("out of memory");
     cart.* = .{
+        .options = options,
+        .lib = lib,
         .watch_run_cmd = watch_run_cmd,
     };
     return cart;
@@ -218,3 +232,53 @@ pub fn install_cart(b: *Build, cart: *Cart) void {
     cart.mz.install_firmware(b, cart.fw, .{});
     cart.mz.install_firmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }
+
+fn add_zeroman_assets_step(b: *Build, cart: *Cart) void {
+    const host_target = b.resolveTargetQuery(.{});
+    const convert = b.addExecutable(.{
+        .name = "convert_gfx",
+        .root_source_file = b.path("samples/zeroman/build/convert_gfx.zig"),
+        .target = host_target,
+        .optimize = cart.options.optimize,
+    });
+    convert.root_module.addImport("zigimg", b.dependency("zigimg", .{}).module("zigimg"));
+
+    const base_path = "samples/zeroman/assets/";
+    const gen_gfx = b.addRunArtifact(convert);
+    inline for (zeroman_assets) |file| {
+        gen_gfx.addArg("-i");
+        gen_gfx.addFileArg(b.path(base_path ++ file.path));
+        gen_gfx.addArg(std.fmt.comptimePrint("{}", .{file.bits}));
+        gen_gfx.addArg(std.fmt.comptimePrint("{}", .{file.transparency}));
+    }
+    gen_gfx.addArg("-o");
+    const gfx_zig = gen_gfx.addOutputFileArg("gfx.zig");
+
+    const gfx_mod = b.addModule("gfx", .{
+        .root_source_file = gfx_zig,
+        .target = cart.options.target,
+        .optimize = cart.options.optimize,
+    });
+    var dep: std.Build.Dependency = .{ .builder = b };
+    gfx_mod.addImport("wasm4", dep.module("wasm4"));
+
+    cart.lib.step.dependOn(&gen_gfx.step);
+    cart.lib.root_module.addImport("gfx", gfx_mod);
+}
+
+const GfxAsset = struct { path: []const u8, bits: u4, transparency: bool };
+
+const zeroman_assets = [_]GfxAsset{
+    .{ .path = "door.png", .bits = 2, .transparency = false },
+    .{ .path = "effects.png", .bits = 2, .transparency = true },
+    .{ .path = "font.png", .bits = 2, .transparency = true },
+    .{ .path = "gopher.png", .bits = 4, .transparency = true },
+    .{ .path = "healthbar.png", .bits = 4, .transparency = true },
+    .{ .path = "hurt.png", .bits = 1, .transparency = true },
+    .{ .path = "needleman.png", .bits = 4, .transparency = false },
+    .{ .path = "shot.png", .bits = 2, .transparency = true },
+    .{ .path = "spike.png", .bits = 2, .transparency = true },
+    .{ .path = "teleport.png", .bits = 2, .transparency = true },
+    .{ .path = "title.png", .bits = 4, .transparency = false },
+    .{ .path = "zero.png", .bits = 4, .transparency = true },
+};

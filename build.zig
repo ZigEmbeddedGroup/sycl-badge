@@ -139,8 +139,8 @@ pub fn add_cart(
 
     lib.entry = .disabled;
     lib.import_memory = true;
-    lib.initial_memory = 65536;
-    lib.max_memory = 65536;
+    lib.initial_memory = 2 * 65536;
+    lib.max_memory = 2 * 65536;
     lib.stack_size = 14752;
     lib.global_base = 160 * 128 * 2 + 0x1e;
 

@@ -219,6 +219,7 @@ fn add_zeroman_assets_step(b: *Build, cart: *Cart) void {
         .root_source_file = b.path("samples/zeroman/build/convert_gfx.zig"),
         .target = b.host,
         .optimize = cart.options.optimize,
+        .link_libc = true,
     });
     convert.root_module.addImport("zigimg", b.dependency("zigimg", .{}).module("zigimg"));
 

@@ -110,7 +110,6 @@ pub fn build(b: *Build) void {
             .optimize = optimize,
             .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
         });
-        mvp.artifact.image_base = 0x4000;
         mz.install_firmware(b, mvp, .{});
         mz.install_firmware(b, mvp, .{
             .format = .{ .uf2 = .SAMD51 },

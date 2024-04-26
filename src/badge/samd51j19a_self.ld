@@ -28,9 +28,11 @@
  */
 
 
+/*
 OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 SEARCH_DIR(.)
+*/
 
 ENTRY(microzig_main)
 
@@ -41,6 +43,14 @@ MEMORY
   ram      (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00030000
   bkupram  (rwx) : ORIGIN = 0x47000000, LENGTH = 0x00002000
   qspi     (rwx) : ORIGIN = 0x04000000, LENGTH = 0x01000000
+}
+
+PHDRS
+{
+  ph_rom   PT_LOAD FLAGS(0x5);
+  ph_ram   PT_LOAD FLAGS(0x7);
+  ph_bkupram   PT_LOAD FLAGS(0x7);
+  ph_qspi   PT_LOAD FLAGS(0x7);
 }
 
 /* Section Definitions */
@@ -92,14 +102,14 @@ SECTIONS
         KEEP (*crtend.o(.dtors))
 
         . = ALIGN(4);
-    } > rom
+    } > rom : ph_rom
 
     /* .ARM.exidx is sorted, so has to go in its own output section.  */
     PROVIDE_HIDDEN (__exidx_start = .);
     .ARM.exidx :
     {
       *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-    } > rom
+    } > rom : ph_rom
     PROVIDE_HIDDEN (__exidx_end = .);
 
         microzig_data_start = .;
@@ -116,7 +126,7 @@ SECTIONS
         *(.data .data.*);
         . = ALIGN(4);
         microzig_data_end = .;
-    } > ram
+    } > ram : ph_ram
 
     .bkupram (NOLOAD):
     {
@@ -125,7 +135,7 @@ SECTIONS
         *(.bkupram .bkupram.*);
         . = ALIGN(8);
         _ebkupram = .;
-    } > bkupram
+    } > bkupram : ph_bkupram
 
     .qspi (NOLOAD):
     {
@@ -134,7 +144,7 @@ SECTIONS
         *(.qspi .qspi.*);
         . = ALIGN(8);
         _eqspi = .;
-    } > qspi
+    } > qspi : ph_qspi
 
     .bss (NOLOAD) :
     {
@@ -144,7 +154,7 @@ SECTIONS
         *(COMMON)
         . = ALIGN(4);
         microzig_bss_end = .;
-    } > ram
+    } > ram : ph_ram
 
     . = ALIGN(4);
     _end = . ;

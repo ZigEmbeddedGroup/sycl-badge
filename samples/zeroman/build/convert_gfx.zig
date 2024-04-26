@@ -9,7 +9,9 @@ const ConvertFile = struct {
 };
 
 pub fn main() !void {
-    var args = std.process.args();
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
+
     _ = args.next();
     var in_files = std.ArrayList(ConvertFile).init(allocator);
     var out_path: []const u8 = undefined;

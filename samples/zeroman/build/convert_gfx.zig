@@ -9,7 +9,7 @@ const ConvertFile = struct {
 };
 
 pub fn main() !void {
-    var args = std.process.argsWithAllocator(allocator);
+    var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
 
     _ = args.next();

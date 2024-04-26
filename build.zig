@@ -34,12 +34,13 @@ pub fn build(b: *Build) void {
     _ = b.addModule("wasm4", .{ .root_source_file = .{ .path = "src/wasm4.zig" } });
 
     var dep: std.Build.Dependency = .{ .builder = b };
-    // const sample_cart = add_cart(&dep, b, .{
-    //     .name = "sample",
-    //     .target = wasm_target,
-    //     .optimize = .ReleaseSmall,
-    //     .root_source_file = .{ .path = "samples/feature_test.zig" },
-    // });
+    _ = add_cart(&dep, b, .{
+        .name = "sample",
+        .target = wasm_target,
+        .optimize = .ReleaseSmall,
+        .root_source_file = .{ .path = "samples/feature_test.zig" },
+    });
+
     const zeroman_cart = add_cart(&dep, b, .{
         .name = "zeroman",
         .target = wasm_target,
@@ -50,27 +51,6 @@ pub fn build(b: *Build) void {
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&zeroman_cart.watch_run_cmd.step);
-
-    //const modified_memory_regions = b.allocator.dupe(MicroZig.MemoryRegion, py_badge.chip.memory_regions) catch @panic("out of memory");
-    //for (modified_memory_regions) |*memory_region| {
-    //    if (memory_region.kind != .ram) continue;
-    //    memory_region.offset += 0x19A0;
-    //    memory_region.length -= 0x19A0;
-    //    break;
-    //}
-    //var modified_py_badge = py_badge;
-    //modified_py_badge.chip.memory_regions = modified_memory_regions;
-
-    //const fw = mz.add_firmware(b, .{
-    //    .name = "pybadge-io",
-    //    .target = modified_py_badge,
-    //    .optimize = optimize,
-    //    .source_file = .{ .path = "src/main.zig" },
-    //});
-    //fw.artifact.step.dependOn(&fw_options.step);
-    //fw.modules.app.addImport("options", fw_options.createModule());x
-    //mz.install_firmware(b, fw, .{});
-    //mz.install_firmware(b, fw, .{ .format = .{ .uf2 = .SAMD51 } });
 
     const badge = mz.add_firmware(b, .{
         .name = "badge",

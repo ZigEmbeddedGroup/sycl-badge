@@ -141,30 +141,29 @@ pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: 
     if (comptime builtin.target.isWasm()) {
         platform_specific.blit_sub(sprite, x, y, width, height, src_x, src_y, stride, flags);
     } else {
-        @compileError("TODO");
-        // const rest: extern struct {
-        //     width: u32,
-        //     height: u32,
-        //     src_x: u32,
-        //     src_y: u32,
-        //     stride: u32,
-        //     flags: u32,
-        // } = .{
-        //     .width = width,
-        //     .height = height,
-        //     .src_x = src_x,
-        //     .src_y = src_y,
-        //     .stride = stride,
-        //     .flags = flags,
-        // };
-        // asm volatile (" svc #1"
-        //     :
-        //     : [sprite] "{r0}" (sprite),
-        //       [x] "{r1}" (x),
-        //       [y] "{r2}" (y),
-        //       [rest] "{r3}" (&rest),
-        //     : "memory"
-        // );
+        const rest: extern struct {
+            width: u32,
+            height: u32,
+            src_x: u32,
+            src_y: u32,
+            stride: u32,
+            flags: u32,
+        } = .{
+            .width = width,
+            .height = height,
+            .src_x = src_x,
+            .src_y = src_y,
+            .stride = stride,
+            .flags = flags,
+        };
+        asm volatile (" svc #1"
+            :
+            : [sprite] "{r0}" (sprite),
+              [x] "{r1}" (x),
+              [y] "{r2}" (y),
+              [rest] "{r3}" (&rest),
+            : "memory"
+        );
     }
 }
 
@@ -173,15 +172,14 @@ pub inline fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void
     if (comptime builtin.target.isWasm()) {
         platform_specific.line(color, x1, y1, x2, y2);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #2"
-        //     :
-        //     : [x1] "{r0}" (x1),
-        //       [y1] "{r1}" (y1),
-        //       [x2] "{r2}" (x2),
-        //       [y2] "{r3}" (y2),
-        //     : "memory"
-        // );
+        asm volatile (" svc #2"
+            :
+            : [x1] "{r0}" (x1),
+              [y1] "{r1}" (y1),
+              [x2] "{r2}" (x2),
+              [y2] "{r3}" (y2),
+            : "memory"
+        );
     }
 }
 
@@ -190,15 +188,14 @@ pub inline fn oval(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i3
     if (comptime builtin.target.isWasm()) {
         platform_specific.oval(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #3"
-        //     :
-        //     : [x] "{r0}" (x),
-        //       [y] "{r1}" (y),
-        //       [width] "{r2}" (width),
-        //       [height] "{r3}" (height),
-        //     : "memory"
-        // );
+        asm volatile (" svc #3"
+            :
+            : [x] "{r0}" (x),
+              [y] "{r1}" (y),
+              [width] "{r2}" (width),
+              [height] "{r3}" (height),
+            : "memory"
+        );
     }
 }
 
@@ -207,15 +204,14 @@ pub inline fn rect(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i3
     if (comptime builtin.target.isWasm()) {
         platform_specific.rect(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #4"
-        //     :
-        //     : [x] "{r0}" (x),
-        //       [y] "{r1}" (y),
-        //       [width] "{r2}" (width),
-        //       [height] "{r3}" (height),
-        //     : "memory"
-        // );
+        asm volatile (" svc #4"
+            :
+            : [x] "{r0}" (x),
+              [y] "{r1}" (y),
+              [width] "{r2}" (width),
+              [height] "{r3}" (height),
+            : "memory"
+        );
     }
 }
 
@@ -224,15 +220,14 @@ pub inline fn text(text_color: DisplayColor, background_color: ?DisplayColor, st
     if (comptime builtin.target.isWasm()) {
         platform_specific.text(text_color, OptionalDisplayColor.from(background_color), str.ptr, str.len, x, y);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #5"
-        //     :
-        //     : [str_ptr] "{r0}" (str.ptr),
-        //       [str_len] "{r1}" (str.len),
-        //       [x] "{r2}" (x),
-        //       [y] "{r3}" (y),
-        //     : "memory"
-        // );
+        asm volatile (" svc #5"
+            :
+            : [str_ptr] "{r0}" (str.ptr),
+              [str_len] "{r1}" (str.len),
+              [x] "{r2}" (x),
+              [y] "{r3}" (y),
+            : "memory"
+        );
     }
 }
 
@@ -241,14 +236,13 @@ pub inline fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.hline(color, x, y, len);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #7"
-        //     :
-        //     : [x] "{r0}" (x),
-        //       [y] "{r1}" (y),
-        //       [len] "{r2}" (len),
-        //     : "memory"
-        // );
+        asm volatile (" svc #7"
+            :
+            : [x] "{r0}" (x),
+              [y] "{r1}" (y),
+              [len] "{r2}" (len),
+            : "memory"
+        );
     }
 }
 
@@ -257,14 +251,13 @@ pub inline fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.vline(color, x, y, len);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #6"
-        //     :
-        //     : [x] "{r0}" (x),
-        //       [y] "{r1}" (y),
-        //       [len] "{r2}" (len),
-        //     : "memory"
-        // );
+        asm volatile (" svc #6"
+            :
+            : [x] "{r0}" (x),
+              [y] "{r1}" (y),
+              [len] "{r2}" (len),
+            : "memory"
+        );
     }
 }
 
@@ -306,14 +299,13 @@ pub inline fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags)
     if (comptime builtin.target.isWasm()) {
         platform_specific.tone(frequency, duration, volume, flags);
     } else {
-        @compileError("TODO");
-        // asm volatile (" svc #8"
-        //     :
-        //     : [frequency] "{r0}" (frequency),
-        //       [duration] "{r1}" (duration),
-        //       [volume] "{r2}" (volume),
-        //       [flags] "{r3}" (flags),
-        // );
+        asm volatile (" svc #8"
+            :
+            : [frequency] "{r0}" (frequency),
+              [duration] "{r1}" (duration),
+              [volume] "{r2}" (volume),
+              [flags] "{r3}" (flags),
+        );
     }
 }
 
@@ -331,7 +323,7 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
     if (comptime builtin.target.isWasm()) {
         return platform_specific.read_flash(offset, dst.ptr, dst.len);
     } else {
-        @compileError("TODO");
+        @panic("TODO");
     }
 }
 
@@ -339,12 +331,12 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
     if (comptime builtin.target.isWasm()) {
         return platform_specific.write_flash_page(page, &src);
     } else {
-        @compileError("TODO");
-        // return asm volatile (" svc #10"
-        //     : [result] "={r0}" (-> u32),
-        //     : [src] "{r0}" (src),
-        //       [size] "{r1}" (size),
-        // );
+        // TODO: return?
+        _ = asm volatile (" svc #10"
+            : [result] "={r0}" (-> u32),
+            : [src] "{r0}" (src),
+              [size] "{r1}" (flash_page_size),
+        );
     }
 }
 

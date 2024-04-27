@@ -32,7 +32,7 @@ pub fn main() !void {
 
     const writer = out_file.writer();
     try writer.writeAll("const PackedIntSlice = @import(\"std\").packed_int_array.PackedIntSlice;\n");
-    try writer.writeAll("const DisplayColor = @import(\"wasm4\").DisplayColor;\n\n");
+    try writer.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
 
     for (in_files.items) |in_file| {
         try convert(in_file, writer);

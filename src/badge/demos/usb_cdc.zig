@@ -228,7 +228,7 @@ pub fn main() !void {
     while (USB.DEVICE.SYNCBUSY.read().ENABLE != 0) {}
 
     while (true) {
-        tick();
+        //tick();
     }
 }
 

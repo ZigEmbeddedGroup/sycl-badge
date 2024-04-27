@@ -1,4 +1,4 @@
-const wasm4 = @import("wasm4");
+const cart = @import("cart-api");
 const gfx = @import("gfx");
 
 fn blitZero() void {
@@ -8,7 +8,7 @@ fn blitZero() void {
         while (x < 24) : (x += 1) {
             const index = gfx.zero.indices.get(y * gfx.zero.w + x);
             if (index == 0) continue;
-            wasm4.framebuffer[(y + 96) * wasm4.screen_width + x + 80 - 12] = gfx.zero.colors[index];
+            cart.framebuffer[(y + 96) * cart.screen_width + x + 80 - 12] = gfx.zero.colors[index];
         }
     }
 }
@@ -20,7 +20,7 @@ fn blitGopher() void {
         while (x < 24) : (x += 1) {
             const index = gfx.gopher.indices.get(y * gfx.gopher.w + x);
             if (index == 0) continue;
-            wasm4.framebuffer[(y + 104) * wasm4.screen_width + x + 92] = gfx.gopher.colors[index];
+            cart.framebuffer[(y + 104) * cart.screen_width + x + 92] = gfx.gopher.colors[index];
         }
     }
 }
@@ -31,7 +31,7 @@ pub fn blitSpriteOpaque(sheet: anytype, dx: u32, dy: u32) void {
         var x: usize = 0;
         while (x < sheet.w) : (x += 1) {
             const index = sheet.indices.get(y * sheet.w + x);
-            wasm4.framebuffer[(y + dy) * wasm4.screen_width + x + dx] = sheet.colors[index];
+            cart.framebuffer[(y + dy) * cart.screen_width + x + dx] = sheet.colors[index];
         }
     }
 }
@@ -43,10 +43,12 @@ pub fn blitSprite(sheet: anytype, dx: u32, dy: u32) void {
         while (x < sheet.w) : (x += 1) {
             const index = sheet.indices.get(y * sheet.w + x);
             if (index == 0) continue;
-            wasm4.framebuffer[(y + dy) * wasm4.screen_width + x + dx] = sheet.colors[index];
+            cart.framebuffer[(y + dy) * cart.screen_width + x + dx] = sheet.colors[index];
         }
     }
 }
+
+pub export fn start() void {}
 
 pub export fn update() void {
     blitSpriteOpaque(gfx.needleman, 0, 0);

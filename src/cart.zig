@@ -46,8 +46,8 @@ pub fn init() void {
 pub fn start() void {
     call(if (options.have_cart) &libcart.start else &struct {
         fn start() callconv(.C) void {
-            const w4 = @import("wasm4.zig");
-            w4.trace("start");
+            const api = @import("cart/api.zig");
+            api.trace("start");
         }
     }.start);
 }
@@ -87,27 +87,27 @@ pub fn tick() void {
     if (SYSTEM_FLAGS.* & SYSTEM_PRESERVE_FRAMEBUFFER == 0) @memset(FRAMEBUFFER, 0b00_00_00_00);
     call(if (options.have_cart) &libcart.update else &struct {
         fn update() callconv(.C) void {
-            const w4 = @import("wasm4.zig");
+            const api = @import("cart/api.zig");
             const global = struct {
                 var tick: u8 = 0;
                 var stroke: bool = true;
                 var radius: u32 = 0;
                 var note: usize = 0;
             };
-            w4.PALETTE[0] = 0x000000;
-            w4.PALETTE[1] = 0xFF0000;
-            w4.PALETTE[2] = 0xFFFFFF;
-            w4.DRAW_COLORS.* = if (global.stroke) 0x0032 else 0x0002;
-            w4.oval(
+            api.PALETTE[0] = 0x000000;
+            api.PALETTE[1] = 0xFF0000;
+            api.PALETTE[2] = 0xFFFFFF;
+            api.DRAW_COLORS.* = if (global.stroke) 0x0032 else 0x0002;
+            api.oval(
                 @as(i32, lcd.width / 2) -| @min(global.radius, std.math.maxInt(i32)),
                 @as(i32, lcd.height / 2) -| @min(global.radius, std.math.maxInt(i32)),
                 global.radius * 2,
                 global.radius * 2,
             );
-            w4.DRAW_COLORS.* = 0x0003;
+            api.DRAW_COLORS.* = 0x0003;
             for (0..8) |button| {
-                if (w4.GAMEPAD1.* & @as(u8, 1) << @intCast(button) != 0) {
-                    w4.text(
+                if (api.GAMEPAD1.* & @as(u8, 1) << @intCast(button) != 0) {
+                    api.text(
                         &.{0x80 + @as(u8, @intCast(button))},
                         20 + @as(u8, @intCast(button)) * 16,
                         60,
@@ -125,12 +125,12 @@ pub fn tick() void {
                     }
                 }
 
-                w4.tone(([_]u16{
+                api.tone(([_]u16{
                     880, 831, 784, 740, 698, 659, 622, 587, 554, 523, 494, 466,
                     440, 415, 392, 370, 349, 330, 311, 294, 277, 262, 247, 233,
                     220, 207, 196, 185, 175, 165, 156, 147, 139, 131, 123, 117,
                     110,
-                })[global.note], 10, 50, w4.TONE_PULSE1);
+                })[global.note], 10, 50, api.TONE_PULSE1);
                 global.note += 1;
                 if (global.note == 37) global.note = 0;
             }
@@ -545,7 +545,7 @@ const libcart = struct {
     extern fn __return_thunk__() noreturn;
 
     comptime {
-        if (!options.have_cart) _ = @import("wasm4.zig").__return_thunk__;
+        if (!options.have_cart) _ = @import("cart/api.zig").__return_thunk__;
     }
 };
 

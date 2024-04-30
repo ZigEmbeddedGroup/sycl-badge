@@ -37,7 +37,7 @@ pub fn init(
 }
 
 pub fn listen(reloader: *Reloader) !void {
-    try reloader.watcher.listen(reloader, onChange);
+    try reloader.watcher.listen(reloader.gpa, reloader, onChange);
 }
 
 pub fn onChange(reloader: *Reloader, dir_that_changed: usize) void {

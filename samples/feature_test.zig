@@ -84,6 +84,20 @@ export fn update() void {
 
     // TODO: blit, blitSub
 
+    cart.blit(.{
+        .sprite = &.{
+            .{ .red = 31, .green = 0, .blue = 0 },
+            .{ .red = 0, .green = 0, .blue = 31 },
+            .{ .red = 31, .green = 0, .blue = 0 },
+            .{ .red = 0, .green = 0, .blue = 31 },
+        },
+        .x = 40,
+        .y = 40,
+        .width = 2,
+        .height = 2,
+        .flags = .{},
+    });
+
     cart.line(.{
         .x1 = 50,
         .y1 = 50,

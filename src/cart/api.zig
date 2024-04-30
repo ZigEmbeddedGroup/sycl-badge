@@ -69,8 +69,7 @@ pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt
 
 const platform_specific = if (builtin.target.isWasm())
     struct {
-        extern fn blit(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: BlitFlags) void;
-        extern fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void;
+        extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
         extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
         extern fn oval(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
         extern fn rect(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
@@ -94,23 +93,42 @@ comptime {
     _ = platform_specific;
 }
 
-pub const BitsPerPixel = enum(u1) { one, two };
-pub const BlitFlags = packed struct(u32) {
-    bits_per_pixel: BitsPerPixel = .one,
-    flip_x: bool = false,
-    flip_y: bool = false,
-    rotate: bool = false,
-    padding: u28 = undefined,
+pub const BlitOptions = struct {
+    pub const Flags = packed struct(u32) {
+        flip_x: bool = false,
+        flip_y: bool = false,
+        rotate: bool = false,
+        padding: u29 = undefined,
+    };
+
+    sprite: [*]const DisplayColor,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    /// x within the sprite atlas.
+    src_x: i32 = 0,
+    /// y within the sprite atlas.
+    src_y: i32 = 0,
+    /// Width of the entire sprite atlas.
+    stride: ?u32 = null,
+    flags: Flags,
 };
 
 /// Copies pixels to the framebuffer.
-/// colors.len >= 2 for flags.bits_per_pixel == .one
-/// colors.len >= 4 for flags.bits_per_pixel == .two
-/// TODO: this is super unsafe also blit is just a basic wrapper over blitSub
-pub inline fn blit(colors: [*]const DisplayColor, sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: BlitFlags) void {
-    _ = colors;
+pub inline fn blit(options: BlitOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.blit(sprite, x, y, width, height, flags);
+        platform_specific.blit(
+            options.sprite,
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+            options.src_x,
+            options.src_y,
+            options.stride orelse options.width,
+            options.flags,
+        );
     } else {
         @compileError("TODO");
         // const rest: extern struct {
@@ -130,40 +148,6 @@ pub inline fn blit(colors: [*]const DisplayColor, sprite: [*]const u8, x: i32, y
         //       [rest] "{r3}" (&rest),
         //     : "memory"
         // );
-    }
-}
-
-/// Copies a subregion within a larger sprite atlas to the framebuffer.
-/// colors.len >= 2 for flags.bits_per_pixel == .one
-/// colors.len >= 4 for flags.bits_per_pixel == .two
-/// TODO: this is super unsafe also blit is just a basic wrapper over blitSub
-pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.blit_sub(sprite, x, y, width, height, src_x, src_y, stride, flags);
-    } else {
-        const rest: extern struct {
-            width: u32,
-            height: u32,
-            src_x: u32,
-            src_y: u32,
-            stride: u32,
-            flags: u32,
-        } = .{
-            .width = width,
-            .height = height,
-            .src_x = src_x,
-            .src_y = src_y,
-            .stride = stride,
-            .flags = flags,
-        };
-        asm volatile (" svc #1"
-            :
-            : [sprite] "{r0}" (sprite),
-              [x] "{r1}" (x),
-              [y] "{r2}" (y),
-              [rest] "{r3}" (&rest),
-            : "memory"
-        );
     }
 }
 

@@ -16,26 +16,18 @@ children_fds: std.AutoHashMapUnmanaged(std.posix.fd_t, std.ArrayListUnmanaged(st
 /// inotify cookie tracker for move events
 cookie_fds: std.AutoHashMapUnmanaged(u32, std.posix.fd_t) = .{},
 
-const TreeKind = enum { input, output };
-
 const WatchEntry = struct {
     dir_path: []const u8,
     name: []const u8,
-    kind: TreeKind,
+    dir_index: u32,
 };
 
-pub fn init(
-    gpa: std.mem.Allocator,
-    out_dir_path: []const u8,
-    in_dir_paths: []const []const u8,
-) !LinuxWatcher {
-    const notify_fd = try std.posix.inotify_init1(0);
-    var self: LinuxWatcher = .{ .notify_fd = notify_fd };
-    _ = try self.addTree(gpa, .output, out_dir_path);
-    for (in_dir_paths) |p| {
-        _ = try self.addTree(gpa, .input, p);
+pub fn init(gpa: std.mem.Allocator, paths: []const []const u8) (std.posix.INotifyInitError || std.posix.INotifyAddWatchError || std.fs.Dir.OpenError || std.mem.Allocator.Error)!LinuxWatcher {
+    var watcher: LinuxWatcher = .{ .notify_fd = try std.posix.inotify_init1(0) };
+    for (paths, 0..) |p, i| {
+        _ = try watcher.addTree(gpa, @intCast(i), p);
     }
-    return self;
+    return watcher;
 }
 
 /// Register `child` with the `parent`
@@ -92,12 +84,12 @@ fn removeChildByName(
 fn addTree(
     self: *LinuxWatcher,
     gpa: std.mem.Allocator,
-    tree_kind: TreeKind,
+    dir_index: u32,
     root_dir_path: []const u8,
 ) !std.posix.fd_t {
     var root_dir = try std.fs.cwd().openDir(root_dir_path, .{ .iterate = true });
     defer root_dir.close();
-    const parent_fd = try self.addDir(gpa, tree_kind, root_dir_path);
+    const parent_fd = try self.addDir(gpa, dir_index, root_dir_path);
 
     // tracker for fds associated with dir paths
     // helps to track children within a recursive walk
@@ -111,7 +103,7 @@ fn addTree(
         else => continue,
         .directory => {
             const dir_path = try std.fs.path.join(gpa, &.{ root_dir_path, entry.path });
-            const dir_fd = try self.addDir(gpa, tree_kind, dir_path);
+            const dir_fd = try self.addDir(gpa, dir_index, dir_path);
             const p_dir = std.fs.path.dirname(dir_path).?;
             const p_fd = lookup.get(p_dir).?;
 
@@ -126,7 +118,7 @@ fn addTree(
 fn addDir(
     self: *LinuxWatcher,
     gpa: std.mem.Allocator,
-    tree_kind: TreeKind,
+    dir_index: u32,
     dir_path: []const u8,
 ) !std.posix.fd_t {
     const mask = Mask.all(&.{
@@ -144,7 +136,7 @@ fn addDir(
     try self.watch_fds.put(gpa, watch_fd, .{
         .dir_path = dir_path,
         .name = name_copy,
-        .kind = tree_kind,
+        .dir_index = dir_index,
     });
     log.debug("added {s} -> {}", .{ dir_path, watch_fd });
     return watch_fd;
@@ -203,14 +195,14 @@ fn moveDirEnd(
         gpa.free(watch_entry.name);
         const name_copy = try gpa.dupe(u8, name);
         watch_entry.name = name_copy;
-        watch_entry.kind = parent.kind;
+        watch_entry.dir_index = parent.dir_index;
 
         try self.updateDirPath(gpa, moved_fd, parent.dir_path);
         try self.addChild(gpa, to_fd, moved_fd);
         return moved_fd;
     } else { // unknown cookie - move from the outside
         const dir_path = try std.fs.path.join(gpa, &.{ parent.dir_path, name });
-        const moved_fd = try self.addTree(gpa, parent.kind, dir_path);
+        const moved_fd = try self.addTree(gpa, parent.dir_index, dir_path);
         try self.addChild(gpa, to_fd, moved_fd);
         return moved_fd;
     }
@@ -277,8 +269,9 @@ fn dropWatch(
 pub fn listen(
     self: *LinuxWatcher,
     gpa: std.mem.Allocator,
-    reloader: *Reloader,
-) !void {
+    context: anytype,
+    callback: fn (@TypeOf(context), changed_handle: usize) void,
+) (std.posix.INotifyAddWatchError || std.fs.File.ReadError || std.fs.Dir.OpenError || std.mem.Allocator.Error)!void {
     const Event = std.os.linux.inotify_event;
     const event_size = @sizeOf(Event);
     while (true) {
@@ -317,17 +310,10 @@ pub fn listen(
 
                     log.debug("ISDIR CREATE {s}", .{dir_path});
 
-                    const new_fd = try self.addTree(gpa, parent.kind, dir_path);
+                    const new_fd = try self.addTree(gpa, parent.dir_index, dir_path);
                     try self.addChild(gpa, event.wd, new_fd);
                     const data = self.watch_fds.get(new_fd).?;
-                    switch (data.kind) {
-                        .input => {
-                            reloader.onInputChange(data.dir_path, "");
-                        },
-                        .output => {
-                            reloader.onOutputChange(data.dir_path, "");
-                        },
-                    }
+                    callback(context, data.dir_index);
                     continue;
                 } else if (Mask.is(event.mask, .IN_MOVED_FROM)) {
                     log.debug("MOVING {s}/{s}", .{ parent.dir_path, event.getName().? });
@@ -337,30 +323,14 @@ pub fn listen(
                     log.debug("MOVED {s}/{s}", .{ parent.dir_path, event.getName().? });
                     const moved_fd = try self.moveDirEnd(gpa, event.wd, event.cookie, event.getName().?);
                     const moved = self.watch_fds.get(moved_fd).?;
-                    switch (moved.kind) {
-                        .input => {
-                            reloader.onInputChange(moved.dir_path, "");
-                        },
-                        .output => {
-                            reloader.onOutputChange(moved.dir_path, "");
-                        },
-                    }
+                    callback(context, moved.dir_index);
                     continue;
                 }
             } else {
                 if (Mask.is(event.mask, .IN_CLOSE_WRITE) or
                     Mask.is(event.mask, .IN_MOVED_TO))
                 {
-                    switch (parent.kind) {
-                        .input => {
-                            const name = event.getName() orelse continue;
-                            reloader.onInputChange(parent.dir_path, name);
-                        },
-                        .output => {
-                            const name = event.getName() orelse continue;
-                            reloader.onOutputChange(parent.dir_path, name);
-                        },
-                    }
+                    callback(context, parent.dir_index);
                 }
             }
         }

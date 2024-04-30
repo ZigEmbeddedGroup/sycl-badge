@@ -64,7 +64,7 @@ pub fn build(b: *Build) void {
     //
     // TODO: parameterize:
     const watch_run = b.addRunArtifact(watch);
-    watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot("samples"), "--cart", "zig-out/bin/feature_test.wasm" });
+    watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot("samples"), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run.step);

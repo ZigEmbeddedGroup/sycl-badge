@@ -123,7 +123,6 @@ export class Runtime {
             text: this.text.bind(this),
 
             blit: this.blit.bind(this),
-            blit_sub: this.blitSub.bind(this),
 
             tone: this.apu.tone.bind(this.apu),
 
@@ -165,20 +164,13 @@ export class Runtime {
         this.framebuffer.drawText(textColor, backgroundColor, text, x, y);
     }
 
-    blit (colorsPtr: number, spritePtr: number, x: number, y: number, width: number, height: number, flags: number) {
-        this.blitSub(colorsPtr, spritePtr, x, y, width, height, 0, 0, width, flags);
-    }
+    blit (spritePtr: number, x: number, y: number, width: number, height: number, srcX: number, srcY: number, stride: number, flags: number) {
+        const sprite = new Uint16Array(this.memory.buffer, spritePtr);
+        const flipX = (flags & 1);
+        const flipY = (flags & 2);
+        const rotate = (flags & 4);
 
-    blitSub (colorsPtr: number, spritePtr: number, x: number, y: number, width: number, height: number, srcX: number, srcY: number, stride: number, flags: number) {
-        const sprite = new Uint8Array(this.memory.buffer, spritePtr);
-        const bpp2 = (flags & 1);
-        const flipX = (flags & 2);
-        const flipY = (flags & 4);
-        const rotate = (flags & 8);
-
-        const colors = new Uint16Array(this.memory.buffer, colorsPtr);
-
-        this.framebuffer.blit(bpp2 ? [colors[0], colors[1], colors[2], colors[3]] : [colors[0], colors[1]], sprite, x, y, width, height, srcX, srcY, stride, flipX, flipY, rotate);
+        this.framebuffer.blit(sprite, x, y, width, height, srcX, srcY, stride, flipX, flipY, rotate);
     }
 
     read_flash (offset: number, dstPtr: number, length: number): number {

@@ -41,9 +41,12 @@ pub fn deinit(watcher: *WindowsWatcher, gpa: std.mem.Allocator) void {
 
 pub fn listen(
     watcher: *WindowsWatcher,
+    gpa: std.mem.Allocator,
     context: anytype,
     callback: fn (@TypeOf(context), changed_handle: usize) void,
 ) error{ UnknownWaitStatus, NextChangeFailed, WaitAbandoned, Unexpected }!void {
+    _ = gpa;
+
     wait_loop: while (true) {
         const status = windows.WaitForMultipleObjectsEx(watcher.handles.items, false, windows.INFINITE, false) catch |err| switch (err) {
             error.WaitTimeOut => unreachable,

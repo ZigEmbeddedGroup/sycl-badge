@@ -3,13 +3,12 @@ const fs = std.fs;
 const mime = @import("mime");
 const Allocator = std.mem.Allocator;
 const Reloader = @import("Reloader.zig");
-const not_found_html = @embedFile("404.html");
 const assert = std.debug.assert;
 
 const log = std.log.scoped(.server);
-pub const std_options: std.Options = .{
-    .log_level = .err,
-};
+// pub const std_options: std.Options = .{
+//     .log_level = .err,
+// };
 
 const usage =
     \\usage: zine serve [options]
@@ -31,24 +30,12 @@ const Server = struct {
         s.* = undefined;
     }
 
-    fn handleRequest(s: *Server, req: *std.http.Server.Request) !bool {
+    fn handleRequest(s: *Server, req: *std.http.Server.Request, cart_path: []const u8) !bool {
         var arena_impl = std.heap.ArenaAllocator.init(general_purpose_allocator.allocator());
         defer arena_impl.deinit();
         const arena = arena_impl.allocator();
 
         var path = req.head.target;
-
-        if (std.mem.indexOf(u8, path, "..")) |_| {
-            std.debug.print("'..' not allowed in URLs\n", .{});
-            @panic("TODO: check if '..' is fine");
-        }
-
-        if (std.mem.endsWith(u8, path, "/")) {
-            path = try std.fmt.allocPrint(arena, "{s}{s}", .{
-                path,
-                "index.html",
-            });
-        }
 
         if (std.mem.eql(u8, path, "/ws")) {
             var it = req.iterateHeaders();
@@ -85,63 +72,66 @@ const Server = struct {
         const mime_type = mime.extension_map.get(ext) orelse
             .@"application/octet-stream";
 
-        const file = s.zig_out_bin_dir.openFile(path[1..], .{}) catch |err| switch (err) {
-            error.FileNotFound => {
-                if (std.mem.endsWith(u8, req.head.target, "/")) {
-                    try req.respond(not_found_html, .{
-                        .status = .not_found,
+        if (std.mem.eql(u8, path, "/cart.wasm")) {
+            const file = s.zig_out_bin_dir.openFile(std.fs.path.basename(cart_path), .{}) catch |err| switch (err) {
+                error.FileNotFound => {
+                    if (std.mem.endsWith(u8, req.head.target, "/")) {
+                        try req.respond("404", .{
+                            .status = .not_found,
+                            .extra_headers = &.{
+                                .{ .name = "content-type", .value = "text/plain" },
+                                .{ .name = "connection", .value = "close" },
+                                .{ .name = "access-control-allow-origin", .value = "*" },
+                            },
+                        });
+                        log.debug("not found\n", .{});
+                        return false;
+                    } else {
+                        try appendSlashRedirect(arena, req);
+                        return false;
+                    }
+                },
+                else => {
+                    const message = try std.fmt.allocPrint(
+                        arena,
+                        "error accessing the resource: {s}",
+                        .{
+                            @errorName(err),
+                        },
+                    );
+                    try req.respond(message, .{
+                        .status = .internal_server_error,
                         .extra_headers = &.{
                             .{ .name = "content-type", .value = "text/html" },
                             .{ .name = "connection", .value = "close" },
                             .{ .name = "access-control-allow-origin", .value = "*" },
                         },
                     });
-                    log.debug("not found\n", .{});
+                    log.debug("error: {s}\n", .{@errorName(err)});
                     return false;
-                } else {
+                },
+            };
+            defer file.close();
+
+            const contents = file.readToEndAlloc(arena, std.math.maxInt(usize)) catch |err| switch (err) {
+                error.IsDir => {
                     try appendSlashRedirect(arena, req);
                     return false;
-                }
-            },
-            else => {
-                const message = try std.fmt.allocPrint(
-                    arena,
-                    "error accessing the resource: {s}",
-                    .{
-                        @errorName(err),
-                    },
-                );
-                try req.respond(message, .{
-                    .status = .internal_server_error,
-                    .extra_headers = &.{
-                        .{ .name = "content-type", .value = "text/html" },
-                        .{ .name = "connection", .value = "close" },
-                        .{ .name = "access-control-allow-origin", .value = "*" },
-                    },
-                });
-                log.debug("error: {s}\n", .{@errorName(err)});
-                return false;
-            },
-        };
-        defer file.close();
+                },
+                else => return err,
+            };
 
-        const contents = file.readToEndAlloc(arena, std.math.maxInt(usize)) catch |err| switch (err) {
-            error.IsDir => {
-                try appendSlashRedirect(arena, req);
-                return false;
-            },
-            else => return err,
-        };
+            try req.respond(contents, .{
+                .status = .ok,
+                .extra_headers = &.{
+                    .{ .name = "content-type", .value = @tagName(mime_type) },
+                    .{ .name = "connection", .value = "close" },
+                    .{ .name = "access-control-allow-origin", .value = "*" },
+                },
+            });
+            log.debug("sent file\n", .{});
+        }
 
-        try req.respond(contents, .{
-            .status = .ok,
-            .extra_headers = &.{
-                .{ .name = "content-type", .value = @tagName(mime_type) },
-                .{ .name = "connection", .value = "close" },
-                .{ .name = "access-control-allow-origin", .value = "*" },
-            },
-        });
-        log.debug("sent file\n", .{});
         return false;
     }
 };
@@ -155,11 +145,11 @@ fn appendSlashRedirect(
         "{s}/",
         .{req.head.target},
     );
-    try req.respond(not_found_html, .{
+    try req.respond("404", .{
         .status = .see_other,
         .extra_headers = &.{
             .{ .name = "location", .value = location },
-            .{ .name = "content-type", .value = "text/html" },
+            .{ .name = "content-type", .value = "text/plain" },
             .{ .name = "connection", .value = "close" },
             .{ .name = "access-control-allow-origin", .value = "*" },
         },
@@ -190,37 +180,39 @@ fn fatal(comptime format: []const u8, args: anytype) noreturn {
 }
 
 fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
-    var zig_out_bin_path: ?[]const u8 = null;
-    var input_dirs: std.ArrayListUnmanaged([]const u8) = .{};
+    std.log.info("{s}", .{args});
+
+    var cart_path: ?[]const u8 = null;
+    var dirs_to_watch: std.ArrayListUnmanaged([]const u8) = .{};
     const zig_exe = args[0];
 
     {
         var i: usize = 1;
         while (i < args.len) : (i += 1) {
             const arg = args[i];
-            if (std.mem.eql(u8, arg, "--zig-out-bin-dir")) {
+            if (std.mem.eql(u8, arg, "--cart")) {
                 i += 1;
                 if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
-                zig_out_bin_path = args[i];
+                cart_path = args[i];
             } else if (std.mem.eql(u8, arg, "--input-dir")) {
                 i += 1;
                 if (i >= args.len) fatal("expected arg after '{s}'", .{arg});
-                try input_dirs.append(gpa, args[i]);
+                try dirs_to_watch.append(gpa, args[i]);
             } else {
                 fatal("unrecognized arg: '{s}'", .{arg});
             }
         }
     }
 
-    // ensure the path exists. without this, an empty website that
-    // doesn't generate a zig-out/ will cause the server to error out
-    try fs.cwd().makePath(zig_out_bin_path.?);
+    const zig_out_bin_path = std.fs.path.dirname(cart_path.?).?;
+    try fs.cwd().makePath(zig_out_bin_path);
 
-    var zig_out_bin_dir: fs.Dir = fs.cwd().openDir(zig_out_bin_path.?, .{ .iterate = true }) catch |e|
-        fatal("unable to open directory '{s}': {s}", .{ zig_out_bin_path.?, @errorName(e) });
+    var zig_out_bin_dir: fs.Dir = fs.cwd().openDir(zig_out_bin_path, .{ .iterate = true }) catch |e|
+        fatal("unable to open directory '{s}': {s}", .{ zig_out_bin_path, @errorName(e) });
     defer zig_out_bin_dir.close();
 
-    var watcher = try Reloader.init(gpa, zig_exe, zig_out_bin_path.?, input_dirs.items);
+    try dirs_to_watch.append(gpa, zig_out_bin_path);
+    var watcher = try Reloader.init(gpa, zig_exe, dirs_to_watch.items);
 
     var server: Server = .{
         .watcher = &watcher,
@@ -231,10 +223,10 @@ fn cmdServe(gpa: Allocator, args: []const []const u8) !void {
     const watch_thread = try std.Thread.spawn(.{}, Reloader.listen, .{&watcher});
     watch_thread.detach();
 
-    try serve(&server, 2468);
+    try serve(&server, cart_path.?, 2468);
 }
 
-fn serve(s: *Server, listen_port: u16) !void {
+fn serve(s: *Server, cart_path: []const u8, listen_port: u16) !void {
     const address = try std.net.Address.parseIp("127.0.0.1", listen_port);
     var tcp_server = try address.listen(.{
         .reuse_port = true,
@@ -245,7 +237,7 @@ fn serve(s: *Server, listen_port: u16) !void {
     const server_port = tcp_server.listen_address.in.getPort();
     std.debug.assert(server_port == listen_port);
 
-    std.debug.print("\x1b[2K\rSimulator live! Go to [link] to test your cartridge.\n", .{});
+    std.debug.print("\x1b[2K\rSimulator live! Go to https://badgesim.microzig.tech/ to test your cartridge.\n", .{});
 
     var buffer: [1024]u8 = undefined;
     accept: while (true) {
@@ -271,7 +263,7 @@ fn serve(s: *Server, listen_port: u16) !void {
                 continue :accept;
             };
 
-            became_websocket = s.handleRequest(&request) catch |err| {
+            became_websocket = s.handleRequest(&request, cart_path) catch |err| {
                 log.debug("failed request: {s}", .{@errorName(err)});
                 continue :accept;
             };

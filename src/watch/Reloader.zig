@@ -4,7 +4,6 @@ const builtin = @import("builtin");
 const ws = @import("ws");
 
 const log = std.log.scoped(.watcher);
-const ListenerFn = fn (self: *Reloader, path: []const u8, name: []const u8) void;
 const Watcher = switch (builtin.target.os.tag) {
     .linux => @import("watcher/LinuxWatcher.zig"),
     .macos => @import("watcher/MacosWatcher.zig"),
@@ -15,8 +14,8 @@ const Watcher = switch (builtin.target.os.tag) {
 gpa: std.mem.Allocator,
 ws_server: ws.Server,
 zig_exe: []const u8,
-out_dir_path: []const u8,
 watcher: Watcher,
+output_dir_index: usize,
 
 clients_lock: std.Thread.Mutex = .{},
 clients: std.AutoArrayHashMapUnmanaged(*ws.Conn, void) = .{},
@@ -24,127 +23,105 @@ clients: std.AutoArrayHashMapUnmanaged(*ws.Conn, void) = .{},
 pub fn init(
     gpa: std.mem.Allocator,
     zig_exe: []const u8,
-    out_dir_path: []const u8,
-    in_dir_paths: []const []const u8,
+    dirs_to_watch: []const []const u8,
 ) !Reloader {
     const ws_server = try ws.Server.init(gpa, .{});
 
     return .{
         .gpa = gpa,
         .zig_exe = zig_exe,
-        .out_dir_path = out_dir_path,
         .ws_server = ws_server,
-        .watcher = try Watcher.init(gpa, out_dir_path, in_dir_paths),
+        .watcher = try Watcher.init(gpa, dirs_to_watch),
+        .output_dir_index = dirs_to_watch.len - 1,
     };
 }
 
-pub fn listen(self: *Reloader) !void {
-    try self.watcher.listen(self.gpa, self);
+pub fn listen(reloader: *Reloader) !void {
+    try reloader.watcher.listen(reloader, onChange);
 }
 
-pub fn onInputChange(self: *Reloader, path: []const u8, name: []const u8) void {
-    _ = name;
-    _ = path;
-    log.debug("re-building!", .{});
-    const result = std.ChildProcess.run(.{
-        .allocator = self.gpa,
-        .argv = &.{ self.zig_exe, "build" },
-    }) catch |err| {
-        log.err("unable to run zig build: {s}", .{@errorName(err)});
-        return;
-    };
-    defer {
-        self.gpa.free(result.stdout);
-        self.gpa.free(result.stderr);
-    }
+pub fn onChange(reloader: *Reloader, dir_that_changed: usize) void {
+    if (dir_that_changed == reloader.output_dir_index) {
+        std.log.info("Output changed", .{});
 
-    if (result.stdout.len > 0) {
-        log.info("zig build stdout: {s}", .{result.stdout});
-    }
+        reloader.clients_lock.lock();
+        defer reloader.clients_lock.unlock();
 
-    if (result.stderr.len > 0) {
-        std.debug.print("{s}\n\n", .{result.stderr});
+        var idx: usize = 0;
+        while (idx < reloader.clients.entries.len) {
+            const conn = reloader.clients.entries.get(idx).key;
+
+            conn.write("reload") catch |err| {
+                log.debug("error writing to websocket: {s}", .{
+                    @errorName(err),
+                });
+                reloader.clients.swapRemoveAt(idx);
+                continue;
+            };
+
+            idx += 1;
+        }
     } else {
-        std.debug.print("File change triggered a successful build.\n", .{});
-    }
+        std.log.info("Input changed", .{});
 
-    self.clients_lock.lock();
-    defer self.clients_lock.unlock();
-
-    var idx: usize = 0;
-    while (idx < self.clients.entries.len) {
-        const conn = self.clients.entries.get(idx).key;
-
-        const BuildCommand = struct {
-            command: []const u8 = "build",
-            err: []const u8,
-        };
-
-        const cmd: BuildCommand = .{ .err = result.stderr };
-
-        var buf = std.ArrayList(u8).init(self.gpa);
-        defer buf.deinit();
-
-        std.json.stringify(cmd, .{}, buf.writer()) catch {
-            log.err("unable to generate ws message", .{});
+        const result = std.ChildProcess.run(.{
+            .allocator = reloader.gpa,
+            .argv = &.{ reloader.zig_exe, "build" },
+        }) catch |err| {
+            log.err("unable to run zig build: {s}", .{@errorName(err)});
             return;
         };
+        defer {
+            reloader.gpa.free(result.stdout);
+            reloader.gpa.free(result.stderr);
+        }
 
-        conn.write(buf.items) catch |err| {
-            log.debug("error writing to websocket: {s}", .{
-                @errorName(err),
-            });
-            self.clients.swapRemoveAt(idx);
-            continue;
-        };
+        if (result.stdout.len > 0) {
+            log.info("zig build stdout: {s}", .{result.stdout});
+        }
 
-        idx += 1;
-    }
-}
-pub fn onOutputChange(self: *Reloader, path: []const u8, name: []const u8) void {
-    if (std.mem.indexOfScalar(u8, name, '.') == null) {
-        return;
-    }
-    log.debug("reload: {s}/{s}!", .{ path, name });
+        if (result.stderr.len > 0) {
+            std.debug.print("{s}\n\n", .{result.stderr});
+        } else {
+            std.debug.print("File change triggered a successful build.\n", .{});
+        }
 
-    self.clients_lock.lock();
-    defer self.clients_lock.unlock();
+        reloader.clients_lock.lock();
+        defer reloader.clients_lock.unlock();
 
-    std.log.info("{d}", .{self.clients.entries.len});
+        var idx: usize = 0;
+        while (idx < reloader.clients.entries.len) {
+            const conn = reloader.clients.entries.get(idx).key;
 
-    var idx: usize = 0;
-    while (idx < self.clients.entries.len) {
-        const conn = self.clients.entries.get(idx).key;
+            const BuildCommand = struct {
+                command: []const u8 = "build",
+                err: []const u8,
+            };
 
-        const msg_fmt =
-            \\{{
-            \\  "command":"reload",
-            \\  "path":"{s}/{s}"
-            \\}}
-        ;
+            const cmd: BuildCommand = .{ .err = result.stderr };
 
-        var buf: [4096]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, msg_fmt, .{
-            path[self.out_dir_path.len..],
-            name,
-        }) catch {
-            log.err("unable to generate ws message", .{});
-            return;
-        };
+            var buf = std.ArrayList(u8).init(reloader.gpa);
+            defer buf.deinit();
 
-        conn.write(msg) catch |err| {
-            log.debug("error writing to websocket: {s}", .{
-                @errorName(err),
-            });
-            self.clients.swapRemoveAt(idx);
-            continue;
-        };
+            std.json.stringify(cmd, .{}, buf.writer()) catch {
+                log.err("unable to generate ws message", .{});
+                return;
+            };
 
-        idx += 1;
+            conn.write(buf.items) catch |err| {
+                log.debug("error writing to websocket: {s}", .{
+                    @errorName(err),
+                });
+                reloader.clients.swapRemoveAt(idx);
+                continue;
+            };
+
+            idx += 1;
+        }
     }
 }
 
-pub fn handleWs(self: *Reloader, stream: std.net.Stream, h: [20]u8) void {
+pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
     var buf =
         ("HTTP/1.1 101 Switching Protocols\r\n" ++
         "Access-Control-Allow-Origin: *\r\n" ++
@@ -157,13 +134,13 @@ pub fn handleWs(self: *Reloader, stream: std.net.Stream, h: [20]u8) void {
 
     stream.writeAll(&buf) catch @panic("bad");
 
-    // var conn = self.ws_server.newConn(stream);
-    const conn = self.gpa.create(ws.Conn) catch @panic("bad");
-    conn.* = self.ws_server.newConn(stream);
+    // var conn = reloader.ws_server.newConn(stream);
+    const conn = reloader.gpa.create(ws.Conn) catch @panic("bad");
+    conn.* = reloader.ws_server.newConn(stream);
 
-    var context: Handler.Context = .{ .watcher = self };
+    var context: Handler.Context = .{ .watcher = reloader };
     var handler = Handler.init(undefined, conn, &context) catch @panic("bad");
-    self.ws_server.handle(Handler, &handler, conn);
+    reloader.ws_server.handle(Handler, &handler, conn);
 }
 
 const Handler = struct {
@@ -188,16 +165,16 @@ const Handler = struct {
         };
     }
 
-    pub fn handle(self: *Handler, message: ws.Message) !void {
-        _ = self;
+    pub fn handle(handler: *Handler, message: ws.Message) !void {
+        _ = handler;
         _ = message;
     }
 
-    pub fn close(self: *Handler) void {
+    pub fn close(handler: *Handler) void {
         log.debug("ws connection was closed\n", .{});
-        const watcher = self.context.watcher;
+        const watcher = handler.context.watcher;
         watcher.clients_lock.lock();
         defer watcher.clients_lock.unlock();
-        _ = watcher.clients.swapRemove(self.conn);
+        _ = watcher.clients.swapRemove(handler.conn);
     }
 };

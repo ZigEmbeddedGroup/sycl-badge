@@ -64,9 +64,7 @@ pub fn build(b: *Build) void {
     //
     // TODO: parameterize:
     const watch_run = b.addRunArtifact(watch);
-    watch_run.addArg("serve");
-    watch_run.addArtifactArg(feature_test_cart.wasm);
-    watch_run.addArgs(&.{ "--zig-out-bin-dir", "zig-out/bin" });
+    watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot("samples"), "--cart", "zig-out/bin/feature_test.wasm" });
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run.step);
@@ -163,8 +161,8 @@ pub fn add_cart(
 
     wasm.entry = .disabled;
     wasm.import_memory = true;
-    wasm.initial_memory = 2 * 65536;
-    wasm.max_memory = 2 * 65536;
+    wasm.initial_memory = 64 * 65536;
+    wasm.max_memory = 64 * 65536;
     wasm.stack_size = 14752;
     wasm.global_base = 160 * 128 * 2 + 0x1e;
 

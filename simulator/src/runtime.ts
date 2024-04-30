@@ -42,7 +42,7 @@ export class Runtime {
 
         this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
 
-        this.memory = new WebAssembly.Memory({initial: 2, maximum: 2});
+        this.memory = new WebAssembly.Memory({initial: 64, maximum: 64});
         this.data = new DataView(this.memory.buffer);
 
         this.framebuffer = new Framebuffer(this.memory.buffer);
@@ -272,6 +272,7 @@ export class Runtime {
 
 function errorToBlueScreenText(err: Error) {
     // hand written messages for specific errors
+    console.log(err);
     if (err instanceof WebAssembly.RuntimeError) {
         let message;
         if (err.message.match(/unreachable/)) {

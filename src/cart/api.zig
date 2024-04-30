@@ -77,7 +77,7 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn text(text_color: DisplayColor, background_color: OptionalDisplayColor, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
-        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void;
+        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
         extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
         extern fn write_flash_page(page: u32, src: [*]const u8) void;
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
@@ -167,126 +167,171 @@ pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: 
     }
 }
 
+pub const LineOptions = struct {
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    color: DisplayColor,
+};
+
 /// Draws a line between two points.
-pub inline fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void {
+pub inline fn line(options: LineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.line(color, x1, y1, x2, y2);
+        platform_specific.line(options.color, options.x1, options.y1, options.x2, options.y2);
     } else {
         asm volatile (" svc #2"
             :
-            : [x1] "{r0}" (x1),
-              [y1] "{r1}" (y1),
-              [x2] "{r2}" (x2),
-              [y2] "{r3}" (y2),
+            : [x1] "{r0}" (options.x1),
+              [y1] "{r1}" (options.y1),
+              [x2] "{r2}" (options.x2),
+              [y2] "{r3}" (options.y2),
             : "memory"
         );
     }
 }
 
+pub const OvalOptions = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    stroke_color: ?DisplayColor,
+    fill_color: ?DisplayColor,
+};
+
 /// Draws an oval (or circle).
-pub inline fn oval(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i32, y: i32, width: u32, height: u32) void {
+pub inline fn oval(options: OvalOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.oval(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
+        platform_specific.oval(
+            OptionalDisplayColor.from(options.stroke_color),
+            OptionalDisplayColor.from(options.fill_color),
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+        );
     } else {
         asm volatile (" svc #3"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [width] "{r2}" (width),
-              [height] "{r3}" (height),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [width] "{r2}" (options.width),
+              [height] "{r3}" (options.height),
             : "memory"
         );
     }
 }
 
+pub const RectOptions = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    stroke_color: ?DisplayColor,
+    fill_color: ?DisplayColor,
+};
+
 /// Draws a rectangle.
-pub inline fn rect(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i32, y: i32, width: u32, height: u32) void {
+pub inline fn rect(options: RectOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.rect(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
+        platform_specific.rect(
+            OptionalDisplayColor.from(options.stroke_color),
+            OptionalDisplayColor.from(options.fill_color),
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+        );
     } else {
         asm volatile (" svc #4"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [width] "{r2}" (width),
-              [height] "{r3}" (height),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [width] "{r2}" (options.width),
+              [height] "{r3}" (options.height),
             : "memory"
         );
     }
 }
 
+pub const TextOptions = struct {
+    str: []const u8,
+    x: i32,
+    y: i32,
+    text_color: DisplayColor,
+    background_color: ?DisplayColor,
+};
+
 /// Draws text using the built-in system font.
-pub inline fn text(text_color: DisplayColor, background_color: ?DisplayColor, str: []const u8, x: i32, y: i32) void {
+pub inline fn text(options: TextOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.text(text_color, OptionalDisplayColor.from(background_color), str.ptr, str.len, x, y);
+        platform_specific.text(
+            options.text_color,
+            OptionalDisplayColor.from(options.background_color),
+            options.str.ptr,
+            options.str.len,
+            options.x,
+            options.y,
+        );
     } else {
         asm volatile (" svc #5"
             :
-            : [str_ptr] "{r0}" (str.ptr),
-              [str_len] "{r1}" (str.len),
-              [x] "{r2}" (x),
-              [y] "{r3}" (y),
+            : [str_ptr] "{r0}" (options.str.ptr),
+              [str_len] "{r1}" (options.str.len),
+              [x] "{r2}" (options.x),
+              [y] "{r3}" (options.y),
             : "memory"
         );
     }
 }
 
+pub const StraightLineOptions = struct {
+    x: i32,
+    y: i32,
+    len: u32,
+    color: DisplayColor,
+};
+
 /// Draws a horizontal line
-pub inline fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void {
+pub inline fn hline(options: StraightLineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.hline(color, x, y, len);
+        platform_specific.hline(
+            options.color,
+            options.x,
+            options.y,
+            options.len,
+        );
     } else {
         asm volatile (" svc #7"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [len] "{r2}" (len),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [len] "{r2}" (options.len),
             : "memory"
         );
     }
 }
 
 /// Draws a vertical line
-pub inline fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void {
+pub inline fn vline(options: StraightLineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.vline(color, x, y, len);
+        platform_specific.vline(
+            options.color,
+            options.x,
+            options.y,
+            options.len,
+        );
     } else {
         asm volatile (" svc #6"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [len] "{r2}" (len),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [len] "{r2}" (options.len),
             : "memory"
         );
     }
 }
-
-pub const ToneFlags = packed struct(u32) {
-    pub const Channel = enum(u2) {
-        pulse1,
-        pulse2,
-        triangle,
-        noise,
-    };
-
-    pub const DutyCycle = enum(u2) {
-        @"1/8",
-        @"1/4",
-        @"1/2",
-        @"3/4",
-    };
-
-    pub const Panning = enum(u2) {
-        stereo,
-        left,
-        right,
-    };
-
-    channel: Channel,
-    duty_cycle: DutyCycle,
-    panning: Panning,
-    padding: u26 = undefined,
-};
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -294,17 +339,56 @@ pub const ToneFlags = packed struct(u32) {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
+pub const ToneOptions = struct {
+    pub const Flags = packed struct(u32) {
+        pub const Channel = enum(u2) {
+            pulse1,
+            pulse2,
+            triangle,
+            noise,
+        };
+
+        pub const DutyCycle = enum(u2) {
+            @"1/8",
+            @"1/4",
+            @"1/2",
+            @"3/4",
+        };
+
+        pub const Panning = enum(u2) {
+            stereo,
+            left,
+            right,
+        };
+
+        channel: Channel,
+        duty_cycle: DutyCycle,
+        panning: Panning,
+        padding: u26 = undefined,
+    };
+
+    frequency: u32,
+    duration: u32,
+    volume: u32,
+    flags: Flags,
+};
+
 /// Plays a sound tone.
-pub inline fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void {
+pub inline fn tone(options: ToneOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.tone(frequency, duration, volume, flags);
+        platform_specific.tone(
+            options.frequency,
+            options.duration,
+            options.volume,
+            options.flags,
+        );
     } else {
         asm volatile (" svc #8"
             :
-            : [frequency] "{r0}" (frequency),
-              [duration] "{r1}" (duration),
-              [volume] "{r2}" (volume),
-              [flags] "{r3}" (flags),
+            : [frequency] "{r0}" (options.frequency),
+              [duration] "{r1}" (options.duration),
+              [volume] "{r2}" (options.volume),
+              [flags] "{r3}" (options.flags),
         );
     }
 }

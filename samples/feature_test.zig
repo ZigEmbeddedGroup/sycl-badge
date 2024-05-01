@@ -82,8 +82,6 @@ export fn update() void {
         };
     }
 
-    // TODO: blit, blitSub
-
     cart.blit(.{
         .sprite = &.{
             .{ .red = 31, .green = 0, .blue = 0 },

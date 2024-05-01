@@ -46,13 +46,17 @@ pub fn build(b: *Build) void {
         watch.linkFramework("CoreServices");
     }
 
+    b.getInstallStep().dependOn(&b.addInstallArtifact(watch, .{
+        .dest_dir = .disabled,
+    }).step);
+
     var dep: std.Build.Dependency = .{ .builder = b };
     const feature_test_cart = add_cart(&dep, b, .{
         .name = "feature_test",
         .optimize = .ReleaseSmall,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
-    feature_test_cart.install(b);
+    const watch_run_step = feature_test_cart.install_with_watcher(&dep, b);
 
     const zeroman_cart = add_cart(&dep, b, .{
         .name = "zeroman",
@@ -61,13 +65,9 @@ pub fn build(b: *Build) void {
     });
     add_zeroman_assets_step(b, zeroman_cart);
     zeroman_cart.install(b);
-    //
-    // TODO: parameterize:
-    const watch_run = b.addRunArtifact(watch);
-    watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot("samples"), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
 
     const watch_step = b.step("watch", "");
-    watch_step.dependOn(&watch_run.step);
+    watch_step.dependOn(&watch_run_step.step);
 
     const badge = mz.add_firmware(b, .{
         .name = "badge",
@@ -128,11 +128,24 @@ pub const Cart = struct {
     cart_lib: *Build.Step.Compile,
 
     options: CartOptions,
-    //watch_run_cmd: *std.Build.Step.Run,
 
     pub fn install(c: *const Cart, b: *Build) void {
         c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         b.installArtifact(c.wasm);
+    }
+
+    pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build) *Build.Step.Run {
+        c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+        const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
+        b.getInstallStep().dependOn(&install_artifact_step.step);
+
+        const watch_run = b.addRunArtifact(d.artifact("watch"));
+        // watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot(std.fs.path.dirname(options.root_source_file) orelse ""), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
+        watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir" });
+        watch_run.addFileArg(c.options.root_source_file.dirname());
+        watch_run.addArgs(&.{ "--cart", b.getInstallPath(install_artifact_step.dest_dir.?, install_artifact_step.dest_sub_path) });
+
+        return watch_run;
     }
 };
 

@@ -22,14 +22,22 @@ const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 pub const NeopixelColor = packed struct(u24) { blue: u8, green: u8, red: u8 };
 
 /// RGB565, high color
-pub const DisplayColor = packed struct(u16) { blue: u5, green: u6, red: u5 };
-const OptionalDisplayColor = enum(i32) {
-    none = -1,
-    _,
+pub const DisplayColor = packed struct(u16) {
+    /// 0-31
+    blue: u5,
+    /// 0-63
+    green: u6,
+    /// 0-31
+    red: u5,
 
-    inline fn from(color: ?DisplayColor) OptionalDisplayColor {
-        return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
-    }
+    const Optional = enum(i32) {
+        none = -1,
+        _,
+
+        inline fn from(color: ?DisplayColor) Optional {
+            return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
+        }
+    };
 };
 
 pub const Controls = packed struct {
@@ -71,9 +79,9 @@ const platform_specific = if (builtin.target.isWasm())
     struct {
         extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
         extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
-        extern fn oval(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn rect(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn text(text_color: DisplayColor, background_color: OptionalDisplayColor, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
+        extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        extern fn text(text_color: DisplayColor, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
@@ -130,7 +138,6 @@ pub inline fn blit(options: BlitOptions) void {
             options.flags,
         );
     } else {
-        @compileError("TODO");
         // const rest: extern struct {
         //     width: u32,
         //     height: u32,
@@ -188,8 +195,8 @@ pub const OvalOptions = struct {
 pub inline fn oval(options: OvalOptions) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.oval(
-            OptionalDisplayColor.from(options.stroke_color),
-            OptionalDisplayColor.from(options.fill_color),
+            DisplayColor.Optional.from(options.stroke_color),
+            DisplayColor.Optional.from(options.fill_color),
             options.x,
             options.y,
             options.width,
@@ -220,8 +227,8 @@ pub const RectOptions = struct {
 pub inline fn rect(options: RectOptions) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.rect(
-            OptionalDisplayColor.from(options.stroke_color),
-            OptionalDisplayColor.from(options.fill_color),
+            DisplayColor.Optional.from(options.stroke_color),
+            DisplayColor.Optional.from(options.fill_color),
             options.x,
             options.y,
             options.width,
@@ -252,7 +259,7 @@ pub inline fn text(options: TextOptions) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.text(
             options.text_color,
-            OptionalDisplayColor.from(options.background_color),
+            DisplayColor.Optional.from(options.background_color),
             options.str.ptr,
             options.str.len,
             options.x,

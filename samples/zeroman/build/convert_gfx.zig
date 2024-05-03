@@ -80,7 +80,7 @@ fn convert(args: ConvertFile, writer: std.fs.File.Writer) !void {
 
         try writer.writeAll("    pub const colors = [_]DisplayColor{\n");
         for (colors.items) |c| {
-            try writer.print("        .{{ .red = {}, .green = {}, .blue = {} }},\n", .{ c.r, c.g, c.b });
+            try writer.print("        .{{ .r = {}, .g = {}, .b = {} }},\n", .{ c.r, c.g, c.b });
         }
         try writer.writeAll("    };\n");
 

@@ -67,27 +67,27 @@ export fn update() void {
     for (0..cart.screen_height) |y| {
         for (0..cart.screen_width) |x| {
             cart.framebuffer[y * cart.screen_width + x] = .{
-                .red = @intFromFloat(@as(f32, @floatFromInt(x)) / cart.screen_width * 31),
-                .green = green_565,
-                .blue = @intFromFloat(@as(f32, @floatFromInt(y)) / cart.screen_height * 31),
+                .r = @intFromFloat(@as(f32, @floatFromInt(x)) / cart.screen_width * 31),
+                .g = green_565,
+                .b = @intFromFloat(@as(f32, @floatFromInt(y)) / cart.screen_height * 31),
             };
         }
     }
 
     for (cart.neopixels, 0..) |*np, i| {
         np.* = .{
-            .red = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
-            .green = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
-            .blue = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
+            .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
+            .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
+            .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
         };
     }
 
     cart.blit(.{
         .sprite = &.{
-            .{ .red = 31, .green = 0, .blue = 0 },
-            .{ .red = 0, .green = 0, .blue = 31 },
-            .{ .red = 31, .green = 0, .blue = 0 },
-            .{ .red = 0, .green = 0, .blue = 31 },
+            .{ .r = 31, .g = 0, .b = 0 },
+            .{ .r = 0, .g = 0, .b = 31 },
+            .{ .r = 31, .g = 0, .b = 0 },
+            .{ .r = 0, .g = 0, .b = 31 },
         },
         .x = 40,
         .y = 40,
@@ -101,21 +101,21 @@ export fn update() void {
         .y1 = 50,
         .x2 = 70,
         .y2 = 70,
-        .color = .{ .red = 0, .green = 63, .blue = 0 },
+        .color = .{ .r = 0, .g = 63, .b = 0 },
     });
 
     cart.hline(.{
         .x = 30,
         .y = 30,
         .len = 20,
-        .color = .{ .red = 31, .green = 0, .blue = 0 },
+        .color = .{ .r = 31, .g = 0, .b = 0 },
     });
 
     cart.vline(.{
         .x = 30,
         .y = 30,
         .len = 20,
-        .color = .{ .red = 31, .green = 0, .blue = 0 },
+        .color = .{ .r = 31, .g = 0, .b = 0 },
     });
 
     cart.oval(.{
@@ -123,8 +123,8 @@ export fn update() void {
         .y = 80,
         .width = 10,
         .height = 10,
-        .stroke_color = .{ .red = 0, .green = 0, .blue = 31 },
-        .fill_color = .{ .red = 31, .green = 0, .blue = 31 },
+        .stroke_color = .{ .r = 0, .g = 0, .b = 31 },
+        .fill_color = .{ .r = 31, .g = 0, .b = 31 },
     });
 
     cart.rect(.{
@@ -132,23 +132,23 @@ export fn update() void {
         .y = 100,
         .width = 10,
         .height = 10,
-        .stroke_color = .{ .red = 31, .green = 31, .blue = 31 },
-        .fill_color = .{ .red = 0, .green = 63, .blue = 31 },
+        .stroke_color = .{ .r = 31, .g = 31, .b = 31 },
+        .fill_color = .{ .r = 0, .g = 63, .b = 31 },
     });
 
     cart.text(.{
         .str = fbs.getWritten(),
         .x = 0,
         .y = 0,
-        .text_color = .{ .red = 0, .green = 0, .blue = 0 },
-        .background_color = .{ .red = 31, .green = 63, .blue = 31 },
+        .text_color = .{ .r = 0, .g = 0, .b = 0 },
+        .background_color = .{ .r = 31, .g = 63, .b = 31 },
     });
 
     cart.text(.{
         .str = "\x80\x81\x82\x83\x84\x85\x86\x87\x88",
         .x = 0,
         .y = 120,
-        .text_color = .{ .red = 0, .green = 0, .blue = 0 },
-        .background_color = .{ .red = 31, .green = 63, .blue = 31 },
+        .text_color = .{ .r = 0, .g = 0, .b = 0 },
+        .background_color = .{ .r = 31, .g = 63, .b = 31 },
     });
 }

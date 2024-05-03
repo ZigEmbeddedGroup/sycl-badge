@@ -19,16 +19,16 @@ pub const screen_height: u32 = 128;
 const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 
 /// RGB888, true color
-pub const NeopixelColor = packed struct(u24) { blue: u8, green: u8, red: u8 };
+pub const NeopixelColor = packed struct(u24) { b: u8, g: u8, r: u8 };
 
 /// RGB565, high color
 pub const DisplayColor = packed struct(u16) {
     /// 0-31
-    blue: u5,
+    b: u5,
     /// 0-63
-    green: u6,
+    g: u6,
     /// 0-31
-    red: u5,
+    r: u5,
 
     const Optional = enum(i32) {
         none = -1,
@@ -40,7 +40,7 @@ pub const DisplayColor = packed struct(u16) {
     };
 };
 
-pub const Controls = packed struct {
+pub const Controls = packed struct(u9) {
     /// START button
     start: bool,
     /// SELECT button
@@ -81,7 +81,7 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
         extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
         extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn text(text_color: DisplayColor, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
+        extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
@@ -115,12 +115,12 @@ pub const BlitOptions = struct {
     width: u32,
     height: u32,
     /// x within the sprite atlas.
-    src_x: i32 = 0,
+    src_x: u32 = 0,
     /// y within the sprite atlas.
-    src_y: i32 = 0,
+    src_y: u32 = 0,
     /// Width of the entire sprite atlas.
     stride: ?u32 = null,
-    flags: Flags,
+    flags: Flags = .{},
 };
 
 /// Copies pixels to the framebuffer.
@@ -187,8 +187,8 @@ pub const OvalOptions = struct {
     y: i32,
     width: u32,
     height: u32,
-    stroke_color: ?DisplayColor,
-    fill_color: ?DisplayColor,
+    stroke_color: ?DisplayColor = null,
+    fill_color: ?DisplayColor = null,
 };
 
 /// Draws an oval (or circle).
@@ -219,8 +219,8 @@ pub const RectOptions = struct {
     y: i32,
     width: u32,
     height: u32,
-    stroke_color: ?DisplayColor,
-    fill_color: ?DisplayColor,
+    stroke_color: ?DisplayColor = null,
+    fill_color: ?DisplayColor = null,
 };
 
 /// Draws a rectangle.
@@ -250,15 +250,15 @@ pub const TextOptions = struct {
     str: []const u8,
     x: i32,
     y: i32,
-    text_color: DisplayColor,
-    background_color: ?DisplayColor,
+    text_color: ?DisplayColor = null,
+    background_color: ?DisplayColor = null,
 };
 
 /// Draws text using the built-in system font.
 pub inline fn text(options: TextOptions) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.text(
-            options.text_color,
+            DisplayColor.Optional.from(options.text_color),
             DisplayColor.Optional.from(options.background_color),
             options.str.ptr,
             options.str.len,
@@ -353,8 +353,9 @@ pub const ToneOptions = struct {
         };
 
         channel: Channel,
-        duty_cycle: DutyCycle,
-        panning: Panning,
+        /// `duty_cycle` is only used when `channel` is set to `pulse1` or `pulse2`
+        duty_cycle: DutyCycle = .@"1/8",
+        panning: Panning = .stereo,
         padding: u26 = undefined,
     };
 

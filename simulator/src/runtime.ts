@@ -246,7 +246,7 @@ export class Runtime {
         const headerX = (160 - (8 * title.length)) / 2;
         const headerY = 20;
         const messageX = 9;
-        const messageY = 60;
+        const messageY = 52;
 
         this.framebuffer.fillScreen(blue);
         
@@ -272,15 +272,15 @@ function errorToBlueScreenText(err: Error) {
         } else if (err.message.match(/out of bounds/)) {
             message = "The cartridge has\nattempted a memory\naccess that is\nout of bounds.";
         }
-        return message + "\n\n\n\n\nHit R to reboot.";
+        return message + "\n\n\n\nHit R to reboot.";
     } else if (err instanceof WebAssembly.LinkError) {
-        return "The cartridge has\ntried to import\na missing function.\n\n\n\nSee console for\nmore details.";
+        return "The cartridge has\ntried to import\na missing function.\n\n\nSee console for\nmore details.";
     } else if (err instanceof WebAssembly.CompileError) {
-        return "The cartridge is\ncorrupted.\n\n\n\nSee console for\nmore details.";
+        return "The cartridge is\ncorrupted.\n\n\nSee console for\nmore details.";
     } else if (err instanceof Wasm4Error) {
         return err.wasm4Message;
     }
-    return "Unknown error.\n\n\n\nSee console for\nmore details.";
+    return "Unknown error.\n\n\nSee console for\nmore details.";
 }
 
 class Wasm4Error extends Error {

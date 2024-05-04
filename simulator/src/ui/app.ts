@@ -58,6 +58,7 @@ export class App extends LitElement {
         }
 
         .help {
+            font-family: wasm4-font;
             font-size: 0.9em;
             color: #aaa;
         }
@@ -114,11 +115,13 @@ export class App extends LitElement {
         ws.onopen = w => {
             setInterval(() => {
                 ws.send("spam");
-            }, 1000);
+            }, 100);
         }
 
         ws.onmessage = async m => {
-            await this.resetCart(new Uint8Array(await (await fetch("http://localhost:2468/cart.wasm")).arrayBuffer()), false);
+            if (m.data == "reload") {
+                await this.resetCart(new Uint8Array(await (await fetch("http://localhost:2468/cart.wasm")).arrayBuffer()), false);
+            }
         }
 
         function takeScreenshot () {

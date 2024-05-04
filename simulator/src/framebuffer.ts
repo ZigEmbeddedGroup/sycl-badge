@@ -238,7 +238,7 @@ export class Framebuffer {
                 y += 8;
                 currentX = x;
             } else if (charCode >= 32 && charCode <= 255) {
-                this.blit([textColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
+                this.blitPalette([textColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
                 currentX += 8;
             } else {
                 currentX += 8;
@@ -246,7 +246,7 @@ export class Framebuffer {
         }
     }
 
-    blit (
+    blitPalette (
         colors: [number, number] | [number, number, number, number],
         sprite: Uint8Array,
         dstX: number, dstY: number,
@@ -299,6 +299,49 @@ export class Framebuffer {
                 if (colors[colorIdx] !== OPTIONAL_COLOR_NONE) {
                     this.drawPoint(colors[colorIdx], tx, ty);
                 }
+            }
+        }
+    }
+
+    blit(
+        sprite: Uint16Array,
+        dstX: number, dstY: number,
+        width: number, height: number,
+        srcX: number, srcY: number,
+        srcStride: number,
+        flipX: number | boolean = false,
+        flipY: number | boolean = false,
+        rotate: number | boolean = false
+    ) {
+        // Clip rectangle to screen
+        let clipXMin, clipYMin, clipXMax, clipYMax;
+        if (rotate) {
+            flipX = !flipX;
+            clipXMin = Math.max(0, dstY) - dstY;
+            clipYMin = Math.max(0, dstX) - dstX;
+            clipXMax = Math.min(width, HEIGHT - dstY);
+            clipYMax = Math.min(height, WIDTH - dstX);
+        } else {
+            clipXMin = Math.max(0, dstX) - dstX;
+            clipYMin = Math.max(0, dstY) - dstY;
+            clipXMax = Math.min(width, WIDTH - dstX);
+            clipYMax = Math.min(height, HEIGHT - dstY);
+        }
+
+        // Iterate pixels in rectangle
+        for (let y = clipYMin; y < clipYMax; y++) {
+            for (let x = clipXMin; x < clipXMax; x++) {
+                // Calculate sprite target coords
+                const tx = dstX + (rotate ? y : x);
+                const ty = dstY + (rotate ? x : y);
+
+                // Calculate sprite source coords
+                const sx = srcX + (flipX ? width - x - 1 : x);
+                const sy = srcY + (flipY ? height - y - 1 : y);
+
+                const index = sy * srcStride + sx;
+
+                this.drawPoint(sprite[index], tx, ty);
             }
         }
     }

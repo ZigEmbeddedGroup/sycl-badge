@@ -19,20 +19,28 @@ pub const screen_height: u32 = 128;
 const base = if (builtin.target.isWasm()) 0 else 0x20000000;
 
 /// RGB888, true color
-pub const NeopixelColor = packed struct(u24) { blue: u8, green: u8, red: u8 };
+pub const NeopixelColor = packed struct(u24) { b: u8, g: u8, r: u8 };
 
 /// RGB565, high color
-pub const DisplayColor = packed struct(u16) { blue: u5, green: u6, red: u5 };
-const OptionalDisplayColor = enum(i32) {
-    none = -1,
-    _,
+pub const DisplayColor = packed struct(u16) {
+    /// 0-31
+    b: u5,
+    /// 0-63
+    g: u6,
+    /// 0-31
+    r: u5,
 
-    inline fn from(color: ?DisplayColor) OptionalDisplayColor {
-        return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
-    }
+    const Optional = enum(i32) {
+        none = -1,
+        _,
+
+        inline fn from(color: ?DisplayColor) Optional {
+            return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
+        }
+    };
 };
 
-pub const Controls = packed struct {
+pub const Controls = packed struct(u9) {
     /// START button
     start: bool,
     /// SELECT button
@@ -69,15 +77,14 @@ pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt
 
 const platform_specific = if (builtin.target.isWasm())
     struct {
-        extern fn blit(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: BlitFlags) void;
-        extern fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void;
+        extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
         extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
-        extern fn oval(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn rect(stroke_color: OptionalDisplayColor, fill_color: OptionalDisplayColor, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn text(text_color: DisplayColor, background_color: OptionalDisplayColor, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
+        extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
-        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void;
+        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
         extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
         extern fn write_flash_page(page: u32, src: [*]const u8) void;
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
@@ -94,25 +101,43 @@ comptime {
     _ = platform_specific;
 }
 
-pub const BitsPerPixel = enum(u1) { one, two };
-pub const BlitFlags = packed struct(u32) {
-    bits_per_pixel: BitsPerPixel = .one,
-    flip_x: bool = false,
-    flip_y: bool = false,
-    rotate: bool = false,
-    padding: u28 = undefined,
+pub const BlitOptions = struct {
+    pub const Flags = packed struct(u32) {
+        flip_x: bool = false,
+        flip_y: bool = false,
+        rotate: bool = false,
+        padding: u29 = undefined,
+    };
+
+    sprite: [*]const DisplayColor,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    /// x within the sprite atlas.
+    src_x: u32 = 0,
+    /// y within the sprite atlas.
+    src_y: u32 = 0,
+    /// Width of the entire sprite atlas.
+    stride: ?u32 = null,
+    flags: Flags = .{},
 };
 
 /// Copies pixels to the framebuffer.
-/// colors.len >= 2 for flags.bits_per_pixel == .one
-/// colors.len >= 4 for flags.bits_per_pixel == .two
-/// TODO: this is super unsafe also blit is just a basic wrapper over blitSub
-pub inline fn blit(colors: [*]const DisplayColor, sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: BlitFlags) void {
-    _ = colors;
+pub inline fn blit(options: BlitOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.blit(sprite, x, y, width, height, flags);
+        platform_specific.blit(
+            options.sprite,
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+            options.src_x,
+            options.src_y,
+            options.stride orelse options.width,
+            options.flags,
+        );
     } else {
-        @compileError("TODO");
         // const rest: extern struct {
         //     width: u32,
         //     height: u32,
@@ -133,160 +158,171 @@ pub inline fn blit(colors: [*]const DisplayColor, sprite: [*]const u8, x: i32, y
     }
 }
 
-/// Copies a subregion within a larger sprite atlas to the framebuffer.
-/// colors.len >= 2 for flags.bits_per_pixel == .one
-/// colors.len >= 4 for flags.bits_per_pixel == .two
-/// TODO: this is super unsafe also blit is just a basic wrapper over blitSub
-pub inline fn blit_sub(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitFlags) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.blit_sub(sprite, x, y, width, height, src_x, src_y, stride, flags);
-    } else {
-        const rest: extern struct {
-            width: u32,
-            height: u32,
-            src_x: u32,
-            src_y: u32,
-            stride: u32,
-            flags: u32,
-        } = .{
-            .width = width,
-            .height = height,
-            .src_x = src_x,
-            .src_y = src_y,
-            .stride = stride,
-            .flags = flags,
-        };
-        asm volatile (" svc #1"
-            :
-            : [sprite] "{r0}" (sprite),
-              [x] "{r1}" (x),
-              [y] "{r2}" (y),
-              [rest] "{r3}" (&rest),
-            : "memory"
-        );
-    }
-}
+pub const LineOptions = struct {
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    color: DisplayColor,
+};
 
 /// Draws a line between two points.
-pub inline fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void {
+pub inline fn line(options: LineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.line(color, x1, y1, x2, y2);
+        platform_specific.line(options.color, options.x1, options.y1, options.x2, options.y2);
     } else {
         asm volatile (" svc #2"
             :
-            : [x1] "{r0}" (x1),
-              [y1] "{r1}" (y1),
-              [x2] "{r2}" (x2),
-              [y2] "{r3}" (y2),
+            : [x1] "{r0}" (options.x1),
+              [y1] "{r1}" (options.y1),
+              [x2] "{r2}" (options.x2),
+              [y2] "{r3}" (options.y2),
             : "memory"
         );
     }
 }
 
+pub const OvalOptions = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    stroke_color: ?DisplayColor = null,
+    fill_color: ?DisplayColor = null,
+};
+
 /// Draws an oval (or circle).
-pub inline fn oval(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i32, y: i32, width: u32, height: u32) void {
+pub inline fn oval(options: OvalOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.oval(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
+        platform_specific.oval(
+            DisplayColor.Optional.from(options.stroke_color),
+            DisplayColor.Optional.from(options.fill_color),
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+        );
     } else {
         asm volatile (" svc #3"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [width] "{r2}" (width),
-              [height] "{r3}" (height),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [width] "{r2}" (options.width),
+              [height] "{r3}" (options.height),
             : "memory"
         );
     }
 }
 
+pub const RectOptions = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    stroke_color: ?DisplayColor = null,
+    fill_color: ?DisplayColor = null,
+};
+
 /// Draws a rectangle.
-pub inline fn rect(stroke_color: ?DisplayColor, fill_color: ?DisplayColor, x: i32, y: i32, width: u32, height: u32) void {
+pub inline fn rect(options: RectOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.rect(OptionalDisplayColor.from(stroke_color), OptionalDisplayColor.from(fill_color), x, y, width, height);
+        platform_specific.rect(
+            DisplayColor.Optional.from(options.stroke_color),
+            DisplayColor.Optional.from(options.fill_color),
+            options.x,
+            options.y,
+            options.width,
+            options.height,
+        );
     } else {
         asm volatile (" svc #4"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [width] "{r2}" (width),
-              [height] "{r3}" (height),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [width] "{r2}" (options.width),
+              [height] "{r3}" (options.height),
             : "memory"
         );
     }
 }
 
+pub const TextOptions = struct {
+    str: []const u8,
+    x: i32,
+    y: i32,
+    text_color: ?DisplayColor = null,
+    background_color: ?DisplayColor = null,
+};
+
 /// Draws text using the built-in system font.
-pub inline fn text(text_color: DisplayColor, background_color: ?DisplayColor, str: []const u8, x: i32, y: i32) void {
+pub inline fn text(options: TextOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.text(text_color, OptionalDisplayColor.from(background_color), str.ptr, str.len, x, y);
+        platform_specific.text(
+            DisplayColor.Optional.from(options.text_color),
+            DisplayColor.Optional.from(options.background_color),
+            options.str.ptr,
+            options.str.len,
+            options.x,
+            options.y,
+        );
     } else {
         asm volatile (" svc #5"
             :
-            : [str_ptr] "{r0}" (str.ptr),
-              [str_len] "{r1}" (str.len),
-              [x] "{r2}" (x),
-              [y] "{r3}" (y),
+            : [str_ptr] "{r0}" (options.str.ptr),
+              [str_len] "{r1}" (options.str.len),
+              [x] "{r2}" (options.x),
+              [y] "{r3}" (options.y),
             : "memory"
         );
     }
 }
 
+pub const StraightLineOptions = struct {
+    x: i32,
+    y: i32,
+    len: u32,
+    color: DisplayColor,
+};
+
 /// Draws a horizontal line
-pub inline fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void {
+pub inline fn hline(options: StraightLineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.hline(color, x, y, len);
+        platform_specific.hline(
+            options.color,
+            options.x,
+            options.y,
+            options.len,
+        );
     } else {
         asm volatile (" svc #7"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [len] "{r2}" (len),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [len] "{r2}" (options.len),
             : "memory"
         );
     }
 }
 
 /// Draws a vertical line
-pub inline fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void {
+pub inline fn vline(options: StraightLineOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.vline(color, x, y, len);
+        platform_specific.vline(
+            options.color,
+            options.x,
+            options.y,
+            options.len,
+        );
     } else {
         asm volatile (" svc #6"
             :
-            : [x] "{r0}" (x),
-              [y] "{r1}" (y),
-              [len] "{r2}" (len),
+            : [x] "{r0}" (options.x),
+              [y] "{r1}" (options.y),
+              [len] "{r2}" (options.len),
             : "memory"
         );
     }
 }
-
-pub const ToneFlags = packed struct(u32) {
-    pub const Channel = enum(u2) {
-        pulse1,
-        pulse2,
-        triangle,
-        noise,
-    };
-
-    pub const DutyCycle = enum(u2) {
-        @"1/8",
-        @"1/4",
-        @"1/2",
-        @"3/4",
-    };
-
-    pub const Panning = enum(u2) {
-        stereo,
-        left,
-        right,
-    };
-
-    channel: Channel,
-    duty_cycle: DutyCycle,
-    panning: Panning,
-    padding: u26 = undefined,
-};
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -294,17 +330,57 @@ pub const ToneFlags = packed struct(u32) {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
+pub const ToneOptions = struct {
+    pub const Flags = packed struct(u32) {
+        pub const Channel = enum(u2) {
+            pulse1,
+            pulse2,
+            triangle,
+            noise,
+        };
+
+        pub const DutyCycle = enum(u2) {
+            @"1/8",
+            @"1/4",
+            @"1/2",
+            @"3/4",
+        };
+
+        pub const Panning = enum(u2) {
+            stereo,
+            left,
+            right,
+        };
+
+        channel: Channel,
+        /// `duty_cycle` is only used when `channel` is set to `pulse1` or `pulse2`
+        duty_cycle: DutyCycle = .@"1/8",
+        panning: Panning = .stereo,
+        padding: u26 = undefined,
+    };
+
+    frequency: u32,
+    duration: u32,
+    volume: u32,
+    flags: Flags,
+};
+
 /// Plays a sound tone.
-pub inline fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneFlags) void {
+pub inline fn tone(options: ToneOptions) void {
     if (comptime builtin.target.isWasm()) {
-        platform_specific.tone(frequency, duration, volume, flags);
+        platform_specific.tone(
+            options.frequency,
+            options.duration,
+            options.volume,
+            options.flags,
+        );
     } else {
         asm volatile (" svc #8"
             :
-            : [frequency] "{r0}" (frequency),
-              [duration] "{r1}" (duration),
-              [volume] "{r2}" (volume),
-              [flags] "{r3}" (flags),
+            : [frequency] "{r0}" (options.frequency),
+              [duration] "{r1}" (options.duration),
+              [volume] "{r2}" (options.volume),
+              [flags] "{r3}" (options.flags),
         );
     }
 }

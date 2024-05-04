@@ -8,72 +8,14 @@ const c = @cImport({
 
 const log = std.log.scoped(.watcher);
 
-out_dir_path: []const u8,
-in_dir_paths: []const []const u8,
+paths: []const []const u8,
+macos_paths: []const c.CFStringRef,
+paths_to_watch: c.CFArrayRef,
 
-pub fn init(
-    gpa: std.mem.Allocator,
-    out_dir_path: []const u8,
-    in_dir_paths: []const []const u8,
-) !MacosWatcher {
-    _ = gpa;
-    return .{
-        .out_dir_path = out_dir_path,
-        .in_dir_paths = in_dir_paths,
-    };
-}
+pub fn init(gpa: std.mem.Allocator, paths: []const []const u8) !MacosWatcher {
+    const macos_paths = try gpa.alloc(c.CFStringRef, paths.len);
 
-pub fn callback(
-    streamRef: c.ConstFSEventStreamRef,
-    clientCallBackInfo: ?*anyopaque,
-    numEvents: usize,
-    eventPaths: ?*anyopaque,
-    eventFlags: ?[*]const c.FSEventStreamEventFlags,
-    eventIds: ?[*]const c.FSEventStreamEventId,
-) callconv(.C) void {
-    _ = eventIds;
-    _ = eventFlags;
-    _ = streamRef;
-    const ctx: *Context = @alignCast(@ptrCast(clientCallBackInfo));
-
-    const paths: [*][*:0]u8 = @alignCast(@ptrCast(eventPaths));
-    for (paths[0..numEvents]) |p| {
-        const path = std.mem.span(p);
-        log.debug("Changed: {s}\n", .{path});
-
-        const basename = std.fs.path.basename(path);
-        var base_path = path[0 .. path.len - basename.len];
-        if (std.mem.endsWith(u8, base_path, "/"))
-            base_path = base_path[0 .. base_path.len - 1];
-
-        const is_out = std.mem.startsWith(u8, path, ctx.out_dir_path);
-        if (is_out) {
-            ctx.reloader.onOutputChange(base_path, basename);
-        } else {
-            ctx.reloader.onInputChange(base_path, basename);
-        }
-    }
-}
-
-const Context = struct {
-    reloader: *Reloader,
-    out_dir_path: []const u8,
-};
-pub fn listen(
-    self: *MacosWatcher,
-    gpa: std.mem.Allocator,
-    reloader: *Reloader,
-) !void {
-    var macos_paths = try gpa.alloc(c.CFStringRef, self.in_dir_paths.len + 1);
-    defer gpa.free(macos_paths);
-
-    macos_paths[0] = c.CFStringCreateWithCString(
-        null,
-        self.out_dir_path.ptr,
-        c.kCFStringEncodingUTF8,
-    );
-
-    for (self.in_dir_paths, macos_paths[1..]) |str, *ref| {
+    for (paths, macos_paths) |str, *ref| {
         ref.* = c.CFStringCreateWithCString(
             null,
             str.ptr,
@@ -88,17 +30,91 @@ pub fn listen(
         null,
     );
 
-    var ctx: Context = .{
-        .reloader = reloader,
-        .out_dir_path = self.out_dir_path,
+    return .{
+        .paths = paths,
+        .macos_paths = macos_paths,
+        .paths_to_watch = paths_to_watch,
+    };
+}
+
+pub fn deinit(watcher: *MacosWatcher, gpa: std.mem.Allocator) void {
+    gpa.free(watcher.macos_paths);
+    c.CFRelease(watcher.paths_to_watch);
+}
+
+fn eventStreamCallback(comptime ContextType: type) fn (
+    streamRef: c.ConstFSEventStreamRef,
+    clientCallBackInfo: ?*anyopaque,
+    numEvents: usize,
+    eventPaths: ?*anyopaque,
+    eventFlags: ?[*]const c.FSEventStreamEventFlags,
+    eventIds: ?[*]const c.FSEventStreamEventId,
+) callconv(.C) void {
+    return struct {
+        fn call(
+            streamRef: c.ConstFSEventStreamRef,
+            clientCallBackInfo: ?*anyopaque,
+            numEvents: usize,
+            eventPaths: ?*anyopaque,
+            eventFlags: ?[*]const c.FSEventStreamEventFlags,
+            eventIds: ?[*]const c.FSEventStreamEventId,
+        ) callconv(.C) void {
+            _ = eventIds;
+            _ = eventFlags;
+            _ = streamRef;
+            const ctx: *Context(ContextType) = @alignCast(@ptrCast(clientCallBackInfo));
+
+            const watcher = ctx.watcher;
+            const callback = ctx.callback;
+
+            const paths: [*][*:0]u8 = @alignCast(@ptrCast(eventPaths));
+            for (paths[0..numEvents]) |p| {
+                const path = std.mem.span(p);
+                log.debug("Changed: {s}\n", .{path});
+
+                const basename = std.fs.path.basename(path);
+                var base_path = path[0 .. path.len - basename.len];
+                if (std.mem.endsWith(u8, base_path, "/"))
+                    base_path = base_path[0 .. base_path.len - 1];
+
+                for (watcher.paths, 0..) |target_path, idx| {
+                    if (std.mem.startsWith(u8, path, target_path)) {
+                        callback(ctx.context, idx);
+                        break;
+                    }
+                }
+            }
+        }
+    }.call;
+}
+
+pub fn Context(comptime ContextType: type) type {
+    return struct {
+        watcher: *const MacosWatcher,
+        context: ContextType,
+        callback: *const fn (ContextType, changed_handle: usize) void,
+    };
+}
+
+pub fn listen(
+    watcher: *MacosWatcher,
+    gpa: std.mem.Allocator,
+    context: anytype,
+    callback: *const fn (@TypeOf(context), changed_handle: usize) void,
+) !void {
+    _ = gpa; // autofix
+    var stream_context_context = Context(@TypeOf(context)){
+        .watcher = watcher,
+        .callback = callback,
+        .context = context,
     };
 
-    var stream_context: c.FSEventStreamContext = .{ .info = &ctx };
+    var stream_context: c.FSEventStreamContext = .{ .info = &stream_context_context };
     const stream: c.FSEventStreamRef = c.FSEventStreamCreate(
         null,
-        &callback,
+        &eventStreamCallback(@TypeOf(callback)),
         &stream_context,
-        paths_to_watch,
+        watcher.paths_to_watch,
         c.kFSEventStreamEventIdSinceNow,
         0.05,
         c.kFSEventStreamCreateFlagFileEvents,
@@ -119,6 +135,4 @@ pub fn listen(
     c.FSEventStreamStop(stream);
     c.FSEventStreamInvalidate(stream);
     c.FSEventStreamRelease(stream);
-
-    c.CFRelease(paths_to_watch);
 }

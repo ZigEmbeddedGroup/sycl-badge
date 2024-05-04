@@ -1,0 +1,14 @@
+.{
+    .name = "sycl-badge-introduction",
+    .version = "0.0.0",
+    .paths = .{
+        "hello.zig",
+        "build.zig",
+    },
+
+    .dependencies = .{
+        .@"sycl-badge" = .{
+            .path = "../..",
+        },
+    },
+}

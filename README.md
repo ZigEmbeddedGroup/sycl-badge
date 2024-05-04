@@ -2,12 +2,7 @@
 
 ## Getting Started
 
-Temporarily this repo targets the `zig-master` branch of
-[MicroZig](https://github.com/ZigEmbeddedGroup/microzig). In order to build this
-repo, you must have it checked out, and `microzig` next to `sycl-badge-2024` in
-your filesystem. Once this branch is merged it won't be as janky to build this
-firmware.
-
+Check out the [Introduction](docs/introduction/README.md)!
 
 ## Uploading firmware using a debugger
 

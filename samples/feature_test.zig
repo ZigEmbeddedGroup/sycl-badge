@@ -22,10 +22,15 @@ fn write_stored_number(number: u64) void {
 
 export fn update() void {
     if (offset % (60 * 2) == 0) {
-        cart.tone(440, 20, 10, .{
-            .channel = .pulse1,
-            .duty_cycle = .@"1/8",
-            .panning = .left,
+        cart.tone(.{
+            .frequency = 440,
+            .duration = 20,
+            .volume = 10,
+            .flags = .{
+                .channel = .pulse1,
+                .duty_cycle = .@"1/8",
+                .panning = .left,
+            },
         });
     }
 
@@ -62,32 +67,88 @@ export fn update() void {
     for (0..cart.screen_height) |y| {
         for (0..cart.screen_width) |x| {
             cart.framebuffer[y * cart.screen_width + x] = .{
-                .red = @intFromFloat(@as(f32, @floatFromInt(x)) / cart.screen_width * 31),
-                .green = green_565,
-                .blue = @intFromFloat(@as(f32, @floatFromInt(y)) / cart.screen_height * 31),
+                .r = @intFromFloat(@as(f32, @floatFromInt(x)) / cart.screen_width * 31),
+                .g = green_565,
+                .b = @intFromFloat(@as(f32, @floatFromInt(y)) / cart.screen_height * 31),
             };
         }
     }
 
     for (cart.neopixels, 0..) |*np, i| {
         np.* = .{
-            .red = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
-            .green = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
-            .blue = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
+            .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
+            .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
+            .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
         };
     }
 
-    // TODO: blit, blitSub
+    cart.blit(.{
+        .sprite = &.{
+            .{ .r = 31, .g = 0, .b = 0 },
+            .{ .r = 0, .g = 0, .b = 31 },
+            .{ .r = 31, .g = 0, .b = 0 },
+            .{ .r = 0, .g = 0, .b = 31 },
+        },
+        .x = 40,
+        .y = 40,
+        .width = 2,
+        .height = 2,
+        .flags = .{},
+    });
 
-    cart.line(.{ .red = 0, .green = 63, .blue = 0 }, 50, 50, 70, 70);
+    cart.line(.{
+        .x1 = 50,
+        .y1 = 50,
+        .x2 = 70,
+        .y2 = 70,
+        .color = .{ .r = 0, .g = 63, .b = 0 },
+    });
 
-    cart.hline(.{ .red = 31, .green = 0, .blue = 0 }, 30, 30, 20);
-    cart.vline(.{ .red = 31, .green = 0, .blue = 0 }, 30, 30, 20);
+    cart.hline(.{
+        .x = 30,
+        .y = 30,
+        .len = 20,
+        .color = .{ .r = 31, .g = 0, .b = 0 },
+    });
 
-    cart.oval(.{ .red = 0, .green = 0, .blue = 31 }, .{ .red = 31, .green = 0, .blue = 31 }, 80, 80, 10, 10);
-    cart.rect(.{ .red = 31, .green = 31, .blue = 31 }, .{ .red = 0, .green = 63, .blue = 31 }, 100, 100, 10, 10);
+    cart.vline(.{
+        .x = 30,
+        .y = 30,
+        .len = 20,
+        .color = .{ .r = 31, .g = 0, .b = 0 },
+    });
 
-    cart.text(.{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 }, fbs.getWritten(), 0, 0);
+    cart.oval(.{
+        .x = 80,
+        .y = 80,
+        .width = 10,
+        .height = 10,
+        .stroke_color = .{ .r = 0, .g = 0, .b = 31 },
+        .fill_color = .{ .r = 31, .g = 0, .b = 31 },
+    });
 
-    cart.text(.{ .red = 0, .green = 0, .blue = 0 }, .{ .red = 31, .green = 63, .blue = 31 }, "\x80\x81\x82\x83\x84\x85\x86\x87\x88", 0, 120);
+    cart.rect(.{
+        .x = 100,
+        .y = 100,
+        .width = 10,
+        .height = 10,
+        .stroke_color = .{ .r = 31, .g = 31, .b = 31 },
+        .fill_color = .{ .r = 0, .g = 63, .b = 31 },
+    });
+
+    cart.text(.{
+        .str = fbs.getWritten(),
+        .x = 0,
+        .y = 0,
+        .text_color = .{ .r = 0, .g = 0, .b = 0 },
+        .background_color = .{ .r = 31, .g = 63, .b = 31 },
+    });
+
+    cart.text(.{
+        .str = "\x80\x81\x82\x83\x84\x85\x86\x87\x88",
+        .x = 0,
+        .y = 120,
+        .text_color = .{ .r = 0, .g = 0, .b = 0 },
+        .background_color = .{ .r = 31, .g = 63, .b = 31 },
+    });
 }

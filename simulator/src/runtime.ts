@@ -42,7 +42,7 @@ export class Runtime {
 
         this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
 
-        this.memory = new WebAssembly.Memory({initial: 2, maximum: 2});
+        this.memory = new WebAssembly.Memory({initial: 64, maximum: 64});
         this.data = new DataView(this.memory.buffer);
 
         this.framebuffer = new Framebuffer(this.memory.buffer);
@@ -123,7 +123,6 @@ export class Runtime {
             text: this.text.bind(this),
 
             blit: this.blit.bind(this),
-            blit_sub: this.blitSub.bind(this),
 
             tone: this.apu.tone.bind(this.apu),
 
@@ -165,20 +164,13 @@ export class Runtime {
         this.framebuffer.drawText(textColor, backgroundColor, text, x, y);
     }
 
-    blit (colorsPtr: number, spritePtr: number, x: number, y: number, width: number, height: number, flags: number) {
-        this.blitSub(colorsPtr, spritePtr, x, y, width, height, 0, 0, width, flags);
-    }
+    blit (spritePtr: number, x: number, y: number, width: number, height: number, srcX: number, srcY: number, stride: number, flags: number) {
+        const sprite = new Uint16Array(this.memory.buffer, spritePtr);
+        const flipX = (flags & 1);
+        const flipY = (flags & 2);
+        const rotate = (flags & 4);
 
-    blitSub (colorsPtr: number, spritePtr: number, x: number, y: number, width: number, height: number, srcX: number, srcY: number, stride: number, flags: number) {
-        const sprite = new Uint8Array(this.memory.buffer, spritePtr);
-        const bpp2 = (flags & 1);
-        const flipX = (flags & 2);
-        const flipY = (flags & 4);
-        const rotate = (flags & 8);
-
-        const colors = new Uint16Array(this.memory.buffer, colorsPtr);
-
-        this.framebuffer.blit(bpp2 ? [colors[0], colors[1], colors[2], colors[3]] : [colors[0], colors[1]], sprite, x, y, width, height, srcX, srcY, stride, flipX, flipY, rotate);
+        this.framebuffer.blit(sprite, x, y, width, height, srcX, srcY, stride, flipX, flipY, rotate);
     }
 
     read_flash (offset: number, dstPtr: number, length: number): number {
@@ -254,7 +246,7 @@ export class Runtime {
         const headerX = (160 - (8 * title.length)) / 2;
         const headerY = 20;
         const messageX = 9;
-        const messageY = 60;
+        const messageY = 52;
 
         this.framebuffer.fillScreen(blue);
         
@@ -272,6 +264,7 @@ export class Runtime {
 
 function errorToBlueScreenText(err: Error) {
     // hand written messages for specific errors
+    console.log(err);
     if (err instanceof WebAssembly.RuntimeError) {
         let message;
         if (err.message.match(/unreachable/)) {
@@ -279,15 +272,15 @@ function errorToBlueScreenText(err: Error) {
         } else if (err.message.match(/out of bounds/)) {
             message = "The cartridge has\nattempted a memory\naccess that is\nout of bounds.";
         }
-        return message + "\n\n\n\n\nHit R to reboot.";
+        return message + "\n\n\n\nHit R to reboot.";
     } else if (err instanceof WebAssembly.LinkError) {
-        return "The cartridge has\ntried to import\na missing function.\n\n\n\nSee console for\nmore details.";
+        return "The cartridge has\ntried to import\na missing function.\n\n\nSee console for\nmore details.";
     } else if (err instanceof WebAssembly.CompileError) {
-        return "The cartridge is\ncorrupted.\n\n\n\nSee console for\nmore details.";
+        return "The cartridge is\ncorrupted.\n\n\nSee console for\nmore details.";
     } else if (err instanceof Wasm4Error) {
         return err.wasm4Message;
     }
-    return "Unknown error.\n\n\n\nSee console for\nmore details.";
+    return "Unknown error.\n\n\nSee console for\nmore details.";
 }
 
 class Wasm4Error extends Error {

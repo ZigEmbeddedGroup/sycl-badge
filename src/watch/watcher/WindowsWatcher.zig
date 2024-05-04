@@ -43,7 +43,7 @@ pub fn listen(
     watcher: *WindowsWatcher,
     gpa: std.mem.Allocator,
     context: anytype,
-    callback: fn (@TypeOf(context), changed_handle: usize) void,
+    callback: *const fn (@TypeOf(context), changed_handle: usize) void,
 ) error{ UnknownWaitStatus, NextChangeFailed, WaitAbandoned, Unexpected }!void {
     _ = gpa;
 

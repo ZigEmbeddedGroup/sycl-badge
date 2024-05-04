@@ -270,7 +270,7 @@ pub fn listen(
     self: *LinuxWatcher,
     gpa: std.mem.Allocator,
     context: anytype,
-    callback: fn (@TypeOf(context), changed_handle: usize) void,
+    callback: *const fn (@TypeOf(context), changed_handle: usize) void,
 ) (std.posix.INotifyAddWatchError || std.fs.File.ReadError || std.fs.Dir.OpenError || std.mem.Allocator.Error)!void {
     const Event = std.os.linux.inotify_event;
     const event_size = @sizeOf(Event);

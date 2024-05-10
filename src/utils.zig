@@ -32,12 +32,12 @@ const DBL_TAP_MAGIC = 0xf01669ef;
 const DBL_TAP_MAGIC_QUICK_BOOT = 0xf02669ef;
 
 //adafruit/uf2-samdx1:src/utils.c
-pub fn reset_into_app() noreturn {
+pub fn resetIntoApp() noreturn {
     DBL_TAP_PTR.* = DBL_TAP_MAGIC_QUICK_BOOT;
     NVIC_SystemReset();
 }
 
-pub fn reset_into_bootloader() noreturn {
+pub fn resetIntoBootloader() noreturn {
     DBL_TAP_PTR.* = DBL_TAP_MAGIC;
     NVIC_SystemReset();
 }

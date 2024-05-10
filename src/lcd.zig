@@ -33,12 +33,12 @@ pub const white24: Color24 = .{ .r = 0xff, .g = 0xff, .b = 0xff };
 pub fn init(bpp: Bpp) void {
     @setCold(true);
 
-    Port.TFT_RST.set_dir(.out);
-    Port.TFT_LITE.set_dir(.out);
-    Port.TFT_DC.set_dir(.out);
-    Port.TFT_CS.set_dir(.out);
-    Port.TFT_SCK.set_dir(.out);
-    Port.TFT_MOSI.set_dir(.out);
+    Port.TFT_RST.setDir(.out);
+    Port.TFT_LITE.setDir(.out);
+    Port.TFT_DC.setDir(.out);
+    Port.TFT_CS.setDir(.out);
+    Port.TFT_SCK.setDir(.out);
+    Port.TFT_MOSI.setDir(.out);
 
     Port.TFT_CS.write(.high);
     Port.TFT_DC.write(.high);
@@ -71,8 +71,8 @@ pub fn init(bpp: Bpp) void {
         .padding = 0,
     });
     while (io.SERCOM4.SPIM.SYNCBUSY.read().SWRST != 0) {}
-    Port.TFT_SCK.set_mux(.C);
-    Port.TFT_MOSI.set_mux(.C);
+    Port.TFT_SCK.setMux(.C);
+    Port.TFT_MOSI.setMux(.C);
     io.GCLK.PCHCTRL[GCLK.PCH.SERCOM4_CORE].write(.{
         .GEN = .{ .value = GCLK.GEN.@"120MHz".PCHCTRL_GEN },
         .reserved6 = 0,
@@ -101,15 +101,15 @@ pub fn init(bpp: Bpp) void {
     });
     while (io.SERCOM4.SPIM.SYNCBUSY.read().ENABLE != 0) {}
 
-    send_cmd(ST7735.SWRESET, &.{}, 120 * std.time.us_per_ms);
-    send_cmd(ST7735.SLPOUT, &.{}, 120 * std.time.us_per_ms);
-    send_cmd(ST7735.INVOFF, &.{}, 1);
-    send_cmd(ST7735.COLMOD, &.{@intFromEnum(@as(ST7735.COLMOD_PARAM0, switch (bpp) {
+    sendCmd(ST7735.SWRESET, &.{}, 120 * std.time.us_per_ms);
+    sendCmd(ST7735.SLPOUT, &.{}, 120 * std.time.us_per_ms);
+    sendCmd(ST7735.INVOFF, &.{}, 1);
+    sendCmd(ST7735.COLMOD, &.{@intFromEnum(@as(ST7735.COLMOD_PARAM0, switch (bpp) {
         .bpp12 => .@"12BPP",
         .bpp16 => .@"16BPP",
         .bpp24 => .@"24BPP",
     }))}, 1);
-    send_cmd(ST7735.MADCTL, &.{@as(u8, @bitCast(ST7735.MADCTL_PARAM0{
+    sendCmd(ST7735.MADCTL, &.{@as(u8, @bitCast(ST7735.MADCTL_PARAM0{
         .MH = .LEFT_TO_RIGHT,
         .RGB = .BGR,
         .ML = .TOP_TO_BOTTOM,
@@ -117,27 +117,27 @@ pub fn init(bpp: Bpp) void {
         .MX = false,
         .MY = true,
     }))}, 1);
-    send_cmd(ST7735.GMCTRP1, &.{
+    sendCmd(ST7735.GMCTRP1, &.{
         0x02, 0x1c, 0x07, 0x12,
         0x37, 0x32, 0x29, 0x2d,
         0x29, 0x25, 0x2B, 0x39,
         0x00, 0x01, 0x03, 0x10,
     }, 1);
-    send_cmd(ST7735.NORON, &.{}, 10 * std.time.us_per_ms);
-    send_cmd(ST7735.DISPON, &.{}, 10 * std.time.us_per_ms);
-    send_cmd(ST7735.RAMWR, &.{}, 1);
+    sendCmd(ST7735.NORON, &.{}, 10 * std.time.us_per_ms);
+    sendCmd(ST7735.DISPON, &.{}, 10 * std.time.us_per_ms);
+    sendCmd(ST7735.RAMWR, &.{}, 1);
 
     if (dma.enable) {
         Port.TFT_CS.write(.low);
         timer.delay(1);
-        dma.init_lcd(bpp);
+        dma.initLcd(bpp);
     }
 }
 
 pub fn invert() void {
     stop();
     inverted = !inverted;
-    send_cmd(switch (inverted) {
+    sendCmd(switch (inverted) {
         false => ST7735.INVOFF,
         true => ST7735.INVON,
     }, &.{}, 1);
@@ -181,18 +181,18 @@ pub fn rect24(rect: Rect, fill: Color24, line: Color24) void {
 }
 
 pub fn blit12() void {
-    if (!dma.enable) send_cmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp12), 1);
+    if (!dma.enable) sendCmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp12), 1);
 }
 
 pub fn blit16() void {
-    if (!dma.enable) send_cmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp16), 1);
+    if (!dma.enable) sendCmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp16), 1);
 }
 
 pub fn blit24() void {
-    if (!dma.enable) send_cmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp24), 1);
+    if (!dma.enable) sendCmd(ST7735.RAMWR, std.mem.asBytes(&fb.bpp24), 1);
 }
 
-fn send_cmd(cmd: u8, params: []const u8, delay_us: u32) void {
+fn sendCmd(cmd: u8, params: []const u8, delay_us: u32) void {
     timer.delay(1);
     Port.TFT_CS.write(.low);
     Port.TFT_DC.write(.low);
@@ -213,16 +213,16 @@ fn send_cmd(cmd: u8, params: []const u8, delay_us: u32) void {
 
 fn start() void {
     if (dma.enable) {
-        send_cmd(ST7735.RAMWR, &.{}, 1);
+        sendCmd(ST7735.RAMWR, &.{}, 1);
         Port.TFT_CS.write(.low);
         timer.delay(1);
-        dma.start_lcd();
+        dma.startLcd();
     }
 }
 
 fn stop() void {
     if (dma.enable) {
-        dma.stop_lcd();
+        dma.stopLcd();
         timer.delay(1);
         Port.TFT_CS.write(.high);
         timer.delay(1);

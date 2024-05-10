@@ -64,27 +64,27 @@ pub const Group = enum { A, B };
 pub const Direction = enum { in, out };
 pub const Level = enum { low, high };
 
-pub inline fn set_dir(port: Port, dir: Direction) void {
+pub inline fn setDir(port: Port, dir: Direction) void {
     switch (dir) {
-        .in => port.group_ptr().DIRCLR.write(.{ .DIRCLR = @as(u32, 1) << port.pin }),
-        .out => port.group_ptr().DIRSET.write(.{ .DIRSET = @as(u32, 1) << port.pin }),
+        .in => port.groupPtr().DIRCLR.write(.{ .DIRCLR = @as(u32, 1) << port.pin }),
+        .out => port.groupPtr().DIRSET.write(.{ .DIRSET = @as(u32, 1) << port.pin }),
     }
 }
 
 pub inline fn write(port: Port, level: Level) void {
     switch (level) {
-        .low => port.group_ptr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
-        .high => port.group_ptr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
+        .low => port.groupPtr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
+        .high => port.groupPtr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
     }
 }
 
 pub inline fn read(port: Port) Level {
-    return @enumFromInt(port.group_ptr().IN.read().IN >> port.pin & 1);
+    return @enumFromInt(port.groupPtr().IN.read().IN >> port.pin & 1);
 }
 
 pub const Mux = enum(u4) { A, B, C, D, E, F, G, H, I, J, K, L, M, N };
-pub inline fn set_mux(port: Port, mux: Mux) void {
-    const pmux = &port.group_ptr().PMUX[port.pin / 2];
+pub inline fn setMux(port: Port, mux: Mux) void {
+    const pmux = &port.groupPtr().PMUX[port.pin / 2];
     switch (@as(u1, @truncate(port.pin))) {
         0 => pmux.modify(.{ .PMUXE = .{
             .value = @as(io_types.PORT.PORT_PMUX__PMUXE, @enumFromInt(@intFromEnum(mux))),
@@ -93,15 +93,15 @@ pub inline fn set_mux(port: Port, mux: Mux) void {
             .value = @as(io_types.PORT.PORT_PMUX__PMUXO, @enumFromInt(@intFromEnum(mux))),
         } }),
     }
-    port.config_ptr().modify(.{ .PMUXEN = 1 });
+    port.configPtr().modify(.{ .PMUXEN = 1 });
 }
 
 const PinCfg = @typeInfo(std.meta.FieldType(io_types.PORT.GROUP, .PINCFG)).Array.child;
-pub inline fn config_ptr(port: Port) *volatile PinCfg {
-    return &port.group_ptr().PINCFG[port.pin];
+pub inline fn configPtr(port: Port) *volatile PinCfg {
+    return &port.groupPtr().PINCFG[port.pin];
 }
 
-fn group_ptr(port: Port) *volatile io_types.PORT.GROUP {
+fn groupPtr(port: Port) *volatile io_types.PORT.GROUP {
     return &io.PORT.GROUP[@intFromEnum(port.group)];
 }
 

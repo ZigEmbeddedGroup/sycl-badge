@@ -111,13 +111,20 @@ export class App extends LitElement {
             }
         });
 
+        let wsWasConnected = false
         const ws = new WebSocket(`ws://localhost:2468/ws`);
-        ws.onopen = w => {
+        ws.onopen = () => {
+            wsWasConnected = true;
             setInterval(() => {
                 ws.send("spam");
             }, 100);
         }
-
+        ws.onclose = () => {
+            if (wsWasConnected) {
+                wsWasConnected = false;
+                runtime.blueScreen("Watcher was\ndisconnected.");
+            }
+        };
         ws.onmessage = async m => {
             if (m.data == "reload") {
                 await this.resetCart(new Uint8Array(await (await fetch("http://localhost:2468/cart.wasm")).arrayBuffer()), false);

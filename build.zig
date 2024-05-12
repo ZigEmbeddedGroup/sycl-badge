@@ -56,7 +56,7 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
-    const watch_run_step = feature_test_cart.install_with_watcher(&dep, b);
+    const watch_run_step = feature_test_cart.install_with_watcher(&dep, b, .{});
 
     const zeroman_cart = add_cart(&dep, b, .{
         .name = "zeroman",
@@ -121,6 +121,12 @@ pub fn build(b: *Build) void {
     }.make;
 }
 
+pub const CartWatcherOptions = struct {
+    /// Directories for the Watcher to watch.
+    /// If null, defaults to the root source file directory.
+    watch_dirs: ?[]const []const u8 = null,
+};
+
 pub const Cart = struct {
     fw: *MicroZig.Firmware,
     wasm: *Build.Step.Compile,
@@ -134,15 +140,22 @@ pub const Cart = struct {
         b.installArtifact(c.wasm);
     }
 
-    pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build) *Build.Step.Run {
+    pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build, opt: CartWatcherOptions) *Build.Step.Run {
         c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
         b.getInstallStep().dependOn(&install_artifact_step.step);
 
         const watch_run = b.addRunArtifact(d.artifact("watch"));
         // watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot(std.fs.path.dirname(options.root_source_file) orelse ""), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
-        watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir" });
-        watch_run.addFileArg(c.options.root_source_file.dirname());
+        watch_run.addArgs(&.{ "serve", b.graph.zig_exe });
+        if (opt.watch_dirs) |dirs| {
+            for (dirs) |dir| {
+                watch_run.addArgs(&.{ "--input-dir", dir });
+            }
+        } else {
+            watch_run.addArgs(&.{"--input-dir"});
+            watch_run.addFileArg(c.options.root_source_file.dirname());
+        }
         watch_run.addArgs(&.{ "--cart", b.getInstallPath(install_artifact_step.dest_dir.?, install_artifact_step.dest_sub_path) });
 
         return watch_run;

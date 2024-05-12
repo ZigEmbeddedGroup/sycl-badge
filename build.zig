@@ -125,6 +125,7 @@ pub const CartWatcherOptions = struct {
     /// Directories for the Watcher to watch.
     /// If null, defaults to the root source file directory.
     watch_dirs: ?[]const []const u8 = null,
+    build_firmware: bool = true,
 };
 
 pub const Cart = struct {
@@ -141,7 +142,9 @@ pub const Cart = struct {
     }
 
     pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build, opt: CartWatcherOptions) *Build.Step.Run {
-        c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+        if (opt.build_firmware) {
+            c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+        }
         const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
         b.getInstallStep().dependOn(&install_artifact_step.step);
 

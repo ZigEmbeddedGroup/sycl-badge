@@ -94,12 +94,7 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
-    struct {
-        export fn __return_thunk__() noreturn {
-            asm volatile (" svc #12");
-            unreachable;
-        }
-    };
+    struct {};
 
 comptime {
     _ = platform_specific;
@@ -142,23 +137,23 @@ pub inline fn blit(options: BlitOptions) void {
             options.flags,
         );
     } else {
-        // const rest: extern struct {
-        //     width: u32,
-        //     height: u32,
-        //     flags: u32,
-        // } = .{
-        //     .width = width,
-        //     .height = height,
-        //     .flags = flags,
-        // };
-        // asm volatile (" svc #0"
-        //     :
-        //     : [sprite] "{r0}" (sprite),
-        //       [x] "{r1}" (x),
-        //       [y] "{r2}" (y),
-        //       [rest] "{r3}" (&rest),
-        //     : "memory"
-        // );
+        const rest: extern struct {
+            width: u32,
+            height: u32,
+            flags: u32,
+        } = .{
+            .width = options.width,
+            .height = options.height,
+            .flags = @bitCast(options.flags),
+        };
+        asm volatile (" svc #0"
+            :
+            : [sprite] "{r0}" (options.sprite),
+              [x] "{r1}" (options.x),
+              [y] "{r2}" (options.y),
+              [rest] "{r3}" (&rest),
+            : "memory"
+        );
     }
 }
 

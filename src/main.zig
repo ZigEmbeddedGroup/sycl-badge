@@ -7,12 +7,14 @@ const io_types = microzig.chip.types.peripherals;
 const lcd = @import("lcd.zig");
 const microzig = @import("microzig");
 const NVMCTRL = @import("chip.zig").NVMCTRL;
-const options = @import("options");
 const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
 const timer = @import("timer.zig");
 const utils = @import("utils.zig");
+
+const hal = microzig.hal;
+const clocks = hal.clocks;
 
 const interrupt_log = std.log.scoped(.interrupt);
 const Context = extern struct {
@@ -36,7 +38,7 @@ fn unhandled(comptime name: []const u8) microzig.interrupt.Handler {
         }.handler,
     };
 }
-fn withContext(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
+fn with_context(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
     return microzig.interrupt.Handler{
         .Naked = struct {
             fn interrupt() callconv(.Naked) void {
@@ -62,7 +64,7 @@ pub const microzig_options = .{
     .logFn = log,
     .interrupts = .{
         .NonMaskableInt = unhandled("NonMaskableInt"),
-        .HardFault = withContext(struct {
+        .HardFault = with_context(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.HFSR.raw,
@@ -71,7 +73,7 @@ pub const microzig_options = .{
                 microzig.hang();
             }
         }.handler),
-        .MemoryManagement = withContext(struct {
+        .MemoryManagement = with_context(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -81,7 +83,7 @@ pub const microzig_options = .{
                 microzig.hang();
             }
         }.handler),
-        .BusFault = withContext(struct {
+        .BusFault = with_context(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -91,7 +93,7 @@ pub const microzig_options = .{
                 microzig.hang();
             }
         }.handler),
-        .UsageFault = withContext(struct {
+        .UsageFault = with_context(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -232,7 +234,7 @@ pub fn log(
     out.print("[" ++ level.asText() ++ "] (" ++ @tagName(scope) ++ "): " ++ format ++ "\n", args) catch return;
 }
 
-pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
+pub fn dump_peripheral(logger: anytype, comptime prefix: []const u8, pointer: anytype) void {
     switch (@typeInfo(@typeInfo(@TypeOf(pointer)).Pointer.child)) {
         .Int => {
             logger.info("[0x{x}] " ++ prefix ++ " = 0x{x}", .{ @intFromPtr(pointer), pointer.* });
@@ -240,10 +242,10 @@ pub fn dumpPeripheral(logger: anytype, comptime prefix: []const u8, pointer: any
         .Struct => |*info| inline for (info.fields) |field| {
             if (comptime std.mem.startsWith(u8, field.name, "reserved")) continue;
             if (comptime std.mem.eql(u8, field.name, "padding")) continue;
-            dumpPeripheral(logger, prefix ++ "." ++ field.name, &@field(pointer, field.name));
+            dump_peripheral(logger, prefix ++ "." ++ field.name, &@field(pointer, field.name));
         },
         .Array => inline for (0.., pointer) |index, *elem| {
-            dumpPeripheral(logger, std.fmt.comptimePrint("{s}[{d}]", .{ prefix, index }), elem);
+            dump_peripheral(logger, std.fmt.comptimePrint("{s}[{d}]", .{ prefix, index }), elem);
         },
         else => @compileError("Unhandled type: " ++ @typeName(@TypeOf(pointer))),
     }
@@ -289,9 +291,9 @@ pub fn main() !void {
     usb.init();
     // ID detection
     const id_port = Port.D13;
-    id_port.setDir(.out);
+    id_port.set_dir(.out);
     id_port.write(.high);
-    id_port.configPtr().write(.{
+    id_port.config_ptr().write(.{
         .PMUXEN = 0,
         .INEN = 1,
         .PULLEN = 1,
@@ -299,7 +301,7 @@ pub fn main() !void {
         .DRVSTR = 0,
         .padding = 0,
     });
-    usb.reinitMode(.DEVICE);
+    usb.reinit_mode(.DEVICE);
 
     timer.init();
     lcd.init(.bpp24);
@@ -314,7 +316,7 @@ pub fn main() !void {
         .ENABLE = 1,
         .SIZE = (@ctz(utils.FLASH.SIZE) - 1) & 1,
         .reserved8 = @as(u4, (@ctz(utils.FLASH.SIZE) - 1) >> 1),
-        .SRD = if (options.have_cart) 0b00000111 else 0b00000000,
+        .SRD = 0b00000111,
         .B = 0,
         .C = 1,
         .S = 0,
@@ -334,7 +336,7 @@ pub fn main() !void {
         .ENABLE = 1,
         .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) & 1,
         .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) >> 1),
-        .SRD = if (options.have_cart) 0b11110000 else 0b00000000,
+        .SRD = 0b11110000,
         .B = 1,
         .C = 1,
         .S = 0,
@@ -374,6 +376,10 @@ pub fn main() !void {
 
     cart.init();
 
+    const state = clocks.get_state();
+    const freqs = clocks.Frequencies.get(state);
+    _ = freqs;
+
     var was_ready = false;
     var cart_running = false;
     var color: enum { red, green, blue } = .red;
@@ -399,7 +405,7 @@ pub fn main() !void {
                 'A' - '@' => {
                     timer.delay(std.time.us_per_s);
                     const tempo = 0.78;
-                    audio.playSong(&.{
+                    audio.play_song(&.{
                         &.{
                             .{ .duration = tempo * 0.75, .frequency = audio.Note.F5 },
                             .{ .duration = tempo * 0.25, .frequency = audio.Note.Db5 },
@@ -528,7 +534,7 @@ pub fn main() !void {
                         },
                     });
                 },
-                'B' - '@' => utils.resetIntoBootloader(),
+                'B' - '@' => utils.reset_into_bootloader(),
                 'C' - '@' => { // Debug clock frequencies
                     const clock_log = std.log.scoped(.clock);
 
@@ -683,7 +689,7 @@ pub fn main() !void {
                 'I' - '@' => if (true) lcd.invert(),
                 '\r' => out.writeByte('\n') catch break :input,
                 'P' - '@' => @panic("user"),
-                'R' - '@' => utils.resetIntoApp(),
+                'R' - '@' => utils.reset_into_app(),
                 'S' - '@' => for (0.., &io.PORT.GROUP) |group_i, *group|
                     std.log.info("IN{d} = 0x{X:0>8}", .{ group_i, group.IN.read().IN }),
                 'T' - '@' => { // Debug timer delay
@@ -862,14 +868,14 @@ pub const usb = struct {
     fn init() void {
         @setCold(true);
 
-        Port.@"D-".setMux(.H);
-        Port.@"D+".setMux(.H);
+        Port.@"D-".set_mux(.H);
+        Port.@"D+".set_mux(.H);
         io.MCLK.AHBMASK.modify(.{ .USB_ = 1 });
         io.MCLK.APBBMASK.modify(.{ .USB_ = 1 });
     }
 
     /// Reinitialize into the specified mode
-    fn reinitMode(mode: io_types.USB.USB_CTRLA__MODE) void {
+    fn reinit_mode(mode: io_types.USB.USB_CTRLA__MODE) void {
         @setCold(true);
 
         // Tear down clocks
@@ -911,6 +917,7 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+
         io.OSCCTRL.DPLL[1].DPLLCTRLA.write(.{
             .reserved1 = 0,
             .ENABLE = 0,
@@ -919,6 +926,7 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().ENABLE != 0) {}
+
         io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
             .GEN = .{ .raw = 0 },
             .reserved6 = 0,
@@ -1404,14 +1412,14 @@ pub const usb = struct {
                         .out => switch (@as(Setup.standard.Request, @enumFromInt(setup.bRequest))) {
                             .SET_ADDRESS => if (setup.wIndex == 0 and setup.wLength == 0) {
                                 if (std.math.cast(u7, setup.wValue)) |addr| {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     io.USB.DEVICE.DADD.write(.{ .DADD = addr, .ADDEN = 1 });
                                     break :setup;
                                 }
                             },
                             .SET_CONFIGURATION => {
                                 if (std.math.cast(u8, setup.wValue)) |config| {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     current_configuration = config;
                                     cdc.current_connection = 0;
                                     switch (config) {
@@ -1502,7 +1510,7 @@ pub const usb = struct {
                             .GET_DESCRIPTOR => {
                                 switch (@as(Setup.standard.DescriptorType, @enumFromInt(setup.wValue >> 8))) {
                                     .DEVICE => if (@as(u8, @truncate(setup.wValue)) == 0 and setup.wIndex == 0) {
-                                        writeControl(&[0x12]u8{
+                                        write_control(&[0x12]u8{
                                             0x12, @intFromEnum(Setup.standard.DescriptorType.DEVICE), //
                                             0x00, 0x02, //
                                             0xef, 0x02, 0x01, //
@@ -1518,7 +1526,7 @@ pub const usb = struct {
                                     .CONFIGURATION => if (setup.wIndex == 0) {
                                         switch (@as(u8, @truncate(setup.wValue))) {
                                             0 => {
-                                                writeControl(&[0x003e]u8{
+                                                write_control(&[0x003e]u8{
                                                     0x09, @intFromEnum(Setup.standard.DescriptorType.CONFIGURATION), //
                                                     0x3e, 0x00, //
                                                     0x02, 0x01, 0x00, //
@@ -1563,7 +1571,7 @@ pub const usb = struct {
                                     .STRING => switch (@as(u8, @truncate(setup.wValue))) {
                                         0 => switch (setup.wIndex) {
                                             0 => {
-                                                writeControl(&[4]u8{
+                                                write_control(&[4]u8{
                                                     4, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     0x09, 0x04, // English (United States)
                                                 });
@@ -1573,7 +1581,7 @@ pub const usb = struct {
                                         },
                                         1 => switch (setup.wIndex) {
                                             0x0409 => { // English (United States)
-                                                writeControl(&[38]u8{
+                                                write_control(&[38]u8{
                                                     38, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     'Z', 0x00, //
                                                     'i', 0x00, //
@@ -1600,7 +1608,7 @@ pub const usb = struct {
                                         },
                                         2 => switch (setup.wIndex) {
                                             0x0409 => { // English (United States)
-                                                writeControl(&[16]u8{
+                                                write_control(&[16]u8{
                                                     16, @intFromEnum(Setup.standard.DescriptorType.STRING), //
                                                     'B', 0x00, //
                                                     'a', 0x00, //
@@ -1633,13 +1641,13 @@ pub const usb = struct {
                         0 => switch (setup.bmRequestType.dir) {
                             .out => switch (@as(Setup.cdc.Request, @enumFromInt(setup.bRequest))) {
                                 .SET_LINE_CODING => if (setup.wValue == 0) {
-                                    writeControl(&[0]u8{});
+                                    write_control(&[0]u8{});
                                     break :setup;
                                 },
                                 .SET_CONTROL_LINE_STATE => if (setup.wLength == 0) {
                                     if (std.math.cast(u8, setup.wValue)) |conn| {
                                         cdc.current_connection = conn;
-                                        writeControl(&[0]u8{});
+                                        write_control(&[0]u8{});
                                         break :setup;
                                     }
                                 },
@@ -1702,7 +1710,7 @@ pub const usb = struct {
         return data[0..0];
     }
 
-    fn writeControl(data: []const u8) void {
+    fn write_control(data: []const u8) void {
         write(0, data[0..@min(data.len, setup.wLength)]);
     }
 

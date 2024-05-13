@@ -55,6 +55,10 @@ pub fn Group(comptime count: u16) type {
             asm volatile (
                 \\  add     r3, r2, r3;
                 \\
+                \\initial_pause:
+                \\  str r1, [r0, #0];                       // clr
+                \\  mov r6, #3000; d4: subs r6, #1; bne d4;  // 80us low
+                \\
                 \\loop_load:
                 \\  ldrb r5, [r2, #0];                      // r5 := *ptr
                 \\  add  r2, #1;                            // ptr++

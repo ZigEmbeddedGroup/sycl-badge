@@ -76,6 +76,7 @@ const OSC32KCTRL = microzig.chip.peripherals.OSC32KCTRL;
 
 pub const mclk = @import("clocks/mclk.zig");
 pub const gclk = @import("clocks/gclk.zig");
+pub const oscctrl = @import("clocks/oscctrl.zig");
 
 pub const Frequencies = struct {
     oscillators: struct {
@@ -84,7 +85,7 @@ pub const Frequencies = struct {
     },
     generators: [12]u32,
     peripherals: struct {},
-    cpu: u32,
+    gclk_main: u32,
 
     pub fn get(state: State) Frequencies {
         return Frequencies{
@@ -106,7 +107,7 @@ pub const Frequencies = struct {
                 break :blk ret;
             },
             .peripherals = .{},
-            .cpu = 0,
+            .gclk_main = state.generic_clock_controller.generators[0].get_output_freq_hz(),
         };
     }
 };
@@ -172,7 +173,7 @@ pub const State = struct {
 
         pub fn get_div(generator: Generator) u32 {
             return switch (generator.div_selection) {
-                .DIV1 => if (generator.div <= 1) 1 else @panic("div must be 0 or 1"),
+                .DIV1 => if (generator.div <= 1) 1 else generator.div,
                 .DIV2 => std.math.pow(u32, 2, generator.div + 1),
             };
         }

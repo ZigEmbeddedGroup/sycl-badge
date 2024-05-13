@@ -53,6 +53,15 @@ pub const PeripheralIndex = enum(u6) {
     GCLK_CM4_TRACE = 47,
 };
 
+pub fn reset_blocking() void {
+    GCLK.CTRLA.write(.{ .SWRST = 1, .padding = 0 });
+    while (GCLK.SYNCBUSY.read().SWRST != 0) {}
+}
+
+pub fn wait_for_sync_mask(mask: u12) void {
+    while ((GCLK.SYNCBUSY.read().GENCTRL.raw & mask) != 0) {}
+}
+
 pub const EnableGeneratorOptions = struct {
     divsel: microzig.chip.types.peripherals.GCLK.GCLK_GENCTRL__DIVSEL,
     div: u8,

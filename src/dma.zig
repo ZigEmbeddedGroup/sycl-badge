@@ -1,6 +1,6 @@
 pub const enable = true;
 
-pub fn initLcd(bpp: lcd.Bpp) void {
+pub fn init_lcd(bpp: lcd.Bpp) void {
     @setCold(true);
 
     init();
@@ -71,19 +71,17 @@ pub fn initLcd(bpp: lcd.Bpp) void {
     });
 }
 
-pub fn startLcd() void {
+pub fn start_lcd() void {
     io.DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.modify(.{ .ENABLE = 1 });
     while (io.DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.read().ENABLE != 1) {}
 }
 
-pub fn stopLcd() void {
+pub fn stop_lcd() void {
     io.DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.modify(.{ .ENABLE = 0 });
     while (io.DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.read().ENABLE != 0) {}
 }
 
-pub fn initAudio() void {
-    @setCold(true);
-
+pub fn init_audio() void {
     init();
     io.DMAC.CHANNEL[CHANNEL.AUDIO].CHCTRLA.write(.{
         .SWRST = 0,
@@ -170,12 +168,12 @@ pub fn initAudio() void {
     });
 }
 
-pub fn getAudioPart() usize {
+pub fn get_audio_part() usize {
     return (desc_wb[DESC.AUDIO0].SRCADDR.read().SRCADDR - @intFromPtr(audio.sample_buffer) - 1) /
         @sizeOf(@TypeOf(audio.sample_buffer[0]));
 }
 
-pub fn ackAudio() void {
+pub fn ack_audio() void {
     io.DMAC.CHANNEL[CHANNEL.AUDIO].CHINTFLAG.write(.{
         .TERR = 0,
         .TCMPL = 1,
@@ -184,13 +182,11 @@ pub fn ackAudio() void {
     });
 }
 
-pub fn waitAudio(i: usize) void {
+pub fn wait_audio(i: usize) void {
     while (@intFromBool(desc_wb[DESC.AUDIO0].SRCADDR.read().SRCADDR > @intFromPtr(&audio.buffer[1])) == i) {}
 }
 
 fn init() void {
-    @setCold(true);
-
     if (initialized) return;
     io.MCLK.AHBMASK.modify(.{ .DMAC_ = 1 });
     io.DMAC.CTRL.write(.{

@@ -17,33 +17,144 @@ const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
 const hal = microzig.hal;
+const clocks = hal.clocks;
+const cpu = microzig.cpu;
+const chip = microzig.chip;
+
+// direct peripheral access
+const SystemControl = chip.peripherals.SystemControl;
+const CMCC = chip.peripherals.CMCC;
+const NVMCTRL = chip.peripherals.NVMCTRL;
+const GCLK = chip.peripherals.GCLK;
+const OSCCTRL = chip.peripherals.OSCCTRL;
+
+const cart = @import("badge/cart.zig");
 
 const led_pin = board.D13;
 
 const Lcd = board.Lcd;
 const Buttons = board.Buttons;
 
-const peripherals = microzig.chip.peripherals;
-const MCLK = peripherals.MCLK;
+pub const microzig_options = .{
+    .interrupts = .{
+        .SVCall = microzig.interrupt.Handler{ .Naked = cart.svcall_handler },
+    },
+};
 
 pub fn main() !void {
-    // Initialize clocks
-    MCLK.AHBMASK.modify(.{ .USB_ = 1 });
-    MCLK.APBBMASK.modify(.{ .USB_ = 1 });
+    SystemControl.CCR.modify(.{
+        .NONBASETHRDENA = 0,
+        .USERSETMPEND = 0,
+        .UNALIGN_TRP = .{ .value = .VALUE_0 }, // TODO
+        .DIV_0_TRP = 1,
+        .BFHFNMIGN = 0,
+        .STKALIGN = .{ .value = .VALUE_1 },
+    });
+    SystemControl.SHCSR.modify(.{
+        .MEMFAULTENA = 1,
+        .BUSFAULTENA = 1,
+        .USGFAULTENA = 1,
+    });
+    SystemControl.CPACR.write(.{
+        .reserved20 = 0,
+        .CP10 = .{ .value = .FULL },
+        .CP11 = .{ .value = .FULL },
+        .padding = 0,
+    });
 
-    // Initialize pins
-    led_pin.set_dir(.out);
+    clocks.mclk.set_ahb_mask(.{ .CMCC = .enabled });
+    CMCC.CTRL.write(.{
+        .CEN = 1,
+        .padding = 0,
+    });
 
-    const period = 200000;
+    NVMCTRL.CTRLA.modify(.{ .AUTOWS = 1 });
+    clocks.gclk.reset_blocking();
+    microzig.cpu.dmb();
+
+    // init USB
+    // usb reinit mode
+    // timer init
+    // lcd init
+    // audio init
+    //
+    // MPU.RBAR
+    // MPU.RASR
+    // MPU.RBAR_A1
+    // MPU.RASR_A1
+    // MPU.RBAR_A2
+    // MPU.RASR_A2
+    // MPU.CTRL
+    //
+    // cart init
+    //  pins
+    //  bss
+    //  data
+
+    clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{
+        .divsel = .DIV1,
+        .div = 1,
+    });
+
+    clocks.gclk.enable_generator(.GCLK1, .DFLL, .{
+        .divsel = .DIV1,
+        .div = 48,
+    });
+
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_OSCCTRL_FDPLL1, .GCLK1);
+
+    OSCCTRL.DPLL[1].DPLLCTRLB.write(.{
+        .FILTER = .{ .value = .FILTER1 },
+        .WUF = 0,
+        .REFCLK = .{ .value = .GCLK },
+        .LTIME = .{ .value = .DEFAULT },
+        .LBYPASS = 0,
+        .DCOFILTER = .{ .raw = 0 },
+        .DCOEN = 0,
+        .DIV = 0,
+        .padding = 0,
+    });
+
+    const dpll1_factor = 1;
+    const dpll1_frequency = 120_000_000 * dpll1_factor;
+    comptime std.debug.assert(dpll1_frequency >= 96_000_000 and dpll1_frequency <= 200_000_000);
+    const dpll1_ratio = @divExact(dpll1_frequency * 32, 1_000_000);
+    OSCCTRL.DPLL[1].DPLLRATIO.write(.{
+        .LDR = dpll1_ratio / 32 - 1,
+        .reserved16 = 0,
+        .LDRFRAC = dpll1_ratio % 32,
+        .padding = 0,
+    });
+    while (OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().DPLLRATIO != 0) {}
+
+    OSCCTRL.DPLL[1].DPLLCTRLA.write(.{
+        .reserved1 = 0,
+        .ENABLE = 1,
+        .reserved6 = 0,
+        .RUNSTDBY = 0,
+        .ONDEMAND = 0,
+    });
+    while (OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().ENABLE != 0) {}
+    while (OSCCTRL.DPLL[1].DPLLSTATUS.read().CLKRDY == 0) {}
+
+    clocks.gclk.enable_generator(.GCLK0, .DPLL1, .{
+        .divsel = .DIV1,
+        .div = 1,
+    });
+
+    const state = clocks.get_state();
+    const freqs = clocks.Frequencies.get(state);
+    _ = freqs;
+
+    const neopixels = board.Neopixels.init(board.D8_NEOPIX);
+    neopixels.write_all(.{
+        .r = 0,
+        .g = 16,
+        .b = 0,
+    });
+
+    cart.start();
     while (true) {
-        delay_count(period);
-        led_pin.write(.high);
-        delay_count(period);
-        led_pin.write(.low);
+        cart.tick();
     }
-}
-
-fn delay_count(count: u32) void {
-    var i: u32 = 0;
-    while (i < count) : (i += 1) {}
 }

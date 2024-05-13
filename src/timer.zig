@@ -136,7 +136,7 @@ pub fn init() void {
     while (io.TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
 }
 
-pub fn startDelay(us: u32) void {
+pub fn start_delay(us: u32) void {
     io.TC0.COUNT32.COUNT.write(.{ .COUNT = us });
     while (io.TC0.COUNT32.SYNCBUSY.read().COUNT != 0) {}
     io.TC0.COUNT32.CTRLBSET.write(.{
@@ -149,16 +149,16 @@ pub fn startDelay(us: u32) void {
     while (io.TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
 }
 
-pub fn finishDelay() void {
+pub fn finish_delay() void {
     while (io.TC0.COUNT32.STATUS.read().STOP != 1) {}
 }
 
 pub fn delay(us: u32) void {
-    startDelay(us);
-    finishDelay();
+    start_delay(us);
+    finish_delay();
 }
 
-pub fn initFrameSync() void {
+pub fn init_frame_sync() void {
     io.MCLK.APBCMASK.modify(.{ .TC4_ = 1 });
     io.TC4.COUNT16.CTRLA.write(.{
         .SWRST = 0,
@@ -267,7 +267,7 @@ pub fn initFrameSync() void {
     while (io.TC4.COUNT16.SYNCBUSY.read().CTRLB != 0) {}
 }
 
-pub fn checkFrameReady() bool {
+pub fn check_frame_ready() bool {
     if (io.TC4.COUNT16.INTFLAG.read().OVF != 1) return false;
     io.TC4.COUNT16.INTFLAG.write(.{
         .OVF = 1,

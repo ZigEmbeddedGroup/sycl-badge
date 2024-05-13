@@ -7,3 +7,4 @@ pub const pins = @import("hal/pins.zig");
 pub const timer = @import("hal/timer.zig");
 pub const sercom = @import("hal/sercom.zig");
 pub const qspi = @import("hal/qspi.zig");
+pub const mpu = @import("hal/mpu.zig");

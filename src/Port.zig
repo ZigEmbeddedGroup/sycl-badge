@@ -10,28 +10,22 @@ pub const QSPI_DATA: [4]Port = .{
     .{ .group = .A, .pin = 11 },
 };
 pub const D8_NEOPIX: Port = .{ .group = .A, .pin = 15 };
-//pub const SCK: Port = .{ .group = .A, .pin = 17 };
 pub const D13: Port = .{ .group = .A, .pin = 5 };
 pub const @"D-": Port = .{ .group = .A, .pin = 24 };
 pub const @"D+": Port = .{ .group = .A, .pin = 25 };
-// PA26 not present
 pub const SPKR_EN: Port = .{ .group = .A, .pin = 23 };
-// PA28-PA29 not present
 pub const SWCLK: Port = .{ .group = .A, .pin = 30 };
 pub const SWDIO: Port = .{ .group = .A, .pin = 31 };
 
 pub const A6_VMEAS: Port = .{ .group = .A, .pin = 4 };
 pub const A7_LIGHT: Port = .{ .group = .A, .pin = 6 };
 pub const TFT_DC: Port = .{ .group = .B, .pin = 12 };
-// PB06 not connected
 pub const TFT_CS: Port = .{ .group = .B, .pin = 14 };
 pub const QSPI_SCK: Port = .{ .group = .B, .pin = 10 };
 pub const QSPI_CS: Port = .{ .group = .B, .pin = 11 };
-// PB12 not connected
 pub const TFT_SCK: Port = .{ .group = .B, .pin = 13 };
 pub const TFT_MOSI: Port = .{ .group = .B, .pin = 15 };
-// PB18-PB21 not present
-// PB24-PB29 not present
+
 pub const BUTTON_SELECT: Port = .{ .group = .B, .pin = 0 };
 pub const BUTTON_START: Port = .{ .group = .B, .pin = 1 };
 pub const BUTTON_A: Port = .{ .group = .B, .pin = 2 };
@@ -49,27 +43,27 @@ pub const Group = enum { A, B };
 pub const Direction = enum { in, out };
 pub const Level = enum(u1) { low, high };
 
-pub inline fn setDir(port: Port, dir: Direction) void {
+pub inline fn set_dir(port: Port, dir: Direction) void {
     switch (dir) {
-        .in => port.groupPtr().DIRCLR.write(.{ .DIRCLR = @as(u32, 1) << port.pin }),
-        .out => port.groupPtr().DIRSET.write(.{ .DIRSET = @as(u32, 1) << port.pin }),
+        .in => port.group_ptr().DIRCLR.write(.{ .DIRCLR = @as(u32, 1) << port.pin }),
+        .out => port.group_ptr().DIRSET.write(.{ .DIRSET = @as(u32, 1) << port.pin }),
     }
 }
 
 pub inline fn write(port: Port, level: Level) void {
     switch (level) {
-        .low => port.groupPtr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
-        .high => port.groupPtr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
+        .low => port.group_ptr().OUTCLR.write(.{ .OUTCLR = @as(u32, 1) << port.pin }),
+        .high => port.group_ptr().OUTSET.write(.{ .OUTSET = @as(u32, 1) << port.pin }),
     }
 }
 
 pub inline fn read(port: Port) Level {
-    return @enumFromInt(port.groupPtr().IN.read().IN >> port.pin & 1);
+    return @enumFromInt(port.group_ptr().IN.read().IN >> port.pin & 1);
 }
 
 pub const Mux = enum(u4) { A, B, C, D, E, F, G, H, I, J, K, L, M, N };
-pub inline fn setMux(port: Port, mux: Mux) void {
-    const pmux = &port.groupPtr().PMUX[port.pin / 2];
+pub inline fn set_mux(port: Port, mux: Mux) void {
+    const pmux = &port.group_ptr().PMUX[port.pin / 2];
     switch (@as(u1, @truncate(port.pin))) {
         0 => pmux.modify(.{ .PMUXE = .{
             .value = @as(io_types.PORT.PORT_PMUX__PMUXE, @enumFromInt(@intFromEnum(mux))),
@@ -78,15 +72,15 @@ pub inline fn setMux(port: Port, mux: Mux) void {
             .value = @as(io_types.PORT.PORT_PMUX__PMUXO, @enumFromInt(@intFromEnum(mux))),
         } }),
     }
-    port.configPtr().modify(.{ .PMUXEN = 1 });
+    port.config_ptr().modify(.{ .PMUXEN = 1 });
 }
 
 const PinCfg = @typeInfo(std.meta.FieldType(io_types.PORT.GROUP, .PINCFG)).Array.child;
-pub inline fn configPtr(port: Port) *volatile PinCfg {
-    return &port.groupPtr().PINCFG[port.pin];
+pub inline fn config_ptr(port: Port) *volatile PinCfg {
+    return &port.group_ptr().PINCFG[port.pin];
 }
 
-fn groupPtr(port: Port) *volatile io_types.PORT.GROUP {
+fn group_ptr(port: Port) *volatile io_types.PORT.GROUP {
     return &io.PORT.GROUP[@intFromEnum(port.group)];
 }
 

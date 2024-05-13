@@ -1,20 +1,18 @@
 pub fn init() void {
     @setCold(true);
-    Port.BUTTON_SELECT.setDir(.in);
-    Port.BUTTON_START.setDir(.in);
-    Port.BUTTON_A.setDir(.in);
-    Port.BUTTON_B.setDir(.in);
-    Port.BUTTON_UP.setDir(.in);
-    Port.BUTTON_DOWN.setDir(.in);
-    Port.BUTTON_PRESS.setDir(.in);
-    Port.BUTTON_RIGHT.setDir(.in);
-    Port.BUTTON_LEFT.setDir(.in);
+    Port.BUTTON_SELECT.set_dir(.in);
+    Port.BUTTON_START.set_dir(.in);
+    Port.BUTTON_A.set_dir(.in);
+    Port.BUTTON_B.set_dir(.in);
+    Port.BUTTON_UP.set_dir(.in);
+    Port.BUTTON_DOWN.set_dir(.in);
+    Port.BUTTON_PRESS.set_dir(.in);
+    Port.BUTTON_RIGHT.set_dir(.in);
+    Port.BUTTON_LEFT.set_dir(.in);
 
-    timer.initFrameSync();
+    timer.init_frame_sync();
 
     @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
-
-    if (!options.have_cart) return;
 
     // fill .bss with zeroes
     {
@@ -37,16 +35,11 @@ pub fn init() void {
 }
 
 pub fn start() void {
-    call(if (options.have_cart) &libcart.start else &struct {
-        fn start() callconv(.C) void {
-            const w4 = @import("wasm4.zig");
-            w4.trace("start");
-        }
-    }.start);
+    call(&libcart.start);
 }
 
 pub fn tick() void {
-    if (!timer.checkFrameReady()) return;
+    if (!timer.check_frame_ready()) return;
 
     {
         GAMEPAD1.* = ((@as(u8, 1) & @intFromEnum(Port.BUTTON_SELECT.read())) << 0 |
@@ -61,57 +54,7 @@ pub fn tick() void {
         );
     }
     if (SYSTEM_FLAGS.* & SYSTEM_PRESERVE_FRAMEBUFFER == 0) @memset(FRAMEBUFFER, 0b00_00_00_00);
-    call(if (options.have_cart) &libcart.update else &struct {
-        fn update() callconv(.C) void {
-            const w4 = @import("wasm4.zig");
-            const global = struct {
-                var tick: u8 = 0;
-                var stroke: bool = true;
-                var radius: u32 = 0;
-                var note: usize = 0;
-            };
-            w4.PALETTE[0] = 0x000000;
-            w4.PALETTE[1] = 0xFF0000;
-            w4.PALETTE[2] = 0xFFFFFF;
-            w4.DRAW_COLORS.* = if (global.stroke) 0x0032 else 0x0002;
-            w4.oval(
-                @as(i32, lcd.width / 2) -| @min(global.radius, std.math.maxInt(i32)),
-                @as(i32, lcd.height / 2) -| @min(global.radius, std.math.maxInt(i32)),
-                global.radius * 2,
-                global.radius * 2,
-            );
-            w4.DRAW_COLORS.* = 0x0003;
-            for (0..8) |button| {
-                if (w4.GAMEPAD1.* & @as(u8, 1) << @intCast(button) != 0) {
-                    w4.text(
-                        &.{0x80 + @as(u8, @intCast(button))},
-                        20 + @as(u8, @intCast(button)) * 16,
-                        60,
-                    );
-                }
-            }
-            global.tick += 1;
-            if (global.tick == 10) {
-                global.tick = 0;
-                global.stroke = !global.stroke;
-                if (global.stroke) {
-                    global.radius += 1;
-                    if (global.radius == 100) {
-                        global.radius = 0;
-                    }
-                }
-
-                w4.tone(([_]u16{
-                    880, 831, 784, 740, 698, 659, 622, 587, 554, 523, 494, 466,
-                    440, 415, 392, 370, 349, 330, 311, 294, 277, 262, 247, 233,
-                    220, 207, 196, 185, 175, 165, 156, 147, 139, 131, 123, 117,
-                    110,
-                })[global.note], 10, 50, w4.TONE_PULSE1);
-                global.note += 1;
-                if (global.note == 37) global.note = 0;
-            }
-        }
-    }.update);
+    call(&libcart.update);
     var x: u8 = 0;
     var y: u8 = 0;
     for (FRAMEBUFFER[0 .. lcd.width * lcd.height * 2 / 8]) |byte| {
@@ -140,7 +83,7 @@ pub fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struc
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u1 = @truncate(sprite[sprite_index >> 3].load() >>
                     (7 - @as(u3, @truncate(sprite_index))));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -152,7 +95,7 @@ pub fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struc
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u2 = @truncate(sprite[sprite_index >> 2].load() >>
                     (6 - (@as(u3, @as(u2, @truncate(sprite_index))) << 1)));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -190,14 +133,14 @@ pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
                 hline(mid_x -| cur_y, mid_y -| cur_x, cur_y << 1);
                 hline(mid_x -| cur_y, mid_y +| cur_x, cur_y << 1);
                 if (stroke_palette_index) |palette_index| {
-                    clipDrawPalette(mid_x -| cur_x, mid_y -| cur_y, palette_index);
-                    clipDrawPalette(mid_x +| cur_x, mid_y -| cur_y, palette_index);
-                    clipDrawPalette(mid_x -| cur_y, mid_y -| cur_x, palette_index);
-                    clipDrawPalette(mid_x +| cur_y, mid_y -| cur_x, palette_index);
-                    clipDrawPalette(mid_x -| cur_y, mid_y +| cur_x, palette_index);
-                    clipDrawPalette(mid_x +| cur_y, mid_y +| cur_x, palette_index);
-                    clipDrawPalette(mid_x -| cur_x, mid_y +| cur_y, palette_index);
-                    clipDrawPalette(mid_x +| cur_x, mid_y +| cur_y, palette_index);
+                    clip_draw_palette(mid_x -| cur_x, mid_y -| cur_y, palette_index);
+                    clip_draw_palette(mid_x +| cur_x, mid_y -| cur_y, palette_index);
+                    clip_draw_palette(mid_x -| cur_y, mid_y -| cur_x, palette_index);
+                    clip_draw_palette(mid_x +| cur_y, mid_y -| cur_x, palette_index);
+                    clip_draw_palette(mid_x -| cur_y, mid_y +| cur_x, palette_index);
+                    clip_draw_palette(mid_x +| cur_y, mid_y +| cur_x, palette_index);
+                    clip_draw_palette(mid_x -| cur_x, mid_y +| cur_y, palette_index);
+                    clip_draw_palette(mid_x +| cur_x, mid_y +| cur_y, palette_index);
                 }
                 cur_x += 1;
                 err += cur_x;
@@ -233,7 +176,7 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     if (stroke_palette_index) |palette_index| {
         if (y >= 0 and y < SCREEN_SIZE) {
             for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-                drawPalette(@intCast(cur_x), @intCast(y), palette_index);
+                draw_palette(@intCast(cur_x), @intCast(y), palette_index);
             }
         }
     }
@@ -241,19 +184,19 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
         for (@max(y + 1, 0)..@intCast(@min(end_y - 1, SCREEN_SIZE))) |cur_y| {
             if (stroke_palette_index) |palette_index| {
                 if (x >= 0 and x < SCREEN_SIZE) {
-                    drawPalette(@intCast(x), @intCast(cur_y), palette_index);
+                    draw_palette(@intCast(x), @intCast(cur_y), palette_index);
                 }
             }
             if (fill_palette_index) |palette_index| {
                 if (width > 2) {
                     for (@max(x + 1, 0)..@intCast(@min(end_x - 1, SCREEN_SIZE))) |cur_x| {
-                        drawPalette(@intCast(cur_x), @intCast(cur_y), palette_index);
+                        draw_palette(@intCast(cur_x), @intCast(cur_y), palette_index);
                     }
                 }
             }
             if (stroke_palette_index) |palette_index| {
                 if (width > 1 and end_x - 1 >= 0 and end_x - 1 < SCREEN_SIZE) {
-                    drawPalette(@intCast(end_x - 1), @intCast(cur_y), palette_index);
+                    draw_palette(@intCast(end_x - 1), @intCast(cur_y), palette_index);
                 }
             }
         }
@@ -261,7 +204,7 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     if (stroke_palette_index) |palette_index| {
         if (height > 1 and end_y - 1 >= 0 and end_y - 1 < SCREEN_SIZE) {
             for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-                drawPalette(@intCast(cur_x), @intCast(end_y - 1), palette_index);
+                draw_palette(@intCast(cur_x), @intCast(end_y - 1), palette_index);
             }
         }
     }
@@ -278,7 +221,7 @@ pub fn text(str: [*]const User(u8), len: usize, x: i32, y: i32) callconv(.C) voi
         },
         ' '...0xFF => |char| {
             const glyph = &font[char - ' '];
-            blitUnsafe(glyph, cur_x, cur_y, 8, 8, BLIT_1BPP);
+            blit_unsafe(glyph, cur_x, cur_y, 8, 8, BLIT_1BPP);
             cur_x +|= 8;
         },
     };
@@ -294,7 +237,7 @@ pub fn vline(x: i32, y: i32, len: u32) callconv(.C) void {
     const palette_index: u2 = @truncate(draw_color - 1);
 
     for (@max(y, 0)..@intCast(@min(end_y, SCREEN_SIZE))) |cur_y| {
-        drawPalette(@intCast(x), @intCast(cur_y), palette_index);
+        draw_palette(@intCast(x), @intCast(cur_y), palette_index);
     }
 }
 
@@ -308,7 +251,7 @@ pub fn hline(x: i32, y: i32, len: u32) callconv(.C) void {
     const palette_index: u2 = @truncate(draw_color - 1);
 
     for (@max(x, 0)..@intCast(@min(end_x, SCREEN_SIZE))) |cur_x| {
-        drawPalette(@intCast(cur_x), @intCast(y), palette_index);
+        draw_palette(@intCast(cur_x), @intCast(y), palette_index);
     }
 }
 
@@ -392,11 +335,11 @@ pub fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) callconv(.C)
         },
     }
 
-    audio.setChannel(@intFromEnum(channel), state);
+    audio.set_channel(@intFromEnum(channel), state);
 }
 
 pub fn trace(str: [*]const User(u8), len: usize) callconv(.C) void {
-    std.log.scoped(.trace).info("{}", .{fmtUserString(str[0..len])});
+    std.log.scoped(.trace).info("{}", .{fmt_user_string(str[0..len])});
 }
 
 fn call(func: *const fn () callconv(.C) void) void {
@@ -406,7 +349,7 @@ fn call(func: *const fn () callconv(.C) void) void {
     ) ..][0..@divExact(utils.HSRAM.SIZE, 3 * 4)];
     const frame = comptime std.mem.bytesAsSlice(u32, process_stack[process_stack.len - 0x20 ..]);
     @memset(frame[0..5], 0);
-    frame[5] = @intFromPtr(&libcart.__return_thunk__);
+    frame[5] = @intFromPtr(&__return_thunk__);
     frame[6] = @intFromPtr(func);
     frame[7] = 1 << 24;
     asm volatile (
@@ -418,14 +361,14 @@ fn call(func: *const fn () callconv(.C) void) void {
     );
 }
 
-fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: u32) void {
+fn blit_unsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flags: u32) void {
     switch (flags) {
         BLIT_1BPP => for (0..height) |sprite_y| {
             for (0..width) |sprite_x| {
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u1 = @truncate(sprite[sprite_index >> 3] >>
                     (7 - @as(u3, @truncate(sprite_index))));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -437,7 +380,7 @@ fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flag
                 const sprite_index = sprite_x + width * sprite_y;
                 const draw_color_index: u2 = @truncate(sprite[sprite_index >> 2] >>
                     (6 - (@as(u3, @as(u2, @truncate(sprite_index))) << 1)));
-                clipDraw(
+                clip_draw(
                     x +| @min(sprite_x, std.math.maxInt(i32)),
                     y +| @min(sprite_y, std.math.maxInt(i32)),
                     draw_color_index,
@@ -448,24 +391,24 @@ fn blitUnsafe(sprite: [*]const u8, x: i32, y: i32, width: u32, height: u32, flag
     }
 }
 
-inline fn clipDraw(x: i32, y: i32, draw_color_index: u2) void {
+inline fn clip_draw(x: i32, y: i32, draw_color_index: u2) void {
     if (x < 0 or x >= SCREEN_SIZE or y < 0 or y >= SCREEN_SIZE) return;
     draw(@intCast(x), @intCast(y), draw_color_index);
 }
 
-inline fn clipDrawPalette(x: i32, y: i32, palette_index: u2) void {
+inline fn clip_draw_palette(x: i32, y: i32, palette_index: u2) void {
     if (x < 0 or x >= SCREEN_SIZE or y < 0 or y >= SCREEN_SIZE) return;
-    drawPalette(@intCast(x), @intCast(y), palette_index);
+    draw_palette(@intCast(x), @intCast(y), palette_index);
 }
 
 inline fn draw(x: u8, y: u8, draw_color_index: u2) void {
     const draw_color: u4 = @truncate(DRAW_COLORS.* >> (@as(u4, draw_color_index) << 2));
     if (draw_color == 0) return;
     const palette_index: u2 = @truncate(draw_color - 1);
-    drawPalette(x, y, palette_index);
+    draw_palette(x, y, palette_index);
 }
 
-inline fn drawPalette(x: u8, y: u8, palette_index: u2) void {
+inline fn draw_palette(x: u8, y: u8, palette_index: u2) void {
     std.debug.assert(x < SCREEN_SIZE and y < SCREEN_SIZE);
     const buffer_index = x + SCREEN_SIZE * y;
     const shift = @as(u3, @as(u2, @truncate(buffer_index))) << 1;
@@ -473,10 +416,10 @@ inline fn drawPalette(x: u8, y: u8, palette_index: u2) void {
     byte.* = (byte.* & ~(@as(u8, 0b11) << shift)) | @as(u8, palette_index) << shift;
 }
 
-fn formatUserString(bytes: []const User(u8), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+fn format_user_string(bytes: []const User(u8), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
     for (bytes) |*byte| try writer.writeByte(byte.load());
 }
-inline fn fmtUserString(bytes: []const User(u8)) std.fmt.Formatter(formatUserString) {
+inline fn fmt_user_string(bytes: []const User(u8)) std.fmt.Formatter(format_user_string) {
     return .{ .data = bytes };
 }
 
@@ -518,12 +461,12 @@ const libcart = struct {
 
     extern fn start() void;
     extern fn update() void;
-    extern fn __return_thunk__() noreturn;
-
-    comptime {
-        if (!options.have_cart) _ = @import("wasm4.zig").__return_thunk__;
-    }
 };
+
+export fn __return_thunk__() noreturn {
+    asm volatile (" svc #12");
+    unreachable;
+}
 
 pub const SCREEN_SIZE: u32 = 160;
 
@@ -2580,7 +2523,6 @@ const font: [0x100 - ' '][8]u8 = .{ .{
 
 const audio = @import("audio.zig");
 const lcd = @import("lcd.zig");
-const options = @import("options");
 const Port = @import("Port.zig");
 const std = @import("std");
 const timer = @import("timer.zig");

@@ -26,7 +26,7 @@ fn sycl_badge_microzig_target(d: *Build.Dependency) MicroZig.Target {
 }
 
 pub fn build(b: *Build) void {
-    const mz = MicroZig.init(b, .{});
+    //const mz = MicroZig.init(b, .{});
     const optimize = b.standardOptimizeOption(.{});
 
     const ws_dep = b.dependency("ws", .{});
@@ -71,39 +71,34 @@ pub fn build(b: *Build) void {
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
 
-    const badge = mz.add_firmware(b, .{
-        .name = "badge",
-        .target = sycl_badge_microzig_target(&dep),
-        .optimize = .ReleaseSmall,
-        .root_source_file = .{ .path = "src/badge.zig" },
-    });
-    mz.install_firmware(b, badge, .{});
+    //const badge = mz.add_firmware(b, .{
+    //    .name = "badge",
+    //    .target = sycl_badge_microzig_target(&dep),
+    //    .optimize = optimize,
+    //    .root_source_file = .{ .path = "src/badge.zig" },
+    //});
+    //mz.install_firmware(b, badge, .{});
 
     inline for (.{
-        "blinky",
-        "blinky_timer",
-        "usb_cdc",
-        "usb_storage",
-        "buttons",
+        //"blinky",
+        //"blinky_timer",
+        //"usb_cdc",
+        //"usb_storage",
+        //"buttons",
         //"lcd",
-        "audio",
-        "light_sensor",
+        //"audio",
+        //"light_sensor",
         "neopixels",
-        "qspi",
-        "qa",
-        "clocks",
+        //"qspi",
+        //"qa",
+        //"clocks",
     }) |name| {
-        const mvp = mz.add_firmware(b, .{
+        const mvp = add_cart(&dep, b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
-            .target = sycl_badge_microzig_target(&dep),
             .optimize = optimize,
             .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
         });
-
-        mz.install_firmware(b, mvp, .{});
-        mz.install_firmware(b, mvp, .{
-            .format = .{ .uf2 = .SAMD51 },
-        });
+        mvp.install(b);
     }
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -141,6 +136,7 @@ pub const Cart = struct {
     options: CartOptions,
 
     pub fn install(c: *const Cart, b: *Build) void {
+        c.mz.install_firmware(b, c.fw, .{ .format = .elf });
         c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         b.installArtifact(c.wasm);
     }
@@ -219,21 +215,16 @@ pub fn add_cart(
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
     cart_lib.linker_script = d.path("src/cart.ld");
 
-    const fw_options = b.addOptions();
-    fw_options.addOption(bool, "have_cart", true);
-
     const mz = MicroZig.init(d.builder, .{});
 
     const fw = mz.add_firmware(d.builder, .{
         .name = options.name,
         .target = sycl_badge_microzig_target(d),
         .optimize = options.optimize,
-        .root_source_file = d.path("src/main.zig"),
+        .root_source_file = d.path("src/badge.zig"),
         .linker_script = d.path("src/cart.ld"),
     });
     fw.artifact.linkLibrary(cart_lib);
-    fw.artifact.step.dependOn(&fw_options.step);
-    fw.modules.app.addOptions("options", fw_options);
 
     const cart: *Cart = b.allocator.create(Cart) catch @panic("OOM");
     cart.* = .{

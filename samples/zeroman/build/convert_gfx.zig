@@ -75,8 +75,8 @@ fn convert(args: ConvertFile, writer: std.fs.File.Writer) !void {
         const name = std.fs.path.stem(args.path);
         try writer.print("pub const {s} = struct {{\n", .{name});
 
-        try writer.print("    pub const w = {};\n", .{image.width});
-        try writer.print("    pub const h = {};\n", .{image.height});
+        try writer.print("    pub const width = {};\n", .{image.width});
+        try writer.print("    pub const height = {};\n", .{image.height});
 
         try writer.writeAll("    pub const colors = [_]DisplayColor{\n");
         for (colors.items) |c| {

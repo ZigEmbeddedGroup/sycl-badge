@@ -1,6 +1,10 @@
 # Introduction
 
-This guide will help you get up and running with the badge and fittingly help introduce you to other attendees.
+This is a small example that shows how to use the badge as an actual badge with a little game as a bonus.
+
+## What's Inside
+
+See `src/hello.zig` and tweak the the values to your liking.
 
 ## Running
 

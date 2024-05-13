@@ -18,26 +18,21 @@ const microzig = @import("microzig");
 const board = microzig.board;
 const hal = microzig.hal;
 
+const led_pin = board.D13;
+
 const Lcd = board.Lcd;
 const Buttons = board.Buttons;
-const Neopixels = board.D8_NEOPIX
 
 const peripherals = microzig.chip.peripherals;
 const MCLK = peripherals.MCLK;
 
 pub fn main() !void {
-    const clock_config = 
     // Initialize clocks
     MCLK.AHBMASK.modify(.{ .USB_ = 1 });
     MCLK.APBBMASK.modify(.{ .USB_ = 1 });
 
     // Initialize pins
     led_pin.set_dir(.out);
-    backlight.set_dir(.out);
-    @"D+".set_mux(.H);
-    @"D-".set_mux(.H);
-
-    backlight.write(.low);
 
     const period = 200000;
     while (true) {

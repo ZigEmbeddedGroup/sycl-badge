@@ -12,19 +12,7 @@
 const hal = @import("microzig").hal;
 const port = hal.port;
 
-pub const pin_config = hal.pins.create_config(.{
-    .{ .name = "tft_rst", .port = "PA0", .mode = .output },
-    .{ .name = "tft_lite", .port = "PA1", .mode = .output },
-    .{ .name = "audio", .port = "PA2", .mode = .dac },
-    .{ .name = "battery_level", .port = "PA2", .mode = .adc },
-    .{ .name = "led", .port = "PA5" },
-    .{ .name = "light_sensor", .port = "PA6" },
-    .{ .name = "neopixels", .port = "PA15" },
-    .{ .name = "spkr_en", .port = "PA23" },
-    .{ .name = "D-", .port = "PA24" },
-    .{ .name = "D+", .port = "PA25" },
-    // TODO: rest
-});
+pub const Neopixels = @import("board/neopixel.zig").Group(5);
 
 pub const TFT_RST = port.pin(.a, 0);
 pub const TFT_LITE = port.pin(.a, 1);

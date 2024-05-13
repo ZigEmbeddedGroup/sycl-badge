@@ -72,8 +72,8 @@ export class Framebuffer {
         const startY = Math.max(0, y);
         const endXUnclamped = x + width;
         const endYUnclamped = y + height;
-        const endX = Math.min(endXUnclamped, WIDTH);
-        const endY = Math.min(endYUnclamped, HEIGHT);
+        const endX = Math.max(0, Math.min(endXUnclamped, WIDTH));
+        const endY = Math.max(0, Math.min(endYUnclamped, HEIGHT));
 
         if (fillColor !== OPTIONAL_COLOR_NONE) {
             for (let yy = startY; yy < endY; ++yy) {

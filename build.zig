@@ -10,18 +10,20 @@ pub const py_badge: MicroZig.Target = .{
     .hal = null,
 };
 
-pub const sycl_badge = MicroZig.Target{
-    .preferred_format = .elf,
-    .chip = atsam.chips.atsamd51j19.chip,
-    .hal = .{
-        .root_source_file = .{ .cwd_relative = "src/hal.zig" },
-    },
-    .board = .{
-        .name = "SYCL Badge Rev A",
-        .root_source_file = .{ .cwd_relative = "src/board.zig" },
-    },
-    .linker_script = .{ .cwd_relative = "src/badge/samd51j19a_self.ld" },
-};
+fn sycl_badge_microzig_target(d: *Build.Dependency) MicroZig.Target {
+    return .{
+        .preferred_format = .elf,
+        .chip = atsam.chips.atsamd51j19.chip,
+        .hal = .{
+            .root_source_file = d.path("src/hal.zig"),
+        },
+        .board = .{
+            .name = "SYCL Badge Rev A",
+            .root_source_file = d.path("src/board.zig"),
+        },
+        .linker_script = d.path("src/badge/samd51j19a_self.ld"),
+    };
+}
 
 pub fn build(b: *Build) void {
     const mz = MicroZig.init(b, .{});
@@ -71,7 +73,7 @@ pub fn build(b: *Build) void {
 
     const badge = mz.add_firmware(b, .{
         .name = "badge",
-        .target = sycl_badge,
+        .target = sycl_badge_microzig_target(&dep),
         .optimize = .ReleaseSmall,
         .root_source_file = .{ .path = "src/badge.zig" },
     });
@@ -92,7 +94,7 @@ pub fn build(b: *Build) void {
     }) |name| {
         const mvp = mz.add_firmware(b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
-            .target = sycl_badge,
+            .target = sycl_badge_microzig_target(&dep),
             .optimize = optimize,
             .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
         });
@@ -152,6 +154,7 @@ pub const Cart = struct {
         // watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot(std.fs.path.dirname(options.root_source_file) orelse ""), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
         watch_run.addArgs(&.{ "serve", b.graph.zig_exe });
         if (opt.watch_dirs) |dirs| {
+            if (dirs.len == 0) @panic("watch input directories should either be empty or null");
             for (dirs) |dir| {
                 watch_run.addArgs(&.{ "--input-dir", dir });
             }
@@ -199,7 +202,7 @@ pub fn add_cart(
     wasm.root_module.addImport("cart-api", d.module("cart-api"));
 
     const sycl_badge_target =
-        b.resolveTargetQuery(sycl_badge.chip.cpu.target);
+        b.resolveTargetQuery(sycl_badge_microzig_target(d).chip.cpu.target);
 
     const cart_lib = b.addStaticLibrary(.{
         .name = "cart",
@@ -212,7 +215,7 @@ pub fn add_cart(
         .use_lld = true,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
-    cart_lib.linker_script = .{ .path = "src/cart.ld" };
+    cart_lib.linker_script = d.path("src/cart.ld");
 
     const fw_options = b.addOptions();
     fw_options.addOption(bool, "have_cart", true);
@@ -221,10 +224,10 @@ pub fn add_cart(
 
     const fw = mz.add_firmware(d.builder, .{
         .name = options.name,
-        .target = sycl_badge,
+        .target = sycl_badge_microzig_target(d),
         .optimize = options.optimize,
-        .root_source_file = .{ .path = "src/main.zig" },
-        .linker_script = .{ .path = "src/cart.ld" },
+        .root_source_file = d.path("src/main.zig"),
+        .linker_script = d.path("src/cart.ld"),
     });
     fw.artifact.linkLibrary(cart_lib);
     fw.artifact.step.dependOn(&fw_options.step);

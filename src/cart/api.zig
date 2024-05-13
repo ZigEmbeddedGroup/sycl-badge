@@ -10,6 +10,9 @@ const builtin = @import("builtin");
 pub const screen_width: u32 = 160;
 pub const screen_height: u32 = 128;
 
+pub const font_width: u32 = 8;
+pub const font_height: u32 = 8;
+
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Memory Addresses                                                          │
@@ -63,6 +66,7 @@ pub const Controls = packed struct(u9) {
 };
 
 pub const controls: *const Controls = @ptrFromInt(base + 0x04);
+/// 0-4095
 pub const light_level: *const u12 = @ptrFromInt(base + 0x06);
 /// 5 24-bit color LEDs
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);

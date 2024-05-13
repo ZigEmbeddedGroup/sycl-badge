@@ -15,7 +15,6 @@ fn read_stored_number() u64 {
 
 fn write_stored_number(number: u64) void {
     var page: [cart.flash_page_size]u8 = undefined;
-    // @as(*u64, @alignCast(@ptrCast(page[0..8]))).* = number;
     std.mem.bytesAsSlice(u64, &page)[0] = number;
     cart.write_flash_page(0, page);
 }
@@ -39,7 +38,8 @@ export fn update() void {
     var inputs_buf: [128]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&inputs_buf);
 
-    fbs.writer().print("{d}\n", .{read_stored_number()}) catch unreachable;
+    // ENABLE AT YOUR OWN RISK
+    // fbs.writer().print("{d}\n", .{read_stored_number()}) catch unreachable;
 
     inline for (std.meta.fields(cart.Controls)) |control| {
         if (comptime !std.mem.eql(u8, control.name, "padding")) {

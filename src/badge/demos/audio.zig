@@ -1,7 +1,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
-const gclk = hal.gclk;
+const gclk = hal.clocks.gclk;
 const timer = hal.timer;
 
 const spkr_en_pin = microzig.board.SPKR_EN;

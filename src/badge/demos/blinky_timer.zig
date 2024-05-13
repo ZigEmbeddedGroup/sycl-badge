@@ -2,7 +2,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const timer = hal.timer;
-const gclk = hal.gclk;
+const gclk = hal.clocks.gclk;
 
 const led_pin = microzig.board.D13;
 

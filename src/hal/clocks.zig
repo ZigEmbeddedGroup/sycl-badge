@@ -69,64 +69,317 @@
 //! state, except for peripheral channels and associated generators who are
 //! locked.
 //!
+const std = @import("std");
 const microzig = @import("microzig");
-const peripherals = microzig.chip.peripherals;
-const GCLK = peripherals.GCLK;
+const OSCCTRL = microzig.chip.peripherals.OSCCTRL;
+const OSC32KCTRL = microzig.chip.peripherals.OSC32KCTRL;
 
-/// Index into the PCHCTRL[m] array
-pub const PeripheralIndex = enum(u5) {
-    GCLK_OSCCTRL_DFLL48 = 0,
-    GCLK_OSCCTRL_FDPLL0 = 1,
-    GCLK_OSCCTRL_FDPLL1 = 2,
-    // TODO:
-    //3 GCLK_OSCCTRL_FDPLL0_32K GCLK_OSCCTRL_FDPLL1_32K GCLK_SDHC0_SLOW GCLK_SDHC1_SLOW GCLK_SERCOM[0..7]_SLOW
-    //FDPLL0 32KHz clock for internal lock timer FDPLL1 32KHz clock for internal lock timer SDHC0 Slow
-    //SDHC1 Slow
-    //SERCOM[0..7] Slow
-    GCLK_EIC = 4,
-    GCLK_FREQM_MSR = 5,
-    GCLK_FREQM_REF = 6,
-    GCLK_SERCOM0_CORE = 7,
-    GCLK_SERCOM1_CORE = 8,
-    GCLK_TC0_TC1 = 9,
-    GCLK_USB = 10,
-    // TODO:
-    //22:11 GCLK_EVSYS[0..11] EVSYS[0..11]
-    GCLK_SERCOM2_CORE = 23,
-    GCLK_SERCOM3_CORE = 24,
-    GCLK_TCC0_TCC1 = 25,
-    GCLK_TC2_TC3 = 26,
-    GCLK_CAN0 = 27,
-    GCLK_CAN1 = 28,
-    GCLK_TCC2_TCC3 = 29,
-    GCLK_TC4_TC5 = 30,
-    GCLK_PDEC = 31,
-    GCLK_AC = 32,
-    GCLK_CCL = 33,
-    GCLK_SERCOM4_CORE = 34,
-    GCLK_SERCOM5_CORE = 35,
-    GCLK_SERCOM6_CORE = 36,
-    GCLK_SERCOM7_CORE = 37,
-    GCLK_TCC4 = 38,
-    GCLK_TC6_TC7 = 39,
-    GCLK_ADC0 = 40,
-    GCLK_ADC1 = 41,
-    GCLK_DAC = 42,
-    GCLK_I2S = 43, // TODO: and 44?
-    GCLK_SDHC0 = 45,
-    GCLK_SDHC1 = 46,
-    GCLK_CM4_TRACE = 47,
+pub const mclk = @import("clocks/mclk.zig");
+pub const gclk = @import("clocks/gclk.zig");
+
+pub const State = struct {
+    oscillators_controller: struct {
+        /// 48 MHz output
+        frequency_locked_loop: struct {
+            enabled: bool,
+            on_demand_enabled: bool,
+            operating_mode: enum {
+                open_loop,
+                closed_loop,
+            },
+            // TODO: other info that I'm not sure is interesting
+        },
+        xosc: [2]Xosc,
+        /// 96 - 200 MHz
+        ///
+        /// 32kHz - 3.2MHz
+        phase_locked_loop: [2]PhaseLockedLoop,
+        rtc: struct {
+            clock_selection: microzig.chip.types.peripherals.OSC32KCTRL.OSC32KCTRL_RTCCTRL__RTCSEL,
+        },
+        xosc32k: struct {
+            enabled: bool,
+            crystal_oscillator_enabled: bool,
+            on_demand_enabled: bool,
+            enabled_32khz: bool,
+            enabled_1khz: bool,
+        },
+        /// Ultra Low-Power Internal Oscillator
+        osculp32k: struct {
+            enabled_32khz: bool,
+            enabled_1khz: bool,
+        },
+    },
+    generic_clock_controller: struct {
+        generators: [12]Generator,
+        peripherals: Peripherals,
+    },
+    main_clock_controller: struct {
+        hsdiv: mclk.HsDiv,
+        cpudiv: mclk.CpuDiv,
+        ahb_mask: mclk.AhbMask,
+        apb_mask: mclk.ApbMask,
+    },
+
+    pub const Generator = struct {
+        enabled: bool,
+        source: gclk.Source,
+        div: u16,
+        div_selection: gclk.DivSelection,
+        output_enable: bool,
+        output_off_value: enum {
+            low,
+            high,
+        },
+        improve_duty_cycle: enum {
+            not_balanced,
+            balanced_50_50,
+        },
+
+        pub fn get_div(generator: Generator) u32 {
+            return switch (generator.div_selection) {
+                .DIV1 => generator.div,
+                .DIV2 => std.math.pow(2, generator.div + 1),
+            };
+        }
+
+        pub fn get_output_freq_hz(generator: Generator) u32 {
+            return switch (generator.source) {
+                .XOSC0, .XOSC1 => @panic("TODO"),
+                .GCLKIN => @panic("TODO"),
+                .GCLKGEN1 => blk: {
+                    const gen1 = get_generator(1);
+                    break :blk gen1.get_output_freq_hz();
+                },
+                .OSCULP32K => @panic("TODO"),
+                .XOSC32K => @panic("TODO"),
+                .DFLL => 48_000_000,
+                .DPLL0, .DPLL1 => blk: {
+                    const index: u32 = switch (generator.source) {
+                        .DPLL0 => 0,
+                        .DPLL1 => 1,
+                        else => unreachable,
+                    };
+
+                    const pll = get_phase_locked_loop(index);
+                    break :blk pll.get_output_freq_hz();
+                },
+            } / generator.get_div();
+        }
+    };
+
+    pub const Xosc = struct {
+        enabled: bool,
+        on_demand_enabled: bool,
+        crystal_oscillator_enabled: bool,
+        switch_back_enabled: bool,
+        clock_failure_detector_enabled: bool,
+        automatic_control_loop_enabled: bool,
+        low_buffer_gain_enabled: bool,
+    };
+
+    pub const PhaseLockedLoop = struct {
+        enabled: bool,
+        on_demand_enabled: bool,
+        frac: u5,
+        ratio: u13,
+        div: u11,
+        ref_clk: microzig.chip.types.peripherals.OSCCTRL.OSCCTRL_DPLLCTRLB__REFCLK,
+
+        pub fn get_output_freq_hz(pll: PhaseLockedLoop) u32 {
+            if (!pll.enabled)
+                @panic("PLL not enabled");
+        }
+    };
+
+    pub const Peripheral = struct {
+        channel_enable: bool,
+        write_locked: bool,
+        generator: gclk.Generator,
+    };
+    pub const Peripherals = struct {
+        OSCCTRL_DFLL48: Peripheral,
+        OSCCTRL_FDPLL0: Peripheral,
+        OSCCTRL_FDPLL1: Peripheral,
+        slow: union {
+            OSCCTRL_FDPLL0_32K: Peripheral,
+            OSCCTRL_FDPLL1_32K: Peripheral,
+            SDHC0_SLOW: Peripheral,
+            SDHC1_SLOW: Peripheral,
+            SERCOM_0_TO_7: Peripheral,
+        },
+        EIC: Peripheral,
+        FREQM_MSR: Peripheral,
+        FREQM_REF: Peripheral,
+        SERCOM0_CORE: Peripheral,
+        SERCOM1_CORE: Peripheral,
+        TC0_TC1: Peripheral,
+        USB: Peripheral,
+        EVSYS: [12]Peripheral,
+        SERCOM2_CORE: Peripheral,
+        SERCOM3_CORE: Peripheral,
+        TCC0_TCC1: Peripheral,
+        TC2_TC3: Peripheral,
+        CAN0: Peripheral,
+        CAN1: Peripheral,
+        TCC2_TCC3: Peripheral,
+        TC4_TC5: Peripheral,
+        PDEC: Peripheral,
+        AC: Peripheral,
+        CCL: Peripheral,
+        SERCOM4_CORE: Peripheral,
+        SERCOM5_CORE: Peripheral,
+        SERCOM6_CORE: Peripheral,
+        SERCOM7_CORE: Peripheral,
+        TCC4: Peripheral,
+        TC6_TC7: Peripheral,
+        ADC0: Peripheral,
+        ADC1: Peripheral,
+        DAC: Peripheral,
+        I2S: Peripheral,
+        SDHC0: Peripheral,
+        SDHC1: Peripheral,
+        CM4_TRACE: Peripheral,
+    };
 };
 
-/// Set the Generic CLock Generator for a peripheral
-pub fn set_peripheral_clk_gen(peripheral: PeripheralIndex, clk_gen: u4) void {
-    GCLK.PCHCTRL[@intFromEnum(peripheral)].modify(.{
-        .GEN = clk_gen,
-    });
+pub fn get_peripheral(index: u32) State.Peripheral {
+    const ctrl = gclk.GCLK.PCHCTRL[index].read();
+    return State.Peripheral{
+        .channel_enable = ctrl.CHEN == 1,
+        .write_locked = ctrl.WRTLOCK == 1,
+        .generator = ctrl.GEN.value,
+    };
 }
 
-pub fn enable_apb(peripheral: Peripheral) void {
+pub fn get_peripheral_clock_freq_hz(index: gclk.PeripheralIndex) u32 {
+    const state = get_peripheral(@intFromEnum(index));
+    if (!state.channel_enable)
+        @panic("channel clock not configured");
+
+    const generator = get_generator(@intFromEnum(state.generator));
+    if (!generator.enabled)
+        @panic("generator isn't enabled!");
+
+    return generator.get_output_freq_hz();
 }
 
-pub fn enable_ahb(peripheral: Peripheral) void {
+fn get_xosc(index: u32) State.Xosc {
+    const ctrl = OSCCTRL.XOSCCTRL[index].read();
+    return State.Xosc{
+        .enabled = (ctrl.ENABLE == 1),
+        .on_demand_enabled = (ctrl.ONDEMAND == 1),
+        .crystal_oscillator_enabled = (ctrl.XTALEN == 1),
+        .switch_back_enabled = (ctrl.SWBEN == 1),
+        .clock_failure_detector_enabled = (ctrl.CFDEN == 1),
+        .automatic_control_loop_enabled = (ctrl.ENALC == 1),
+        .low_buffer_gain_enabled = (ctrl.LOWBUFGAIN == 1),
+    };
 }
+
+fn get_phase_locked_loop(index: u32) State.PhaseLockedLoop {
+    const ctrl_a = OSCCTRL.DPLL[index].DPLLCTRLA.read();
+    const ctrl_b = OSCCTRL.DPLL[index].DPLLCTRLB.read();
+    const ratio = OSCCTRL.DPLL[index].DPLLRATIO.read();
+    return State.PhaseLockedLoop{
+        .enabled = (ctrl_a.ENABLE == 1),
+        .on_demand_enabled = (ctrl_a.ONDEMAND == 1),
+        .frac = ratio.LDRFRAC,
+        .ratio = ratio.LDR,
+        .div = ctrl_b.DIV,
+        .ref_clk = ctrl_b.REFCLK.value,
+    };
+}
+fn get_generator(index: u32) State.Generator {
+    const ctrl = gclk.GCLK.GENCTRL[index].read();
+    return State.Generator{
+        .enabled = (ctrl.GENEN == 1),
+        .source = ctrl.SRC.value,
+        .div = ctrl.DIV,
+        .div_selection = ctrl.DIVSEL.value,
+        .output_enable = (ctrl.OE == 1),
+        .output_off_value = @enumFromInt(ctrl.OOV),
+        .improve_duty_cycle = @enumFromInt(ctrl.IDC),
+    };
+}
+
+pub fn get_state() State {
+    return State{
+        .oscillators_controller = .{
+            .frequency_locked_loop = blk: {
+                const ctrl_a = OSCCTRL.DFLLCTRLA.read();
+                const ctrl_b = OSCCTRL.DFLLCTRLB.read();
+                break :blk .{
+                    .enabled = (ctrl_a.ENABLE == 1),
+                    .on_demand_enabled = (ctrl_a.ONDEMAND == 1),
+                    .operating_mode = switch (ctrl_b.MODE) {
+                        0 => .open_loop,
+                        1 => .closed_loop,
+                    },
+                };
+            },
+            .xosc = .{
+                get_xosc(0),
+                get_xosc(1),
+            },
+            .phase_locked_loop = .{
+                get_phase_locked_loop(0),
+                get_phase_locked_loop(1),
+            },
+            .rtc = blk: {
+                const ctrl = OSC32KCTRL.RTCCTRL.read();
+                break :blk .{
+                    .clock_selection = ctrl.RTCSEL.value,
+                };
+            },
+            .xosc32k = blk: {
+                const ctrl = OSC32KCTRL.XOSC32K.read();
+                break :blk .{
+                    .enabled = (ctrl.ENABLE == 1),
+                    .crystal_oscillator_enabled = (ctrl.XTALEN == 1),
+                    .on_demand_enabled = (ctrl.ONDEMAND == 1),
+                    .enabled_32khz = (ctrl.EN32K == 1),
+                    .enabled_1khz = (ctrl.EN1K == 1),
+                };
+            },
+            .osculp32k = blk: {
+                const ctrl = OSC32KCTRL.OSCULP32K.read();
+                break :blk .{
+                    .enabled_32khz = (ctrl.EN32K == 1),
+                    .enabled_1khz = (ctrl.EN1K == 1),
+                };
+            },
+        },
+        .generic_clock_controller = .{
+            .generators = blk: {
+                var ret: [12]State.Generator = undefined;
+                for (&ret, 0..) |*generator, i|
+                    generator.* = get_generator(i);
+
+                break :blk ret;
+            },
+            .peripherals = blk: {
+                var ret: State.Peripherals = undefined;
+                inline for (@typeInfo(State.Peripherals).Struct.fields, 0..) |field, i| {
+                    if (@typeInfo(field.type) == .Union)
+                        ret.slow = .{ .OSCCTRL_FDPLL0_32K = get_peripheral(i) }
+                    else if (@typeInfo(field.type) == .Array) {
+                        for (0..12) |j| {
+                            ret.EVSYS[j] = get_peripheral(i + j);
+                        }
+                    } else @field(ret, field.name) = get_peripheral(i);
+                }
+
+                break :blk ret;
+            },
+        },
+        .main_clock_controller = .{
+            .hsdiv = mclk.get_hs_div(),
+            .cpudiv = mclk.get_cpu_div(),
+            .ahb_mask = mclk.get_ahb_mask(),
+            .apb_mask = mclk.get_apb_mask(),
+        },
+    };
+}
+
+pub const Configuration = struct {};

@@ -14,30 +14,55 @@ const std = @import("std");
 const timer = @import("timer.zig");
 const utils = @import("utils.zig");
 
-pub const std_options = struct {
-    pub const log_level = switch (builtin.mode) {
-        .Debug => .debug,
-        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
-    };
-    pub const logFn = log;
+const interrupt_log = std.log.scoped(.interrupt);
+const Context = extern struct {
+    R0: u32,
+    R1: u32,
+    R2: u32,
+    R3: u32,
+    R12: u32,
+    LR: u32,
+    ReturnAddress: u32,
+    xPSR: u32,
 };
 
-pub const microzig_options = struct {
-    pub const interrupts = struct {
-        const interrupt_log = std.log.scoped(.interrupt);
-        const Context = extern struct {
-            R0: u32,
-            R1: u32,
-            R2: u32,
-            R3: u32,
-            R12: u32,
-            LR: u32,
-            ReturnAddress: u32,
-            xPSR: u32,
-        };
+fn unhandled(comptime name: []const u8) microzig.interrupt.Handler {
+    return microzig.interrupt.Handler{
+        .C = struct {
+            fn handler() callconv(.C) void {
+                interrupt_log.info(name, .{});
+                microzig.hang();
+            }
+        }.handler,
+    };
+}
+fn withContext(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
+    return microzig.interrupt.Handler{
+        .Naked = struct {
+            fn interrupt() callconv(.Naked) void {
+                asm volatile (
+                    \\ tst lr, #1 << 2
+                    \\ ite eq
+                    \\ moveq r0, sp
+                    \\ mrsne r0, psp
+                    \\ b %[handler:P]
+                    :
+                    : [handler] "X" (&handler),
+                );
+            }
+        }.interrupt,
+    };
+}
 
-        pub const NonMaskableInt = unhandled("NonMaskableInt");
-        pub const HardFault = withContext(struct {
+pub const microzig_options = .{
+    .log_level = switch (builtin.mode) {
+        .Debug => .debug,
+        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
+    },
+    .logFn = log,
+    .interrupts = .{
+        .NonMaskableInt = unhandled("NonMaskableInt"),
+        .HardFault = withContext(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.HFSR.raw,
@@ -45,8 +70,8 @@ pub const microzig_options = struct {
                 });
                 microzig.hang();
             }
-        }.handler);
-        pub const MemoryManagement = withContext(struct {
+        }.handler),
+        .MemoryManagement = withContext(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -55,8 +80,8 @@ pub const microzig_options = struct {
                 });
                 microzig.hang();
             }
-        }.handler);
-        pub const BusFault = withContext(struct {
+        }.handler),
+        .BusFault = withContext(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -65,8 +90,8 @@ pub const microzig_options = struct {
                 });
                 microzig.hang();
             }
-        }.handler);
-        pub const UsageFault = withContext(struct {
+        }.handler),
+        .UsageFault = withContext(struct {
             fn handler(ctx: *Context) void {
                 interrupt_log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
@@ -74,125 +99,105 @@ pub const microzig_options = struct {
                 });
                 microzig.hang();
             }
-        }.handler);
-        pub fn SVCall() callconv(.Naked) void {
-            asm volatile (
-                \\ mvns r0, lr, lsl #31 - 2
-                \\ bcc 1f
-                \\ ite mi
-                \\ movmi r1, sp
-                \\ mrspl r1, psp
-                \\ ldr r2, [r1, #6 * 4]
-                \\ subs r2, #2
-                \\ ldrb r3, [r2, #1 * 1]
-                \\ cmp r3, #0xDF
-                \\ bne 1f
-                \\ ldrb r3, [r2, #0 * 1]
-                \\ cmp r3, #12
-                \\ bhi 1f
-                \\ tbb [pc, r3]
-                \\0:
-                \\ .byte (0f - 0b) / 2
-                \\ .byte (9f - 0b) / 2
-                \\ .byte (9f - 0b) / 2
-                \\ .byte (2f - 0b) / 2
-                \\ .byte (3f - 0b) / 2
-                \\ .byte (4f - 0b) / 2
-                \\ .byte (5f - 0b) / 2
-                \\ .byte (6f - 0b) / 2
-                \\ .byte (7f - 0b) / 2
-                \\ .byte (8f - 0b) / 2
-                \\ .byte (8f - 0b) / 2
-                \\ .byte (10f - 0b) / 2
-                \\1:
-                \\ .byte (11f - 0b) / 2
-                \\ .byte 0xDE
-                \\ .align 1
-                \\0:
-                \\ ldm r1, {r0-r3}
-                \\ b %[blit:P]
-                \\2:
-                \\ ldm r1, {r0-r3}
-                \\ b %[oval:P]
-                \\3:
-                \\ ldm r1, {r0-r3}
-                \\ b %[rect:P]
-                \\4:
-                \\ ldm r1, {r0-r3}
-                \\ b %[text:P]
-                \\5:
-                \\ ldm r1, {r0-r2}
-                \\ b %[vline:P]
-                \\6:
-                \\ ldm r1, {r0-r2}
-                \\ b %[hline:P]
-                \\7:
-                \\ ldm r1, {r0-r3}
-                \\ b %[tone:P]
-                \\8:
-                \\ movs r0, #0
-                \\ str r0, [r1, #0 * 4]
-                \\9:
-                \\ bx lr
-                \\10:
-                \\ ldm r1, {r0-r1}
-                \\ b %[trace:P]
-                \\11:
-                \\ lsrs r0, #31
-                \\ msr control, r0
-                \\ it eq
-                \\ popeq {r3, r5-r11, pc}
-                \\ subs r0, #1 - 0xFFFFFFFD
-                \\ push {r4-r11, lr}
-                \\ movs r4, #0
-                \\ movs r5, #0
-                \\ movs r6, #0
-                \\ movs r7, #0
-                \\ mov r8, r4
-                \\ mov r9, r5
-                \\ mov r10, r6
-                \\ mov r11, r7
-                \\ bx r0
-                :
-                : [blit] "X" (&cart.blit),
-                  [oval] "X" (&cart.oval),
-                  [rect] "X" (&cart.rect),
-                  [text] "X" (&cart.text),
-                  [vline] "X" (&cart.vline),
-                  [hline] "X" (&cart.hline),
-                  [tone] "X" (&cart.tone),
-                  [trace] "X" (&cart.trace),
-            );
-        }
-        pub const DebugMonitor = unhandled("DebugMonitor");
-        pub const PendSV = unhandled("PendSV");
-        pub const SysTick = unhandled("SysTick");
-        pub const DMAC_DMAC_1 = audio.mix;
-
-        fn unhandled(comptime name: []const u8) fn () callconv(.C) void {
-            return struct {
-                fn handler() callconv(.C) void {
-                    interrupt_log.info(name, .{});
-                    microzig.hang();
-                }
-            }.handler;
-        }
-        fn withContext(comptime handler: fn (*Context) void) fn () callconv(.Naked) void {
-            return struct {
-                fn interrupt() callconv(.Naked) void {
+        }.handler),
+        .SVCall = microzig.interrupt.Handler{
+            .Naked = struct {
+                fn handler() callconv(.Naked) void {
                     asm volatile (
-                        \\ tst lr, #1 << 2
-                        \\ ite eq
-                        \\ moveq r0, sp
-                        \\ mrsne r0, psp
-                        \\ b %[handler:P]
+                        \\ mvns r0, lr, lsl #31 - 2
+                        \\ bcc 1f
+                        \\ ite mi
+                        \\ movmi r1, sp
+                        \\ mrspl r1, psp
+                        \\ ldr r2, [r1, #6 * 4]
+                        \\ subs r2, #2
+                        \\ ldrb r3, [r2, #1 * 1]
+                        \\ cmp r3, #0xDF
+                        \\ bne 1f
+                        \\ ldrb r3, [r2, #0 * 1]
+                        \\ cmp r3, #12
+                        \\ bhi 1f
+                        \\ tbb [pc, r3]
+                        \\0:
+                        \\ .byte (0f - 0b) / 2
+                        \\ .byte (9f - 0b) / 2
+                        \\ .byte (9f - 0b) / 2
+                        \\ .byte (2f - 0b) / 2
+                        \\ .byte (3f - 0b) / 2
+                        \\ .byte (4f - 0b) / 2
+                        \\ .byte (5f - 0b) / 2
+                        \\ .byte (6f - 0b) / 2
+                        \\ .byte (7f - 0b) / 2
+                        \\ .byte (8f - 0b) / 2
+                        \\ .byte (8f - 0b) / 2
+                        \\ .byte (10f - 0b) / 2
+                        \\1:
+                        \\ .byte (11f - 0b) / 2
+                        \\ .byte 0xDE
+                        \\ .align 1
+                        \\0:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[blit:P]
+                        \\2:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[oval:P]
+                        \\3:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[rect:P]
+                        \\4:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[text:P]
+                        \\5:
+                        \\ ldm r1, {r0-r2}
+                        \\ b %[vline:P]
+                        \\6:
+                        \\ ldm r1, {r0-r2}
+                        \\ b %[hline:P]
+                        \\7:
+                        \\ ldm r1, {r0-r3}
+                        \\ b %[tone:P]
+                        \\8:
+                        \\ movs r0, #0
+                        \\ str r0, [r1, #0 * 4]
+                        \\9:
+                        \\ bx lr
+                        \\10:
+                        \\ ldm r1, {r0-r1}
+                        \\ b %[trace:P]
+                        \\11:
+                        \\ lsrs r0, #31
+                        \\ msr control, r0
+                        \\ it eq
+                        \\ popeq {r3, r5-r11, pc}
+                        \\ subs r0, #1 - 0xFFFFFFFD
+                        \\ push {r4-r11, lr}
+                        \\ movs r4, #0
+                        \\ movs r5, #0
+                        \\ movs r6, #0
+                        \\ movs r7, #0
+                        \\ mov r8, r4
+                        \\ mov r9, r5
+                        \\ mov r10, r6
+                        \\ mov r11, r7
+                        \\ bx r0
                         :
-                        : [handler] "X" (&handler),
+                        : [blit] "X" (&cart.blit),
+                          [oval] "X" (&cart.oval),
+                          [rect] "X" (&cart.rect),
+                          [text] "X" (&cart.text),
+                          [vline] "X" (&cart.vline),
+                          [hline] "X" (&cart.hline),
+                          [tone] "X" (&cart.tone),
+                          [trace] "X" (&cart.trace),
                     );
                 }
-            }.interrupt;
-        }
-    };
+            }.handler,
+        },
+        .DebugMonitor = unhandled("DebugMonitor"),
+        .PendSV = unhandled("PendSV"),
+        .SysTick = unhandled("SysTick"),
+        .DMAC_DMAC_1 = .{ .C = audio.mix },
+    },
 };
 
 const InOutError = error{NoConnection};

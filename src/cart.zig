@@ -1,19 +1,14 @@
 pub fn init() void {
     @setCold(true);
-
-    Port.BUTTON_OUT.setDir(.in);
-    Port.BUTTON_OUT.configPtr().write(.{
-        .PMUXEN = 0,
-        .INEN = 1,
-        .PULLEN = 0,
-        .reserved6 = 0,
-        .DRVSTR = 0,
-        .padding = 0,
-    });
-    Port.BUTTON_CLK.setDir(.out);
-    Port.BUTTON_CLK.write(.high);
-    Port.BUTTON_LATCH.setDir(.out);
-    Port.BUTTON_LATCH.write(.high);
+    Port.BUTTON_SELECT.setDir(.in);
+    Port.BUTTON_START.setDir(.in);
+    Port.BUTTON_A.setDir(.in);
+    Port.BUTTON_B.setDir(.in);
+    Port.BUTTON_UP.setDir(.in);
+    Port.BUTTON_DOWN.setDir(.in);
+    Port.BUTTON_PRESS.setDir(.in);
+    Port.BUTTON_RIGHT.setDir(.in);
+    Port.BUTTON_LEFT.setDir(.in);
 
     timer.initFrameSync();
 
@@ -54,33 +49,16 @@ pub fn tick() void {
     if (!timer.checkFrameReady()) return;
 
     {
-        var gamepad: u8 = 0;
-        timer.delay(1);
-        Port.BUTTON_LATCH.write(.low);
-        timer.delay(1);
-        Port.BUTTON_LATCH.write(.high);
-        for ([8]u8{
-            BUTTON_2,
-            BUTTON_1,
-            1 << 2,
-            1 << 3,
-            BUTTON_RIGHT,
-            BUTTON_DOWN,
-            BUTTON_UP,
-            BUTTON_LEFT,
-        }) |button| {
-            timer.delay(1);
-            switch (Port.BUTTON_OUT.read()) {
-                .low => {},
-                .high => gamepad |= button,
-            }
-            timer.delay(1);
-            Port.BUTTON_CLK.write(.high);
-            timer.delay(2);
-            Port.BUTTON_CLK.write(.low);
-        }
-        timer.delay(1);
-        GAMEPAD1.* = gamepad;
+        GAMEPAD1.* = ((@as(u8, 1) & @intFromEnum(Port.BUTTON_SELECT.read())) << 0 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_START.read())) << 1 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_A.read())) << 2 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_B.read())) << 3 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_UP.read())) << 4 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_DOWN.read())) << 5 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_RIGHT.read())) << 6 |
+            (@as(u8, 1) & @intFromEnum(Port.BUTTON_LEFT.read())) << 7
+        // TODO: pressed
+        );
     }
     if (SYSTEM_FLAGS.* & SYSTEM_PRESERVE_FRAMEBUFFER == 0) @memset(FRAMEBUFFER, 0b00_00_00_00);
     call(if (options.have_cart) &libcart.update else &struct {
@@ -223,7 +201,7 @@ pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
                 }
                 cur_x += 1;
                 err += cur_x;
-                var temp = err - cur_y;
+                const temp = err - cur_y;
                 if (temp >= 0) {
                     err = temp;
                     cur_y -= 1;

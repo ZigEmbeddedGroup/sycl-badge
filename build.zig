@@ -91,6 +91,7 @@ pub fn build(b: *Build) void {
         "neopixels",
         "qspi",
         "qa",
+        "clocks",
     }) |name| {
         const mvp = mz.add_firmware(b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
@@ -98,6 +99,7 @@ pub fn build(b: *Build) void {
             .optimize = optimize,
             .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
         });
+
         mz.install_firmware(b, mvp, .{});
         mz.install_firmware(b, mvp, .{
             .format = .{ .uf2 = .SAMD51 },

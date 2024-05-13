@@ -5,13 +5,13 @@ const hal = microzig.hal;
 const sercom = hal.sercom;
 const port = hal.port;
 const timer = hal.timer;
+const clocks = hal.clocks;
 
-pub const FrameBuffer = union {
+pub const FrameBuffer = union(enum) {
     bpp12: *[width][@divExact(height, 2)]Color12,
     bpp16: *[width][height]Color16,
     bpp24: *[width][height]Color24,
 };
-pub const Bpp = std.meta.FieldEnum(FrameBuffer);
 pub const Color12 = extern struct {
     b0_g0: packed struct(u8) { b0: u4, g0: u4 },
     r0_b1: packed struct(u8) { r0: u4, b1: u4 },
@@ -41,7 +41,6 @@ pub const Lcd = struct {
     spi: sercom.spi.Master,
     pins: Pins,
     inverted: bool = false,
-    bpp: Bpp,
     fb: FrameBuffer,
 
     pub const Pins = struct {
@@ -56,7 +55,6 @@ pub const Lcd = struct {
     pub const InitOptions = struct {
         spi: sercom.spi.Master,
         pins: Pins,
-        bpp: Bpp,
         fb: FrameBuffer,
     };
 
@@ -88,88 +86,77 @@ pub const Lcd = struct {
         // TODO: analyze this from the circuitpython repo:
         // uint8_t display_init_sequence[] = {
         //     0x01, 0 | DELAY, 150, // SWRESET
+        lcd.send_cmd(ST7735.SWRESET, &.{});
+        timer.delay_us(150 * std.time.us_per_ms);
         //     0x11, 0 | DELAY, 255, // SLPOUT
+        lcd.send_cmd(ST7735.SLPOUT, &.{});
+        timer.delay_us(255 * std.time.us_per_ms);
         //     0xb1, 3, 0x01, 0x2C, 0x2D, // _FRMCTR1
         //     0xb2, 3, 0x01, 0x2C, 0x2D, //
         //     0xb3, 6, 0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D,
+        lcd.send_cmd(ST7735.FRMCTR1, &.{ 0x01, 0x2C, 0x2D });
+        lcd.send_cmd(ST7735.FRMCTR2, &.{ 0x01, 0x2C, 0x2D });
+        lcd.send_cmd(ST7735.FRMCTR3, &.{ 0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D });
         //     0xb4, 1, 0x07, // _INVCTR line inversion
+        lcd.send_cmd(ST7735.INVCTR, &.{0x07});
         //     0xc0, 3, 0xa2, 0x02, 0x84, // _PWCTR1 GVDD = 4.7V, 1.0uA
+        lcd.send_cmd(ST7735.PWCTR1, &.{ 0xA2, 0x02, 0x84 });
         //     0xc1, 1, 0xc5, // _PWCTR2 VGH=14.7V, VGL=-7.35V
+        lcd.send_cmd(ST7735.PWCTR2, &.{0xC5});
         //     0xc2, 2, 0x0a, 0x00, // _PWCTR3 Opamp current small, Boost frequency
+        lcd.send_cmd(ST7735.PWCTR3, &.{ 0x0A, 0x00 });
         //     0xc3, 2, 0x8a, 0x2a,
+        lcd.send_cmd(ST7735.PWCTR4, &.{ 0x8A, 0x2A });
         //     0xc4, 2, 0x8a, 0xee,
+        lcd.send_cmd(ST7735.PWCTR5, &.{ 0x8A, 0xEE });
         //     0xc5, 1, 0x0e, // _VMCTR1 VCOMH = 4V, VOML = -1.1V
+        lcd.send_cmd(ST7735.VMCTR1, &.{0x0E});
         //     0x2a, 0, // _INVOFF
+        lcd.send_cmd(ST7735.INVOFF, &.{});
         //     0x36, 1, 0b10100000,  // _MADCTL for rotation 0
         //     // 1 clk cycle nonoverlap, 2 cycle gate rise, 3 cycle osc equalie,
         //     // fix on VTL
+        lcd.send_cmd(ST7735.MADCTL, &.{0b10100000});
         //     0x3a, 1, 0x05, // COLMOD - 16bit color
+        lcd.send_cmd(ST7735.COLMOD, &.{0x05});
         //     0xe0, 16, 0x02, 0x1c, 0x07, 0x12, // _GMCTRP1 Gamma
         //     0x37, 0x32, 0x29, 0x2d,
         //     0x29, 0x25, 0x2B, 0x39,
         //     0x00, 0x01, 0x03, 0x10,
-        //     0xe1, 16, 0x03, 0x1d, 0x07, 0x06, // _GMCTRN1
-        //     0x2E, 0x2C, 0x29, 0x2D,
-        //     0x2E, 0x2E, 0x37, 0x3F,
-        //     0x00, 0x00, 0x02, 0x10,
-        //     0x2a, 3, 0x02, 0x00, 0x81, // _CASET XSTART = 2, XEND = 129
-        //     0x2b, 3, 0x02, 0x00, 0x81, // _RASET XSTART = 2, XEND = 129
-        //     0x13, 0 | DELAY, 10, // _NORON
-        //     0x29, 0 | DELAY, 100, // _DISPON
-
-        lcd.send_cmd(ST7735.SWRESET, &.{}, 120 * std.time.us_per_ms);
-        lcd.send_cmd(ST7735.SLPOUT, &.{}, 120 * std.time.us_per_ms);
-        lcd.send_cmd(ST7735.INVOFF, &.{}, 1);
-        lcd.send_cmd(ST7735.COLMOD, &.{@intFromEnum(@as(ST7735.COLMOD_PARAM0, switch (opts.fb) {
-            .bpp12 => .@"12BPP",
-            .bpp16 => .@"16BPP",
-            .bpp24 => .@"24BPP",
-        }))}, 1);
         lcd.send_cmd(ST7735.GMCTRP1, &.{
             0x02, 0x1c, 0x07, 0x12,
             0x37, 0x32, 0x29, 0x2d,
             0x29, 0x25, 0x2B, 0x39,
             0x00, 0x01, 0x03, 0x10,
-        }, 1);
-        lcd.send_cmd(ST7735.NORON, &.{}, 10 * std.time.us_per_ms);
-        lcd.send_cmd(ST7735.DISPON, &.{}, 10 * std.time.us_per_ms);
-        //lcd.send_cmd(ST7735.RAMWR, &.{}, 1);
+        });
+        //     0xe1, 16, 0x03, 0x1d, 0x07, 0x06, // _GMCTRN1
+        //     0x2E, 0x2C, 0x29, 0x2D,
+        //     0x2E, 0x2E, 0x37, 0x3F,
+        //     0x00, 0x00, 0x02, 0x10,
+        lcd.send_cmd(ST7735.GMCTRN1, &.{
+            0x03, 0x1d, 0x07, 0x06,
+            0x2E, 0x2C, 0x29, 0x2D,
+            0x2E, 0x2E, 0x37, 0x3F,
+            0x00, 0x00, 0x02, 0x10,
+        });
+        //     0x2a, 3, 0x02, 0x00, 0x81, // _CASET XSTART = 2, XEND = 129
+        lcd.send_cmd(ST7735.CASET, &.{ 0x02, 0x00, 0x81 });
+        //     0x2b, 3, 0x02, 0x00, 0x81, // _RASET XSTART = 2, XEND = 129
+        lcd.send_cmd(ST7735.RASET, &.{ 0x02, 0x00, 0x81 });
+        //     0x13, 0 | DELAY, 10, // _NORON
+        lcd.send_cmd(ST7735.NORON, &.{});
+        timer.delay_us(10 * std.time.us_per_ms);
+        //     0x29, 0 | DELAY, 100, // _DISPON
+        lcd.send_cmd(ST7735.DISPON, &.{});
+        timer.delay_us(100 * std.time.us_per_ms);
 
-        //if (dma.enable) {
-        //    Port.TFT_CS.write(.low);
-        //    timer.delay(1);
-        //    dma.init_lcd(bpp);
-        //}
-        //
-        lcd.send_cmd(ST7735.MADCTL, &.{@as(u8, @bitCast(ST7735.MADCTL_PARAM0{
-            .MH = .LEFT_TO_RIGHT,
-            .RGB = .BGR,
-            .ML = .TOP_TO_BOTTOM,
-            .MV = false,
-            .MX = false,
-            .MY = true,
-        }))}, 1);
-
-        const frmctr1: u32 = 0; // TODO: get this value
-        lcd.send_cmd(ST7735.FRMCTR1, &.{
-            @truncate(frmctr1 >> 16),
-            @truncate(frmctr1 >> 8),
-            @truncate(frmctr1),
-        }, 0);
-
-        const x = 0;
-        const y = 0;
-        const w = 0;
-        const h = 0;
-        lcd.send_cmd(ST7735.RASET, &.{ 0, x, 0, (x + w - 1) }, 0);
-        lcd.send_cmd(ST7735.CASET, &.{ 0, y, 0, (y + h - 1) }, 0);
-
+        // TODO: more
         @memset(lcd.fb, 0);
 
         return lcd;
     }
 
-    fn send_cmd(lcd: Lcd, cmd: u8, params: []const u8, delay_us: u32) void {
+    fn send_cmd(lcd: Lcd, cmd: u8, params: []const u8) void {
         lcd.pins.cs.write(.low);
         lcd.pins.dc.write(.low);
 
@@ -181,8 +168,6 @@ pub const Lcd = struct {
             lcd.spi.write_all_blocking(params);
 
         lcd.pins.cs.write(.high);
-
-        timer.delay_us(delay_us);
     }
 
     pub fn invert(lcd: *Lcd) void {

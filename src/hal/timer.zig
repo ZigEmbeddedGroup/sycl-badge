@@ -1,8 +1,8 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
-const mclk = hal.mclk;
-const gclk = hal.gclk;
+const mclk = hal.clocks.mclk;
+const gclk = hal.clocks.gclk;
 
 const peripherals = microzig.chip.peripherals;
 const TC0 = peripherals.TC0;

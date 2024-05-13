@@ -214,7 +214,7 @@ pub fn init() void {
     io.NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-pub fn mix() void {
+pub fn mix() callconv(.C) void {
     var local_channels = channels.*;
     for (&sample_buffer[
         (dma.getAudioPart() + sample_buffer.len - 1) % sample_buffer.len

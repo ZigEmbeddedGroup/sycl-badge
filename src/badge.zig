@@ -17,17 +17,16 @@ const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
 const hal = microzig.hal;
-const usb = hal.usb;
+
+const Lcd = board.Lcd;
+const Buttons = board.Buttons;
+const Neopixels = board.D8_NEOPIX
 
 const peripherals = microzig.chip.peripherals;
 const MCLK = peripherals.MCLK;
 
-const led_pin = board.D13;
-const backlight = board.TFT_LITE;
-const @"D+" = board.@"D+";
-const @"D-" = board.@"D-";
-
 pub fn main() !void {
+    const clock_config = 
     // Initialize clocks
     MCLK.AHBMASK.modify(.{ .USB_ = 1 });
     MCLK.APBBMASK.modify(.{ .USB_ = 1 });

@@ -2,8 +2,8 @@ const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
 const hal = microzig.hal;
-const gclk = hal.gclk;
-const mclk = hal.mclk;
+const gclk = hal.clocks.gclk;
+const mclk = hal.clocks.mclk;
 const qspi = hal.qspi;
 const nvm = hal.nvm;
 

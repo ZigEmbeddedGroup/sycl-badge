@@ -77,6 +77,40 @@ const OSC32KCTRL = microzig.chip.peripherals.OSC32KCTRL;
 pub const mclk = @import("clocks/mclk.zig");
 pub const gclk = @import("clocks/gclk.zig");
 
+pub const Frequencies = struct {
+    oscillators: struct {
+        DFLL48M: u32,
+        FDPLL: [2]u32,
+    },
+    generators: [12]u32,
+    peripherals: struct {},
+    cpu: u32,
+
+    pub fn get(state: State) Frequencies {
+        return Frequencies{
+            .oscillators = .{
+                .DFLL48M = if (state.oscillators_controller.frequency_locked_loop.enabled)
+                    48_000_000
+                else
+                    0,
+                .FDPLL = .{
+                    state.oscillators_controller.phase_locked_loop[0].get_output_freq_hz(),
+                    state.oscillators_controller.phase_locked_loop[1].get_output_freq_hz(),
+                },
+            },
+            .generators = blk: {
+                var ret: [12]u32 = undefined;
+                for (&ret, state.generic_clock_controller.generators) |*r, g|
+                    r.* = g.get_output_freq_hz();
+
+                break :blk ret;
+            },
+            .peripherals = .{},
+            .cpu = 0,
+        };
+    }
+};
+
 pub const State = struct {
     oscillators_controller: struct {
         /// 48 MHz output
@@ -138,12 +172,15 @@ pub const State = struct {
 
         pub fn get_div(generator: Generator) u32 {
             return switch (generator.div_selection) {
-                .DIV1 => generator.div,
-                .DIV2 => std.math.pow(2, generator.div + 1),
+                .DIV1 => if (generator.div <= 1) 1 else @panic("div must be 0 or 1"),
+                .DIV2 => std.math.pow(u32, 2, generator.div + 1),
             };
         }
 
         pub fn get_output_freq_hz(generator: Generator) u32 {
+            if (!generator.enabled)
+                return 0;
+
             return switch (generator.source) {
                 .XOSC0, .XOSC1 => @panic("TODO"),
                 .GCLKIN => @panic("TODO"),
@@ -155,7 +192,7 @@ pub const State = struct {
                 .XOSC32K => @panic("TODO"),
                 .DFLL => 48_000_000,
                 .DPLL0, .DPLL1 => blk: {
-                    const index: u32 = switch (generator.source) {
+                    const index: u1 = switch (generator.source) {
                         .DPLL0 => 0,
                         .DPLL1 => 1,
                         else => unreachable,
@@ -164,6 +201,7 @@ pub const State = struct {
                     const pll = get_phase_locked_loop(index);
                     break :blk pll.get_output_freq_hz();
                 },
+                _ => unreachable,
             } / generator.get_div();
         }
     };
@@ -179,6 +217,7 @@ pub const State = struct {
     };
 
     pub const PhaseLockedLoop = struct {
+        index: u1,
         enabled: bool,
         on_demand_enabled: bool,
         frac: u5,
@@ -188,7 +227,24 @@ pub const State = struct {
 
         pub fn get_output_freq_hz(pll: PhaseLockedLoop) u32 {
             if (!pll.enabled)
-                @panic("PLL not enabled");
+                return 0;
+
+            return switch (pll.ref_clk) {
+                .GCLK => blk: {
+                    const index: gclk.PeripheralIndex = switch (pll.index) {
+                        0 => .GCLK_OSCCTRL_FDPLL0,
+                        1 => .GCLK_OSCCTRL_FDPLL1,
+                    };
+
+                    break :blk get_peripheral_clock_freq_hz(index);
+                },
+                .XOSC32 => 32_000,
+                .XOSC0 => @panic("TODO"),
+                .XOSC1 => @panic("TODO"),
+                _ => unreachable,
+            } * (pll.ratio + 1
+            //+ (pll.frac / 32)
+            );
         }
     };
 
@@ -277,11 +333,12 @@ fn get_xosc(index: u32) State.Xosc {
     };
 }
 
-fn get_phase_locked_loop(index: u32) State.PhaseLockedLoop {
+fn get_phase_locked_loop(index: u1) State.PhaseLockedLoop {
     const ctrl_a = OSCCTRL.DPLL[index].DPLLCTRLA.read();
     const ctrl_b = OSCCTRL.DPLL[index].DPLLCTRLB.read();
     const ratio = OSCCTRL.DPLL[index].DPLLRATIO.read();
     return State.PhaseLockedLoop{
+        .index = index,
         .enabled = (ctrl_a.ENABLE == 1),
         .on_demand_enabled = (ctrl_a.ONDEMAND == 1),
         .frac = ratio.LDRFRAC,

@@ -198,6 +198,7 @@ fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struct { 
     _ = x;
     _ = y;
     _ = rest;
+    @panic("TODO");
 }
 
 pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
@@ -205,6 +206,7 @@ pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     _ = y;
     _ = width;
     _ = height;
+    @panic("TODO");
 }
 
 pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
@@ -212,6 +214,7 @@ pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
     _ = y;
     _ = width;
     _ = height;
+    @panic("TODO");
 }
 
 pub fn text(str: [*]const User(u8), len: usize, x: i32, y: i32) callconv(.C) void {
@@ -219,18 +222,21 @@ pub fn text(str: [*]const User(u8), len: usize, x: i32, y: i32) callconv(.C) voi
     _ = len;
     _ = x;
     _ = y;
+    @panic("TODO");
 }
 
 pub fn vline(x: i32, y: i32, len: u32) callconv(.C) void {
     _ = x;
     _ = y;
     _ = len;
+    @panic("TODO");
 }
 
 pub fn hline(x: i32, y: i32, len: u32) callconv(.C) void {
     _ = x;
     _ = y;
     _ = len;
+    @panic("TODO");
 }
 
 pub fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) callconv(.C) void {
@@ -238,9 +244,11 @@ pub fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) callconv(.C)
     _ = duration;
     _ = volume;
     _ = flags;
+    @panic("TODO");
 }
 
 pub fn trace(str: [*]const User(u8), len: usize) callconv(.C) void {
     _ = str;
     _ = len;
+    @panic("TODO");
 }

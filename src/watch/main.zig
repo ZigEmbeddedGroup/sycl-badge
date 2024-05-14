@@ -6,9 +6,9 @@ const Reloader = @import("Reloader.zig");
 const assert = std.debug.assert;
 
 const log = std.log.scoped(.server);
-// pub const std_options: std.Options = .{
-//     .log_level = .err,
-// };
+pub const std_options: std.Options = .{
+    .log_level = .err,
+};
 
 const usage =
     \\usage: zine serve [options]

@@ -1,8 +1,11 @@
-# SYCL 2024 PCB Badge
+# Software You Can Love Badge
 
-## Getting Started
+Welcome to the SYCL badge repo!
 
-Check out the [Introduction](docs/introduction/README.md)!
+## Get started with the [Introduction](docs/introduction/README.md)!
+
+<!--
+Useful information but I think it might confuse folks.
 
 ## Uploading firmware using a debugger
 
@@ -19,4 +22,4 @@ file zig-out/firmware/pybadge-io.elf
 
 ```
 sudo dfu-util -a 0 --dfuse-address 0x08000000:leave -R -D ~/Downloads/blackmagic-firmware-v1.10.0-rc1/blackpill-f401cc/blackmagic-blackpill-f401cc.bin ^C
-```
+```-->

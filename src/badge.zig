@@ -34,6 +34,9 @@ const led_pin = board.D13;
 
 const Lcd = board.Lcd;
 const Buttons = board.Buttons;
+const light_sensor_pin = microzig.board.A7_LIGHT;
+
+const adc = hal.adc.num(0);
 
 pub const microzig_options = .{
     .interrupts = .{
@@ -142,19 +145,48 @@ pub fn main() !void {
         .div = 1,
     });
 
+    // Light sensor adc
+    light_sensor_pin.set_mux(.B);
+    clocks.mclk.set_apb_mask(.{ .ADC0 = .enabled });
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_ADC0, .GCLK1);
+
     const state = clocks.get_state();
     const freqs = clocks.Frequencies.get(state);
     _ = freqs;
 
     const neopixels = board.Neopixels.init(board.D8_NEOPIX);
-    neopixels.write_all(.{
-        .r = 0,
-        .g = 16,
-        .b = 0,
-    });
+    adc.init();
+    Buttons.configure();
+    led_pin.set_dir(.out);
 
     cart.start();
     while (true) {
+        const light_reading = adc.single_shot_blocking(.AIN6);
+        cart.api.light_level.* = @intCast(light_reading);
+
+        const buttons = Buttons.read_from_port();
+        cart.api.controls.* = .{
+            .start = buttons.start == 1,
+            .select = buttons.select == 1,
+            .a = buttons.a == 1,
+            .b = buttons.b == 1,
+            .click = buttons.click == 1,
+            .up = buttons.up == 1,
+            .down = buttons.down == 1,
+            .left = buttons.left == 1,
+            .right = buttons.right == 1,
+        };
+
         cart.tick();
+        var pixels: [5]board.NeopixelColor = undefined;
+        for (&pixels, cart.api.neopixels) |*local, pixel|
+            local.* = .{
+                .r = pixel.r,
+                .g = pixel.g,
+                .b = pixel.b,
+            };
+
+        neopixels.write(&pixels);
+        led_pin.write(if (cart.api.red_led.*) .high else .low);
     }
 }

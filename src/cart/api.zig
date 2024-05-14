@@ -19,10 +19,8 @@ pub const font_height: u32 = 8;
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-const base = if (builtin.target.isWasm()) 0 else 0x20000000;
-
 /// RGB888, true color
-pub const NeopixelColor = packed struct(u24) { b: u8, g: u8, r: u8 };
+pub const NeopixelColor = extern struct { g: u8, r: u8, b: u8 };
 
 /// RGB565, high color
 pub const DisplayColor = packed struct(u16) {
@@ -65,10 +63,10 @@ pub const Controls = packed struct(u9) {
     right: bool,
 };
 
-pub const controls: *const Controls = @ptrFromInt(base + 0x04);
-/// 0-4095
-pub const light_level: *const u12 = @ptrFromInt(base + 0x06);
-/// 5 24-bit color LEDs
+const base = if (builtin.target.isWasm()) 0 else 0x20000000;
+
+pub const controls: *Controls = @ptrFromInt(base + 0x04);
+pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt(base + 0x1e);

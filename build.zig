@@ -10,23 +10,21 @@ pub const py_badge: MicroZig.Target = .{
     .hal = null,
 };
 
-fn sycl_badge_microzig_target(d: *Build.Dependency) MicroZig.Target {
-    return .{
-        .preferred_format = .elf,
-        .chip = atsam.chips.atsamd51j19.chip,
-        .hal = .{
-            .root_source_file = d.path("src/hal.zig"),
-        },
-        .board = .{
-            .name = "SYCL Badge Rev A",
-            .root_source_file = d.path("src/board.zig"),
-        },
-        .linker_script = d.path("src/badge/samd51j19a_self.ld"),
-    };
-}
+pub const sycl_badge_microzig_target = MicroZig.Target{
+    .preferred_format = .elf,
+    .chip = atsam.chips.atsamd51j19.chip,
+    .hal = .{
+        .root_source_file = .{ .cwd_relative = "src/hal.zig" },
+    },
+    .board = .{
+        .name = "SYCL Badge Rev A",
+        .root_source_file = .{ .cwd_relative = "src/board.zig" },
+    },
+    .linker_script = .{ .cwd_relative = "src/badge/samd51j19a_self.ld" },
+};
 
 pub fn build(b: *Build) void {
-    //const mz = MicroZig.init(b, .{});
+    const mz = MicroZig.init(b, .{});
     const optimize = b.standardOptimizeOption(.{});
 
     const ws_dep = b.dependency("ws", .{});
@@ -58,6 +56,7 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
+    feature_test_cart.install(b);
     const watch_run_step = feature_test_cart.install_with_watcher(&dep, b, .{});
 
     const zeroman_cart = add_cart(&dep, b, .{
@@ -71,27 +70,31 @@ pub fn build(b: *Build) void {
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
 
-    //const badge = mz.add_firmware(b, .{
-    //    .name = "badge",
-    //    .target = sycl_badge_microzig_target(&dep),
-    //    .optimize = optimize,
-    //    .root_source_file = .{ .path = "src/badge.zig" },
-    //});
-    //mz.install_firmware(b, badge, .{});
-
     inline for (.{
-        //"blinky",
+        "blinky",
         //"blinky_timer",
         //"usb_cdc",
         //"usb_storage",
-        //"buttons",
+        "buttons",
         //"lcd",
-        //"audio",
-        //"light_sensor",
-        "neopixels",
+        "audio",
+        "light_sensor",
         //"qspi",
         //"qa",
         //"clocks",
+    }) |name| {
+        const mvp = mz.add_firmware(b, .{
+            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+            .optimize = optimize,
+            .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
+            .target = sycl_badge_microzig_target,
+        });
+        mz.install_firmware(b, mvp, .{ .format = .elf });
+        mz.install_firmware(b, mvp, .{ .format = .{ .uf2 = .SAMD51 } });
+    }
+
+    inline for (.{
+        "neopixels",
     }) |name| {
         const mvp = add_cart(&dep, b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
@@ -200,7 +203,7 @@ pub fn add_cart(
     wasm.root_module.addImport("cart-api", d.module("cart-api"));
 
     const sycl_badge_target =
-        b.resolveTargetQuery(sycl_badge_microzig_target(d).chip.cpu.target);
+        b.resolveTargetQuery(sycl_badge_microzig_target.chip.cpu.target);
 
     const cart_lib = b.addStaticLibrary(.{
         .name = "cart",
@@ -211,18 +214,18 @@ pub fn add_cart(
         .single_threaded = true,
         .use_llvm = true,
         .use_lld = true,
+        .strip = false,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
-    cart_lib.linker_script = d.path("src/cart.ld");
+    cart_lib.linker_script = .{ .path = "src/cart.ld" };
 
     const mz = MicroZig.init(d.builder, .{});
-
     const fw = mz.add_firmware(d.builder, .{
         .name = options.name,
-        .target = sycl_badge_microzig_target(d),
+        .target = sycl_badge_microzig_target,
         .optimize = options.optimize,
-        .root_source_file = d.path("src/badge.zig"),
-        .linker_script = d.path("src/cart.ld"),
+        .root_source_file = .{ .path = "src/badge.zig" },
+        .linker_script = .{ .path = "src/cart.ld" },
     });
     fw.artifact.linkLibrary(cart_lib);
 
@@ -238,7 +241,7 @@ pub fn add_cart(
 }
 
 pub fn install_cart(b: *Build, cart: *Cart) void {
-    cart.mz.install_firmware(b, cart.fw, .{});
+    cart.mz.install_firmware(b, cart.fw, .{ .format = .elf });
     cart.mz.install_firmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }
 

@@ -1,7 +1,8 @@
 const microzig = @import("microzig");
 const std = @import("std");
 
-pub const Color = struct {
+const cart = @import("cart-api");
+pub const Color = extern struct {
     g: u8,
     r: u8,
     b: u8,

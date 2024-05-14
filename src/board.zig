@@ -12,6 +12,7 @@
 const hal = @import("microzig").hal;
 const port = hal.port;
 
+pub const NeopixelColor = @import("board/neopixel.zig").Color;
 pub const Neopixels = @import("board/neopixel.zig").Group(5);
 
 pub const TFT_RST = port.pin(.a, 0);
@@ -49,7 +50,7 @@ pub const Buttons = packed struct(u9) {
     b: u1,
     up: u1,
     down: u1,
-    press: u1,
+    click: u1,
     right: u1,
     left: u1,
 
@@ -60,6 +61,7 @@ pub const Buttons = packed struct(u9) {
     }
 
     pub fn read_from_port() Buttons {
-        return @bitCast(@as(u9, @truncate(mask.read())));
+        const value = mask.read();
+        return @bitCast(@as(u9, @truncate(value)));
     }
 };

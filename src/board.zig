@@ -43,25 +43,29 @@ pub const TFT_SCK = port.pin(.b, 13);
 pub const TFT_CS = port.pin(.b, 14);
 pub const TFT_MOSI = port.pin(.b, 15);
 
-pub const Buttons = packed struct(u9) {
-    select: u1,
-    start: u1,
-    a: u1,
-    b: u1,
-    up: u1,
-    down: u1,
-    click: u1,
-    right: u1,
-    left: u1,
-
+pub const ButtonPoller = struct {
     pub const mask = port.mask(.b, 0x1FF);
 
-    pub fn configure() void {
+    pub fn init() ButtonPoller {
         mask.set_dir(.in);
+        return ButtonPoller{};
     }
 
-    pub fn read_from_port() Buttons {
+    pub fn read_from_port(poller: ButtonPoller) Buttons {
+        _ = poller;
         const value = mask.read();
         return @bitCast(@as(u9, @truncate(value)));
     }
+
+    pub const Buttons = packed struct(u9) {
+        select: u1,
+        start: u1,
+        a: u1,
+        b: u1,
+        up: u1,
+        down: u1,
+        click: u1,
+        right: u1,
+        left: u1,
+    };
 };

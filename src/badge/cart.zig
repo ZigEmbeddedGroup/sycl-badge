@@ -1,4 +1,6 @@
 const std = @import("std");
+const microzig = @import("microzig");
+const timer = microzig.hal.timer;
 pub const api = @import("../cart/api.zig");
 
 const libcart = struct {
@@ -112,13 +114,26 @@ pub const HSRAM = struct {
 };
 
 pub fn start() void {
-    // Initialize API Global state
+    @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
 
-    //for (&api.neopixels) |*pixel|
-    //    pixel.* = .{ .r = 0, .g = 0, .b = 0 };
+    // fill .bss with zeroes
+    {
+        const bss_start: [*]u8 = @ptrCast(&libcart.cart_bss_start);
+        const bss_end: [*]u8 = @ptrCast(&libcart.cart_bss_end);
+        const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss_start);
 
-    //for (&api.framebuffer) |*pixel|
-    //    pixel.* = .{ .r = 0, .g = 0, .b = 0 };
+        @memset(bss_start[0..bss_len], 0);
+    }
+
+    // load .data from flash
+    {
+        const data_start: [*]u8 = @ptrCast(&libcart.cart_data_start);
+        const data_end: [*]u8 = @ptrCast(&libcart.cart_data_end);
+        const data_len = @intFromPtr(data_end) - @intFromPtr(data_start);
+        const data_src: [*]const u8 = @ptrCast(&libcart.cart_data_load_start);
+
+        @memcpy(data_start[0..data_len], data_src[0..data_len]);
+    }
 
     call(&libcart.start);
 }

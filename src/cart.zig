@@ -10,8 +10,6 @@ pub fn init() void {
     Port.BUTTON_RIGHT.set_dir(.in);
     Port.BUTTON_LEFT.set_dir(.in);
 
-    timer.init_frame_sync();
-
     @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
 
     // fill .bss with zeroes

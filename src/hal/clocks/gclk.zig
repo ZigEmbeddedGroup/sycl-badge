@@ -64,7 +64,7 @@ pub fn wait_for_sync_mask(mask: u12) void {
 
 pub const EnableGeneratorOptions = struct {
     divsel: microzig.chip.types.peripherals.GCLK.GCLK_GENCTRL__DIVSEL,
-    div: u8,
+    div: u16,
 };
 
 pub fn enable_generator(gen: Generator, source: Source, opts: EnableGeneratorOptions) void {

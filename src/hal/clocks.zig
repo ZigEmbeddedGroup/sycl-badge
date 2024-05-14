@@ -182,6 +182,7 @@ pub const State = struct {
             if (!generator.enabled)
                 return 0;
 
+            const div = generator.get_div();
             return switch (generator.source) {
                 .XOSC0, .XOSC1 => @panic("TODO"),
                 .GCLKIN => @panic("TODO"),
@@ -203,7 +204,7 @@ pub const State = struct {
                     break :blk pll.get_output_freq_hz();
                 },
                 _ => unreachable,
-            } / generator.get_div();
+            } / div;
         }
     };
 
@@ -441,3 +442,52 @@ pub fn get_state() State {
 }
 
 pub const Configuration = struct {};
+
+pub const EnableDpllOptions = struct {
+    factor: u32,
+    output_freq_hz: u32,
+    input_freq_hz: u32,
+};
+
+pub fn enable_dpll(index: u1, gen: gclk.Generator, comptime opts: EnableDpllOptions) void {
+    const periph_index: gclk.PeripheralIndex = switch (index) {
+        0 => .GCLK_OSCCTRL_FDPLL0,
+        1 => .GCLK_OSCCTRL_FDPLL1,
+    };
+
+    gclk.set_peripheral_clk_gen(periph_index, gen);
+    OSCCTRL.DPLL[index].DPLLCTRLB.write(.{
+        .FILTER = .{ .value = .FILTER1 },
+        .WUF = 0,
+        .REFCLK = .{ .value = .GCLK },
+        .LTIME = .{ .value = .DEFAULT },
+        .LBYPASS = 0,
+        .DCOFILTER = .{ .raw = 0 },
+        .DCOEN = 0,
+        .DIV = 0,
+        .padding = 0,
+    });
+
+    const freq_hz = opts.output_freq_hz * opts.factor;
+    comptime std.debug.assert(freq_hz >= 96_000_000 and freq_hz <= 200_000_000);
+    const ratio = @divExact(freq_hz * 32, opts.input_freq_hz);
+
+    OSCCTRL.DPLL[index].DPLLRATIO.write(.{
+        .LDR = ratio / 32 - 1,
+        .reserved16 = 0,
+        .LDRFRAC = ratio % 32,
+        .padding = 0,
+    });
+    while (OSCCTRL.DPLL[index].DPLLSYNCBUSY.read().DPLLRATIO != 0) {}
+
+    OSCCTRL.DPLL[index].DPLLCTRLA.write(.{
+        .reserved1 = 0,
+        .ENABLE = 1,
+        .reserved6 = 0,
+        .RUNSTDBY = 0,
+        .ONDEMAND = 0,
+    });
+
+    while (OSCCTRL.DPLL[index].DPLLSYNCBUSY.read().ENABLE != 0) {}
+    while (OSCCTRL.DPLL[index].DPLLSTATUS.read().CLKRDY == 0) {}
+}

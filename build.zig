@@ -69,6 +69,19 @@ pub fn build(b: *Build) void {
     add_zeroman_assets_step(b, zeroman_cart);
     zeroman_cart.install(b);
 
+    {
+        const cart = add_cart(&dep, b, .{
+            .name = "blobs",
+            .optimize = .ReleaseSmall,
+            .root_source_file = .{ .path = "samples/blobs/blobs.zig" },
+        });
+        cart.install(b);
+        b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
+            &cart.install_with_watcher(&dep, b, .{}).step
+        );
+    }
+
+
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
 

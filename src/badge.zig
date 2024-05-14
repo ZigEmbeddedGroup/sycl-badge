@@ -88,39 +88,20 @@ pub fn main() !void {
     // MPU.RBAR_A2
     // MPU.RASR_A2
     // MPU.CTRL
-    //
-    // cart init
-    //  pins
-    //  bss
-    //  data
-
-    // After this section of code runs we'll have the following clock setup:
-    // FDLL (48MHz)    => GCLK2 (1MHz)
-    // GCLK2 (1MHz)    => DPLL0 (120MHz)
-    //                 => ADC0 (1MHz)
-    //                 => TC0 (1MHz)
-    //                 => TC1 (1MHz)
-    // DPLL0 (120MHz)  => GCLK0 (120MHz)
-    //
-    // FDLL (48MHz)    => GCLK1 (76.8KHz)
-    // GCLK1 (76.8KHz) => DPLL1 (8.467MHz)
-    // DPLL1 (8.467MHz => GCLK3 (8.467MHz)
-    // GCLK3 (8.467MHz => TC4 (8.467MHz)
 
     // GCLK0 feeds the CPU so put it on OSCULP32K for now
-    clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{
-        .divsel = .DIV1,
-        .div = 1,
-    });
+    clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{});
 
+    // Enable the first chain of clock generators:
+    //
+    // FDLL (48MHz) => GCLK2 (1MHz) => DPLL0 (120MHz) => GCLK0 (120MHz)
+    //                              => ADC0 (1MHz)
+    //                              => TC0 (1MHz)
+    //                              => TC1 (1MHz)
+    //
     clocks.gclk.enable_generator(.GCLK2, .DFLL, .{
         .divsel = .DIV1,
         .div = 48,
-    });
-
-    clocks.gclk.enable_generator(.GCLK1, .DFLL, .{
-        .divsel = .DIV1,
-        .div = 625,
     });
 
     clocks.enable_dpll(0, .GCLK2, .{
@@ -129,20 +110,30 @@ pub fn main() !void {
         .output_freq_hz = 120_000_000,
     });
 
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_ADC0, .GCLK2);
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK2);
+    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{});
+
+    // The second chain of clock generators:
+    //
+    // FDLL (48MHz) => GCLK1 (76.8KHz) => DPLL1 (8.467MHz) => GCLK3 (8.467MHz) => TC4 (8.467MHz)
+    //
+
+    // The we use GCLK1 here because it's able to divide much more than the
+    // other generators, the other generators max out at 512
+    clocks.gclk.enable_generator(.GCLK1, .DFLL, .{
+        .divsel = .DIV1,
+        .div = 625,
+    });
+
     clocks.enable_dpll(1, .GCLK1, .{
         .factor = 12,
         .input_freq_hz = 76_800,
         .output_freq_hz = 8_467_200,
     });
 
-    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{
-        .divsel = .DIV1,
-        .div = 1,
-    });
-
-    clocks.gclk.set_peripheral_clk_gen(.GCLK_ADC0, .GCLK1);
-    clocks.gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK1);
-    clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK2);
+    clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{});
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK3);
 
     timer.init();
     init_frame_sync();

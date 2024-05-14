@@ -2,6 +2,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const port = hal.port;
+const clocks = hal.clocks;
 
 const peripherals = microzig.chip.peripherals;
 const SERCOM = microzig.chip.types.peripherals.SERCOM;
@@ -51,6 +52,21 @@ pub const Sercom = enum(u3) {
             else
                 unreachable, // MCU does not have SERCOM7
         };
+    }
+
+    fn get_clock_frequency_hz(sercom: Sercom) u32 {
+        const index: clocks.gclk.PeripheralIndex = switch (sercom) {
+            .SERCOM0 => .GCLK_SERCOM0_CORE,
+            .SERCOM1 => .GCLK_SERCOM1_CORE,
+            .SERCOM2 => .GCLK_SERCOM2_CORE,
+            .SERCOM3 => .GCLK_SERCOM3_CORE,
+            .SERCOM4 => .GCLK_SERCOM4_CORE,
+            .SERCOM5 => .GCLK_SERCOM5_CORE,
+            .SERCOM6 => .GCLK_SERCOM6_CORE,
+            .SERCOM7 => .GCLK_SERCOM7_CORE,
+        };
+
+        return clocks.get_peripheral_clock_freq_hz(index);
     }
 };
 

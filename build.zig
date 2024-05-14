@@ -15,13 +15,13 @@ fn sycl_badge_microzig_target(d: *Build.Dependency) MicroZig.Target {
         .preferred_format = .elf,
         .chip = atsam.chips.atsamd51j19.chip,
         .hal = .{
-            .root_source_file = d.path("src/hal.zig"),
+            .root_source_file = d.builder.path("src/hal.zig"),
         },
         .board = .{
             .name = "SYCL Badge Rev A",
-            .root_source_file = d.path("src/board.zig"),
+            .root_source_file = d.builder.path("src/board.zig"),
         },
-        .linker_script = d.path("src/badge/samd51j19a_self.ld"),
+        .linker_script = d.builder.path("src/badge/samd51j19a_self.ld"),
     };
 }
 
@@ -58,6 +58,7 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
+    feature_test_cart.install(b);
     const watch_run_step = feature_test_cart.install_with_watcher(&dep, b, .{});
 
     const zeroman_cart = add_cart(&dep, b, .{
@@ -71,37 +72,38 @@ pub fn build(b: *Build) void {
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
 
-    const badge = mz.add_firmware(b, .{
-        .name = "badge",
-        .target = sycl_badge_microzig_target(&dep),
-        .optimize = .ReleaseSmall,
-        .root_source_file = .{ .path = "src/badge.zig" },
-    });
-    mz.install_firmware(b, badge, .{});
-
     inline for (.{
         "blinky",
-        "blinky_timer",
-        "usb_cdc",
-        "usb_storage",
+        //"blinky_timer",
+        //"usb_cdc",
+        //"usb_storage",
         "buttons",
         //"lcd",
         "audio",
         "light_sensor",
-        "neopixels",
-        "qspi",
-        "qa",
+        //"qspi",
+        //"qa",
+        //"clocks",
     }) |name| {
         const mvp = mz.add_firmware(b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+            .optimize = optimize,
+            .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
             .target = sycl_badge_microzig_target(&dep),
+        });
+        mz.install_firmware(b, mvp, .{ .format = .elf });
+        mz.install_firmware(b, mvp, .{ .format = .{ .uf2 = .SAMD51 } });
+    }
+
+    inline for (.{
+        "neopixels",
+    }) |name| {
+        const mvp = add_cart(&dep, b, .{
+            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
             .optimize = optimize,
             .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
         });
-        mz.install_firmware(b, mvp, .{});
-        mz.install_firmware(b, mvp, .{
-            .format = .{ .uf2 = .SAMD51 },
-        });
+        mvp.install(b);
     }
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -139,6 +141,7 @@ pub const Cart = struct {
     options: CartOptions,
 
     pub fn install(c: *const Cart, b: *Build) void {
+        c.mz.install_firmware(b, c.fw, .{ .format = .elf });
         c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         b.installArtifact(c.wasm);
     }
@@ -213,25 +216,20 @@ pub fn add_cart(
         .single_threaded = true,
         .use_llvm = true,
         .use_lld = true,
+        .strip = false,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
-    cart_lib.linker_script = d.path("src/cart.ld");
-
-    const fw_options = b.addOptions();
-    fw_options.addOption(bool, "have_cart", true);
+    cart_lib.linker_script = d.builder.path("src/cart.ld");
 
     const mz = MicroZig.init(d.builder, .{});
-
     const fw = mz.add_firmware(d.builder, .{
         .name = options.name,
         .target = sycl_badge_microzig_target(d),
         .optimize = options.optimize,
-        .root_source_file = d.path("src/main.zig"),
-        .linker_script = d.path("src/cart.ld"),
+        .root_source_file = d.builder.path("src/badge.zig"),
+        .linker_script = d.builder.path("src/cart.ld"),
     });
     fw.artifact.linkLibrary(cart_lib);
-    fw.artifact.step.dependOn(&fw_options.step);
-    fw.modules.app.addOptions("options", fw_options);
 
     const cart: *Cart = b.allocator.create(Cart) catch @panic("OOM");
     cart.* = .{
@@ -245,7 +243,7 @@ pub fn add_cart(
 }
 
 pub fn install_cart(b: *Build, cart: *Cart) void {
-    cart.mz.install_firmware(b, cart.fw, .{});
+    cart.mz.install_firmware(b, cart.fw, .{ .format = .elf });
     cart.mz.install_firmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }
 

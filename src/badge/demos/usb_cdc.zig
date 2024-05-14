@@ -3,8 +3,8 @@ const microzig = @import("microzig");
 const board = microzig.board;
 const hal = microzig.hal;
 const usb = hal.usb;
-const mclk = hal.mclk;
-const gclk = hal.gclk;
+const mclk = hal.clocks.mclk;
+const gclk = hal.clocks.gclk;
 
 const io_types = microzig.chip.types.peripherals;
 

@@ -1,8 +1,8 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
-const mclk = hal.mclk;
-const gclk = hal.gclk;
+const mclk = hal.clocks.mclk;
+const gclk = hal.clocks.gclk;
 
 const peripherals = microzig.chip.peripherals;
 const TC0 = peripherals.TC0;
@@ -10,7 +10,6 @@ const TC1 = peripherals.TC1;
 const MCLK = peripherals.MCLK;
 
 pub fn init() void {
-    MCLK.APBAMASK.modify(.{ .TC0_ = 1, .TC1_ = 1 });
     TC0.COUNT32.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 0,
@@ -55,7 +54,6 @@ pub fn init() void {
         .padding = 0,
     });
     while (TC1.COUNT32.SYNCBUSY.read().ENABLE != 0) {}
-    gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK1);
 
     TC0.COUNT32.CTRLA.write(.{
         .SWRST = 1,
@@ -79,7 +77,6 @@ pub fn init() void {
         .padding = 0,
     });
     while (TC0.COUNT32.SYNCBUSY.read().SWRST != 0) {}
-    gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK1);
 
     TC1.COUNT32.CTRLA.write(.{
         .SWRST = 1,

@@ -3,7 +3,7 @@ const microzig = @import("microzig");
 const board = microzig.board;
 
 // pins
-const Buttons = board.Buttons;
+const ButtonPoller = board.ButtonPoller;
 const led_pin = board.D13;
 
 const Symbol = enum {
@@ -65,14 +65,14 @@ fn get_symbols(character: u8) []const Symbol {
 }
 
 pub fn main() !void {
-    Buttons.configure();
+    const poller = ButtonPoller.init();
     // Use morse code to convey which button is currently pressed
     led_pin.set_dir(.out);
 
     while (true) {
         const message: []const u8 = blk: {
-            const buttons = Buttons.read_from_port();
-            inline for (@typeInfo(Buttons).Struct.fields) |field| {
+            const buttons = poller.read_from_port();
+            inline for (@typeInfo(ButtonPoller.Buttons).Struct.fields) |field| {
                 if (@field(buttons, field.name) == 1)
                     break :blk field.name;
             }

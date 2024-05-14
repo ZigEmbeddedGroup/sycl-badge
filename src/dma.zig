@@ -82,8 +82,6 @@ pub fn stop_lcd() void {
 }
 
 pub fn init_audio() void {
-    @setCold(true);
-
     init();
     io.DMAC.CHANNEL[CHANNEL.AUDIO].CHCTRLA.write(.{
         .SWRST = 0,
@@ -189,8 +187,6 @@ pub fn wait_audio(i: usize) void {
 }
 
 fn init() void {
-    @setCold(true);
-
     if (initialized) return;
     io.MCLK.AHBMASK.modify(.{ .DMAC_ = 1 });
     io.DMAC.CTRL.write(.{

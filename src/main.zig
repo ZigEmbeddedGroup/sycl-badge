@@ -7,54 +7,54 @@ const io_types = microzig.chip.types.peripherals;
 const lcd = @import("lcd.zig");
 const microzig = @import("microzig");
 const NVMCTRL = @import("chip.zig").NVMCTRL;
-const options = @import("options");
 const Port = @import("Port.zig");
 const sleep = microzig.core.experimental.debug.busy_sleep;
 const std = @import("std");
 const timer = @import("timer.zig");
 const utils = @import("utils.zig");
 
-const interrupt = struct {
-    fn unhandled(comptime name: []const u8) microzig.interrupt.Handler {
-        return .{
-            .C = struct {
-                fn handler() callconv(.C) void {
-                    interrupt.log.info(name, .{});
-                    microzig.hang();
-                }
-            }.handler,
-        };
-    }
+const hal = microzig.hal;
+const clocks = hal.clocks;
 
-    fn with_context(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
-        return microzig.interrupt.Handler{
-            .Naked = struct {
-                fn interrupt() callconv(.Naked) void {
-                    asm volatile (
-                        \\ tst lr, #1 << 2
-                        \\ ite eq
-                        \\ moveq r0, sp
-                        \\ mrsne r0, psp
-                        \\ b %[handler:P]
-                        :
-                        : [handler] "X" (&handler),
-                    );
-                }
-            }.interrupt,
-        };
-    }
-    const log = std.log.scoped(.interrupt);
-    const Context = extern struct {
-        R0: u32,
-        R1: u32,
-        R2: u32,
-        R3: u32,
-        R12: u32,
-        LR: u32,
-        ReturnAddress: u32,
-        xPSR: u32,
-    };
+const interrupt_log = std.log.scoped(.interrupt);
+const Context = extern struct {
+    R0: u32,
+    R1: u32,
+    R2: u32,
+    R3: u32,
+    R12: u32,
+    LR: u32,
+    ReturnAddress: u32,
+    xPSR: u32,
 };
+
+fn unhandled(comptime name: []const u8) microzig.interrupt.Handler {
+    return microzig.interrupt.Handler{
+        .C = struct {
+            fn handler() callconv(.C) void {
+                interrupt_log.info(name, .{});
+                microzig.hang();
+            }
+        }.handler,
+    };
+}
+fn with_context(comptime handler: fn (*Context) void) microzig.interrupt.Handler {
+    return microzig.interrupt.Handler{
+        .Naked = struct {
+            fn interrupt() callconv(.Naked) void {
+                asm volatile (
+                    \\ tst lr, #1 << 2
+                    \\ ite eq
+                    \\ moveq r0, sp
+                    \\ mrsne r0, psp
+                    \\ b %[handler:P]
+                    :
+                    : [handler] "X" (&handler),
+                );
+            }
+        }.interrupt,
+    };
+}
 
 pub const microzig_options = .{
     .log_level = switch (builtin.mode) {
@@ -63,19 +63,19 @@ pub const microzig_options = .{
     },
     .logFn = log,
     .interrupts = .{
-        .NonMaskableInt = interrupt.unhandled("NonMaskableInt"),
-        .HardFault = interrupt.with_context(struct {
-            fn handler(ctx: *interrupt.Context) void {
-                interrupt.log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+        .NonMaskableInt = unhandled("NonMaskableInt"),
+        .HardFault = with_context(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[HardFault] HFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.HFSR.raw,
                     ctx.ReturnAddress,
                 });
                 microzig.hang();
             }
         }.handler),
-        .MemoryManagement = interrupt.with_context(struct {
-            fn handler(ctx: *interrupt.Context) void {
-                interrupt.log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+        .MemoryManagement = with_context(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[MemoryManagement] CFSR = 0x{x}, MMFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
                     io.SystemControl.MMFAR.raw,
                     ctx.ReturnAddress,
@@ -83,9 +83,9 @@ pub const microzig_options = .{
                 microzig.hang();
             }
         }.handler),
-        .BusFault = interrupt.with_context(struct {
-            fn handler(ctx: *interrupt.Context) void {
-                interrupt.log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
+        .BusFault = with_context(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[BusFault] CFSR = 0x{x}, BFAR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
                     io.SystemControl.BFAR.raw,
                     ctx.ReturnAddress,
@@ -93,22 +93,18 @@ pub const microzig_options = .{
                 microzig.hang();
             }
         }.handler),
-        .UsageFault = interrupt.with_context(struct {
-            fn handler(ctx: *interrupt.Context) void {
-                interrupt.log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
+        .UsageFault = with_context(struct {
+            fn handler(ctx: *Context) void {
+                interrupt_log.info("[UsageFault] CFSR = 0x{x}, ReturnAddress = 0x{x}", .{
                     io.SystemControl.CFSR.raw,
                     ctx.ReturnAddress,
                 });
                 microzig.hang();
             }
         }.handler),
-        .DebugMonitor = interrupt.unhandled("DebugMonitor"),
-        .PendSV = interrupt.unhandled("PendSV"),
-        .SysTick = interrupt.unhandled("SysTick"),
-        .DMAC_DMAC_1 = .{ .C = audio.mix },
-        .SVCall = .{
+        .SVCall = microzig.interrupt.Handler{
             .Naked = struct {
-                fn SVCall() callconv(.Naked) void {
+                fn handler() callconv(.Naked) void {
                     asm volatile (
                         \\ mvns r0, lr, lsl #31 - 2
                         \\ bcc 1f
@@ -197,8 +193,12 @@ pub const microzig_options = .{
                           [trace] "X" (&cart.trace),
                     );
                 }
-            }.SVCall,
+            }.handler,
         },
+        .DebugMonitor = unhandled("DebugMonitor"),
+        .PendSV = unhandled("PendSV"),
+        .SysTick = unhandled("SysTick"),
+        .DMAC_DMAC_1 = .{ .C = audio.mix },
     },
 };
 
@@ -316,7 +316,7 @@ pub fn main() !void {
         .ENABLE = 1,
         .SIZE = (@ctz(utils.FLASH.SIZE) - 1) & 1,
         .reserved8 = @as(u4, (@ctz(utils.FLASH.SIZE) - 1) >> 1),
-        .SRD = if (options.have_cart) 0b00000111 else 0b00000000,
+        .SRD = 0b00000111,
         .B = 0,
         .C = 1,
         .S = 0,
@@ -336,7 +336,7 @@ pub fn main() !void {
         .ENABLE = 1,
         .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) & 1,
         .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) >> 1),
-        .SRD = if (options.have_cart) 0b11110000 else 0b00000000,
+        .SRD = 0b11110000,
         .B = 1,
         .C = 1,
         .S = 0,
@@ -375,6 +375,10 @@ pub fn main() !void {
     });
 
     cart.init();
+
+    const state = clocks.get_state();
+    const freqs = clocks.Frequencies.get(state);
+    _ = freqs;
 
     var was_ready = false;
     var cart_running = false;
@@ -913,6 +917,7 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[0].DPLLSYNCBUSY.read().ENABLE != 0) {}
+
         io.OSCCTRL.DPLL[1].DPLLCTRLA.write(.{
             .reserved1 = 0,
             .ENABLE = 0,
@@ -921,6 +926,7 @@ pub const usb = struct {
             .ONDEMAND = 0,
         });
         while (io.OSCCTRL.DPLL[1].DPLLSYNCBUSY.read().ENABLE != 0) {}
+
         io.GCLK.PCHCTRL[GCLK.PCH.OSCCTRL_FDPLL0].write(.{
             .GEN = .{ .raw = 0 },
             .reserved6 = 0,

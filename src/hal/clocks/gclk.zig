@@ -1,12 +1,13 @@
 const microzig = @import("microzig");
 const peripherals = microzig.chip.peripherals;
-const GCLK = peripherals.GCLK;
+pub const GCLK = peripherals.GCLK;
 const types = microzig.chip.types;
 
 /// For SYNCBUSY
 const Genctrl = types.peripherals.GCLK.GCLK_SYNCBUSY__GENCTRL;
 pub const Generator = types.peripherals.GCLK.GCLK_PCHCTRL__GEN;
 pub const Source = types.peripherals.GCLK.GCLK_GENCTRL__SRC;
+pub const DivSelection = microzig.chip.types.peripherals.GCLK.GCLK_GENCTRL__DIVSEL;
 
 pub const PeripheralIndex = enum(u6) {
     GCLK_OSCCTRL_DFLL48 = 0,
@@ -52,9 +53,18 @@ pub const PeripheralIndex = enum(u6) {
     GCLK_CM4_TRACE = 47,
 };
 
+pub fn reset_blocking() void {
+    GCLK.CTRLA.write(.{ .SWRST = 1, .padding = 0 });
+    while (GCLK.SYNCBUSY.read().SWRST != 0) {}
+}
+
+pub fn wait_for_sync_mask(mask: u12) void {
+    while ((GCLK.SYNCBUSY.read().GENCTRL.raw & mask) != 0) {}
+}
+
 pub const EnableGeneratorOptions = struct {
     divsel: microzig.chip.types.peripherals.GCLK.GCLK_GENCTRL__DIVSEL,
-    div: u8,
+    div: u16,
 };
 
 pub fn enable_generator(gen: Generator, source: Source, opts: EnableGeneratorOptions) void {

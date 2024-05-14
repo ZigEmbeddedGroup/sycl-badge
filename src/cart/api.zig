@@ -19,10 +19,8 @@ pub const font_height: u32 = 8;
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-const base = if (builtin.target.isWasm()) 0 else 0x20000000;
-
 /// RGB888, true color
-pub const NeopixelColor = packed struct(u24) { b: u8, g: u8, r: u8 };
+pub const NeopixelColor = extern struct { g: u8, r: u8, b: u8 };
 
 /// RGB565, high color
 pub const DisplayColor = packed struct(u16) {
@@ -65,10 +63,10 @@ pub const Controls = packed struct(u9) {
     right: bool,
 };
 
-pub const controls: *const Controls = @ptrFromInt(base + 0x04);
-/// 0-4095
-pub const light_level: *const u12 = @ptrFromInt(base + 0x06);
-/// 5 24-bit color LEDs
+const base = if (builtin.target.isWasm()) 0 else 0x20000000;
+
+pub const controls: *Controls = @ptrFromInt(base + 0x04);
+pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt(base + 0x1e);
@@ -94,12 +92,7 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
-    struct {
-        export fn __return_thunk__() noreturn {
-            asm volatile (" svc #12");
-            unreachable;
-        }
-    };
+    struct {};
 
 comptime {
     _ = platform_specific;
@@ -142,23 +135,23 @@ pub inline fn blit(options: BlitOptions) void {
             options.flags,
         );
     } else {
-        // const rest: extern struct {
-        //     width: u32,
-        //     height: u32,
-        //     flags: u32,
-        // } = .{
-        //     .width = width,
-        //     .height = height,
-        //     .flags = flags,
-        // };
-        // asm volatile (" svc #0"
-        //     :
-        //     : [sprite] "{r0}" (sprite),
-        //       [x] "{r1}" (x),
-        //       [y] "{r2}" (y),
-        //       [rest] "{r3}" (&rest),
-        //     : "memory"
-        // );
+        const rest: extern struct {
+            width: u32,
+            height: u32,
+            flags: u32,
+        } = .{
+            .width = options.width,
+            .height = options.height,
+            .flags = @bitCast(options.flags),
+        };
+        asm volatile (" svc #0"
+            :
+            : [sprite] "{r0}" (options.sprite),
+              [x] "{r1}" (options.x),
+              [y] "{r2}" (options.y),
+              [rest] "{r3}" (&rest),
+            : "memory"
+        );
     }
 }
 

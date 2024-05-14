@@ -2,8 +2,8 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const hal = microzig.hal;
-const gclk = hal.gclk;
-const mclk = hal.mclk;
+const gclk = hal.clocks.gclk;
+const mclk = hal.clocks.mclk;
 const timer = hal.timer;
 
 const adc0 = hal.adc.num(0);

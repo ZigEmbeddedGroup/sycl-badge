@@ -1,7 +1,8 @@
 const microzig = @import("microzig");
 const std = @import("std");
 
-pub const Color = struct {
+const cart = @import("cart-api");
+pub const Color = extern struct {
     g: u8,
     r: u8,
     b: u8,
@@ -53,8 +54,11 @@ pub fn Group(comptime count: u16) type {
             const OUTCLR = &neopixels.pin.group.ptr().OUTCLR;
             const pin_mask = @as(u32, 1) << neopixels.pin.num;
             asm volatile (
-                \\  push    {r4, r5, r6, lr};
                 \\  add     r3, r2, r3;
+                \\
+                \\initial_pause:
+                \\  str r1, [r0, #0];                       // clr
+                \\  mov r6, #3000; d4: subs r6, #1; bne d4;  // 80us low
                 \\
                 \\loop_load:
                 \\  ldrb r5, [r2, #0];                      // r5 := *ptr
@@ -84,13 +88,13 @@ pub fn Group(comptime count: u16) type {
                 \\  b loop_load;
                 \\
                 \\neopixel_stop:
-                \\        pop {r4, r5, r6, pc};
                 \\
                 :
                 : [OUTCLR] "{r0}" (OUTCLR),
                   [pin_mask] "{r1}" (pin_mask),
                   [ptr] "{r2}" (buf.ptr),
                   [count] "{r3}" (buf.len),
+                : "r4", "r5", "r6"
             );
         }
     };

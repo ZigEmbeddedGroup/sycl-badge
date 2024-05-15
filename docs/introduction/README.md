@@ -49,10 +49,6 @@ Once you're happy with what you've made, read on to learn how to flash your code
 
 ## Hard(ware) mode
 
-**Please wait until the afternoon before trying to upload programs onto badges as the badge is still being worked on.**
-
-Currently, only the neopixels are functional.
-
 ### Power and Boot
 
 Your badge can be powered via the USB-C port, but to allow cordless use of the badge, you've been provided with a battery and two pieces of velcro.

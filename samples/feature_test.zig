@@ -74,13 +74,13 @@ export fn update() void {
         }
     }
 
-    // for (cart.neopixels, 0..) |*np, i| {
-    //     np.* = .{
-    //         .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
-    //         .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
-    //         .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
-    //     };
-    // }
+    for (cart.neopixels, 0..) |*np, i| {
+        np.* = .{
+            .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 20),
+            .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 20),
+            .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 20),
+        };
+    }
 
     cart.blit(.{
         .sprite = &.{

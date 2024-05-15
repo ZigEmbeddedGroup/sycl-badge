@@ -26,7 +26,8 @@ export fn update() void {
             .duration = 20,
             .volume = 10,
             .flags = .{
-                .channel = .pulse1,
+                .function = .pulse1,
+                .channel = 0,
                 .duty_cycle = .@"1/8",
                 .panning = .left,
             },

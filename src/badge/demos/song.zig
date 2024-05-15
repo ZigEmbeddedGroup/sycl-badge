@@ -200,7 +200,8 @@ pub export fn update() void {
                 .duration = @intFromFloat(@max(note.duration - 0.04, 0.0) * 60),
                 .volume = 100,
                 .flags = .{
-                    .channel = @enumFromInt(channel_index),
+                    .channel = 0,
+                    .function = @enumFromInt(channel_index),
                 },
             });
         }

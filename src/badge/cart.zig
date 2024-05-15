@@ -410,7 +410,7 @@ fn tone(
         state.release_volume_step = @divTrunc(@as(i32, 0) - state.sustain_volume, state.release_duration);
     }
 
-    switch (flags.channel) {
+    switch (flags.function) {
         .pulse1, .pulse2 => {
             state.duty = switch (flags.duty_cycle) {
                 .@"1/8" => (1 << 32) / 8,
@@ -427,7 +427,7 @@ fn tone(
         },
     }
 
-    audio.set_channel(@intFromEnum(flags.channel), state);
+    audio.set_channel(flags.channel, state);
 }
 
 fn read_flash(

@@ -13,6 +13,7 @@
 //! - USB mass drive
 //! - USB CDC logging
 const std = @import("std");
+const builtin = @import("builtin");
 
 const microzig = @import("microzig");
 const board = microzig.board;

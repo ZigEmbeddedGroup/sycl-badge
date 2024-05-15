@@ -196,12 +196,12 @@ pub fn init() void {
 
     dma.init_audio();
     while (DAC.STATUS.read().READY0 != 1) {}
-    board.SPKR_EN.write(.high);
     NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
 pub fn mix() callconv(.C) void {
     var local_channels = channels.*;
+    var speaker_enable: port.Level = .low;
     for (&sample_buffer[
         (dma.get_audio_part() + sample_buffer.len - 1) % sample_buffer.len
     ]) |*out_sample| {
@@ -217,9 +217,9 @@ pub fn mix() callconv(.C) void {
                 // update
                 channel.phase +%= channel.phase_step;
                 channel.phase_step = @intCast(channel.phase_step + channel.phase_step_step);
-                channel.volume = @intCast(channel.volume + channel.volume_step);
                 if (channel.duration > 0) {
                     channel.duration -= 1;
+                    channel.volume = @intCast(channel.volume + channel.volume_step);
                 } else if (channel.attack_duration > 0) {
                     channel.duration = channel.attack_duration;
                     channel.attack_duration = 0;
@@ -245,9 +245,11 @@ pub fn mix() callconv(.C) void {
                 }
             }
         }
+        if (sample != 0) speaker_enable = .high;
         out_sample.* = @intCast((sample >> 16) - std.math.minInt(i16));
     }
     channels.* = local_channels;
+    board.SPKR_EN.write(speaker_enable);
     dma.ack_audio();
 }
 

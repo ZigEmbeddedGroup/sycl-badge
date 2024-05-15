@@ -146,6 +146,7 @@ pub fn main() !void {
         .TC0 = .enabled,
         .TC1 = .enabled,
         .TC4 = .enabled,
+        .SERCOM4 = .enabled,
     });
 
     const state = clocks.get_state();
@@ -174,7 +175,7 @@ pub fn main() !void {
         },
     });
 
-    lcd.clear_screen(.{ .r = 0, .g = 0, .b = 0 });
+    lcd.clear_screen(.{ .r = 31, .g = 0, .b = 0 });
 
     const neopixels = board.Neopixels.init(board.D8_NEOPIX);
     adc.init();

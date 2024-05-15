@@ -63,7 +63,7 @@ pub fn build(b: *Build) void {
 
     const zeroman_cart = add_cart(&dep, b, .{
         .name = "zeroman",
-        .optimize = .ReleaseSmall,
+        .optimize = optimize,
         .root_source_file = .{ .path = "samples/zeroman/main.zig" },
     });
     add_zeroman_assets_step(b, zeroman_cart);

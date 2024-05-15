@@ -98,6 +98,10 @@ pub fn set_peripheral_clk_gen(peripheral: PeripheralIndex, gen: Generator) void 
     });
 }
 
+pub fn peripheral_is_enabled(peripheral: PeripheralIndex) bool {
+    return GCLK.PCHCTRL[@intFromEnum(peripheral)].read().CHEN == 1;
+}
+
 pub fn disable_peripheral_channel(peripheral: PeripheralIndex) void {
     GCLK.PCHCTRL[@intFromEnum(peripheral)].modify(.{
         .CHEN = 0,

@@ -21,6 +21,7 @@ const chip = microzig.chip;
 const hal = microzig.hal;
 const clocks = hal.clocks;
 const timer = hal.timer;
+const sercom = hal.sercom;
 
 // direct peripheral access
 const SystemControl = chip.peripherals.SystemControl;
@@ -78,7 +79,6 @@ pub fn main() !void {
     clocks.gclk.reset_blocking();
     microzig.cpu.dmb();
 
-    // lcd init
     // audio init
     //
     // MPU.RBAR
@@ -134,6 +134,7 @@ pub fn main() !void {
 
     clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{});
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK3);
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
 
     timer.init();
     init_frame_sync();
@@ -150,6 +151,30 @@ pub fn main() !void {
     const state = clocks.get_state();
     const freqs = clocks.Frequencies.get(state);
     _ = freqs;
+
+    const lcd = Lcd.init(.{
+        .spi = sercom.spi.Master.init(.SERCOM4, .{
+            .cpha = .LEADING_EDGE,
+            .cpol = .IDLE_LOW,
+            .dord = .MSB,
+            .dopo = .PAD2,
+            .ref_freq_hz = 120_000_000,
+            .baud_freq_hz = 4_000_000,
+        }),
+        .pins = .{
+            .rst = board.TFT_RST,
+            .lite = board.TFT_LITE,
+            .dc = board.TFT_DC,
+            .cs = board.TFT_CS,
+            .sck = board.TFT_SCK,
+            .mosi = board.TFT_MOSI,
+        },
+        .fb = .{
+            .bpp16 = @ptrCast(cart.api.framebuffer),
+        },
+    });
+
+    lcd.clear_screen(.{ .r = 0, .g = 0, .b = 0 });
 
     const neopixels = board.Neopixels.init(board.D8_NEOPIX);
     adc.init();
@@ -188,6 +213,8 @@ pub fn main() !void {
 
         neopixels.write(&pixels);
         led_pin.write(if (cart.api.red_led.*) .high else .low);
+        lcd.set_window(0, 0, 160, 128);
+        lcd.send_colors(@ptrCast(cart.api.framebuffer));
     }
 }
 

@@ -150,9 +150,6 @@ pub const Lcd = struct {
         lcd.send_cmd(ST7735.DISPON, &.{});
         timer.delay_us(100 * std.time.us_per_ms);
 
-        // TODO: more
-        @memset(lcd.fb, 0);
-
         return lcd;
     }
 
@@ -225,8 +222,10 @@ pub const Lcd = struct {
     }
 
     pub fn set_window(lcd: Lcd, x0: u8, y0: u8, x1: u8, y1: u8) void {
-        lcd.send_cmd(ST7735.CASET, &.{ 0x00, x0, 0x00, x1 }, 1);
-        lcd.send_cmd(ST7735.RASET, &.{ 0x00, y0, 0x00, y1 }, 1);
+        lcd.send_cmd(ST7735.CASET, &.{ 0x00, x0, 0x00, x1 });
+        timer.delay_us(1);
+        lcd.send_cmd(ST7735.RASET, &.{ 0x00, y0, 0x00, y1 });
+        timer.delay_us(1);
     }
 
     pub fn fill16(lcd: Lcd, color: Color16) void {

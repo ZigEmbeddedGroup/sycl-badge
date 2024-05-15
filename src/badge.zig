@@ -236,7 +236,7 @@ pub fn main() !void {
             .dord = .MSB,
             .dopo = .PAD2,
             .ref_freq_hz = 120_000_000,
-            .baud_freq_hz = 4_000_000,
+            .baud_freq_hz = 12_000_000,
         }),
         .pins = .{
             .rst = board.TFT_RST,

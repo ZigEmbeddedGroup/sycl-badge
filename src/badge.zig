@@ -27,10 +27,8 @@ const sercom = hal.sercom;
 const SystemControl = chip.peripherals.SystemControl;
 const CMCC = chip.peripherals.CMCC;
 const NVMCTRL = chip.peripherals.NVMCTRL;
-const GCLK = chip.peripherals.GCLK;
-const OSCCTRL = chip.peripherals.OSCCTRL;
 const TC4 = chip.peripherals.TC4;
-const MCLK = chip.peripherals.MCLK;
+const MPU = chip.peripherals.MPU;
 
 const cart = @import("badge/cart.zig");
 
@@ -39,12 +37,16 @@ const led_pin = board.D13;
 const Lcd = board.Lcd;
 const ButtonPoller = board.ButtonPoller;
 const light_sensor_pin = microzig.board.A7_LIGHT;
+const audio = board.audio;
 
 const adc = hal.adc.num(0);
+
+const utils = @import("utils.zig");
 
 pub const microzig_options = .{
     .interrupts = .{
         .SVCall = microzig.interrupt.Handler{ .Naked = cart.svcall_handler },
+        .DMAC_DMAC_1 = .{ .C = &audio.mix },
     },
 };
 
@@ -69,7 +71,10 @@ pub fn main() !void {
         .padding = 0,
     });
 
-    clocks.mclk.set_ahb_mask(.{ .CMCC = .enabled });
+    clocks.mclk.set_ahb_mask(.{
+        .CMCC = .enabled,
+        .DMAC = .enabled,
+    });
     CMCC.CTRL.write(.{
         .CEN = 1,
         .padding = 0,
@@ -193,18 +198,23 @@ pub fn main() !void {
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK3);
     clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
 
-    timer.init();
-    init_frame_sync();
-
-    // Light sensor adc
-    light_sensor_pin.set_mux(.B);
     clocks.mclk.set_apb_mask(.{
         .ADC0 = .enabled,
         .TC0 = .enabled,
         .TC1 = .enabled,
         .TC4 = .enabled,
         .SERCOM4 = .enabled,
+        .TC5 = .enabled,
+        .DAC = .enabled,
+        .EVSYS = .enabled,
     });
+
+    timer.init();
+    audio.init();
+    init_frame_sync();
+
+    // Light sensor adc
+    light_sensor_pin.set_mux(.B);
 
     const state = clocks.get_state();
     const freqs = clocks.Frequencies.get(state);

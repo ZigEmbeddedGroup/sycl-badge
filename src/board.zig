@@ -15,11 +15,13 @@ const port = hal.port;
 pub const NeopixelColor = @import("board/neopixel.zig").Color;
 pub const Neopixels = @import("board/neopixel.zig").Group(5);
 pub const Lcd = @import("board/lcd.zig").Lcd;
+pub const audio = @import("board/audio.zig");
 
 pub const TFT_RST = port.pin(.a, 0);
 pub const TFT_LITE = port.pin(.a, 1);
 pub const A0 = port.pin(.a, 2);
-pub const A6_VMEAS = port.pin(.a, 2);
+pub const AVCC = port.pin(.a, 3);
+pub const A6_VMEAS = port.pin(.a, 4);
 pub const D13 = port.pin(.a, 5);
 pub const A7_LIGHT = port.pin(.a, 6);
 

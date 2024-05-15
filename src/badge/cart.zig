@@ -385,6 +385,8 @@ fn tone(
         .attack_volume_step = 0,
         .decay_volume_step = 0,
         .release_volume_step = 0,
+
+        .function = @enumFromInt(@intFromEnum(flags.function)),
     };
 
     const start_phase_step = @mulWithOverflow((1 << 32) / 44100, @as(u31, start_frequency));

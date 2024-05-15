@@ -182,11 +182,10 @@ pub export fn start() void {}
 pub export fn update() void {
     time += 1.0 / 10.0; // TODO: should be higher fps once lcd is dma'd
     for (
-        0..,
         &channels_note_index,
         &channels_note_start,
         &song,
-    ) |channel_index, *note_index, *note_start, notes| {
+    ) |*note_index, *note_start, notes| {
         if (note_index.* > notes.len) continue;
         const next_note_time =
             note_start.* + if (note_index.* > 0) notes[note_index.* - 1].duration else 0.0;
@@ -201,7 +200,7 @@ pub export fn update() void {
                 .volume = 100,
                 .flags = .{
                     .channel = 0,
-                    .function = @enumFromInt(channel_index),
+                    .function = .pulse1,
                 },
             });
         }

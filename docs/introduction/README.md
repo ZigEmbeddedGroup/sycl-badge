@@ -59,7 +59,7 @@ Your badge can be powered via the USB-C port, but to allow cordless use of the b
 
 Place one piece of velcro on the back of the board where space has been left available, and the other piece of velcro on the battery. Then plug the connector on the battery into the similar connector on the back of the board. Finally, attach the battery's velcro to the board's.
 
-Once the battery is connected, it can be charged via the USB-C port. **PLEASE BE CAREFUL** about leaving your badge charging for too long as the batteries/battery controller are not necessarily production ready. They should pose little risk, but it's better to be safe than sorry.
+Once the battery is connected, it can be charged via the USB-C port. **NOTE:** As this is an educational tool and not a piece of consumer electronics, this badge has not undergone rigorous power testing. When charging your battery please don't leave it unattended.
 
 There is an on/off switch located at the top of the badge. Try booting the badge now if you haven't already!
 

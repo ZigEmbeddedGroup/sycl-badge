@@ -67,7 +67,7 @@ pub const Mask = packed struct(u33) {
             .in => {
                 m.group.ptr().DIRCLR.write(.{ .DIRCLR = m.pins });
                 for (0..32) |i| {
-                    if (m.pins & (@as(u32, 1) << 1) != 0)
+                    if (m.pins & (@as(u32, 1) << @intCast(i)) != 0)
                         m.group.ptr().PINCFG[i].modify(.{ .INEN = 1 });
                 }
             },

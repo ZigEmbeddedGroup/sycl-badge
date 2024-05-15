@@ -10,12 +10,12 @@
 
     .dependencies = .{
         .@"microzig/build" = .{
-            .url = "https://downloads.microzig.tech/microzig-0.12.0/build-0.0.0.tar.gz",
-            .hash = "1220362d63876dd7ad88d0ee55ab24c2eb7fc49b0441703111d98d7b78bf315ebf70",
+            .url = "https://downloads.microzig.tech/microzig-0.12.1/build-0.0.1.tar.gz",
+            .hash = "122066a2dd8e6cfef346bc5cd6de8294fe9d53bde59b65b042750ee25537438df2ad",
         },
         .@"microzig/bsp/microchip/atsam" = .{
-            .url = "https://downloads.microzig.tech/microzig-0.12.0/bsp/microchip/atsam-0.0.0.tar.gz",
-            .hash = "1220aacdf6291f5e3d57cdd51f9a5a9b210dea2080558d6bbe755477b6c5ed19d91e",
+            .url = "https://downloads.microzig.tech/microzig-0.12.1/bsp/microchip/atsam-0.0.0.tar.gz",
+            .hash = "122037355c936100684b565d20b32157a067230f7d586874ae291c8ba817e08e8ee1",
         },
         .mime = .{
             .url = "git+https://github.com/andrewrk/mime.git#bf80e2e8b1d9413ddf9abe7d94537388b54c83ab",

@@ -210,6 +210,230 @@ pub fn main() !void {
         .EVSYS = .enabled,
     });
 
+    {
+        var buffer: [128]u8 = undefined;
+        const io_types = chip.types.peripherals;
+        const io = chip.peripherals;
+
+        const GCLK = struct {
+            pub const GEN = struct {
+                fn Gen(comptime id: u4) type {
+                    const tag = std.fmt.comptimePrint("GCLK{d}", .{id});
+                    return struct {
+                        pub const ID = id;
+                        pub const SYNCBUSY_GENCTRL = @intFromEnum(@field(io_types.GCLK.GCLK_SYNCBUSY__GENCTRL, tag));
+                        pub const PCHCTRL_GEN = @field(io_types.GCLK.GCLK_PCHCTRL__GEN, tag);
+                    };
+                }
+                pub const @"120MHz" = Gen(0);
+                pub const @"76.8KHz" = Gen(1);
+                pub const @"48MHz" = Gen(2);
+                pub const @"8.4672MHz" = Gen(3);
+                pub const @"1MHz" = Gen(4);
+                pub const @"64KHz" = Gen(11);
+            };
+            pub const PCH = struct {
+                pub const OSCCTRL_DFLL48 = 0;
+                pub const OSCCTRL_FDPLL0 = 1;
+                pub const OSCCTRL_FDPLL1 = 2;
+                pub const OSCCTRL_FDPLL0_32K = 3;
+                pub const OSCCTRL_FDPLL1_32K = 3;
+                pub const SDHC0_SLOW = 3;
+                pub const SDHC1_SLOW = 3;
+                pub const SERCOM0_SLOW = 3;
+                pub const SERCOM1_SLOW = 3;
+                pub const SERCOM2_SLOW = 3;
+                pub const SERCOM3_SLOW = 3;
+                pub const SERCOM4_SLOW = 3;
+                pub const SERCOM5_SLOW = 3;
+                pub const SERCOM6_SLOW = 3;
+                pub const SERCOM7_SLOW = 3;
+                pub const EIC = 4;
+                pub const FREQM_MSR = 5;
+                pub const FREQM_REF = 6;
+                pub const SERCOM0_CORE = 7;
+                pub const SERCOM1_CORE = 8;
+                pub const TC0 = 9;
+                pub const TC1 = 9;
+                pub const USB = 10;
+                pub const EVSYS0 = 11;
+                pub const EVSYS1 = 12;
+                pub const EVSYS2 = 13;
+                pub const EVSYS3 = 14;
+                pub const EVSYS4 = 15;
+                pub const EVSYS5 = 16;
+                pub const EVSYS6 = 17;
+                pub const EVSYS7 = 18;
+                pub const EVSYS8 = 19;
+                pub const EVSYS9 = 20;
+                pub const EVSYS10 = 21;
+                pub const EVSYS11 = 22;
+                pub const SERCOM2_CORE = 23;
+                pub const SERCOM3_CORE = 24;
+                pub const TCC0_CORE = 25;
+                pub const TCC1_CORE = 25;
+                pub const TC2 = 26;
+                pub const TC3 = 26;
+                pub const CAN0 = 27;
+                pub const CAN1 = 28;
+                pub const TCC2 = 29;
+                pub const TCC3 = 29;
+                pub const TC4 = 30;
+                pub const TC5 = 30;
+                pub const PDEC = 31;
+                pub const AC = 32;
+                pub const CCL = 33;
+                pub const SERCOM4_CORE = 34;
+                pub const SERCOM5_CORE = 35;
+                pub const SERCOM6_CORE = 36;
+                pub const SERCOM7_CORE = 37;
+                pub const TCC4 = 38;
+                pub const TC6 = 39;
+                pub const TC7 = 39;
+                pub const ADC0 = 40;
+                pub const ADC1 = 41;
+                pub const DAC = 42;
+                pub const I2C = .{ 43, 44 };
+                pub const SDHC0 = 45;
+                pub const SDHC1 = 46;
+                pub const CM4_TRACE = 47;
+            };
+        };
+
+        io.MCLK.APBAMASK.modify(.{ .FREQM_ = 1 });
+
+        // Use OSCULP32K / 512 as reference
+        io.GCLK.GENCTRL[GCLK.GEN.@"64KHz".ID].write(.{
+            .SRC = .{ .value = .OSCULP32K },
+            .reserved8 = 0,
+            .GENEN = 1,
+            .IDC = 0,
+            .OOV = 0,
+            .OE = 0,
+            .DIVSEL = .{ .value = .DIV2 },
+            .RUNSTDBY = 0,
+            .reserved16 = 0,
+            .DIV = 8,
+        });
+        io.GCLK.PCHCTRL[GCLK.PCH.FREQM_REF].write(.{
+            .GEN = .{ .value = GCLK.GEN.@"64KHz".PCHCTRL_GEN },
+            .reserved6 = 0,
+            .CHEN = 1,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+
+        for (0.., &io.GCLK.GENCTRL) |gen_id, *gen_ctrl| {
+            if (gen_id == GCLK.GEN.@"64KHz".ID) continue;
+            const config = gen_ctrl.read();
+            if (config.GENEN == 0) continue;
+
+            io.GCLK.PCHCTRL[GCLK.PCH.FREQM_MSR].write(.{
+                .GEN = .{ .raw = @intCast(gen_id) },
+                .reserved6 = 0,
+                .CHEN = 1,
+                .WRTLOCK = 0,
+                .padding = 0,
+            });
+
+            // Reset Frequency Meter
+            io.FREQM.CTRLA.write(.{
+                .SWRST = 1,
+                .ENABLE = 0,
+                .padding = 0,
+            });
+            while (io.FREQM.SYNCBUSY.read().SWRST != 0) {}
+
+            // Run Frequency Meter
+            io.FREQM.CFGA.write(.{
+                .REFNUM = 8,
+                .padding = 0,
+            });
+            io.FREQM.CTRLA.write(.{
+                .SWRST = 0,
+                .ENABLE = 1,
+                .padding = 0,
+            });
+            while (io.FREQM.SYNCBUSY.read().ENABLE != 0) {}
+            io.FREQM.CTRLB.write(.{
+                .START = 1,
+                .padding = 0,
+            });
+            while (io.FREQM.STATUS.read().BUSY != 0) {}
+            if (io.FREQM.STATUS.read().OVF == 0) {
+                const freq = (@as(u32, io.FREQM.VALUE.read().VALUE) + 1) * 8;
+                const div = switch (config.DIVSEL.value) {
+                    .DIV1 => switch (config.DIV) {
+                        0 => 1,
+                        else => |div| div,
+                    },
+                    .DIV2 => @as(u32, 1) << @min(config.DIV + 1, @as(u5, switch (gen_id) {
+                        else => 9,
+                        1 => 17,
+                    })),
+                };
+                switch (gen_id) {
+                    0 => {
+                        const hs_div = @min(io.MCLK.HSDIV.read().DIV.raw, 1);
+                        _ = std.fmt.bufPrintZ(
+                            &buffer,
+                            "High-Speed Clock ({s} / {d}): {d} Hz",
+                            .{ @tagName(config.SRC.value), div * hs_div, freq / hs_div },
+                        ) catch {};
+                        @breakpoint();
+                        const cpu_div = @min(io.MCLK.CPUDIV.read().DIV.raw, 1);
+                        _ = std.fmt.bufPrintZ(
+                            &buffer,
+                            "CPU Clock ({s} / {d}): {d} Hz",
+                            .{ @tagName(config.SRC.value), div * cpu_div, freq / cpu_div },
+                        ) catch {};
+                        @breakpoint();
+                    },
+                    else => {},
+                }
+                _ = std.fmt.bufPrintZ(
+                    &buffer,
+                    "Generator #{d} ({s} / {d}): {d} Hz",
+                    .{ gen_id, @tagName(config.SRC.value), div, freq },
+                ) catch {};
+                @breakpoint();
+            } else {
+                _ = std.fmt.bufPrintZ(&buffer, "Unable to measure generator #{d}", .{gen_id}) catch {};
+                @breakpoint();
+            }
+        }
+
+        io.GCLK.PCHCTRL[GCLK.PCH.FREQM_MSR].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+        io.GCLK.PCHCTRL[GCLK.PCH.FREQM_REF].write(.{
+            .GEN = .{ .raw = 0 },
+            .reserved6 = 0,
+            .CHEN = 0,
+            .WRTLOCK = 0,
+            .padding = 0,
+        });
+
+        io.MCLK.APBAMASK.modify(.{ .FREQM_ = 0 });
+
+        for (0.., &io.GCLK.PCHCTRL) |pch_id, *pch_ctrl| {
+            const config = pch_ctrl.read();
+            if (config.CHEN == 0) continue;
+            _ = std.fmt.bufPrintZ(
+                &buffer,
+                "Peripheral Channel #{d}: Generator #{d}",
+                .{ pch_id, config.GEN.raw },
+            ) catch {};
+            @breakpoint();
+        }
+
+        if (true) while (true) asm volatile ("");
+    }
+
     timer.init();
     audio.init();
     init_frame_sync();

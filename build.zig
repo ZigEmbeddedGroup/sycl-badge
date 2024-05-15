@@ -154,6 +154,7 @@ pub const Cart = struct {
         b.getInstallStep().dependOn(&install_artifact_step.step);
 
         const watch_run = b.addRunArtifact(d.artifact("watch"));
+        watch_run.step.dependOn(&install_artifact_step.step);
         // watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot(std.fs.path.dirname(options.root_source_file) orelse ""), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
         watch_run.addArgs(&.{ "serve", b.graph.zig_exe });
         if (opt.watch_dirs) |dirs| {

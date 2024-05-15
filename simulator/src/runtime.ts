@@ -66,13 +66,13 @@ export class Runtime {
     }
 
     getNeopixels (): [number, number, number, number, number] {
-        const mem32 = new Uint32Array(this.data.buffer, constants.ADDR_NEOPIXELS);
+        const mem8 = new Uint8Array(this.data.buffer, constants.ADDR_NEOPIXELS);
         return [
-            mem32[0] & 0b1111_1111_1111_1111_1111_1111,
-            mem32[1] & 0b1111_1111_1111_1111_1111_1111,
-            mem32[2] & 0b1111_1111_1111_1111_1111_1111,
-            mem32[3] & 0b1111_1111_1111_1111_1111_1111,
-            mem32[4] & 0b1111_1111_1111_1111_1111_1111
+            mem8[0] | (mem8[1] << 8) | (mem8[2] << 16),
+            mem8[3] | (mem8[4] << 8) | (mem8[5] << 16),
+            mem8[6] | (mem8[7] << 8) | (mem8[8] << 16),
+            mem8[9] | (mem8[10] << 8) | (mem8[11] << 16),
+            mem8[12] | (mem8[13] << 8) | (mem8[14] << 16),
         ];
     }
 

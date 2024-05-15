@@ -52,5 +52,5 @@ export function unpack565(bgr565: number): [number, number, number] {
 }
 
 export function unpack888(bgr888: number): [number, number, number] {
-    return [bgr888 >> 16, bgr888 >> 8 & 0b11111111, bgr888 & 0b11111111];
+    return [(bgr888 >> 8) & 0b11111111, bgr888 & 0b11111111, bgr888 >> 16];
 }

@@ -14,6 +14,7 @@ const port = hal.port;
 
 pub const NeopixelColor = @import("board/neopixel.zig").Color;
 pub const Neopixels = @import("board/neopixel.zig").Group(5);
+pub const Lcd = @import("board/lcd.zig").Lcd;
 
 pub const TFT_RST = port.pin(.a, 0);
 pub const TFT_LITE = port.pin(.a, 1);

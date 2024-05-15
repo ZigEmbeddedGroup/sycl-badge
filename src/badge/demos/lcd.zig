@@ -2,8 +2,8 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const hal = microzig.hal;
-const mclk = hal.mclk;
-const gclk = hal.gclk;
+const mclk = hal.clocks.mclk;
+const gclk = hal.clocks.gclk;
 const sercom = hal.sercom;
 const port = hal.port;
 const timer = hal.timer;
@@ -35,7 +35,8 @@ pub fn main() !void {
         .div = 48,
     });
 
-    gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
+    gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK1);
+    gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK1);
 
     // TODO: pin and clock configuration
     mclk.set_apb_mask(.{
@@ -45,7 +46,7 @@ pub fn main() !void {
     });
 
     timer.init();
-    const lcd = Lcd.init(.{
+    var lcd = Lcd.init(.{
         .spi = sercom.spi.Master.init(.SERCOM4, .{
             .cpha = .LEADING_EDGE,
             .cpol = .IDLE_LOW,
@@ -67,7 +68,11 @@ pub fn main() !void {
         },
     });
 
-    lcd.clear_screen(red16);
+    lcd.clear_screen(.{
+        .r = 31,
+        .g = 0,
+        .b = 0,
+    });
     lcd.set_window(0, 0, 10, 10);
 
     //Lcd.fill16(red16);

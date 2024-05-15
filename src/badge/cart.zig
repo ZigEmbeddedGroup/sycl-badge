@@ -115,6 +115,13 @@ pub const HSRAM = struct {
 
 pub fn start() void {
     @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
+    api.neopixels.* = .{
+        .{ .r = 0, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 0, .b = 0 },
+    };
 
     // fill .bss with zeroes
     {

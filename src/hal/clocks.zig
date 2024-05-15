@@ -84,7 +84,7 @@ pub const Frequencies = struct {
         FDPLL: [2]u32,
     },
     generators: [12]u32,
-    peripherals: struct {},
+    peripherals: Peripherals,
     gclk_main: u32,
 
     pub fn get(state: State) Frequencies {
@@ -106,10 +106,70 @@ pub const Frequencies = struct {
 
                 break :blk ret;
             },
-            .peripherals = .{},
+            .peripherals = blk: {
+                var ret: Peripherals = undefined;
+                ret.slow = .{
+                    .OSCCTRL_FDPLL0_32K = 0,
+                };
+
+                ret.EVSYS = .{0} ** 12;
+
+                inline for (@typeInfo(Peripherals).Struct.fields) |field| {
+                    if (@typeInfo(field.type) != .Int)
+                        break;
+
+                    @field(ret, field.name) = get_peripheral_clock_freq_hz(@field(gclk.PeripheralIndex, "GCLK_" ++ field.name));
+                }
+                break :blk ret;
+            },
             .gclk_main = state.generic_clock_controller.generators[0].get_output_freq_hz(),
         };
     }
+
+    pub const Peripherals = struct {
+        OSCCTRL_DFLL48: u32,
+        OSCCTRL_FDPLL0: u32,
+        OSCCTRL_FDPLL1: u32,
+        slow: union {
+            OSCCTRL_FDPLL0_32K: u32,
+            OSCCTRL_FDPLL1_32K: u32,
+            SDHC0_SLOW: u32,
+            SDHC1_SLOW: u32,
+            SERCOM_0_TO_7: u32,
+        },
+        EIC: u32,
+        FREQM_MSR: u32,
+        FREQM_REF: u32,
+        SERCOM0_CORE: u32,
+        SERCOM1_CORE: u32,
+        TC0_TC1: u32,
+        USB: u32,
+        EVSYS: [12]u32,
+        SERCOM2_CORE: u32,
+        SERCOM3_CORE: u32,
+        TCC0_TCC1: u32,
+        TC2_TC3: u32,
+        CAN0: u32,
+        CAN1: u32,
+        TCC2_TCC3: u32,
+        TC4_TC5: u32,
+        PDEC: u32,
+        AC: u32,
+        CCL: u32,
+        SERCOM4_CORE: u32,
+        SERCOM5_CORE: u32,
+        SERCOM6_CORE: u32,
+        SERCOM7_CORE: u32,
+        TCC4: u32,
+        TC6_TC7: u32,
+        ADC0: u32,
+        ADC1: u32,
+        DAC: u32,
+        I2S: u32,
+        SDHC0: u32,
+        SDHC1: u32,
+        CM4_TRACE: u32,
+    };
 };
 
 pub const State = struct {
@@ -313,11 +373,11 @@ pub fn get_peripheral(index: u32) State.Peripheral {
 pub fn get_peripheral_clock_freq_hz(index: gclk.PeripheralIndex) u32 {
     const state = get_peripheral(@intFromEnum(index));
     if (!state.channel_enable)
-        @panic("channel clock not configured");
+        return 0;
 
     const generator = get_generator(@intFromEnum(state.generator));
     if (!generator.enabled)
-        @panic("generator isn't enabled!");
+        return 0;
 
     return generator.get_output_freq_hz();
 }

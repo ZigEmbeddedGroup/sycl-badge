@@ -1,4 +1,6 @@
 const std = @import("std");
+const assert = std.debug.assert;
+
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const port = hal.port;
@@ -54,8 +56,8 @@ pub const Sercom = enum(u3) {
         };
     }
 
-    fn get_clock_frequency_hz(sercom: Sercom) u32 {
-        const index: clocks.gclk.PeripheralIndex = switch (sercom) {
+    pub fn get_peripheral_index(sercom: Sercom) clocks.gclk.PeripheralIndex {
+        return switch (sercom) {
             .SERCOM0 => .GCLK_SERCOM0_CORE,
             .SERCOM1 => .GCLK_SERCOM1_CORE,
             .SERCOM2 => .GCLK_SERCOM2_CORE,
@@ -65,7 +67,10 @@ pub const Sercom = enum(u3) {
             .SERCOM6 => .GCLK_SERCOM6_CORE,
             .SERCOM7 => .GCLK_SERCOM7_CORE,
         };
+    }
 
+    pub fn get_clock_frequency_hz(sercom: Sercom) u32 {
+        const index = sercom.get_peripheral_index();
         return clocks.get_peripheral_clock_freq_hz(index);
     }
 };
@@ -115,6 +120,7 @@ pub const spi = struct {
                 .DOPO = .{ .value = opts.dopo },
                 .DORD = .{ .value = opts.dord },
             });
+
             // CTRLB only needs syncronization if the module is enabled.
             regs.CTRLB.modify(.{
                 .CHSIZE = .{ .value = .@"8_BIT" },
@@ -131,6 +137,7 @@ pub const spi = struct {
         }
 
         pub fn enable(m: Master) void {
+            assert(clocks.gclk.peripheral_is_enabled(m.sercom.get_peripheral_index()));
             const regs = m.get_regs();
             regs.CTRLA.modify(.{
                 .ENABLE = 1,
@@ -170,8 +177,8 @@ pub const spi = struct {
         pub fn write_all_blocking(m: Master, bytes: []const u8) void {
             const regs = m.get_regs();
             for (bytes) |b| {
-                regs.DATA.write(.{ .DATA = b });
                 while (regs.INTFLAG.read().DRE == 0) {}
+                regs.DATA.write(.{ .DATA = b });
             }
 
             while (regs.INTFLAG.read().TXC == 0) {}

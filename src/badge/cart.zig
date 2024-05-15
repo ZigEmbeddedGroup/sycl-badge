@@ -421,12 +421,7 @@ fn tone(
                 .@"3/4" => (3 << 32) / 4,
             };
         },
-        .triangle => {
-            state.duty = (1 << 32) / 2;
-        },
-        .noise => {
-            state.duty = (1 << 32) / 2;
-        },
+        else => {},
     }
 
     audio.set_channel(flags.channel, state);

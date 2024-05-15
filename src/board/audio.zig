@@ -1,9 +1,10 @@
 pub const sample_buffer: *volatile [2][512]u16 = &sample_buffer_storage;
 
-pub const Function = enum(u2) {
+pub const Function = enum(u3) {
     pulse1,
     pulse2,
     triangle,
+    sine,
     noise,
 };
 
@@ -219,16 +220,21 @@ pub fn mix() callconv(.C) void {
             if (channel.duty > 0) {
                 // generate sample;
                 switch (channel.function) {
-                    .pulse1, .pulse2, .noise, .triangle => {
+                    .pulse1, .pulse2, .noise => {
                         if (channel.phase < channel.duty) {
                             sample += channel.volume;
                         } else {
                             sample -= channel.volume;
                         }
                     },
-                    // .triangle => {
-                    //     sample += @intCast((@as(u64, channel.volume) * @as(u64, @abs(channel.phase >> 1))) >> 32);
-                    // },
+                    .triangle => {
+                        sample += @intCast((@as(u64, channel.volume) * @as(u64, @abs(channel.phase >> 1))) >> 32);
+                    },
+                    .sine => {
+                        const vol = @as(f32, @floatFromInt(channel.volume));
+                        sample += @intFromFloat(vol * @sin(@as(f32, @floatFromInt(channel.phase))));
+                        // sample += @intFromFloat(10 * vol * @sin(2 * std.math.pi * @as(f32, @floatFromInt(channel.phase)) / @as(f32, @floatFromInt(std.math.maxInt(@TypeOf(channel.phase))))));
+                    },
                 }
                 // update
                 channel.phase +%= channel.phase_step;
@@ -261,7 +267,7 @@ pub fn mix() callconv(.C) void {
                 }
             }
         }
-        if (sample != 0) speaker_enable = .high; // TODO this is weird
+        speaker_enable = .high; // TODO this is weird
         out_sample.* = @intCast((sample >> 16) - std.math.minInt(i16));
     }
     channels.* = local_channels;

@@ -2,8 +2,8 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const hal = microzig.hal;
-const mclk = hal.mclk;
-const gclk = hal.gclk;
+const mclk = hal.clocks.mclk;
+const gclk = hal.clocks.gclk;
 const sercom = hal.sercom;
 const port = hal.port;
 const timer = hal.timer;
@@ -46,7 +46,7 @@ pub fn main() !void {
     });
 
     timer.init();
-    const lcd = Lcd.init(.{
+    var lcd = Lcd.init(.{
         .spi = sercom.spi.Master.init(.SERCOM4, .{
             .cpha = .LEADING_EDGE,
             .cpol = .IDLE_LOW,

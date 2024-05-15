@@ -175,7 +175,7 @@ pub fn main() !void {
         },
     });
 
-    lcd.clear_screen(.{ .r = 31, .g = 0, .b = 0 });
+    lcd.clear_screen(.{ .r = 0, .g = 0, .b = 0 });
 
     const neopixels = board.Neopixels.init(board.D8_NEOPIX);
     adc.init();

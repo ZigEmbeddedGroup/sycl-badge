@@ -5,15 +5,15 @@ const clocks = hal.clocks;
 const sercom = hal.sercom;
 
 pub fn main() void {
-    clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
     clocks.mclk.set_apb_mask(.{ .SERCOM4 = .enabled });
+    clocks.gclk.enable_generator(.GCLK1, .DFLL, .{});
+
+    clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK1);
 
     board.TFT_RST.set_dir(.out);
     board.TFT_LITE.set_dir(.out);
     board.TFT_DC.set_dir(.out);
     board.TFT_CS.set_dir(.out);
-    board.TFT_SCK.set_dir(.out);
-    board.TFT_MOSI.set_dir(.out);
 
     board.TFT_SCK.set_mux(.C);
     board.TFT_MOSI.set_mux(.C);

@@ -7,41 +7,30 @@ const port = hal.port;
 const timer = hal.timer;
 const clocks = hal.clocks;
 
-pub const FrameBuffer = union(enum) {
-    bpp12: *[width][@divExact(height, 2)]Color12,
-    bpp16: *[width][height]Color16,
-    bpp24: *[width][height]Color24,
-};
-pub const Color12 = extern struct {
-    b0_g0: packed struct(u8) { b0: u4, g0: u4 },
-    r0_b1: packed struct(u8) { r0: u4, b1: u4 },
-    g1_r1: packed struct(u8) { g1: u4, r1: u4 },
-};
-
-pub const Color16 = packed struct(u16) { b: u5, g: u6, r: u5 };
-pub const Color24 = extern struct { b: u8, g: u8, r: u8 };
-pub const Rect = struct { x: u8, y: u8, width: u8, height: u8 };
-
-pub const width = 160;
-pub const height = 128;
-
-pub const black16: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
-pub const red16: Color16 = .{ .r = 0x1f, .g = 0x00, .b = 0x00 };
-pub const green16: Color16 = .{ .r = 0x00, .g = 0x3f, .b = 0x00 };
-pub const blue16: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x1f };
-pub const white16: Color16 = .{ .r = 0x1f, .g = 0x3f, .b = 0x1f };
-
-pub const black24: Color24 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
-pub const red24: Color24 = .{ .r = 0xff, .g = 0x00, .b = 0x00 };
-pub const green24: Color24 = .{ .r = 0x00, .g = 0xff, .b = 0x00 };
-pub const blue24: Color24 = .{ .r = 0x00, .g = 0x00, .b = 0xff };
-pub const white24: Color24 = .{ .r = 0xff, .g = 0xff, .b = 0xff };
-
 pub const Lcd = struct {
     spi: sercom.spi.Master,
     pins: Pins,
     inverted: bool = false,
     fb: FrameBuffer,
+
+    pub const FrameBuffer = union(enum) {
+        bpp12: *[width][@divExact(height, 2)]Color12,
+        bpp16: *[width][height]Color16,
+        bpp24: *[width][height]Color24,
+    };
+
+    pub const Color12 = extern struct {
+        b0_g0: packed struct(u8) { b0: u4, g0: u4 },
+        r0_b1: packed struct(u8) { r0: u4, b1: u4 },
+        g1_r1: packed struct(u8) { g1: u4, r1: u4 },
+    };
+
+    pub const Color16 = packed struct(u16) { b: u5, g: u6, r: u5 };
+    pub const Color24 = extern struct { b: u8, g: u8, r: u8 };
+    pub const Rect = struct { x: u8, y: u8, width: u8, height: u8 };
+
+    pub const width = 160;
+    pub const height = 128;
 
     pub const Pins = struct {
         rst: port.Pin,
@@ -73,6 +62,10 @@ pub const Lcd = struct {
         lcd.pins.cs.set_dir(.out);
         lcd.pins.sck.set_dir(.out);
         lcd.pins.mosi.set_dir(.out);
+
+        // TODO: signal multiplexing
+        lcd.pins.mosi.set_mux(.C);
+        lcd.pins.sck.set_mux(.C);
 
         lcd.pins.cs.write(.high);
         lcd.pins.dc.write(.high);
@@ -175,7 +168,8 @@ pub const Lcd = struct {
         lcd.send_cmd(switch (lcd.inverted) {
             false => ST7735.INVOFF,
             true => ST7735.INVON,
-        }, &.{}, 1);
+        }, &.{});
+        timer.delay_us(1);
     }
 
     pub fn send_color(lcd: Lcd, color: Color16, count: u32) void {

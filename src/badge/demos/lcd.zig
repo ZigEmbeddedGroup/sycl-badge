@@ -7,6 +7,7 @@ const gclk = hal.clocks.gclk;
 const sercom = hal.sercom;
 const port = hal.port;
 const timer = hal.timer;
+const clocks = hal.clocks;
 
 const board = microzig.board;
 const tft_rst_pin = board.TFT_RST;
@@ -30,19 +31,31 @@ pub fn main() !void {
     tft_sck_pin.set_mux(.C);
     tft_mosi_pin.set_mux(.C);
 
-    gclk.enable_generator(.GCLK1, .DFLL, .{
+    clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{});
+    clocks.gclk.enable_generator(.GCLK2, .DFLL, .{
         .divsel = .DIV1,
         .div = 48,
     });
 
-    gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK1);
-    gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK1);
+    clocks.enable_dpll(0, .GCLK2, .{
+        .factor = 1,
+        .input_freq_hz = 1_000_000,
+        .output_freq_hz = 120_000_000,
+    });
+
+    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{});
+
+    gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
+    gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK2);
 
     // TODO: pin and clock configuration
     mclk.set_apb_mask(.{
         .SERCOM4 = .enabled,
         .TC0 = .enabled,
         .TC1 = .enabled,
+    });
+    mclk.set_ahb_mask(.{
+        .DMAC = .enabled,
     });
 
     timer.init();
@@ -53,7 +66,7 @@ pub fn main() !void {
             .dord = .MSB,
             .dopo = .PAD2,
             .ref_freq_hz = 48_000_000,
-            .baud_freq_hz = 4_000_000,
+            .baud_freq_hz = 12_000_000,
         }),
         .pins = .{
             .rst = tft_rst_pin,
@@ -68,15 +81,16 @@ pub fn main() !void {
         },
     });
 
-    lcd.clear_screen(.{
-        .r = 31,
-        .g = 0,
-        .b = 0,
-    });
-    lcd.set_window(0, 0, 10, 10);
-
-    //Lcd.fill16(red16);
-    timer.delay_us(5 * std.time.us_per_s);
-    lcd.invert();
-    while (true) {}
+    while (true) {
+        lcd.clear_screen(.{
+            .r = 31,
+            .g = 0,
+            .b = 0,
+        });
+        lcd.clear_screen(.{
+            .r = 0,
+            .g = 63,
+            .b = 0,
+        });
+    }
 }

@@ -177,8 +177,8 @@ pub const spi = struct {
         pub fn write_all_blocking(m: Master, bytes: []const u8) void {
             const regs = m.get_regs();
             for (bytes) |b| {
-                while (regs.INTFLAG.read().DRE == 0) {}
                 regs.DATA.write(.{ .DATA = b });
+                while (regs.INTFLAG.read().DRE == 0) {}
             }
 
             while (regs.INTFLAG.read().TXC == 0) {}

@@ -6,12 +6,17 @@ const sercom = hal.sercom;
 const port = hal.port;
 const timer = hal.timer;
 const clocks = hal.clocks;
+const dma = hal.dma;
+
+const DMAC = microzig.chip.peripherals.DMAC;
+const SERCOM4 = microzig.chip.peripherals.SERCOM4;
 
 pub const Lcd = struct {
     spi: sercom.spi.Master,
     pins: Pins,
     inverted: bool = false,
     fb: FrameBuffer,
+    dma: dma.Channel,
 
     pub const FrameBuffer = union(enum) {
         bpp12: *[width][@divExact(height, 2)]Color12,
@@ -53,6 +58,7 @@ pub const Lcd = struct {
             .spi = opts.spi,
             .pins = opts.pins,
             .fb = opts.fb,
+            .dma = dma.acquire_channel(),
         };
 
         // TODO: I think this has to be initialized before init atm
@@ -75,6 +81,73 @@ pub const Lcd = struct {
         timer.delay_us(20 * std.time.us_per_ms);
         lcd.pins.rst.write(.high);
         timer.delay_us(20 * std.time.us_per_ms);
+
+        DMAC.CHANNEL[0].CHCTRLA.write(.{
+            .SWRST = 0,
+            .ENABLE = 0,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .reserved8 = 0,
+            .TRIGSRC = .{ .raw = 0 },
+            .reserved20 = 0,
+            .TRIGACT = .{ .raw = 0 },
+            .reserved24 = 0,
+            .BURSTLEN = .{ .raw = 0 },
+            .THRESHOLD = .{ .raw = 0 },
+            .padding = 0,
+        });
+        while (DMAC.CHANNEL[0].CHCTRLA.read().ENABLE != 0) {}
+        DMAC.CHANNEL[0].CHCTRLA.write(.{
+            .SWRST = 1,
+            .ENABLE = 0,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .reserved8 = 0,
+            .TRIGSRC = .{ .raw = 0 },
+            .reserved20 = 0,
+            .TRIGACT = .{ .raw = 0 },
+            .reserved24 = 0,
+            .BURSTLEN = .{ .raw = 0 },
+            .THRESHOLD = .{ .raw = 0 },
+            .padding = 0,
+        });
+        while (DMAC.CHANNEL[0].CHCTRLA.read().SWRST != 0) {}
+        desc[0].BTCTRL.write(.{
+            .VALID = 1,
+            .EVOSEL = .{ .value = .DISABLE },
+            .BLOCKACT = .{ .value = .NOACT },
+            .reserved8 = 0,
+            .BEATSIZE = .{ .value = .BYTE },
+            .SRCINC = 1,
+            .DSTINC = 0,
+            .STEPSEL = .{ .value = .SRC },
+            .STEPSIZE = .{ .value = .X1 },
+        });
+        switch (lcd.fb) {
+            .bpp16 => |fb| {
+                const len = @sizeOf(@TypeOf(fb.*));
+                desc[0].BTCNT.write(.{ .BTCNT = len });
+                desc[0].SRCADDR.write(.{ .SRCADDR = @intFromPtr(fb) + len });
+            },
+            else => @panic("TODO"),
+        }
+        desc[0].DSTADDR.write(.{ .CHKINIT = @intFromPtr(&SERCOM4.SPIM.DATA) });
+        desc[0].DESCADDR.write(.{ .DESCADDR = @intFromPtr(&desc[0]) });
+        microzig.cpu.dmb();
+        DMAC.CHANNEL[0].CHCTRLA.write(.{
+            .SWRST = 0,
+            .ENABLE = 1,
+            .reserved6 = 0,
+            .RUNSTDBY = 0,
+            .reserved8 = 0,
+            .TRIGSRC = .{ .raw = TRIGSRC.SERCOM4_TX },
+            .reserved20 = 0,
+            .TRIGACT = .{ .value = .BURST },
+            .reserved24 = 0,
+            .BURSTLEN = .{ .value = .SINGLE },
+            .THRESHOLD = .{ .value = .@"1BEAT" },
+            .padding = 0,
+        });
 
         // TODO: analyze this from the circuitpython repo:
         // uint8_t display_init_sequence[] = {
@@ -211,8 +284,34 @@ pub const Lcd = struct {
     }
 
     pub fn clear_screen(lcd: Lcd, color: Color16) void {
-        lcd.set_window(0, 0, 128, 160);
-        lcd.send_color(color, 128 * 160);
+        switch (lcd.fb) {
+            .bpp16 => |fb| {
+                for (fb) |*row| {
+                    for (row) |*pixel| {
+                        pixel.* = color;
+                    }
+                }
+            },
+            else => @panic("TODO"),
+        }
+        lcd.set_window(0, 0, 159, 127);
+        lcd.send_framebuffer();
+        //lcd.send_color(color, 128 * 160);
+    }
+
+    pub fn send_framebuffer(lcd: Lcd) void {
+        _ = lcd;
+        DMAC.CHANNEL[0].CHCTRLA.modify(.{ .ENABLE = 1 });
+        while (DMAC.CHANNEL[0].CHCTRLA.read().ENABLE != 1) {}
+        //while (DMAC.CHANNEL[0].CHINTFLAG.read().TCMPL != 1) {}
+        //DMAC.BASEADDR.write(.{
+        //    .BASEADDR = switch (lcd.fb) {
+        //        inline else => |fb| @intFromPtr(fb),
+        //    },
+        //});
+        //DMAC.CHANNEL[0].CHCTRLA.modify(.{
+        //    .
+        //});
     }
 
     pub fn set_window(lcd: Lcd, x0: u8, y0: u8, x1: u8, y1: u8) void {
@@ -364,3 +463,11 @@ const ST7735 = struct {
     const GMCTRP1 = 0xE0;
     const GMCTRN1 = 0xE1;
 };
+
+var desc: [3]microzig.chip.types.peripherals.DMAC.DMAC_DESCRIPTOR align(8) = .{.{
+    .BTCTRL = .{ .raw = 0 },
+    .BTCNT = .{ .raw = 0 },
+    .SRCADDR = .{ .raw = 0 },
+    .DSTADDR = .{ .raw = 0 },
+    .DESCADDR = .{ .raw = 0 },
+}} ** 3;

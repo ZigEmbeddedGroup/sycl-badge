@@ -13,6 +13,7 @@
 //! - USB mass drive
 //! - USB CDC logging
 const std = @import("std");
+const builtin = @import("builtin");
 
 const microzig = @import("microzig");
 const board = microzig.board;
@@ -166,15 +167,19 @@ pub fn main() !void {
         .div = 48,
     });
 
+    const dpll0_factor = 1;
     clocks.enable_dpll(0, .GCLK2, .{
-        .factor = 1,
+        .factor = dpll0_factor,
         .input_freq_hz = 1_000_000,
         .output_freq_hz = 120_000_000,
     });
 
     clocks.gclk.set_peripheral_clk_gen(.GCLK_ADC0, .GCLK2);
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK2);
-    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{});
+    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{
+        .divsel = .DIV1,
+        .div = dpll0_factor,
+    });
 
     // The second chain of clock generators:
     //
@@ -188,13 +193,17 @@ pub fn main() !void {
         .div = 625,
     });
 
+    const dpll1_factor = 12;
     clocks.enable_dpll(1, .GCLK1, .{
-        .factor = 12,
+        .factor = dpll1_factor,
         .input_freq_hz = 76_800,
         .output_freq_hz = 8_467_200,
     });
 
-    clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{});
+    clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{
+        .divsel = .DIV1,
+        .div = dpll1_factor,
+    });
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK3);
     clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
 

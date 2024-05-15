@@ -53,6 +53,10 @@ pub fn Group(comptime count: u16) type {
 
             const OUTCLR = &neopixels.pin.group.ptr().OUTCLR;
             const pin_mask = @as(u32, 1) << neopixels.pin.num;
+            var clobber_r0: usize = undefined;
+            var clobber_r1: usize = undefined;
+            var clobber_r2: usize = undefined;
+            var clobber_r3: usize = undefined;
             asm volatile (
                 \\  add     r3, r2, r3;
                 \\
@@ -89,7 +93,10 @@ pub fn Group(comptime count: u16) type {
                 \\
                 \\6: // neopixel_stop:
                 \\
-                :
+                : [clobber_r0] "={r0}" (clobber_r0),
+                  [clobber_r1] "={r1}" (clobber_r1),
+                  [clobber_r2] "={r2}" (clobber_r2),
+                  [clobber_r3] "={r3}" (clobber_r3),
                 : [OUTCLR] "{r0}" (OUTCLR),
                   [pin_mask] "{r1}" (pin_mask),
                   [ptr] "{r2}" (buf.ptr),

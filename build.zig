@@ -76,7 +76,7 @@ pub fn build(b: *Build) void {
             .root_source_file = .{ .path = "samples/blobs/blobs.zig" },
         });
         cart.install(b);
-        b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
+        b.step("watch-blobs", "Watch/run blobs in the sim;ulator").dependOn(
             &cart.install_with_watcher(&dep, b, .{}).step,
         );
     }

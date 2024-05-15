@@ -2,7 +2,7 @@ const microzig = @import("microzig");
 const board = microzig.board;
 const Color16 = board.Lcd.Color16;
 
-pub const data = [20480]Color16 {
+pub const data = [20480]Color16{
     .{ .b = 31, .g = 63, .r = 31 },
     .{ .b = 31, .g = 63, .r = 31 },
     .{ .b = 31, .g = 63, .r = 31 },

@@ -1,25 +1,38 @@
 const std = @import("std");
 const cart = @import("cart-api");
+const builtin = @import("builtin");
 
 export fn start() void {}
 
-var scene: enum { intro, game } = .intro;
+var scene: enum { intro, game, mnist } = .mnist;
 
 export fn update() void {
     switch (scene) {
         .intro => scene_intro(),
         .game => scene_game(),
+        .mnist => scene_mnist(),
     }
 }
 
+const Img = [28][28]u8;
+const MNIST_DATA = @embedFile("t10k-images.idx3-ubyte.small");
+const n_images = @divExact(MNIST_DATA.len - 16, @sizeOf(Img));
+var step: usize = 0;
+pub fn randomDigit() Img {
+    // var rng = std.rand.DefaultPrng.init(@intCast(std.time.timestamp()));
+    step +%= 1;
+
+    const n = @rem(@divTrunc(step, 2), n_images);
+    const img: Img = @bitCast(MNIST_DATA[16 + n * @sizeOf(Img) ..][0..@sizeOf(Img)].*);
+    return img;
+}
+
 const lines = &[_][]const u8{
-    "Auguste Rame",
-    "~AOE4 Player",
-
-    "",
-
-    "aurame",
-    "SuperAuguste",
+    "Guillaume Wenzek",
+    " //---\\\\ ",
+    "//  Z  \\\\",
+    "\\\\  ML //",
+    " \\\\---// ",
 
     "",
 
@@ -42,9 +55,9 @@ fn scene_intro() void {
     if (ticks / 128 == 0) {
         // Make the neopixel 24-bit color LEDs a nice Zig orange
         @memset(cart.neopixels, .{
-            .r = 247,
-            .g = 164,
-            .b = 29,
+            .r = @divFloor(247, 4),
+            .g = @divFloor(164, 4),
+            .b = @divFloor(29, 4),
         });
     }
 
@@ -61,7 +74,7 @@ fn scene_intro() void {
     }
 
     if (ticks == 0) cart.red_led.* = !cart.red_led.*;
-    if (cart.controls.start) scene = .game;
+    if (cart.controls.start) scene = .mnist;
 
     ticks +%= 4;
 }
@@ -73,6 +86,26 @@ var selected_y: u8 = 0;
 var control_cooldown: bool = false;
 var turn: Player = .x;
 var state: [3][3]Player = @bitCast([1]Player{.none} ** 9);
+
+fn scene_mnist() void {
+    set_background();
+    const img = randomDigit();
+    const scale = 2;
+    const offy = @divExact(cart.screen_height - 28 * scale, 2);
+    const offx = @divExact(cart.screen_width - 28 * scale, 2);
+    for (img, 0..) |row, i| {
+        for (row, 0..) |px, j| {
+            for (0..scale) |ii| {
+                for (0..scale) |jj| {
+                    const x = offx + scale * j + jj;
+                    const y = offy + scale * i + ii;
+                    const p: u5 = @intCast(px >> 3);
+                    cart.framebuffer[y * cart.screen_width + x] = .{ .r = p, .g = p, .b = p };
+                }
+            }
+        }
+    }
+}
 
 fn scene_game() void {
     set_background();
@@ -145,12 +178,10 @@ fn scene_game() void {
 }
 
 fn set_background() void {
-    const ratio = (4095 - @as(f32, @floatFromInt(cart.light_level.*))) / 4095 * 0.2;
-
     @memset(cart.framebuffer, cart.DisplayColor{
-        .r = @intFromFloat(ratio * 31),
-        .g = @intFromFloat(ratio * 63),
-        .b = @intFromFloat(ratio * 31),
+        .r = 0,
+        .g = 0,
+        .b = 0,
     });
 }
 

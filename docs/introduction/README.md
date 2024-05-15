@@ -2,7 +2,7 @@
 
 This is a short introduction containing some information and a small example meant to show how to use the badge.
 
-**It is strongly recommended you read through this entire document.**
+**It is strongly recommended that you read through this entire document.**
 
 ## Quick Badge Facts
 
@@ -11,7 +11,7 @@ The badge is based on the PyBadge and is equipped with:
 - A 32-bit ARM CPU
 - A light sensor
 - A 160x128 16-bit RGB (RGB565) screen
-- 5 24-bit RGB LEDs
+- 5 24-bit RGB LEDs (neopixels)
 - 1 red LED on the back
 - A speaker
 - Start/option buttons
@@ -33,7 +33,7 @@ cd docs/introduction
 
 ## The Example
 
-See `src/hello.zig` and tweak the the values to your liking. I recommend quickly altering the `hello.zig` example a first time and following the rest of these instructions and then going back to modify it some more, if you'd like.
+See `src/hello.zig` and tweak the the values to your liking.
 
 ### Running on the simulator
 
@@ -46,6 +46,10 @@ Run `zig build watch` and head over to https://badgesim.microzig.tech/.
 Once you're happy with what you've made, read on to learn how to flash your code onto the badge!
 
 ## Hard(ware) mode
+
+**Please wait until the afternoon before trying to upload programs onto badges as the badge is still being worked on.**
+
+Currently, only the neopixels are functional.
 
 ### Power and Boot
 
@@ -75,6 +79,6 @@ You'll find a brass colored button on the back of the board, at the top. This is
 
 Please ask someone with a staff badge (most likely Auguste) - we'd be happy to help!
 
-If you can't locate one of us, please post in the Discord thread and we'll get back to you as fast as possible!
+If you can't locate one of us, please post your question in the Discord thread and we'll get back to you as quickly as possible!
 
 ## Have fun!

@@ -55,7 +55,7 @@ pub fn build(b: *Build) void {
     var dep: std.Build.Dependency = .{ .builder = b };
     const feature_test_cart = add_cart(&dep, b, .{
         .name = "feature_test",
-        .optimize = .ReleaseSmall,
+        .optimize = .Debug,
         .root_source_file = .{ .path = "samples/feature_test.zig" },
     });
     feature_test_cart.install(b);

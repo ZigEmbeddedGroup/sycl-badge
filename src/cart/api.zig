@@ -35,8 +35,12 @@ pub const DisplayColor = packed struct(u16) {
         none = -1,
         _,
 
-        inline fn from(color: ?DisplayColor) Optional {
+        pub fn from(color: ?DisplayColor) Optional {
             return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
+        }
+
+        pub fn unwrap(opt: Optional) ?DisplayColor {
+            return if (opt == .none) null else @bitCast(@as(u16, @truncate(@as(u32, @intCast(@intFromEnum(opt))))));
         }
     };
 };

@@ -215,9 +215,9 @@ fn pointUnclipped(x: i32, y: i32, color: api.DisplayColor) void {
 }
 
 fn blit(
-    sprite: [*]const User(u8),
-    x: i32,
-    y: i32,
+    sprite: [*]const User(api.DisplayColor),
+    dst_x: i32,
+    dst_y: i32,
     rest: *const extern struct {
         width: User(u32),
         height: User(u32),
@@ -234,15 +234,43 @@ fn blit(
     const stride = rest.stride.load();
     const flags = rest.flags.load();
 
-    _ = sprite;
-    _ = x;
-    _ = y;
-    _ = width;
-    _ = height;
-    _ = src_x;
-    _ = src_y;
-    _ = stride;
-    _ = flags;
+    const signed_width: i32 = @intCast(width);
+    const signed_height: i32 = @intCast(height);
+
+    // Clip rectangle to screen
+    const flip_x, const clip_x_min: u32, const clip_y_min: u32, const clip_x_max: u32, const clip_y_max: u32 =
+        if (flags.rotate) .{
+        !flags.flip_x,
+        @intCast(@max(0, dst_y) - dst_y),
+        @intCast(@max(0, dst_x) - dst_x),
+        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_height)) - dst_y)),
+        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_width)) - dst_x)),
+    } else .{
+        flags.flip_x,
+        @intCast(@max(0, dst_x) - dst_x),
+        @intCast(@max(0, dst_y) - dst_y),
+        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_width)) - dst_x)),
+        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_height)) - dst_y)),
+    };
+
+    for (clip_y_min..clip_y_max) |y| {
+        for (clip_x_min..clip_x_max) |x| {
+            const signed_x: i32 = @intCast(x);
+            const signed_y: i32 = @intCast(y);
+
+            // Calculate sprite target coords
+            const tx: u32 = @intCast(dst_x + (if (flags.rotate) signed_y else signed_x));
+            const ty: u32 = @intCast(dst_y + (if (flags.rotate) signed_x else signed_y));
+
+            // Calculate sprite source coords
+            const sx = src_x + @as(u32, @intCast((if (flip_x) signed_width - signed_x - 1 else signed_x)));
+            const sy = src_y + @as(u32, @intCast((if (flags.flip_y) signed_height - signed_y - 1 else signed_y)));
+
+            const index = sy * stride + sx;
+
+            point(tx, ty, sprite[index].load());
+        }
+    }
 }
 
 fn line(

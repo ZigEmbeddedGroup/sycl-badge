@@ -39,6 +39,8 @@ See `src/hello.zig` and tweak the the values to your liking. I recommend quickly
 
 The simulator is ideal for fast iteration as it supports live reloading.
 
+Run `zig build` and wait for build to finish.
+
 Run `zig build watch` and head over to https://badgesim.microzig.tech/.
 
 (It's been noted that the live reloaders may be a little finnicky. If they don't work at all, please let Auguste know.)

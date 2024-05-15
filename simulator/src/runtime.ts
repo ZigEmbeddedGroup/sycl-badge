@@ -5,6 +5,8 @@ import { Framebuffer } from "./framebuffer";
 import { WebGLCompositor } from "./compositor";
 import { pack565, unpack565 } from "./ui/utils";
 
+const PIXELS_PER_MILLISECOND = 512; // about 25 FPS for full screen refreshes.
+
 export class Runtime {
     canvas: HTMLCanvasElement;
     memory: WebAssembly.Memory;
@@ -258,7 +260,9 @@ export class Runtime {
     }
 
     composite () {
-        this.compositor.composite(this.framebuffer);
+        const changedPixels = this.compositor.composite(this.framebuffer);
+        const screenUpdateTimeMs = changedPixels / PIXELS_PER_MILLISECOND;
+        return screenUpdateTimeMs;
     }
 }
 

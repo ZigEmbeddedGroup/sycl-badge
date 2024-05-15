@@ -106,7 +106,7 @@ export class WebGLCompositor {
         gl.vertexAttribPointer(positionAttrib, 2, GL.FLOAT, false, 0, 0);
     }
 
-    composite (framebuffer: Framebuffer) {
+    composite (framebuffer: Framebuffer): number {
         const gl = this.gl;
         const bytes = framebuffer.bytes;
 
@@ -115,5 +115,7 @@ export class WebGLCompositor {
 
         // Draw the fullscreen quad
         gl.drawArrays(GL.TRIANGLES, 0, 6);
+
+        return framebuffer.countChangedPixelsAndReset();
     }
 }

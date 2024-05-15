@@ -31,7 +31,7 @@ pub const DisplayColor = packed struct(u16) {
     /// 0-31
     r: u5,
 
-    const Optional = enum(i32) {
+    pub const Optional = enum(i32) {
         none = -1,
         _,
 
@@ -84,18 +84,25 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
         extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
         extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
-        extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
+        extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
         extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
         extern fn write_flash_page(page: u32, src: [*]const u8) void;
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
-    struct {};
+    struct {
+        export fn __return_thunk__() noreturn {
+            asm volatile (" svc #11");
+            unreachable;
+        }
+    };
 
 comptime {
-    _ = platform_specific;
+    if (builtin.target.isWasm() or builtin.output_mode == .Lib) {
+        _ = platform_specific;
+    }
 }
 
 pub const BlitOptions = struct {
@@ -138,11 +145,17 @@ pub inline fn blit(options: BlitOptions) void {
         const rest: extern struct {
             width: u32,
             height: u32,
-            flags: u32,
+            src_x: u32,
+            src_y: u32,
+            stride: u32,
+            flags: BlitOptions.Flags,
         } = .{
             .width = options.width,
             .height = options.height,
-            .flags = @bitCast(options.flags),
+            .src_x = options.src_x,
+            .src_y = options.src_y,
+            .stride = options.stride orelse options.width,
+            .flags = options.flags,
         };
         asm volatile (" svc #0"
             :
@@ -168,12 +181,19 @@ pub inline fn line(options: LineOptions) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.line(options.color, options.x1, options.y1, options.x2, options.y2);
     } else {
-        asm volatile (" svc #2"
+        const rest: extern struct {
+            y2: u32,
+            color: DisplayColor,
+        } = .{
+            .y2 = options.y2,
+            .color = options.color,
+        };
+        asm volatile (" svc #1"
             :
             : [x1] "{r0}" (options.x1),
               [y1] "{r1}" (options.y1),
               [x2] "{r2}" (options.x2),
-              [y2] "{r3}" (options.y2),
+              [rest] "{r3}" (&rest),
             : "memory"
         );
     }
@@ -200,12 +220,21 @@ pub inline fn oval(options: OvalOptions) void {
             options.height,
         );
     } else {
-        asm volatile (" svc #3"
+        const rest: extern struct {
+            height: u32,
+            stroke_color: DisplayColor.Optional,
+            fill_color: DisplayColor.Optional,
+        } = .{
+            .height = options.height,
+            .stroke_color = DisplayColor.Optional.from(options.stroke_color),
+            .fill_color = DisplayColor.Optional.from(options.fill_color),
+        };
+        asm volatile (" svc #2"
             :
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
-              [height] "{r3}" (options.height),
+              [rest] "{r3}" (&rest),
             : "memory"
         );
     }
@@ -232,12 +261,21 @@ pub inline fn rect(options: RectOptions) void {
             options.height,
         );
     } else {
-        asm volatile (" svc #4"
+        const rest: extern struct {
+            height: u32,
+            stroke_color: DisplayColor.Optional,
+            fill_color: DisplayColor.Optional,
+        } = .{
+            .height = options.height,
+            .stroke_color = DisplayColor.Optional.from(options.stroke_color),
+            .fill_color = DisplayColor.Optional.from(options.fill_color),
+        };
+        asm volatile (" svc #3"
             :
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
-              [height] "{r3}" (options.height),
+              [rest] "{r3}" (&rest),
             : "memory"
         );
     }
@@ -263,12 +301,21 @@ pub inline fn text(options: TextOptions) void {
             options.y,
         );
     } else {
-        asm volatile (" svc #5"
+        const rest: extern struct {
+            y: i32,
+            text_color: DisplayColor.Optional,
+            background_color: DisplayColor.Optional,
+        } = .{
+            .y = options.y,
+            .text_color = DisplayColor.Optional.from(options.text_color),
+            .background_color = DisplayColor.Optional.from(options.background_color),
+        };
+        asm volatile (" svc #4"
             :
             : [str_ptr] "{r0}" (options.str.ptr),
               [str_len] "{r1}" (options.str.len),
               [x] "{r2}" (options.x),
-              [y] "{r3}" (options.y),
+              [rest] "{r3}" (&rest),
             : "memory"
         );
     }
@@ -291,11 +338,12 @@ pub inline fn hline(options: StraightLineOptions) void {
             options.len,
         );
     } else {
-        asm volatile (" svc #7"
+        asm volatile (" svc #5"
             :
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
+              [color] "{r3}" (options.color),
             : "memory"
         );
     }
@@ -316,6 +364,7 @@ pub inline fn vline(options: StraightLineOptions) void {
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
+              [color] "{r3}" (options.color),
             : "memory"
         );
     }
@@ -372,7 +421,7 @@ pub inline fn tone(options: ToneOptions) void {
             options.flags,
         );
     } else {
-        asm volatile (" svc #8"
+        asm volatile (" svc #7"
             :
             : [frequency] "{r0}" (options.frequency),
               [duration] "{r1}" (options.duration),
@@ -396,19 +445,23 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
     if (comptime builtin.target.isWasm()) {
         return platform_specific.read_flash(offset, dst.ptr, dst.len);
     } else {
-        @panic("TODO");
+        return asm volatile (" svc #8"
+            : [result] "={r0}" (-> u32),
+            : [offset] "{r0}" (offset),
+              [dst_ptr] "{r1}" (dst.ptr),
+              [dst_len] "{r2}" (dst.len),
+        );
     }
 }
 
 pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
     if (comptime builtin.target.isWasm()) {
-        return platform_specific.write_flash_page(page, &src);
+        platform_specific.write_flash_page(page, &src);
     } else {
-        // TODO: return?
-        _ = asm volatile (" svc #10"
-            : [result] "={r0}" (-> u32),
-            : [src] "{r0}" (src),
-              [size] "{r1}" (flash_page_size),
+        asm volatile (" svc #9"
+            :
+            : [page] "{r0}" (page),
+              [src] "{r1}" (&src),
         );
     }
 }
@@ -424,7 +477,7 @@ pub inline fn trace(x: []const u8) void {
     if (comptime builtin.target.isWasm()) {
         platform_specific.trace(x.ptr, x.len);
     } else {
-        asm volatile (" svc #11"
+        asm volatile (" svc #10"
             :
             : [x_ptr] "{r0}" (x.ptr),
               [x_len] "{r1}" (x.len),

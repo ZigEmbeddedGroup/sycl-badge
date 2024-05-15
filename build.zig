@@ -77,10 +77,9 @@ pub fn build(b: *Build) void {
         });
         cart.install(b);
         b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
-            &cart.install_with_watcher(&dep, b, .{}).step
+            &cart.install_with_watcher(&dep, b, .{}).step,
         );
     }
-
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
@@ -111,6 +110,7 @@ pub fn build(b: *Build) void {
 
     inline for (.{
         "neopixels",
+        "song",
     }) |name| {
         const mvp = add_cart(&dep, b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),

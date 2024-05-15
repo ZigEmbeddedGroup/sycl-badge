@@ -13,6 +13,7 @@
 //! - USB mass drive
 //! - USB CDC logging
 const std = @import("std");
+const builtin = @import("builtin");
 
 const microzig = @import("microzig");
 const board = microzig.board;
@@ -27,10 +28,8 @@ const sercom = hal.sercom;
 const SystemControl = chip.peripherals.SystemControl;
 const CMCC = chip.peripherals.CMCC;
 const NVMCTRL = chip.peripherals.NVMCTRL;
-const GCLK = chip.peripherals.GCLK;
-const OSCCTRL = chip.peripherals.OSCCTRL;
 const TC4 = chip.peripherals.TC4;
-const MCLK = chip.peripherals.MCLK;
+const MPU = chip.peripherals.MPU;
 
 const cart = @import("badge/cart.zig");
 
@@ -39,12 +38,16 @@ const led_pin = board.D13;
 const Lcd = board.Lcd;
 const ButtonPoller = board.ButtonPoller;
 const light_sensor_pin = microzig.board.A7_LIGHT;
+const audio = board.audio;
 
 const adc = hal.adc.num(0);
+
+const utils = @import("utils.zig");
 
 pub const microzig_options = .{
     .interrupts = .{
         .SVCall = microzig.interrupt.Handler{ .Naked = cart.svcall_handler },
+        .DMAC_DMAC_1 = .{ .C = &audio.mix },
     },
 };
 
@@ -69,7 +72,10 @@ pub fn main() !void {
         .padding = 0,
     });
 
-    clocks.mclk.set_ahb_mask(.{ .CMCC = .enabled });
+    clocks.mclk.set_ahb_mask(.{
+        .CMCC = .enabled,
+        .DMAC = .enabled,
+    });
     CMCC.CTRL.write(.{
         .CEN = 1,
         .padding = 0,
@@ -79,15 +85,72 @@ pub fn main() !void {
     clocks.gclk.reset_blocking();
     microzig.cpu.dmb();
 
-    // audio init
-    //
-    // MPU.RBAR
-    // MPU.RASR
-    // MPU.RBAR_A1
-    // MPU.RASR_A1
-    // MPU.RBAR_A2
-    // MPU.RASR_A2
-    // MPU.CTRL
+    MPU.RBAR.write(.{
+        .REGION = 0,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.FLASH.ADDR) >> 5,
+    });
+    MPU.RASR.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(utils.FLASH.SIZE) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(utils.FLASH.SIZE) - 1) >> 1),
+        .SRD = 0b00000111,
+        .B = 0,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b000,
+        .reserved24 = 0,
+        .AP = 0b010,
+        .reserved28 = 0,
+        .XN = 0,
+        .padding = 0,
+    });
+    MPU.RBAR_A1.write(.{
+        .REGION = 1,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR) >> 5,
+    });
+    MPU.RASR_A1.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) >> 1),
+        .SRD = 0b00000000,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    MPU.RBAR_A2.write(.{
+        .REGION = 2,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR[@divExact(utils.HSRAM.SIZE, 3) * 2 ..]) >> 5,
+    });
+    MPU.RASR_A2.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) >> 1),
+        .SRD = 0b11001111,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    MPU.CTRL.write(.{
+        .ENABLE = 1,
+        .HFNMIENA = 0,
+        .PRIVDEFENA = 1,
+        .padding = 0,
+    });
 
     // GCLK0 feeds the CPU so put it on OSCULP32K for now
     clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{});
@@ -104,15 +167,19 @@ pub fn main() !void {
         .div = 48,
     });
 
+    const dpll0_factor = 1;
     clocks.enable_dpll(0, .GCLK2, .{
-        .factor = 1,
+        .factor = dpll0_factor,
         .input_freq_hz = 1_000_000,
         .output_freq_hz = 120_000_000,
     });
 
     clocks.gclk.set_peripheral_clk_gen(.GCLK_ADC0, .GCLK2);
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC0_TC1, .GCLK2);
-    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{});
+    clocks.gclk.enable_generator(.GCLK0, .DPLL0, .{
+        .divsel = .DIV1,
+        .div = dpll0_factor,
+    });
 
     // The second chain of clock generators:
     //
@@ -126,28 +193,37 @@ pub fn main() !void {
         .div = 625,
     });
 
+    const dpll1_factor = 12;
     clocks.enable_dpll(1, .GCLK1, .{
-        .factor = 12,
+        .factor = dpll1_factor,
         .input_freq_hz = 76_800,
         .output_freq_hz = 8_467_200,
     });
 
-    clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{});
+    clocks.gclk.enable_generator(.GCLK3, .DPLL1, .{
+        .divsel = .DIV1,
+        .div = dpll1_factor,
+    });
     clocks.gclk.set_peripheral_clk_gen(.GCLK_TC4_TC5, .GCLK3);
     clocks.gclk.set_peripheral_clk_gen(.GCLK_SERCOM4_CORE, .GCLK0);
 
-    timer.init();
-    init_frame_sync();
-
-    // Light sensor adc
-    light_sensor_pin.set_mux(.B);
     clocks.mclk.set_apb_mask(.{
         .ADC0 = .enabled,
         .TC0 = .enabled,
         .TC1 = .enabled,
         .TC4 = .enabled,
         .SERCOM4 = .enabled,
+        .TC5 = .enabled,
+        .DAC = .enabled,
+        .EVSYS = .enabled,
     });
+
+    timer.init();
+    audio.init();
+    init_frame_sync();
+
+    // Light sensor adc
+    light_sensor_pin.set_mux(.B);
 
     const state = clocks.get_state();
     const freqs = clocks.Frequencies.get(state);

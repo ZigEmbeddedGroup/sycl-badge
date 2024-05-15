@@ -12,17 +12,13 @@ const libcart = struct {
 
     extern fn start() void;
     extern fn update() void;
+    extern fn __return_thunk__() noreturn;
 };
-
-export fn __return_thunk__() noreturn {
-    asm volatile (" svc #12");
-    unreachable;
-}
 
 pub fn svcall_handler() callconv(.Naked) void {
     asm volatile (
         \\ mvns r0, lr, lsl #31 - 2
-        \\ bcc 1f
+        \\ bcc 12f
         \\ ite mi
         \\ movmi r1, sp
         \\ mrspl r1, psp
@@ -30,15 +26,14 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ subs r2, #2
         \\ ldrb r3, [r2, #1 * 1]
         \\ cmp r3, #0xDF
-        \\ bne 1f
+        \\ bne 12f
         \\ ldrb r3, [r2, #0 * 1]
-        \\ cmp r3, #12
-        \\ bhi 1f
+        \\ cmp r3, #11
+        \\ bhi 12f
         \\ tbb [pc, r3]
         \\0:
         \\ .byte (0f - 0b) / 2
-        \\ .byte (9f - 0b) / 2
-        \\ .byte (9f - 0b) / 2
+        \\ .byte (1f - 0b) / 2
         \\ .byte (2f - 0b) / 2
         \\ .byte (3f - 0b) / 2
         \\ .byte (4f - 0b) / 2
@@ -46,15 +41,18 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ .byte (6f - 0b) / 2
         \\ .byte (7f - 0b) / 2
         \\ .byte (8f - 0b) / 2
-        \\ .byte (8f - 0b) / 2
+        \\ .byte (9f - 0b) / 2
         \\ .byte (10f - 0b) / 2
-        \\1:
+        \\12:
         \\ .byte (11f - 0b) / 2
         \\ .byte 0xDE
         \\ .align 1
         \\0:
         \\ ldm r1, {r0-r3}
         \\ b %[blit:P]
+        \\1:
+        \\ ldm r1, {r0-r3}
+        \\ b %[line:P]
         \\2:
         \\ ldm r1, {r0-r3}
         \\ b %[oval:P]
@@ -65,19 +63,20 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ ldm r1, {r0-r3}
         \\ b %[text:P]
         \\5:
-        \\ ldm r1, {r0-r2}
-        \\ b %[vline:P]
-        \\6:
-        \\ ldm r1, {r0-r2}
+        \\ ldm r1, {r0-r3}
         \\ b %[hline:P]
+        \\6:
+        \\ ldm r1, {r0-r3}
+        \\ b %[vline:P]
         \\7:
         \\ ldm r1, {r0-r3}
         \\ b %[tone:P]
         \\8:
-        \\ movs r0, #0
-        \\ str r0, [r1, #0 * 4]
+        \\ ldm r1, {r0-r2}
+        \\ b %[read_flash:P]
         \\9:
-        \\ bx lr
+        \\ ldm r1, {r0-r1}
+        \\ b %[write_flash_page:P]
         \\10:
         \\ ldm r1, {r0-r1}
         \\ b %[trace:P]
@@ -99,12 +98,15 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ bx r0
         :
         : [blit] "X" (&blit),
+          [line] "X" (&line),
           [oval] "X" (&oval),
           [rect] "X" (&rect),
           [text] "X" (&text),
-          [vline] "X" (&vline),
           [hline] "X" (&hline),
+          [vline] "X" (&vline),
           [tone] "X" (&tone),
+          [read_flash] "X" (&read_flash),
+          [write_flash_page] "X" (&write_flash_page),
           [trace] "X" (&trace),
     );
 }
@@ -159,12 +161,12 @@ fn call(func: *const fn () callconv(.C) void) void {
     ) ..][0..@divExact(HSRAM.SIZE, 3 * 4)];
     const frame = comptime std.mem.bytesAsSlice(u32, process_stack[process_stack.len - 0x20 ..]);
     @memset(frame[0..5], 0);
-    frame[5] = @intFromPtr(&__return_thunk__);
+    frame[5] = @intFromPtr(&libcart.__return_thunk__);
     frame[6] = @intFromPtr(func);
     frame[7] = 1 << 24;
     asm volatile (
         \\ msr psp, %[process_stack]
-        \\ svc #12
+        \\ svc #11
         :
         : [process_stack] "r" (frame.ptr),
         : "memory"
@@ -200,54 +202,184 @@ fn User(comptime T: type) type {
     };
 }
 
-fn blit(sprite: [*]const User(u8), x: i32, y: i32, rest: *const extern struct { width: User(u32), height: User(u32), flags: User(u32) }) callconv(.C) void {
+fn blit(
+    sprite: [*]const User(u8),
+    x: i32,
+    y: i32,
+    rest: *const extern struct {
+        width: User(u32),
+        height: User(u32),
+        src_x: User(u32),
+        src_y: User(u32),
+        stride: User(u32),
+        flags: User(api.BlitOptions.Flags),
+    },
+) callconv(.C) void {
+    const width = rest.width.load();
+    const height = rest.height.load();
+    const src_x = rest.src_x.load();
+    const src_y = rest.src_y.load();
+    const stride = rest.stride.load();
+    const flags = rest.flags.load();
+
     _ = sprite;
     _ = x;
     _ = y;
-    _ = rest;
+    _ = width;
+    _ = height;
+    _ = src_x;
+    _ = src_y;
+    _ = stride;
+    _ = flags;
 }
 
-pub fn oval(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
+fn line(
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    rest: *const extern struct {
+        y2: User(i32),
+        color: User(api.DisplayColor),
+    },
+) callconv(.C) void {
+    const y2 = rest.y2.load();
+    const color = rest.color.load();
+
+    _ = x1;
+    _ = y1;
+    _ = x2;
+    _ = y2;
+    _ = color;
+}
+
+fn oval(
+    x: i32,
+    y: i32,
+    width: u32,
+    rest: *const extern struct {
+        height: User(u32),
+        stroke_color: User(api.DisplayColor.Optional),
+        fill_color: User(api.DisplayColor.Optional),
+    },
+) callconv(.C) void {
+    const height = rest.height.load();
+    const stroke_color = rest.stroke_color.load();
+    const fill_color = rest.fill_color.load();
+
     _ = x;
     _ = y;
     _ = width;
     _ = height;
+    _ = stroke_color;
+    _ = fill_color;
 }
 
-pub fn rect(x: i32, y: i32, width: u32, height: u32) callconv(.C) void {
+fn rect(
+    x: i32,
+    y: i32,
+    width: u32,
+    rest: *const extern struct {
+        height: User(u32),
+        stroke_color: User(api.DisplayColor.Optional),
+        fill_color: User(api.DisplayColor.Optional),
+    },
+) callconv(.C) void {
+    const height = rest.height.load();
+    const stroke_color = rest.stroke_color.load();
+    const fill_color = rest.fill_color.load();
+
     _ = x;
     _ = y;
     _ = width;
     _ = height;
+    _ = stroke_color;
+    _ = fill_color;
 }
 
-pub fn text(str: [*]const User(u8), len: usize, x: i32, y: i32) callconv(.C) void {
+fn text(
+    str_ptr: [*]const User(u8),
+    str_len: usize,
+    x: i32,
+    rest: *const extern struct {
+        y: User(i32),
+        text_color: User(api.DisplayColor.Optional),
+        background_color: User(api.DisplayColor.Optional),
+    },
+) callconv(.C) void {
+    const str = str_ptr[0..str_len];
+    const y = rest.y.load();
+    const text_color = rest.text_color.load();
+    const background_color = rest.background_color.load();
+
     _ = str;
-    _ = len;
     _ = x;
     _ = y;
+    _ = text_color;
+    _ = background_color;
 }
 
-pub fn vline(x: i32, y: i32, len: u32) callconv(.C) void {
+fn hline(
+    x: i32,
+    y: i32,
+    len: u32,
+    color: api.DisplayColor,
+) callconv(.C) void {
     _ = x;
     _ = y;
     _ = len;
+    _ = color;
 }
 
-pub fn hline(x: i32, y: i32, len: u32) callconv(.C) void {
+fn vline(
+    x: i32,
+    y: i32,
+    len: u32,
+    color: api.DisplayColor,
+) callconv(.C) void {
     _ = x;
     _ = y;
     _ = len;
+    _ = color;
 }
 
-pub fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) callconv(.C) void {
+fn tone(
+    frequency: u32,
+    duration: u32,
+    volume: u32,
+    flags: api.ToneOptions.Flags,
+) callconv(.C) void {
     _ = frequency;
     _ = duration;
     _ = volume;
     _ = flags;
 }
 
-pub fn trace(str: [*]const User(u8), len: usize) callconv(.C) void {
+fn read_flash(
+    offset: u32,
+    dst_ptr: [*]User(u8),
+    dst_len: usize,
+) callconv(.C) u32 {
+    const dst = dst_ptr[0..dst_len];
+
+    _ = offset;
+    _ = dst;
+
+    return 0;
+}
+
+fn write_flash_page(
+    page: u16,
+    src: *const [api.flash_page_size]User(u8),
+) callconv(.C) void {
+    _ = page;
+    _ = src;
+}
+
+fn trace(
+    str_ptr: [*]const User(u8),
+    str_len: usize,
+) callconv(.C) void {
+    const str = str_ptr[0..str_len];
+
     _ = str;
-    _ = len;
 }

@@ -79,15 +79,72 @@ pub fn main() !void {
     clocks.gclk.reset_blocking();
     microzig.cpu.dmb();
 
-    // audio init
-    //
-    // MPU.RBAR
-    // MPU.RASR
-    // MPU.RBAR_A1
-    // MPU.RASR_A1
-    // MPU.RBAR_A2
-    // MPU.RASR_A2
-    // MPU.CTRL
+    MPU.RBAR.write(.{
+        .REGION = 0,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.FLASH.ADDR) >> 5,
+    });
+    MPU.RASR.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(utils.FLASH.SIZE) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(utils.FLASH.SIZE) - 1) >> 1),
+        .SRD = 0b00000111,
+        .B = 0,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b000,
+        .reserved24 = 0,
+        .AP = 0b010,
+        .reserved28 = 0,
+        .XN = 0,
+        .padding = 0,
+    });
+    MPU.RBAR_A1.write(.{
+        .REGION = 1,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR) >> 5,
+    });
+    MPU.RASR_A1.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3) * 2) - 1) >> 1),
+        .SRD = 0b00000000,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    MPU.RBAR_A2.write(.{
+        .REGION = 2,
+        .VALID = 1,
+        .ADDR = @intFromPtr(utils.HSRAM.ADDR[@divExact(utils.HSRAM.SIZE, 3) * 2 ..]) >> 5,
+    });
+    MPU.RASR_A2.write(.{
+        .ENABLE = 1,
+        .SIZE = (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) & 1,
+        .reserved8 = @as(u4, (@ctz(@divExact(utils.HSRAM.SIZE, 3)) - 1) >> 1),
+        .SRD = 0b11001111,
+        .B = 1,
+        .C = 1,
+        .S = 0,
+        .TEX = 0b001,
+        .reserved24 = 0,
+        .AP = 0b011,
+        .reserved28 = 0,
+        .XN = 1,
+        .padding = 0,
+    });
+    MPU.CTRL.write(.{
+        .ENABLE = 1,
+        .HFNMIENA = 0,
+        .PRIVDEFENA = 1,
+        .padding = 0,
+    });
 
     // GCLK0 feeds the CPU so put it on OSCULP32K for now
     clocks.gclk.enable_generator(.GCLK0, .OSCULP32K, .{});

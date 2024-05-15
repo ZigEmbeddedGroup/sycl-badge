@@ -56,11 +56,11 @@ export fn update() void {
         green_565 -%= 1;
     }
 
-    if (cart.controls.left) {
-        write_stored_number(read_stored_number() -| 1);
-    } else if (cart.controls.right) {
-        write_stored_number(read_stored_number() +| 1);
-    }
+    // if (cart.controls.left) {
+    //     write_stored_number(read_stored_number() -| 1);
+    // } else if (cart.controls.right) {
+    //     write_stored_number(read_stored_number() +| 1);
+    // }
 
     cart.red_led.* = cart.controls.click;
 
@@ -76,9 +76,9 @@ export fn update() void {
 
     for (cart.neopixels, 0..) |*np, i| {
         np.* = .{
-            .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
-            .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 255),
-            .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 255),
+            .r = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 20),
+            .g = @intFromFloat(@as(f32, @floatFromInt(cart.light_level.*)) / std.math.maxInt(u12) * 20),
+            .b = @intFromFloat(@as(f32, @floatFromInt(i)) / 5 * 20),
         };
     }
 

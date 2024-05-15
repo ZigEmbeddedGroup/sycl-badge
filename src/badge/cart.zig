@@ -204,10 +204,20 @@ fn User(comptime T: type) type {
     };
 }
 
+fn point(x: usize, y: usize, color: api.DisplayColor) void {
+    api.framebuffer[y * api.screen_width + x] = color;
+}
+
+fn pointUnclipped(x: i32, y: i32, color: api.DisplayColor) void {
+    if (x >= 0 and x < api.screen_width and y >= 0 and y < api.screen_height) {
+        point(@intCast(x), @intCast(y), color);
+    }
+}
+
 fn blit(
-    sprite: [*]const User(u8),
-    x: i32,
-    y: i32,
+    sprite: [*]const User(api.DisplayColor),
+    dst_x: i32,
+    dst_y: i32,
     rest: *const extern struct {
         width: User(u32),
         height: User(u32),
@@ -224,15 +234,43 @@ fn blit(
     const stride = rest.stride.load();
     const flags = rest.flags.load();
 
-    _ = sprite;
-    _ = x;
-    _ = y;
-    _ = width;
-    _ = height;
-    _ = src_x;
-    _ = src_y;
-    _ = stride;
-    _ = flags;
+    const signed_width: i32 = @intCast(width);
+    const signed_height: i32 = @intCast(height);
+
+    // Clip rectangle to screen
+    const flip_x, const clip_x_min: u32, const clip_y_min: u32, const clip_x_max: u32, const clip_y_max: u32 =
+        if (flags.rotate) .{
+        !flags.flip_x,
+        @intCast(@max(0, dst_y) - dst_y),
+        @intCast(@max(0, dst_x) - dst_x),
+        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_height)) - dst_y)),
+        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_width)) - dst_x)),
+    } else .{
+        flags.flip_x,
+        @intCast(@max(0, dst_x) - dst_x),
+        @intCast(@max(0, dst_y) - dst_y),
+        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_width)) - dst_x)),
+        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_height)) - dst_y)),
+    };
+
+    for (clip_y_min..clip_y_max) |y| {
+        for (clip_x_min..clip_x_max) |x| {
+            const signed_x: i32 = @intCast(x);
+            const signed_y: i32 = @intCast(y);
+
+            // Calculate sprite target coords
+            const tx: u32 = @intCast(dst_x + (if (flags.rotate) signed_y else signed_x));
+            const ty: u32 = @intCast(dst_y + (if (flags.rotate) signed_x else signed_y));
+
+            // Calculate sprite source coords
+            const sx = src_x + @as(u32, @intCast((if (flip_x) signed_width - signed_x - 1 else signed_x)));
+            const sy = src_y + @as(u32, @intCast((if (flags.flip_y) signed_height - signed_y - 1 else signed_y)));
+
+            const index = sy * stride + sx;
+
+            point(tx, ty, sprite[index].load());
+        }
+    }
 }
 
 fn line(
@@ -247,11 +285,34 @@ fn line(
     const y2 = rest.y2.load();
     const color = rest.color.load();
 
-    _ = x1;
-    _ = y1;
-    _ = x2;
-    _ = y2;
-    _ = color;
+    var x1_moving = x1;
+    var y1_adjusted, const y2_adjusted = if (y1 > y2)
+        .{ y2, y1 }
+    else
+        .{ y1, y2 };
+
+    const dx: i32 = @intCast(@abs(x2 - x1_moving));
+    const sx: i32 = if (x1_moving < x2) 1 else -1;
+    const dy = y2_adjusted - y1_adjusted;
+    var err: i32 = @divTrunc(if (dx > dy) dx else -dy, 2);
+    var e2: i32 = 0;
+
+    while (true) {
+        pointUnclipped(x1_moving, y1_adjusted, color);
+
+        if (x1_moving == x2 and y1_adjusted == y2_adjusted) {
+            break;
+        }
+        e2 = err;
+        if (e2 > -dx) {
+            err -= dy;
+            x1_moving += sx;
+        }
+        if (e2 < dy) {
+            err += dx;
+            y1_adjusted += 1;
+        }
+    }
 }
 
 fn oval(
@@ -268,12 +329,80 @@ fn oval(
     const stroke_color = rest.stroke_color.load();
     const fill_color = rest.fill_color.load();
 
-    _ = x;
-    _ = y;
-    _ = width;
-    _ = height;
-    _ = stroke_color;
-    _ = fill_color;
+    const signed_width: i32 = @intCast(width);
+    const signed_height: i32 = @intCast(height);
+
+    var a = signed_width - 1;
+    const b = signed_height - 1;
+    var b1 = @rem(b, 2); // Compensates for precision loss when dividing
+
+    var north = y + @divFloor(signed_height, 2); // Precision loss here
+    var west = x;
+    var east = x + signed_width - 1;
+    var south = north - b1; // Compensation here. Moves the bottom line up by
+    // one (overlapping the top line) for even heights
+
+    const a2 = a * a;
+    const b2 = b * b;
+
+    // Error increments. Also known as the decision parameters
+    var dx = 4 * (1 - a) * b2;
+    var dy = 4 * (b1 + 1) * a2;
+
+    // Error of 1 step
+    var err = dx + dy + b1 * a2;
+
+    a = 8 * a2;
+    b1 = 8 * b2;
+
+    while (true) {
+        if (stroke_color.unwrap()) |sc| {
+            pointUnclipped(east, north, sc); // I. Quadrant
+            pointUnclipped(west, north, sc); // II. Quadrant
+            pointUnclipped(west, south, sc); // III. Quadrant
+            pointUnclipped(east, south, sc); // IV. Quadrant
+        }
+
+        const oval_start = west + 1;
+        const len = east - oval_start;
+
+        if (fill_color != .none and len > 0) { // Only draw fill if the length from west to east is not 0
+            hline(oval_start, north, @intCast(east - oval_start), fill_color.unwrap().?); // I and III. Quadrant
+            hline(oval_start, south, @intCast(east - oval_start), fill_color.unwrap().?); // II and IV. Quadrant
+        }
+
+        const err2 = 2 * err;
+
+        if (err2 <= dy) {
+            // Move vertical scan
+            north += 1;
+            south -= 1;
+            dy += a;
+            err += dy;
+        }
+
+        if (err2 >= dx or err2 > dy) {
+            // Move horizontal scan
+            west += 1;
+            east -= 1;
+            dx += b1;
+            err += dx;
+        }
+
+        if (!(west <= east)) break;
+    }
+
+    if (stroke_color.unwrap()) |sc| {
+        // Make sure north and south have moved the entire way so top/bottom aren't missing
+        while (north - south < signed_height) {
+            pointUnclipped(west - 1, north, sc); // II. Quadrant
+            pointUnclipped(east + 1, north, sc); // I. Quadrant
+            north += 1;
+            pointUnclipped(west - 1, south, sc); // III. Quadrant
+            pointUnclipped(east + 1, south, sc); // IV. Quadrant
+            south -= 1;
+        }
+    }
 }
 
 fn rect(
@@ -287,16 +416,25 @@ fn rect(
     },
 ) callconv(.C) void {
     const height = rest.height.load();
-    const stroke_color = rest.stroke_color.load();
-    const fill_color = rest.fill_color.load();
+    const stroke_color = rest.stroke_color.load().unwrap();
+    const fill_color = rest.fill_color.load().unwrap();
 
-    _ = x;
-    _ = y;
-    _ = width;
-    _ = height;
-    _ = stroke_color;
-    _ = fill_color;
+    if (stroke_color) |sc| {
+        hline(x, y, width, sc);
+        hline(x, y + @as(i32, @intCast(height)), width + 1, sc);
+
+        vline(x, y, height, sc);
+        vline(x + @as(i32, @intCast(width)), y, height, sc);
+    }
+
+    if (fill_color) |fc| {
+        for (@as(u32, @intCast(y)) + 1..@as(u32, @intCast(y)) + height) |yy| {
+            hline(x + 1, @intCast(yy), width - 1, fc);
+        }
+    }
 }
+
+const font = @import("font.zig").font;
 
 fn text(
     str_ptr: [*]const User(u8),
@@ -308,16 +446,42 @@ fn text(
         background_color: User(api.DisplayColor.Optional),
     },
 ) callconv(.C) void {
-    const str = str_ptr[0..str_len];
+    // const str = str_ptr[0].load();
     const y = rest.y.load();
     const text_color = rest.text_color.load();
     const background_color = rest.background_color.load();
 
-    _ = str;
-    _ = x;
-    _ = y;
-    _ = text_color;
-    _ = background_color;
+    const colors = &[_]api.DisplayColor.Optional{ text_color, background_color };
+
+    var char_x_offset = x;
+    var char_y_offset = y;
+
+    for (0..str_len) |char_idx| {
+        const char = str_ptr[char_idx].load();
+
+        if (char == 10) {
+            char_y_offset += 8;
+            char_x_offset = x;
+        } else if (char >= 32 and char <= 255) {
+            const base = (@as(usize, char) - 32) * 64;
+            for (0..8) |y_offset| {
+                const dst_y = char_y_offset + @as(i32, @intCast(y_offset));
+                for (0..8) |x_offset| {
+                    const dst_x = char_x_offset + @as(i32, @intCast(x_offset));
+
+                    const color = colors[std.mem.readPackedIntNative(u1, &font, base + y_offset * 8 + (7 - x_offset))];
+                    if (color.unwrap()) |dc| {
+                        // TODO: this is slow; check bounds once instead
+                        pointUnclipped(dst_x, dst_y, dc);
+                    }
+                }
+            }
+
+            char_x_offset += 8;
+        } else {
+            char_x_offset += 8;
+        }
+    }
 }
 
 fn hline(
@@ -326,10 +490,13 @@ fn hline(
     len: u32,
     color: api.DisplayColor,
 ) callconv(.C) void {
-    _ = x;
-    _ = y;
-    _ = len;
-    _ = color;
+    if (y < 0 or y >= api.screen_height) return;
+
+    const clamped_x: u32 = @intCast(std.math.clamp(x, 0, @as(i32, @intCast(api.screen_width - 1))));
+    const clamped_len = @min(clamped_x + len, api.screen_width) - clamped_x;
+
+    const y_offset = api.screen_width * @as(u32, @intCast(y));
+    @memset(api.framebuffer[y_offset + clamped_x ..][0..clamped_len], color);
 }
 
 fn vline(
@@ -338,10 +505,14 @@ fn vline(
     len: u32,
     color: api.DisplayColor,
 ) callconv(.C) void {
-    _ = x;
-    _ = y;
-    _ = len;
-    _ = color;
+    if (y + @as(i32, @intCast(len)) <= 0 or x < 0 or x >= @as(i32, @intCast(api.screen_width))) return;
+
+    const start_y: u32 = @intCast(@max(0, y));
+    const end_y: u32 = @intCast(@min(api.screen_height, y + @as(i32, @intCast(len))));
+
+    for (start_y..end_y) |yy| {
+        point(@intCast(x), yy, color);
+    }
 }
 
 fn tone(

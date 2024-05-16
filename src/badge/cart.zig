@@ -274,43 +274,39 @@ fn blit(
 }
 
 fn line(
-    x1: i32,
-    y1: i32,
-    x2: i32,
+    x_1: i32,
+    y_1: i32,
+    x_2: i32,
     rest: *const extern struct {
-        y2: User(i32),
+        y_2: User(i32),
         color: User(api.DisplayColor),
     },
 ) callconv(.C) void {
-    const y2 = rest.y2.load();
+    var x0 = x_1;
+    const x1 = x_2;
+    var y0 = y_1;
+    const y1 = rest.y_2.load();
     const color = rest.color.load();
-
-    var x1_moving = x1;
-    var y1_adjusted, const y2_adjusted = if (y1 > y2)
-        .{ y2, y1 }
-    else
-        .{ y1, y2 };
-
-    const dx: i32 = @intCast(@abs(x2 - x1_moving));
-    const sx: i32 = if (x1_moving < x2) 1 else -1;
-    const dy = y2_adjusted - y1_adjusted;
-    var err: i32 = @divTrunc(if (dx > dy) dx else -dy, 2);
-    var e2: i32 = 0;
+    const dx: i32 = @intCast(@abs(x1 - x0));
+    const sx: i32 = if (x0 < x1) 1 else -1;
+    const dy = -@as(i32, @intCast(@abs(y1 - y0)));
+    const sy: i32 = if (y0 < y1) 1 else -1;
+    var err = dx + dy;
 
     while (true) {
-        pointUnclipped(x1_moving, y1_adjusted, color);
+        pointUnclipped(x0, y0, color);
 
-        if (x1_moving == x2 and y1_adjusted == y2_adjusted) {
-            break;
+        if (x0 == x1 and y0 == y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) {
+            if (x0 == x1) break;
+            err += dy;
+            x0 += sx;
         }
-        e2 = err;
-        if (e2 > -dx) {
-            err -= dy;
-            x1_moving += sx;
-        }
-        if (e2 < dy) {
+        if (e2 <= dx) {
+            if (y0 == y1) break;
             err += dx;
-            y1_adjusted += 1;
+            y0 += sy;
         }
     }
 }

@@ -1,8 +1,18 @@
 const std = @import("std");
 const cart = @import("cart-api");
-const builtin = @import("builtin");
 
-export fn start() void {}
+pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
+    @setCold(true);
+    _ = msg;
+    _ = error_return_trace;
+    _ = ret_addr;
+    unreachable;
+}
+
+const model: *const Mnist = @alignCast(@ptrCast(MNIST_WEIGHT));
+export fn start() void {
+    set_background();
+}
 
 var scene: enum { mnist } = .mnist;
 
@@ -19,12 +29,86 @@ export fn update() void {
 
 const Img = [28][28]u8;
 const MNIST_DATA = @embedFile("t10k-images.idx3-ubyte.small");
+const MNIST_WEIGHT: []const u8 align(64) = @embedFile("mnist.q2.bin");
+
 const n_images = @divExact(MNIST_DATA.len - 16, @sizeOf(Img));
 
-pub fn randomDigit() Img {
+pub fn randomDigit() *const Img {
     const n = @rem(@divTrunc(step, 2), n_images);
-    const img: Img = @bitCast(MNIST_DATA[16 + n * @sizeOf(Img) ..][0..@sizeOf(Img)].*);
-    return img;
+    return @ptrCast(MNIST_DATA[16 + n * @sizeOf(Img) ..][0..@sizeOf(Img)]);
+}
+
+const Mnist = struct {
+    //  784*500+500*10
+    // 500, 10
+    weight0: [500 * 784 / 4]u8,
+    bias0: [500]f32,
+    weight1: [10 * 500 / 4]u8,
+    bias1: [10]f32,
+
+    pub fn load(data: []const u8) Mnist {
+        return std.mem.bytesToValue(Mnist, data);
+    }
+
+    pub inline fn forward(self: *const Mnist, img: *const Img) u5 {
+        const x: *const [28 * 28]u8 = @alignCast(@ptrCast(&img));
+        var hidden = quantMatmul(u8, 784, 500, &self.weight0, x);
+        addBias(&hidden, &self.bias0);
+        var out = quantMatmul(f32, 500, 10, &self.weight1, &hidden);
+        addBias(&out, &self.bias1);
+
+        var class: u5 = 0;
+        var max: f32 = -1000;
+        for (out, 0..) |score, c| {
+            if (score > max) {
+                class = @intCast(c);
+                max = score;
+            }
+        }
+        return class;
+    }
+};
+
+fn quantMatmul(T: type, comptime N: usize, comptime M: usize, weights: []const u8, input: *const [N]T) [M]f32 {
+    var res: [M]f32 = undefined;
+    const splat_0: @Vector(8, T) = @splat(0);
+    if (weights.len != M * @divExact(N, 4)) @panic("Unexpected weights.len");
+
+    for (0..M) |i| {
+        const row = i * @divExact(N, 4);
+        var sum: f32 = 0;
+        for (0..@divFloor(N, 8)) |j| {
+            const x = std.mem.bytesToValue(@Vector(8, T), input[j * 8 .. j * 8 + 8]);
+            const pos: @Vector(8, bool) = @bitCast(weights[row + 2 * j]);
+            const neg: @Vector(8, bool) = @bitCast(weights[row + 2 * j + 1]);
+
+            sum = accPos(sum, @reduce(.Add, @select(T, pos, x, splat_0)));
+            sum = accNeg(sum, @reduce(.Add, @select(T, neg, x, splat_0)));
+        }
+
+        res[i] = sum;
+    }
+    return res;
+}
+
+inline fn accPos(sum: f32, x: anytype) f32 {
+    return sum + switch (@typeInfo(@TypeOf(x))) {
+        .Int => @as(f32, @floatFromInt(x)),
+        .Float => x,
+        else => @compileError("acc"),
+    };
+}
+
+inline fn accNeg(sum: f32, x: anytype) f32 {
+    return sum - switch (@typeInfo(@TypeOf(x))) {
+        .Int => @as(f32, @floatFromInt(x)),
+        .Float => x,
+        else => @compileError("acc"),
+    };
+}
+
+fn addBias(input: []f32, bias: []const f32) void {
+    for (input, bias) |*x, b| x.* += b;
 }
 
 const lines = &[_][]const u8{
@@ -88,7 +172,6 @@ var turn: Player = .x;
 var state: [3][3]Player = @bitCast([1]Player{.none} ** 9);
 
 fn scene_mnist() void {
-    set_background();
     const img = randomDigit();
     const scale = 2;
     const offy = @divExact(cart.screen_height - 28 * scale, 2);
@@ -103,6 +186,13 @@ fn scene_mnist() void {
                     cart.framebuffer[y * cart.screen_width + x] = .{ .r = p, .g = p, .b = p };
                 }
             }
+        }
+    }
+    // model.weight0[0][0] = 1;
+    const class = model.forward(img);
+    for (0..scale) |x| {
+        for (0..scale) |y| {
+            cart.framebuffer[y * cart.screen_width + x] = .{ .r = class, .g = class, .b = class };
         }
     }
 }

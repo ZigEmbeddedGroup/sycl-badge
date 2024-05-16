@@ -186,7 +186,7 @@ pub inline fn line(options: LineOptions) void {
         platform_specific.line(options.color, options.x1, options.y1, options.x2, options.y2);
     } else {
         const rest: extern struct {
-            y2: u32,
+            y2: i32,
             color: DisplayColor,
         } = .{
             .y2 = options.y2,

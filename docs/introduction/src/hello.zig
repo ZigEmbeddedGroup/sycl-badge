@@ -9,7 +9,6 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
     unreachable;
 }
 
-const model: *const Mnist = @alignCast(@ptrCast(MNIST_WEIGHT));
 export fn start() void {
     set_background();
 }
@@ -50,14 +49,18 @@ const Mnist = struct {
         return std.mem.bytesToValue(Mnist, data);
     }
 
-    pub inline fn forward(self: *const Mnist, img: *const Img) u5 {
-        const x: *const [28 * 28]u8 = @alignCast(@ptrCast(&img));
-        var hidden = quantMatmul(u8, 784, 500, &self.weight0, x);
-        addBias(&hidden, &self.bias0);
-        var out = quantMatmul(f32, 500, 10, &self.weight1, &hidden);
-        addBias(&out, &self.bias1);
+    pub inline fn forward(img: *const Img) u4 {
+        const x: []const u8 = std.mem.asBytes(img);
+        _ = x; // autofix
+        // var hidden: [500]f32 = undefined;
+        // _ = hidden; // autofix
+        // quantMatmul(u8, 784, 500, getMnistWeight(0), x, &hidden);
+        // addBias(&hidden, getMnistBias(0));
+        var out: [10]f32 = undefined;
+        // quantMatmul(f32, 500, 10, getMnistWeight(1), &hidden, &out);
+        addBias(&out, getMnistBias(1));
 
-        var class: u5 = 0;
+        var class: u4 = 0;
         var max: f32 = -1000;
         for (out, 0..) |score, c| {
             if (score > max) {
@@ -69,26 +72,45 @@ const Mnist = struct {
     }
 };
 
-fn quantMatmul(T: type, comptime N: usize, comptime M: usize, weights: []const u8, input: *const [N]T) [M]f32 {
-    var res: [M]f32 = undefined;
+fn fieldSize(comptime n: std.meta.FieldEnum(Mnist)) usize {
+    return @sizeOf(std.meta.FieldType(Mnist, n));
+}
+
+inline fn getMnistWeight(comptime layer: u1) []const u8 {
+    return comptime switch (layer) {
+        0 => MNIST_WEIGHT[0..fieldSize(.weight0)],
+        1 => MNIST_WEIGHT[fieldSize(.weight0) + fieldSize(.bias0) ..][0..fieldSize(.weight1)],
+    };
+}
+
+inline fn getMnistBias(comptime layer: u1) []const f32 {
+    return comptime @alignCast(std.mem.bytesAsSlice(f32, switch (layer) {
+        0 => MNIST_WEIGHT[fieldSize(.weight0)..][0..fieldSize(.bias0)],
+        1 => MNIST_WEIGHT[fieldSize(.weight0) + fieldSize(.bias0) + fieldSize(.weight1) ..][0..fieldSize(.bias1)],
+    }));
+}
+
+inline fn quantMatmul(T: type, comptime N: usize, comptime M: usize, weights: []const u8, input: []const T, out: []f32) void {
     const splat_0: @Vector(8, T) = @splat(0);
+    _ = splat_0; // autofix
     if (weights.len != M * @divExact(N, 4)) @panic("Unexpected weights.len");
+    if (input.len != N) @panic("Unexpected input.len");
+    if (out.len != M) @panic("Unexpected out.len");
 
     for (0..M) |i| {
-        const row = i * @divExact(N, 4);
-        var sum: f32 = 0;
-        for (0..@divFloor(N, 8)) |j| {
-            const x = std.mem.bytesToValue(@Vector(8, T), input[j * 8 .. j * 8 + 8]);
-            const pos: @Vector(8, bool) = @bitCast(weights[row + 2 * j]);
-            const neg: @Vector(8, bool) = @bitCast(weights[row + 2 * j + 1]);
+        // const row = i * @divExact(N, 4);
+        // var sum: f32 = 0;
+        // for (0..@divFloor(N, 8)) |j| {
+        //     const x = std.mem.bytesToValue(@Vector(8, T), input[j * 8 .. j * 8 + 8]);
+        //     const pos: @Vector(8, bool) = @bitCast(weights[row + 2 * j]);
+        //     const neg: @Vector(8, bool) = @bitCast(weights[row + 2 * j + 1]);
 
-            sum = accPos(sum, @reduce(.Add, @select(T, pos, x, splat_0)));
-            sum = accNeg(sum, @reduce(.Add, @select(T, neg, x, splat_0)));
-        }
+        //     sum = accPos(sum, @reduce(.Add, @select(T, pos, x, splat_0)));
+        //     sum = accNeg(sum, @reduce(.Add, @select(T, neg, x, splat_0)));
+        // }
 
-        res[i] = sum;
+        out[i] = 1;
     }
-    return res;
 }
 
 inline fn accPos(sum: f32, x: anytype) f32 {
@@ -182,7 +204,7 @@ fn scene_mnist() void {
                 for (0..scale) |jj| {
                     const x = offx + scale * j + jj;
                     const y = offy + scale * i + ii;
-                    // TODO: use fg_color
+                    // TODO: interpolate between fg_color/bg_color
                     const p: u5 = @intCast(px >> 3);
                     cart.framebuffer[y * cart.screen_width + x] = .{ .r = p, .g = p, .b = p };
                 }
@@ -190,14 +212,18 @@ fn scene_mnist() void {
         }
     }
     // model.weight0[0][0] = 1;
-    var class: u5 = 0;
-    // class = @intCast(@mod(@divTrunc(step, 240), 10));
-    class = model.forward(img);
+    var class: u4 = undefined;
+    class = @intCast(@mod(@divTrunc(step, 240), 10));
+    class = Mnist.forward(img);
+    renderClass(class);
+}
 
+fn renderClass(class_: u4) void {
+    const class = @min(class_, palette.len - 1);
+    const c = @divTrunc(class, 2);
     const color = palette[class];
-    inline for (cart.neopixels, 0..) |*neopixel, i| {
-        const on = (class >> i) & 0x1;
-        if (on >= 1) {
+    for (cart.neopixels, 0..) |*neopixel, i| {
+        if (i <= c) {
             neopixel.* = color;
         } else {
             neopixel.* = .{ .r = 0, .g = 0, .b = 0 };
@@ -220,6 +246,8 @@ const palette = [_]cart.NeopixelColor{
     .{ .r = 0xBC, .g = 0xBD, .b = 0x74 },
     .{ .r = 0x00, .g = 0x99, .b = 0x07 },
     .{ .r = 0x3E, .g = 0xA5, .b = 0x3E },
+    // error
+    .{ .r = 0xff, .g = 0x00, .b = 0x00 },
 };
 
 fn set_background() void {

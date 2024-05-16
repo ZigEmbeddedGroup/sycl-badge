@@ -18,35 +18,57 @@ const size = cart.screen_width * cart.screen_height;
 var currentbuffer: [size]bool = undefined;
 const sw = cart.screen_width;
 
-export fn start() void {
-    const mid = cart.screen_width / 2;
-    @memset(currentbuffer[mid .. mid + 1], true);
-    for (currentbuffer, 0..) |_, i| {
-        if (i <= sw) {
-            continue;
-        } else {
-            const l = currentbuffer[i - sw - 1];
-            const u = currentbuffer[i - sw];
-            const r = currentbuffer[i - sw + 1];
+fn gen(l: bool, u: bool, r: bool) bool {
+    if (l and u and r) {
+        return false;
+    } else if (l and u and !r) {
+        return false;
+    } else if (l and !u and r) {
+        return false;
+    } else if (l and !u and !r) {
+        return true;
+    } else if (!l and u and r) {
+        return true;
+    } else if (!l and u and !r) {
+        return true;
+    } else if (!l and !u and r) {
+        return true;
+    } else if (!l and !u and !r) {
+        return false;
+    }
+    return true;
+}
 
-            if (l and u and r) {
-                currentbuffer[i] = false;
-            } else if (l and u and !r) {
-                currentbuffer[i] = false;
-            } else if (l and !u and r) {
-                currentbuffer[i] = false;
-            } else if (l and !u and !r) {
-                currentbuffer[i] = true;
-            } else if (!l and u and r) {
-                currentbuffer[i] = true;
-            } else if (!l and u and !r) {
-                currentbuffer[i] = true;
-            } else if (!l and !u and r) {
-                currentbuffer[i] = true;
-            } else if (!l and !u and !r) {
-                currentbuffer[i] = false;
-            }
+export fn start() void {
+    const mid = (cart.screen_width * cart.screen_height) - (cart.screen_width / 2);
+    @memset(currentbuffer[mid .. mid + 1], true);
+}
+
+var linebuffer: [size / cart.screen_height]bool = undefined;
+
+export fn update() void {
+    for (linebuffer, 0..) |_, i| {
+        var l = currentbuffer[currentbuffer.len - sw + i - 1];
+        const u = currentbuffer[currentbuffer.len - sw + i];
+        var r = currentbuffer[currentbuffer.len - sw + i + 1];
+
+        if (i == 0) {
+            l = currentbuffer[currentbuffer.len - 1];
         }
+
+        if (i == linebuffer.len - 1) {
+            r = currentbuffer[currentbuffer.len - sw];
+        }
+
+        linebuffer[i] = gen(l, u, r);
+    }
+
+    for (currentbuffer[0 .. currentbuffer.len - sw], 0..) |_, i| {
+        currentbuffer[i] = currentbuffer[i + sw];
+    }
+
+    for (linebuffer, 0..) |_, i| {
+        currentbuffer[currentbuffer.len - sw + i] = linebuffer[i];
     }
 
     for (cart.framebuffer, 0..) |_, i| {
@@ -57,5 +79,3 @@ export fn start() void {
         }
     }
 }
-
-export fn update() void {}

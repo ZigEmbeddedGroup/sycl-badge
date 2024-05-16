@@ -182,6 +182,7 @@ fn scene_mnist() void {
                 for (0..scale) |jj| {
                     const x = offx + scale * j + jj;
                     const y = offy + scale * i + ii;
+                    // TODO: use fg_color
                     const p: u5 = @intCast(px >> 3);
                     cart.framebuffer[y * cart.screen_width + x] = .{ .r = p, .g = p, .b = p };
                 }
@@ -189,18 +190,38 @@ fn scene_mnist() void {
         }
     }
     // model.weight0[0][0] = 1;
-    const class = model.forward(img);
-    for (0..scale) |x| {
-        for (0..scale) |y| {
-            cart.framebuffer[y * cart.screen_width + x] = .{ .r = class, .g = class, .b = class };
+    var class: u5 = 0;
+    // class = @intCast(@mod(@divTrunc(step, 240), 10));
+    class = model.forward(img);
+
+    const color = palette[class];
+    inline for (cart.neopixels, 0..) |*neopixel, i| {
+        const on = (class >> i) & 0x1;
+        if (on >= 1) {
+            neopixel.* = color;
+        } else {
+            neopixel.* = .{ .r = 0, .g = 0, .b = 0 };
         }
     }
 }
 
+const bg_color: cart.DisplayColor = .{ .r = 0x37 >> 3, .g = 0x2F >> 2, .b = 0x2A >> 3 };
+
+const fg_color: cart.DisplayColor = .{ .r = 0xC2 >> 3, .g = 0xB7 >> 2, .b = 0xAE >> 3 };
+
+const palette = [_]cart.NeopixelColor{
+    .{ .r = 0xD0, .g = 0xC5, .b = 0xBC },
+    .{ .r = 0x3F, .g = 0xA5, .b = 0xEA },
+    .{ .r = 0x22, .g = 0x7E, .b = 0xFF },
+    .{ .r = 0xEB, .g = 0x82, .b = 0x48 },
+    .{ .r = 0xD6, .g = 0x74, .b = 0x79 },
+    .{ .r = 0x7D, .g = 0xCB, .b = 0x6C },
+    .{ .r = 0x71, .g = 0x6F, .b = 0xFF },
+    .{ .r = 0xBC, .g = 0xBD, .b = 0x74 },
+    .{ .r = 0x00, .g = 0x99, .b = 0x07 },
+    .{ .r = 0x3E, .g = 0xA5, .b = 0x3E },
+};
+
 fn set_background() void {
-    @memset(cart.framebuffer, cart.DisplayColor{
-        .r = 0,
-        .g = 0,
-        .b = 0,
-    });
+    @memset(cart.framebuffer, bg_color);
 }

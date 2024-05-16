@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
     const feature_test_cart = badge.add_cart(dep, b, .{
         .name = "hello",
         .optimize = b.standardOptimizeOption(.{}),
-        .root_source_file = .{ .path = "src/hello.zig" },
+        .root_source_file = .{ .path = "src/rule30.zig" },
     });
     const watch_run_step = feature_test_cart.install_with_watcher(dep, b, .{});
 

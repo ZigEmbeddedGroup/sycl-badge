@@ -2,6 +2,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
 const audio = board.audio;
+const lcd = board.lcd;
 const timer = microzig.hal.timer;
 pub const api = @import("../cart/api.zig");
 
@@ -14,7 +15,10 @@ const libcart = struct {
 
     extern fn start() void;
     extern fn update() void;
-    extern fn __return_thunk__() noreturn;
+    export fn __return_thunk__() linksection(".text.cart") noreturn {
+        asm volatile (" svc #11");
+        unreachable;
+    }
 };
 
 pub fn svcall_handler() callconv(.Naked) void {
@@ -118,7 +122,7 @@ pub const HSRAM = struct {
 };
 
 pub fn start() void {
-    @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
+    @memset(@as(*[0xA01E]u8, @ptrFromInt(0x20000000)), 0);
     api.neopixels.* = .{
         .{ .r = 0, .g = 0, .b = 0 },
         .{ .r = 0, .g = 0, .b = 0 },
@@ -149,11 +153,10 @@ pub fn start() void {
     call(&libcart.start);
 }
 pub fn tick() void {
-    // TODO: check if frame is ready
-
-    // read gamepad
-    //if (SYSTEM_FLAGS.* & SYSTEM_PRESERVE_FRAMEBUFFER == 0) @memset(FRAMEBUFFER, 0b00_00_00_00);
+    // non-rendering logic could go here
+    lcd.vsync();
     call(&libcart.update);
+    lcd.update();
 }
 
 fn call(func: *const fn () callconv(.C) void) void {
@@ -178,11 +181,11 @@ fn call(func: *const fn () callconv(.C) void) void {
 fn User(comptime T: type) type {
     return extern struct {
         const Self = @This();
-        const suffix = switch (@sizeOf(T)) {
-            1 => "b",
-            2 => "h",
-            4 => "",
-            else => @compileError("loadUser doesn't support " ++ @typeName(T)),
+        const suffix = switch (@bitSizeOf(T)) {
+            8 => "b",
+            16 => "h",
+            32 => "",
+            else => @compileError("User doesn't support " ++ @typeName(T)),
         };
 
         unsafe: T,

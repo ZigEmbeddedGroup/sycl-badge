@@ -6,6 +6,7 @@ const root = @import("root");
 const carts = .{
     .{ "zeroman", @import("zeroman") },
     .{ "blobs", @import("blobs") },
+    .{ "plasma", @import("plasma") },
     .{ "metalgear_timer", @import("metalgear_timer") },
 };
 

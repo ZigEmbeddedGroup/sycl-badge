@@ -8,6 +8,7 @@ const carts = .{
     .{ "blobs", @import("blobs") },
     .{ "plasma", @import("plasma") },
     .{ "metalgear_timer", @import("metalgear_timer") },
+    .{ "neopixelpuzzle", @import("neopixelpuzzle") },
 };
 
 pub fn build(b: *std.Build) void {

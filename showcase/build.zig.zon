@@ -14,6 +14,7 @@
         .blobs = .{ .path = "carts/blobs" },
         .plasma = .{ .path = "carts/plasma" },
         .metalgear_timer = .{ .path = "carts/metalgear-timer" },
+        .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
     },
     .paths = .{
         "README.md",

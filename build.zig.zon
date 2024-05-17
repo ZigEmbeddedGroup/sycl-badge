@@ -9,6 +9,7 @@
     },
 
     .dependencies = .{
+        //.showcase = .{ .path = "showcase" },
         .@"microzig/build" = .{
             .url = "https://downloads.microzig.tech/microzig-0.12.1/build-0.0.1.tar.gz",
             .hash = "122066a2dd8e6cfef346bc5cd6de8294fe9d53bde59b65b042750ee25537438df2ad",

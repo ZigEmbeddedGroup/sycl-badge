@@ -32,11 +32,11 @@ pub fn build(b: *Build) void {
     const ws_dep = b.dependency("ws", .{});
     const mime_dep = b.dependency("mime", .{});
 
-    _ = b.addModule("cart-api", .{ .root_source_file = .{ .path = "src/cart/api.zig" } });
+    _ = b.addModule("cart-api", .{ .root_source_file = b.path("src/cart/api.zig") });
 
     const watch = b.addExecutable(.{
         .name = "watch",
-        .root_source_file = .{ .path = "src/watch/main.zig" },
+        .root_source_file = b.path("src/watch/main.zig"),
         .target = b.host,
         .optimize = optimize,
     });
@@ -52,34 +52,31 @@ pub fn build(b: *Build) void {
         .dest_dir = .disabled,
     }).step);
 
+    //const showcase_dep = b.dependency("showcase", .{
+    //    .optimize = optimize,
+    //});
+    //b.getInstallStep().dependOn(showcase_dep.builder.getInstallStep());
+
     var dep: std.Build.Dependency = .{ .builder = b };
     const feature_test_cart = add_cart(&dep, b, .{
         .name = "feature_test",
         .optimize = optimize,
-        .root_source_file = .{ .path = "samples/feature_test.zig" },
+        .root_source_file = b.path("samples/feature_test.zig"),
     });
     feature_test_cart.install(b);
     const watch_run_step = feature_test_cart.install_with_watcher(&dep, b, .{});
 
-    const zeroman_cart = add_cart(&dep, b, .{
-        .name = "zeroman",
-        .optimize = optimize,
-        .root_source_file = .{ .path = "samples/zeroman/main.zig" },
-    });
-    add_zeroman_assets_step(b, zeroman_cart);
-    zeroman_cart.install(b);
-
-    {
-        const cart = add_cart(&dep, b, .{
-            .name = "blobs",
-            .optimize = .ReleaseSmall,
-            .root_source_file = .{ .path = "samples/blobs/blobs.zig" },
-        });
-        cart.install(b);
-        b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
-            &cart.install_with_watcher(&dep, b, .{}).step,
-        );
-    }
+    //{
+    //    const cart = add_cart(&dep, b, .{
+    //        .name = "blobs",
+    //        .optimize = .ReleaseSmall,
+    //        .root_source_file = .{ .path = "samples/blobs/blobs.zig" },
+    //    });
+    //    cart.install(b);
+    //    b.step("watch-blobs", "Watch/run blobs in the simulator").dependOn(
+    //        &cart.install_with_watcher(&dep, b, .{}).step,
+    //    );
+    //}
 
     const watch_step = b.step("watch", "");
     watch_step.dependOn(&watch_run_step.step);
@@ -261,53 +258,3 @@ pub fn install_cart(b: *Build, cart: *Cart) void {
     cart.mz.install_firmware(b, cart.fw, .{ .format = .elf });
     cart.mz.install_firmware(b, cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
 }
-
-fn add_zeroman_assets_step(b: *Build, cart: *Cart) void {
-    const convert = b.addExecutable(.{
-        .name = "convert_gfx",
-        .root_source_file = b.path("samples/zeroman/build/convert_gfx.zig"),
-        .target = b.host,
-        .optimize = cart.options.optimize,
-        .link_libc = true,
-    });
-    convert.root_module.addImport("zigimg", b.dependency("zigimg", .{}).module("zigimg"));
-
-    const base_path = "samples/zeroman/assets/";
-    const gen_gfx = b.addRunArtifact(convert);
-    inline for (zeroman_assets) |file| {
-        gen_gfx.addArg("-i");
-        gen_gfx.addFileArg(b.path(base_path ++ file.path));
-        gen_gfx.addArg(std.fmt.comptimePrint("{}", .{file.bits}));
-        gen_gfx.addArg(std.fmt.comptimePrint("{}", .{file.transparency}));
-    }
-    gen_gfx.addArg("-o");
-    const gfx_zig = gen_gfx.addOutputFileArg("gfx.zig");
-
-    const gfx_mod = b.addModule("gfx", .{
-        .root_source_file = gfx_zig,
-        .optimize = cart.options.optimize,
-    });
-    var dep: std.Build.Dependency = .{ .builder = b };
-    gfx_mod.addImport("cart-api", dep.module("cart-api"));
-
-    cart.wasm.step.dependOn(&gen_gfx.step);
-    cart.wasm.root_module.addImport("gfx", gfx_mod);
-    cart.cart_lib.root_module.addImport("gfx", gfx_mod);
-}
-
-const GfxAsset = struct { path: []const u8, bits: u4, transparency: bool };
-
-const zeroman_assets = [_]GfxAsset{
-    .{ .path = "door.png", .bits = 2, .transparency = false },
-    .{ .path = "effects.png", .bits = 2, .transparency = true },
-    .{ .path = "font.png", .bits = 2, .transparency = true },
-    .{ .path = "gopher.png", .bits = 4, .transparency = true },
-    .{ .path = "healthbar.png", .bits = 4, .transparency = true },
-    .{ .path = "hurt.png", .bits = 1, .transparency = true },
-    .{ .path = "needleman.png", .bits = 4, .transparency = false },
-    .{ .path = "shot.png", .bits = 2, .transparency = true },
-    .{ .path = "spike.png", .bits = 2, .transparency = true },
-    .{ .path = "teleport.png", .bits = 2, .transparency = true },
-    .{ .path = "title.png", .bits = 4, .transparency = false },
-    .{ .path = "zero.png", .bits = 4, .transparency = true },
-};

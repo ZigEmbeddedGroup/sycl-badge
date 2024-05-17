@@ -5,7 +5,7 @@ const root = @import("root");
 // cart imports
 const carts = .{
     .{ "zeroman", @import("zeroman") },
-    //.{ "blobs", @import("blobs") },
+    .{ "blobs", @import("blobs") },
 };
 
 pub fn build(b: *std.Build) void {

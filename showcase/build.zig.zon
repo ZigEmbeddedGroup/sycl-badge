@@ -12,6 +12,7 @@
         // Carts go here
         .zeroman = .{ .path = "carts/zeroman" },
         .blobs = .{ .path = "carts/blobs" },
+        .plasma = .{ .path = "carts/plasma" },
     },
     .paths = .{
         "README.md",

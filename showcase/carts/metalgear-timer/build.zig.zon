@@ -1,0 +1,12 @@
+.{
+    .name = "metalgear-timer",
+    .version = "0.0.0",
+    .dependencies = .{
+        .sycl_badge = .{ .path = "../../.." },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

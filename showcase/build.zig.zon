@@ -12,6 +12,7 @@
         // Carts go here
         .zeroman = .{ .path = "carts/zeroman" },
         .blobs = .{ .path = "carts/blobs" },
+        .metalgear_timer = .{ .path = "carts/metalgear-timer" },
     },
     .paths = .{
         "README.md",

@@ -7,6 +7,7 @@ const carts = .{
     .{ "zeroman", @import("zeroman") },
     .{ "blobs", @import("blobs") },
     .{ "plasma", @import("plasma") },
+    .{ "metalgear_timer", @import("metalgear_timer") },
 };
 
 pub fn build(b: *std.Build) void {

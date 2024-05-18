@@ -16,6 +16,7 @@
         .metalgear_timer = .{ .path = "carts/metalgear-timer" },
         .raytracer = .{ .path = "carts/raytracer" },
         .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
+        .dvd = .{ .path = "carts/dvd" },
     },
     .paths = .{
         "README.md",

@@ -4,13 +4,16 @@ const Build = std.Build;
 const MicroZig = @import("microzig/build");
 const atsam = @import("microzig/bsp/microchip/atsam");
 
+pub const py_badge: MicroZig.Target = .{
+    .preferred_format = .elf,
+    .chip = atsam.chips.atsamd51j19,
+    .hal = null,
+};
+
 fn sycl_badge_microzig_target(d: *Build.Dependency) MicroZig.Target {
-    var atsamd51j19_chip_with_fpu = atsam.chips.atsamd51j19.chip;
-    atsamd51j19_chip_with_fpu.cpu.target.cpu_features_add = std.Target.arm.featureSet(&.{.vfp4d16sp});
-    atsamd51j19_chip_with_fpu.cpu.target.abi = .eabihf;
     return .{
         .preferred_format = .elf,
-        .chip = atsamd51j19_chip_with_fpu,
+        .chip = atsam.chips.atsamd51j19.chip,
         .hal = .{
             .root_source_file = d.builder.path("src/hal.zig"),
         },
@@ -103,7 +106,6 @@ pub fn build(b: *Build) void {
     }
 
     inline for (.{
-        "draw",
         "neopixels",
         "song",
     }) |name| {

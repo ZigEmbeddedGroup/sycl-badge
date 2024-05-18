@@ -73,7 +73,7 @@ pub const controls: *Controls = @ptrFromInt(base + 0x04);
 pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
-pub const framebuffer: *volatile [screen_height * screen_width]DisplayColor = @ptrFromInt(base + 0x1e);
+pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt(base + 0x1e);
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -96,7 +96,12 @@ const platform_specific = if (builtin.target.isWasm())
         extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
     }
 else
-    struct {};
+    struct {
+        export fn __return_thunk__() noreturn {
+            asm volatile (" svc #11");
+            unreachable;
+        }
+    };
 
 comptime {
     if (builtin.target.isWasm() or builtin.output_mode == .Lib) {

@@ -15,6 +15,7 @@
         .plasma = .{ .path = "carts/plasma" },
         .metalgear_timer = .{ .path = "carts/metalgear-timer" },
         .raytracer = .{ .path = "carts/raytracer" },
+        .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
     },
     .paths = .{
         "README.md",

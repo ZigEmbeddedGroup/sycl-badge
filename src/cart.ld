@@ -27,7 +27,6 @@ SECTIONS
     *libcart.a:*(.text*)
     *libc.a:*(.text*)
     *libcompiler_rt.a:*(.text*)
-    *(.text.cart)
   } >cart_flash
 
   .rodata.cart : {

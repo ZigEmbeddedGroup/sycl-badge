@@ -180,7 +180,7 @@ var channels_note_start = [1]f32{0.0} ** song.len;
 pub export fn start() void {}
 
 pub export fn update() void {
-    time += 1.0 / 11.5; // TODO: should be higher fps once lcd is dma'd
+    time += 1.0 / 10.0; // TODO: should be higher fps once lcd is dma'd
     for (
         0..,
         &channels_note_index,

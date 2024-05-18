@@ -33,11 +33,10 @@ const MPU = chip.peripherals.MPU;
 
 const cart = @import("badge/cart.zig");
 
-const led_pin = board.D13;
+const led_pin = board.A5_D13;
 
-const Lcd = board.Lcd;
+const lcd = board.lcd;
 const ButtonPoller = board.ButtonPoller;
-const light_sensor_pin = microzig.board.A7_LIGHT;
 const audio = board.audio;
 
 const adc = hal.adc.num(0);
@@ -52,6 +51,7 @@ pub const microzig_options = .{
 };
 
 pub fn main() !void {
+    // Enable safety traps
     SystemControl.CCR.modify(.{
         .NONBASETHRDENA = 0,
         .USERSETMPEND = 0,
@@ -60,11 +60,7 @@ pub fn main() !void {
         .BFHFNMIGN = 0,
         .STKALIGN = .{ .value = .VALUE_1 },
     });
-    SystemControl.SHCSR.modify(.{
-        .MEMFAULTENA = 1,
-        .BUSFAULTENA = 1,
-        .USGFAULTENA = 1,
-    });
+    // Enable FPU access.
     SystemControl.CPACR.write(.{
         .reserved20 = 0,
         .CP10 = .{ .value = .FULL },
@@ -82,8 +78,9 @@ pub fn main() !void {
     });
 
     NVMCTRL.CTRLA.modify(.{ .AUTOWS = 1 });
-    clocks.gclk.reset_blocking();
     microzig.cpu.dmb();
+
+    clocks.gclk.reset_blocking();
 
     MPU.RBAR.write(.{
         .REGION = 0,
@@ -220,50 +217,26 @@ pub fn main() !void {
 
     timer.init();
     audio.init();
-    init_frame_sync();
 
     // Light sensor adc
-    light_sensor_pin.set_mux(.B);
+    microzig.board.A6_LIGHT.set_mux(.B);
 
     const state = clocks.get_state();
     const freqs = clocks.Frequencies.get(state);
     _ = freqs;
 
-    const lcd = Lcd.init(.{
-        .spi = sercom.spi.Master.init(.SERCOM4, .{
-            .cpha = .LEADING_EDGE,
-            .cpol = .IDLE_LOW,
-            .dord = .MSB,
-            .dopo = .PAD2,
-            .ref_freq_hz = 120_000_000,
-            .baud_freq_hz = 12_000_000,
-        }),
-        .pins = .{
-            .rst = board.TFT_RST,
-            .lite = board.TFT_LITE,
-            .dc = board.TFT_DC,
-            .cs = board.TFT_CS,
-            .sck = board.TFT_SCK,
-            .mosi = board.TFT_MOSI,
-        },
-        .fb = .{
-            .bpp16 = @ptrCast(cart.api.framebuffer),
-        },
-    });
-
-    lcd.clear_screen(.{ .r = 0, .g = 0, .b = 0 });
+    lcd.init(.bpp16, @ptrCast(cart.api.framebuffer));
 
     const neopixels = board.Neopixels.init(board.D8_NEOPIX);
-    adc.init();
+    adc.init(.DIV16);
+    adc.set_input(.AIN6, .GND, .single_ended, .stop);
+    adc.enable();
     const poller = ButtonPoller.init();
     led_pin.set_dir(.out);
 
     cart.start();
     while (true) {
-        //if (!frame_is_ready())
-        //    continue;
-
-        const light_reading = adc.single_shot_blocking(.AIN6);
+        const light_reading = adc.single_shot_blocking();
         cart.api.light_level.* = @intCast(light_reading);
 
         const buttons = poller.read_from_port();
@@ -280,6 +253,7 @@ pub fn main() !void {
         };
 
         cart.tick();
+
         var pixels: [5]board.NeopixelColor = undefined;
         for (&pixels, cart.api.neopixels) |*local, pixel|
             local.* = .{
@@ -287,125 +261,6 @@ pub fn main() !void {
                 .g = pixel.g,
                 .b = pixel.b,
             };
-
         neopixels.write(&pixels);
-        led_pin.write(if (cart.api.red_led.*) .high else .low);
-        lcd.set_window(0, 0, 160, 128);
-        lcd.send_colors(@ptrCast(cart.api.framebuffer));
     }
-}
-
-pub fn init_frame_sync() void {
-    TC4.COUNT16.CTRLA.write(.{
-        .SWRST = 0,
-        .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
-        .ALOCK = 0,
-        .reserved16 = 0,
-        .CAPTEN0 = 0,
-        .CAPTEN1 = 0,
-        .reserved20 = 0,
-        .COPEN0 = 0,
-        .COPEN1 = 0,
-        .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
-        .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
-        .padding = 0,
-    });
-    while (TC4.COUNT16.SYNCBUSY.read().ENABLE != 0) {}
-
-    TC4.COUNT16.CTRLA.write(.{
-        .SWRST = 1,
-        .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
-        .ALOCK = 0,
-        .reserved16 = 0,
-        .CAPTEN0 = 0,
-        .CAPTEN1 = 0,
-        .reserved20 = 0,
-        .COPEN0 = 0,
-        .COPEN1 = 0,
-        .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
-        .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
-        .padding = 0,
-    });
-    while (TC4.COUNT16.SYNCBUSY.read().SWRST != 0) {}
-    TC4.COUNT16.CTRLA.write(.{
-        .SWRST = 0,
-        .ENABLE = 0,
-        .MODE = .{ .value = .COUNT16 },
-        .PRESCSYNC = .{ .value = .PRESC },
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-        .PRESCALER = .{ .value = .DIV64 },
-        .ALOCK = 0,
-        .reserved16 = 0,
-        .CAPTEN0 = 0,
-        .CAPTEN1 = 0,
-        .reserved20 = 0,
-        .COPEN0 = 0,
-        .COPEN1 = 0,
-        .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
-        .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
-        .padding = 0,
-    });
-    TC4.COUNT16.WAVE.write(.{ .WAVEGEN = .{ .value = .MFRQ }, .padding = 0 });
-    TC4.COUNT16.CC[0].write(.{ .CC = @divExact(8_467_200, 64 * 60) - 1 });
-    while (TC4.COUNT16.SYNCBUSY.read().CC0 != 0) {}
-    TC4.COUNT16.CTRLA.write(.{
-        .SWRST = 0,
-        .ENABLE = 1,
-        .MODE = .{ .value = .COUNT16 },
-        .PRESCSYNC = .{ .value = .PRESC },
-        .RUNSTDBY = 0,
-        .ONDEMAND = 0,
-        .PRESCALER = .{ .value = .DIV64 },
-        .ALOCK = 0,
-        .reserved16 = 0,
-        .CAPTEN0 = 0,
-        .CAPTEN1 = 0,
-        .reserved20 = 0,
-        .COPEN0 = 0,
-        .COPEN1 = 0,
-        .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
-        .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
-        .padding = 0,
-    });
-    while (TC4.COUNT16.SYNCBUSY.read().ENABLE != 0) {}
-    TC4.COUNT16.CTRLBSET.write(.{
-        .DIR = 0,
-        .LUPD = 0,
-        .ONESHOT = 0,
-        .reserved5 = 0,
-        .CMD = .{ .value = .RETRIGGER },
-    });
-    while (TC4.COUNT16.SYNCBUSY.read().CTRLB != 0) {}
-}
-
-pub fn frame_is_ready() bool {
-    if (TC4.COUNT16.INTFLAG.read().OVF != 1) return false;
-    TC4.COUNT16.INTFLAG.write(.{
-        .OVF = 1,
-        .ERR = 0,
-        .reserved4 = 0,
-        .MC0 = 0,
-        .MC1 = 0,
-        .padding = 0,
-    });
-    return true;
 }

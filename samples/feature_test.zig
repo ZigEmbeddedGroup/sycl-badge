@@ -66,11 +66,11 @@ export fn update() void {
 
     for (0..cart.screen_height) |y| {
         for (0..cart.screen_width) |x| {
-            cart.framebuffer[y * cart.screen_width + x] = .{
+            cart.framebuffer[x][y].setColor(.{
                 .r = @intFromFloat(@as(f32, @floatFromInt(x)) / cart.screen_width * 31),
                 .g = green_565,
                 .b = @intFromFloat(@as(f32, @floatFromInt(y)) / cart.screen_height * 31),
-            };
+            });
         }
     }
 

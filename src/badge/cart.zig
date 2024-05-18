@@ -1,7 +1,10 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const chip = microzig.chip;
+const FPU = chip.peripherals.FPU;
 const board = microzig.board;
 const audio = board.audio;
+const lcd = board.lcd;
 const timer = microzig.hal.timer;
 pub const api = @import("../cart/api.zig");
 
@@ -14,7 +17,10 @@ const libcart = struct {
 
     extern fn start() void;
     extern fn update() void;
-    extern fn __return_thunk__() noreturn;
+    export fn __return_thunk__() linksection(".text.cart") noreturn {
+        asm volatile (" svc #12");
+        unreachable;
+    }
 };
 
 pub fn svcall_handler() callconv(.Naked) void {
@@ -30,8 +36,8 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ cmp r3, #0xDF
         \\ bne 12f
         \\ ldrb r3, [r2, #0 * 1]
-        \\ cmp r3, #11
-        \\ bhi 12f
+        \\ cmp r3, #12
+        \\ bhi 13f
         \\ tbb [pc, r3]
         \\0:
         \\ .byte (0f - 0b) / 2
@@ -45,8 +51,9 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ .byte (8f - 0b) / 2
         \\ .byte (9f - 0b) / 2
         \\ .byte (10f - 0b) / 2
-        \\12:
         \\ .byte (11f - 0b) / 2
+        \\13:
+        \\ .byte (12f - 0b) / 2
         \\ .byte 0xDE
         \\ .align 1
         \\0:
@@ -80,13 +87,15 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ ldm r1, {r0-r1}
         \\ b %[write_flash_page:P]
         \\10:
+        \\ b %[rand:P]
+        \\11:
         \\ ldm r1, {r0-r1}
         \\ b %[trace:P]
-        \\11:
+        \\12:
         \\ lsrs r0, #31
         \\ msr control, r0
         \\ it eq
-        \\ popeq {r3, r5-r11, pc}
+        \\ popeq {r4-r11, pc}
         \\ subs r0, #1 - 0xFFFFFFFD
         \\ push {r4-r11, lr}
         \\ movs r4, #0
@@ -109,6 +118,7 @@ pub fn svcall_handler() callconv(.Naked) void {
           [tone] "X" (&tone),
           [read_flash] "X" (&read_flash),
           [write_flash_page] "X" (&write_flash_page),
+          [rand] "X" (&rand),
           [trace] "X" (&trace),
     );
 }
@@ -118,14 +128,7 @@ pub const HSRAM = struct {
 };
 
 pub fn start() void {
-    @memset(@as(*[0x19A0]u8, @ptrFromInt(0x20000000)), 0);
-    api.neopixels.* = .{
-        .{ .r = 0, .g = 0, .b = 0 },
-        .{ .r = 0, .g = 0, .b = 0 },
-        .{ .r = 0, .g = 0, .b = 0 },
-        .{ .r = 0, .g = 0, .b = 0 },
-        .{ .r = 0, .g = 0, .b = 0 },
-    };
+    @memset(@as(*[0xA020]u8, @ptrFromInt(0x20000000)), 0);
 
     // fill .bss with zeroes
     {
@@ -149,14 +152,14 @@ pub fn start() void {
     call(&libcart.start);
 }
 pub fn tick() void {
-    // TODO: check if frame is ready
-
-    // read gamepad
-    //if (SYSTEM_FLAGS.* & SYSTEM_PRESERVE_FRAMEBUFFER == 0) @memset(FRAMEBUFFER, 0b00_00_00_00);
+    // non-rendering logic could go here
+    lcd.vsync();
     call(&libcart.update);
+    lcd.update();
 }
 
 fn call(func: *const fn () callconv(.C) void) void {
+    // initialize new context
     const process_stack = HSRAM.ADDR[HSRAM.SIZE - @divExact(
         HSRAM.SIZE,
         3 * 2,
@@ -168,21 +171,36 @@ fn call(func: *const fn () callconv(.C) void) void {
     frame[7] = 1 << 24;
     asm volatile (
         \\ msr psp, %[process_stack]
-        \\ svc #11
+        \\ svc #12
         :
         : [process_stack] "r" (frame.ptr),
-        : "memory"
+        : "r0", "r1", "r2", "r3", "memory"
     );
+    // delete fp context
+    FPU.FPCCR.write(.{
+        .LSPACT = 0,
+        .USER = 0,
+        .reserved3 = 0,
+        .THREAD = 0,
+        .HFRDY = 0,
+        .MMRDY = 0,
+        .BFRDY = 0,
+        .reserved8 = 0,
+        .MONRDY = 0,
+        .reserved30 = 0,
+        .LSPEN = 1,
+        .ASPEN = 1,
+    });
 }
 
 fn User(comptime T: type) type {
     return extern struct {
         const Self = @This();
-        const suffix = switch (@sizeOf(T)) {
-            1 => "b",
-            2 => "h",
-            4 => "",
-            else => @compileError("loadUser doesn't support " ++ @typeName(T)),
+        const suffix = switch (@bitSizeOf(T)) {
+            8 => "b",
+            16 => "h",
+            32 => "",
+            else => @compileError("User doesn't support " ++ @typeName(T)),
         };
 
         unsafe: T,
@@ -204,14 +222,10 @@ fn User(comptime T: type) type {
     };
 }
 
-fn point(x: usize, y: usize, color: api.DisplayColor) void {
-    api.framebuffer[y * api.screen_width + x] = color;
-}
-
-fn pointUnclipped(x: i32, y: i32, color: api.DisplayColor) void {
-    if (x >= 0 and x < api.screen_width and y >= 0 and y < api.screen_height) {
-        point(@intCast(x), @intCast(y), color);
-    }
+fn clipPixel(x: i32, y: i32, pixel: api.Pixel) void {
+    if (x < 0 or x >= api.screen_width) return;
+    if (y < 0 or y >= api.screen_height) return;
+    api.framebuffer[@intCast(x)][@intCast(y)] = pixel;
 }
 
 fn blit(
@@ -268,7 +282,7 @@ fn blit(
 
             const index = sy * stride + sx;
 
-            point(tx, ty, sprite[index].load());
+            api.framebuffer[tx][ty].setColor(sprite[index].load());
         }
     }
 }
@@ -293,8 +307,9 @@ fn line(
     const sy: i32 = if (y0 < y1) 1 else -1;
     var err = dx + dy;
 
+    const pixel = api.Pixel.fromColor(color);
     while (true) {
-        pointUnclipped(x0, y0, color);
+        clipPixel(x0, y0, pixel);
 
         if (x0 == x1 and y0 == y1) break;
         const e2 = 2 * err;
@@ -351,12 +366,16 @@ fn oval(
     a = 8 * a2;
     b1 = 8 * b2;
 
+    const stroke_pixel = if (stroke_color.unwrap()) |sc|
+        api.Pixel.fromColor(sc)
+    else
+        null;
     while (true) {
-        if (stroke_color.unwrap()) |sc| {
-            pointUnclipped(east, north, sc); // I. Quadrant
-            pointUnclipped(west, north, sc); // II. Quadrant
-            pointUnclipped(west, south, sc); // III. Quadrant
-            pointUnclipped(east, south, sc); // IV. Quadrant
+        if (stroke_pixel) |sp| {
+            clipPixel(east, north, sp); // I. Quadrant
+            clipPixel(west, north, sp); // II. Quadrant
+            clipPixel(west, south, sp); // III. Quadrant
+            clipPixel(east, south, sp); // IV. Quadrant
         }
 
         const oval_start = west + 1;
@@ -388,14 +407,14 @@ fn oval(
         if (!(west <= east)) break;
     }
 
-    if (stroke_color.unwrap()) |sc| {
+    if (stroke_pixel) |sp| {
         // Make sure north and south have moved the entire way so top/bottom aren't missing
         while (north - south < signed_height) {
-            pointUnclipped(west - 1, north, sc); // II. Quadrant
-            pointUnclipped(east + 1, north, sc); // I. Quadrant
+            clipPixel(west - 1, north, sp); // II. Quadrant
+            clipPixel(east + 1, north, sp); // I. Quadrant
             north += 1;
-            pointUnclipped(west - 1, south, sc); // III. Quadrant
-            pointUnclipped(east + 1, south, sc); // IV. Quadrant
+            clipPixel(west - 1, south, sp); // III. Quadrant
+            clipPixel(east + 1, south, sp); // IV. Quadrant
             south -= 1;
         }
     }
@@ -415,18 +434,36 @@ fn rect(
     const stroke_color = rest.stroke_color.load().unwrap();
     const fill_color = rest.fill_color.load().unwrap();
 
+    if (stroke_color == null and fill_color == null) return;
+    if (width == 0 or height == 0 or x >= api.screen_width or y >= api.screen_height) return;
+    const end_x = x +| @min(width, std.math.maxInt(i32));
+    const end_y = y +| @min(height, std.math.maxInt(i32));
+    if (end_x <= 0 or end_y <= 0) return;
+
+    const min_x: usize = @intCast(@max(x, 0));
+    const min_y: usize = @intCast(@max(y, 0));
+    const max_x: usize = @intCast(@min(end_x, api.screen_width));
+    const max_y: usize = @intCast(@min(end_y, api.screen_height));
+
     if (stroke_color) |sc| {
-        hline(x, y, width, sc);
-        hline(x, y + @as(i32, @intCast(height)), width + 1, sc);
-
-        vline(x, y, height, sc);
-        vline(x + @as(i32, @intCast(width)), y, height, sc);
-    }
-
-    if (fill_color) |fc| {
-        for (@as(u32, @intCast(y)) + 1..@as(u32, @intCast(y)) + height) |yy| {
-            hline(x + 1, @intCast(yy), width - 1, fc);
+        const stroke_pixel = api.Pixel.fromColor(sc);
+        if (x >= 0) @memset(api.framebuffer[min_x][min_y..max_y], stroke_pixel);
+        if (width > 1 and end_x <= api.screen_width) @memset(api.framebuffer[max_x - 1][min_y..max_y], stroke_pixel);
+        if (width > 2) {
+            if (y >= 0) {
+                for (api.framebuffer[min_x + 1 .. max_x - 1]) |*col| col[min_y] = stroke_pixel;
+            }
+            if (height > 1 and end_y <= api.screen_height) {
+                for (api.framebuffer[min_x + 1 .. max_x - 1]) |*col| col[max_y - 1] = stroke_pixel;
+            }
+            if (height > 2) if (fill_color) |fc| {
+                const fill_pixel = api.Pixel.fromColor(fc);
+                for (api.framebuffer[min_x + 1 .. max_x - 2]) |*col| @memset(col[min_y + 1 .. max_y - 2], fill_pixel);
+            };
         }
+    } else if (fill_color) |fc| {
+        const fill_pixel = api.Pixel.fromColor(fc);
+        for (api.framebuffer[min_x..max_x]) |*col| @memset(col[min_y..max_y], fill_pixel);
     }
 }
 
@@ -447,11 +484,13 @@ fn text(
     const text_color = rest.text_color.load();
     const background_color = rest.background_color.load();
 
-    const colors = &[_]api.DisplayColor.Optional{ text_color, background_color };
-
     var char_x_offset = x;
     var char_y_offset = y;
 
+    const pixels = [_]?api.Pixel{
+        if (text_color.unwrap()) |c| api.Pixel.fromColor(c) else null,
+        if (background_color.unwrap()) |c| api.Pixel.fromColor(c) else null,
+    };
     for (0..str_len) |char_idx| {
         const char = str_ptr[char_idx].load();
 
@@ -465,10 +504,9 @@ fn text(
                 for (0..8) |x_offset| {
                     const dst_x = char_x_offset + @as(i32, @intCast(x_offset));
 
-                    const color = colors[std.mem.readPackedIntNative(u1, &font, base + y_offset * 8 + (7 - x_offset))];
-                    if (color.unwrap()) |dc| {
+                    if (pixels[std.mem.readPackedIntNative(u1, &font, base + y_offset * 8 + (7 - x_offset))]) |pixel| {
                         // TODO: this is slow; check bounds once instead
-                        pointUnclipped(dst_x, dst_y, dc);
+                        clipPixel(dst_x, dst_y, pixel);
                     }
                 }
             }
@@ -486,13 +524,12 @@ fn hline(
     len: u32,
     color: api.DisplayColor,
 ) callconv(.C) void {
-    if (y < 0 or y >= api.screen_height) return;
+    if (len == 0 or y < 0 or y >= api.screen_height or x >= api.screen_width) return;
+    const end_x = x +| @min(len, std.math.maxInt(i32));
+    if (end_x <= 0) return;
 
-    const clamped_x: u32 = @intCast(std.math.clamp(x, 0, @as(i32, @intCast(api.screen_width - 1))));
-    const clamped_len = @min(clamped_x + len, api.screen_width) - clamped_x;
-
-    const y_offset = api.screen_width * @as(u32, @intCast(y));
-    @memset(api.framebuffer[y_offset + clamped_x ..][0..clamped_len], color);
+    const pixel = api.Pixel.fromColor(color);
+    for (api.framebuffer[@max(x, 0)..@intCast(@min(end_x, api.screen_width))]) |*col| col[@intCast(y)] = pixel;
 }
 
 fn vline(
@@ -501,14 +538,12 @@ fn vline(
     len: u32,
     color: api.DisplayColor,
 ) callconv(.C) void {
-    if (y + @as(i32, @intCast(len)) <= 0 or x < 0 or x >= @as(i32, @intCast(api.screen_width))) return;
+    if (len == 0 or x < 0 or x >= api.screen_width or y >= api.screen_height) return;
+    const end_y = y +| @min(len, std.math.maxInt(i32));
+    if (end_y <= 0) return;
 
-    const start_y: u32 = @intCast(@max(0, y));
-    const end_y: u32 = @intCast(@min(api.screen_height, y + @as(i32, @intCast(len))));
-
-    for (start_y..end_y) |yy| {
-        point(@intCast(x), yy, color);
-    }
+    const pixel = api.Pixel.fromColor(color);
+    @memset(api.framebuffer[@intCast(x)][@max(y, 0)..@intCast(@min(end_y, api.screen_height))], pixel);
 }
 
 fn tone(
@@ -616,6 +651,10 @@ fn write_flash_page(
 ) callconv(.C) void {
     _ = page;
     _ = src;
+}
+
+fn rand() callconv(.C) u32 {
+    return 0;
 }
 
 fn trace(

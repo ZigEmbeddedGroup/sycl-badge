@@ -45,6 +45,20 @@ pub const DisplayColor = packed struct(u16) {
     };
 };
 
+pub const Pixel = extern struct {
+    bits: u16,
+
+    pub fn fromColor(color: DisplayColor) Pixel {
+        return .{ .bits = @byteSwap(@as(u16, @bitCast(color))) };
+    }
+    pub fn toColor(pixel: Pixel) DisplayColor {
+        return @bitCast(@byteSwap(pixel.bits));
+    }
+    pub fn setColor(pixel: *volatile Pixel, color: DisplayColor) void {
+        pixel.* = fromColor(color);
+    }
+};
+
 pub const Controls = packed struct(u9) {
     /// START button
     start: bool,
@@ -73,41 +87,14 @@ pub const controls: *Controls = @ptrFromInt(base + 0x04);
 pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
-pub const framebuffer: *[screen_width * screen_height]DisplayColor = @ptrFromInt(base + 0x1e);
+pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
+pub const framebuffer: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(base + 0x20);
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Drawing Functions                                                         │
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
-
-const platform_specific = if (builtin.target.isWasm())
-    struct {
-        extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
-        extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
-        extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
-        extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
-        extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
-        extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
-        extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
-        extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
-        extern fn write_flash_page(page: u32, src: [*]const u8) void;
-        extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
-    }
-else
-    struct {
-        export fn __return_thunk__() noreturn {
-            asm volatile (" svc #11");
-            unreachable;
-        }
-    };
-
-comptime {
-    if (builtin.target.isWasm() or builtin.output_mode == .Lib) {
-        _ = platform_specific;
-    }
-}
 
 pub const BlitOptions = struct {
     pub const Flags = packed struct(u32) {
@@ -133,8 +120,10 @@ pub const BlitOptions = struct {
 
 /// Copies pixels to the framebuffer.
 pub inline fn blit(options: BlitOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.blit(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
+        }.blit(
             options.sprite,
             options.x,
             options.y,
@@ -161,8 +150,15 @@ pub inline fn blit(options: BlitOptions) void {
             .stride = options.stride orelse options.width,
             .flags = options.flags,
         };
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #0"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [sprite] "{r0}" (options.sprite),
               [x] "{r1}" (options.x),
               [y] "{r2}" (options.y),
@@ -182,8 +178,10 @@ pub const LineOptions = struct {
 
 /// Draws a line between two points.
 pub inline fn line(options: LineOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.line(options.color, options.x1, options.y1, options.x2, options.y2);
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
+        }.line(options.color, options.x1, options.y1, options.x2, options.y2);
     } else {
         const rest: extern struct {
             y2: i32,
@@ -192,8 +190,15 @@ pub inline fn line(options: LineOptions) void {
             .y2 = options.y2,
             .color = options.color,
         };
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #1"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [x1] "{r0}" (options.x1),
               [y1] "{r1}" (options.y1),
               [x2] "{r2}" (options.x2),
@@ -214,8 +219,10 @@ pub const OvalOptions = struct {
 
 /// Draws an oval (or circle).
 pub inline fn oval(options: OvalOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.oval(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        }.oval(
             DisplayColor.Optional.from(options.stroke_color),
             DisplayColor.Optional.from(options.fill_color),
             options.x,
@@ -233,8 +240,15 @@ pub inline fn oval(options: OvalOptions) void {
             .stroke_color = DisplayColor.Optional.from(options.stroke_color),
             .fill_color = DisplayColor.Optional.from(options.fill_color),
         };
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #2"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
@@ -255,8 +269,10 @@ pub const RectOptions = struct {
 
 /// Draws a rectangle.
 pub inline fn rect(options: RectOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.rect(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
+        }.rect(
             DisplayColor.Optional.from(options.stroke_color),
             DisplayColor.Optional.from(options.fill_color),
             options.x,
@@ -274,8 +290,15 @@ pub inline fn rect(options: RectOptions) void {
             .stroke_color = DisplayColor.Optional.from(options.stroke_color),
             .fill_color = DisplayColor.Optional.from(options.fill_color),
         };
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #3"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
@@ -295,8 +318,10 @@ pub const TextOptions = struct {
 
 /// Draws text using the built-in system font.
 pub inline fn text(options: TextOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.text(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
+        }.text(
             DisplayColor.Optional.from(options.text_color),
             DisplayColor.Optional.from(options.background_color),
             options.str.ptr,
@@ -314,8 +339,15 @@ pub inline fn text(options: TextOptions) void {
             .text_color = DisplayColor.Optional.from(options.text_color),
             .background_color = DisplayColor.Optional.from(options.background_color),
         };
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #4"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [str_ptr] "{r0}" (options.str.ptr),
               [str_len] "{r1}" (options.str.len),
               [x] "{r2}" (options.x),
@@ -334,16 +366,25 @@ pub const StraightLineOptions = struct {
 
 /// Draws a horizontal line
 pub inline fn hline(options: StraightLineOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.hline(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
+        }.hline(
             options.color,
             options.x,
             options.y,
             options.len,
         );
     } else {
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #5"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
@@ -355,16 +396,25 @@ pub inline fn hline(options: StraightLineOptions) void {
 
 /// Draws a vertical line
 pub inline fn vline(options: StraightLineOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.vline(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
+        }.vline(
             options.color,
             options.x,
             options.y,
             options.len,
         );
     } else {
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #6"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [x] "{r0}" (options.x),
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
@@ -417,16 +467,25 @@ pub const ToneOptions = struct {
 
 /// Plays a sound tone.
 pub inline fn tone(options: ToneOptions) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.tone(
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
+        }.tone(
             options.frequency,
             options.duration,
             options.volume,
             options.flags,
         );
     } else {
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
+        var clobber_r3: usize = undefined;
         asm volatile (" svc #7"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
+              [clobber_r3] "={r3}" (clobber_r3),
             : [frequency] "{r0}" (options.frequency),
               [duration] "{r1}" (options.duration),
               [volume] "{r2}" (options.volume),
@@ -446,26 +505,39 @@ pub const flash_page_count = 8000;
 
 /// Attempts to fill `dst`, returns the amount of bytes actually read
 pub inline fn read_flash(offset: u32, dst: []u8) u32 {
-    if (comptime builtin.target.isWasm()) {
-        return platform_specific.read_flash(offset, dst.ptr, dst.len);
+    if (builtin.target.isWasm()) {
+        return struct {
+            extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
+        }.read_flash(offset, dst.ptr, dst.len);
     } else {
+        var clobber_r1: usize = undefined;
+        var clobber_r2: usize = undefined;
         return asm volatile (" svc #8"
             : [result] "={r0}" (-> u32),
+              [clobber_r1] "={r1}" (clobber_r1),
+              [clobber_r2] "={r2}" (clobber_r2),
             : [offset] "{r0}" (offset),
               [dst_ptr] "{r1}" (dst.ptr),
               [dst_len] "{r2}" (dst.len),
+            : "r3"
         );
     }
 }
 
 pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.write_flash_page(page, &src);
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn write_flash_page(page: u32, src: [*]const u8) void;
+        }.write_flash_page(page, &src);
     } else {
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
         asm volatile (" svc #9"
-            :
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
             : [page] "{r0}" (page),
               [src] "{r1}" (&src),
+            : "r2", "r3", "memory"
         );
     }
 }
@@ -476,15 +548,36 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
+/// Returns a random number, useful for seeding a faster prng.
+pub inline fn rand() u32 {
+    if (builtin.target.isWasm()) {
+        return struct {
+            extern fn rand() u32;
+        }.rand();
+    } else {
+        return asm volatile (" svc #10"
+            : [result] "={r0}" (-> u32),
+            :
+            : "r1", "r2", "r3"
+        );
+    }
+}
+
 /// Prints a message to the debug console.
 pub inline fn trace(x: []const u8) void {
-    if (comptime builtin.target.isWasm()) {
-        platform_specific.trace(x.ptr, x.len);
+    if (builtin.target.isWasm()) {
+        struct {
+            extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
+        }.trace(x.ptr, x.len);
     } else {
-        asm volatile (" svc #10"
-            :
+        var clobber_r0: usize = undefined;
+        var clobber_r1: usize = undefined;
+        asm volatile (" svc #11"
+            : [clobber_r0] "={r0}" (clobber_r0),
+              [clobber_r1] "={r1}" (clobber_r1),
             : [x_ptr] "{r0}" (x.ptr),
               [x_len] "{r1}" (x.len),
+            : "r2", "r3"
         );
     }
 }

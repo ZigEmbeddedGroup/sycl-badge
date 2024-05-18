@@ -24,7 +24,7 @@ const hue_colors = init_hue_colors: {
 
 var plasma_buffer = init_plasma_buffer: {
     @setEvalBranchQuota(100000);
-    var initial_plasma_buffer: [cart.framebuffer.len]u8 = undefined;
+    var initial_plasma_buffer: [cart.screen_width][cart.screen_height]u8 = undefined;
     var y: usize = 0;
     while (y < cart.screen_height) : (y += 1) {
         var x: usize = 0;
@@ -37,16 +37,18 @@ var plasma_buffer = init_plasma_buffer: {
             value += @sin(@sqrt(fx * fx + fy * fy) / 8.0);
             // shift range from -4 .. 4 to 0 .. 255
             value = std.math.clamp((value + 4) * 32, 0, 255);
-            initial_plasma_buffer[y * cart.screen_width + x] = @intFromFloat(value);
+            initial_plasma_buffer[x][y] = @intFromFloat(value);
         }
     }
     break :init_plasma_buffer initial_plasma_buffer;
 };
 
 fn updatePlasma() void {
-    for (0..cart.framebuffer.len) |i| {
-        plasma_buffer[i] +%= 2;
-        cart.framebuffer[i] = hue_colors[plasma_buffer[i]];
+    for (cart.framebuffer, &plasma_buffer) |*fb_col, *plasma_col| {
+        for (fb_col, plasma_col) |*fb_pix, *plasma_pix| {
+            plasma_pix.* +%= 2;
+            fb_pix.setColor(hue_colors[plasma_pix.*]);
+        }
     }
 }
 

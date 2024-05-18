@@ -69,7 +69,7 @@ pub const Sprite = struct {
                 const index = (y + src_y0) * sprite.width + (if (flip_x) @abs(src_rect.w) - 1 - x else x) + src_x0;
                 const color = sprite.colors[sprite.indices.get(index)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@as(usize, @intCast(dst_y * cart.screen_width + dst_x))] = color;
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].setColor(color);
             }
         }
     }
@@ -95,7 +95,7 @@ pub const Tilemap = struct {
                 const src_y = (tile_index / 16) * tile_size + (y % tile_size);
                 const color = tiles.colors[tiles.indices.get(src_y * tiles.width + src_x)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@as(usize, @intCast((dst_y) * cart.screen_width + dst_x))] = color;
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].setColor(color);
             }
         }
     }
@@ -104,5 +104,11 @@ pub const Tilemap = struct {
 pub fn init() void {}
 
 pub fn clear() void {
-    @memset(cart.framebuffer, .{ .r = 0, .g = 0, .b = 0 });
+    cart.rect(.{
+        .x = 0,
+        .y = 0,
+        .width = cart.screen_width,
+        .height = cart.screen_height,
+        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+    });
 }

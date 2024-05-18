@@ -41,7 +41,8 @@ pub fn main_program() !void {
     const x = radius * std.math.sin(angle_rad);
     const y = radius * std.math.cos(angle_rad);
 
-    var camera = Camera.init(Vec3.init(x, 2, y));
+    var camera: Camera = undefined;
+    camera.init(Vec3.init(x, 2, y));
 
     var a: i32 = -5;
     while (a < 5) : (a += 1) {

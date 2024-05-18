@@ -177,10 +177,10 @@ var time: f32 = 0.0;
 var channels_note_index = [1]usize{0} ** song.len;
 var channels_note_start = [1]f32{0.0} ** song.len;
 
-pub export fn start() void {}
+export fn start() void {}
 
-pub export fn update() void {
-    time += 1.0 / 10.0; // TODO: should be higher fps once lcd is dma'd
+export fn update() void {
+    time += 1.0 / 11.5; // TODO: should be higher fps once lcd is dma'd
     for (
         0..,
         &channels_note_index,

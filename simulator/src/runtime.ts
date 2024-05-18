@@ -129,6 +129,8 @@ export class Runtime {
             read_flash: this.read_flash.bind(this),
             write_flash_page: this.write_flash_page.bind(this),
 
+            rand: this.rand.bind(this),
+
             trace: this.trace.bind(this),
         };
 
@@ -205,6 +207,10 @@ export class Runtime {
 
     print (str: string) {
         console.log(str);
+    }
+
+    rand (): number {
+        return ~~(Math.random() * 4294967296.0);
     }
 
     trace (strUtf8Ptr: number, byteLength: number) {

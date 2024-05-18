@@ -4,8 +4,10 @@ const NVMCTRL = struct {
     pub const SW0: *volatile microzig.chip.types.peripherals.FUSES.SW0_FUSES = @ptrFromInt(0x00800080);
 };
 
+pub const Div = ADC.ADC_CTRLA__PRESCALER;
 pub const PositiveInput = ADC.ADC_INPUTCTRL__MUXPOS;
 pub const NegativeInput = ADC.ADC_INPUTCTRL__MUXNEG;
+pub const DiffMode = enum { single_ended, differential };
 
 pub const Adc = enum(u1) {
     ADC0,
@@ -18,12 +20,16 @@ pub const Adc = enum(u1) {
         };
     }
 
-    pub fn init(adc: Adc) void {
+    pub fn init(adc: Adc, div: Div) void {
+        const regs = adc.get_regs();
+
         adc.wait_for_sync(.SWRST);
 
         adc.reset();
-        defer adc.enable();
 
+        regs.CTRLA.modify(.{
+            .PRESCALER = .{ .value = div },
+        });
         adc.calibrate();
 
         // CTRLB
@@ -82,7 +88,18 @@ pub const Adc = enum(u1) {
 
     pub fn reset(adc: Adc) void {
         const regs = adc.get_regs();
-        regs.CTRLA.modify(.{ .SWRST = 1 });
+        regs.CTRLA.write(.{
+            .SWRST = 1,
+            .ENABLE = 0,
+            .reserved3 = 0,
+            .DUALSEL = .{ .raw = 0 },
+            .SLAVEEN = 0,
+            .RUNSTDBY = 0,
+            .ONDEMAND = 0,
+            .PRESCALER = .{ .raw = 0 },
+            .reserved15 = 0,
+            .R2R = 0,
+        });
         adc.wait_for_sync(.SWRST);
     }
 
@@ -109,10 +126,21 @@ pub const Adc = enum(u1) {
         });
     }
 
-    pub fn set_input(adc: Adc, input: PositiveInput) void {
+    pub fn set_input(
+        adc: Adc,
+        pos: PositiveInput,
+        neg: NegativeInput,
+        diff_mode: DiffMode,
+        seq_stop: enum { continuous, stop },
+    ) void {
         const regs = adc.get_regs();
-        regs.INPUTCTRL.modify(.{
-            .MUXPOS = .{ .value = input },
+        regs.INPUTCTRL.write(.{
+            .MUXPOS = .{ .value = pos },
+            .reserved7 = 0,
+            .DIFFMODE = @intFromEnum(diff_mode),
+            .MUXNEG = .{ .value = neg },
+            .reserved15 = 0,
+            .DSEQSTOP = @intFromEnum(seq_stop),
         });
 
         adc.wait_for_sync(.INPUTCTRL);
@@ -120,25 +148,36 @@ pub const Adc = enum(u1) {
 
     pub fn start_conversion(adc: Adc) void {
         const regs = adc.get_regs();
-        regs.SWTRIG.modify(.{
+        regs.SWTRIG.write(.{
+            .FLUSH = 0,
             .START = 1,
+            .padding = 0,
         });
 
         adc.wait_for_sync(.SWTRIG);
+        while (regs.SWTRIG.read().START != 0) {}
     }
 
-    pub fn wait_for_result_blocking(adc: Adc) void {
+    pub fn wait_for_result(adc: Adc) void {
         const regs = adc.get_regs();
-        while (regs.INTFLAG.read().RESRDY == 0) {}
+        while (regs.INTFLAG.read().RESRDY != 1) {}
+        regs.INTFLAG.write(.{
+            .RESRDY = 1,
+            .OVERRUN = 0,
+            .WINMON = 0,
+            .padding = 0,
+        });
     }
 
-    pub fn single_shot_blocking(adc: Adc, input: PositiveInput) u16 {
-        adc.set_input(input);
-        adc.start_conversion();
-        adc.wait_for_result_blocking();
-
+    pub fn get_result(adc: Adc) u16 {
         const regs = adc.get_regs();
         return regs.RESULT.read().RESULT;
+    }
+
+    pub fn single_shot_blocking(adc: Adc) u16 {
+        adc.start_conversion();
+        adc.wait_for_result();
+        return adc.get_result();
     }
 };
 

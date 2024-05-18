@@ -6,8 +6,8 @@ const mclk = hal.clocks.mclk;
 const timer = hal.timer;
 
 const spkr_en_pin = microzig.board.SPKR_EN;
-const analog_out_pin = microzig.board.A0;
-const led_pin = microzig.board.D13;
+const analog_out_pin = microzig.board.A0_SPKR;
+const led_pin = microzig.board.A5_D13;
 
 pub fn main() !void {
     spkr_en_pin.set_dir(.out);

@@ -1,6 +1,6 @@
 const microzig = @import("microzig");
 
-const led_pin = microzig.board.D13;
+const led_pin = microzig.board.A5_D13;
 
 pub fn main() !void {
     // Initialize pins

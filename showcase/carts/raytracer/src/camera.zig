@@ -40,8 +40,7 @@ w: Vec3,
 defocus_disk_u: Vec3,
 defocus_disk_v: Vec3,
 
-pub fn init(position: Vec3) Camera {
-    var self: Camera = undefined;
+pub fn init(self: *Camera, position: Vec3) void {
     self.lookfrom = position;
     self.camera_center = self.lookfrom;
 
@@ -68,8 +67,6 @@ pub fn init(position: Vec3) Camera {
 
     self.defocus_disk_u = self.u.mul_scalar(defocus_radius);
     self.defocus_disk_v = self.v.mul_scalar(defocus_radius);
-
-    return self;
 }
 
 fn pixel_sample_square(self: *Camera) Vec3 {
@@ -111,13 +108,12 @@ pub fn render(self: *Camera, world: *HittableList) !void {
             const samples: f32 = @floatFromInt(self.samples);
             col = col.div_scalar(samples);
 
-            const index: usize = i + j * image_width;
             const color = vec.color3_to_color(col);
-            cart.framebuffer[index] = .{
+            cart.framebuffer[i][j].setColor(.{
                 .r = @truncate(color.rgb.r >> 3),
                 .g = @truncate(color.rgb.g >> 2),
                 .b = @truncate(color.rgb.b >> 3),
-            };
+            });
         }
     }
     //std.debug.print("Done!\n", .{});

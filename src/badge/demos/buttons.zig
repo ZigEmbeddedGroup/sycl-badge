@@ -4,7 +4,7 @@ const board = microzig.board;
 
 // pins
 const ButtonPoller = board.ButtonPoller;
-const led_pin = board.D13;
+const led_pin = board.A5_D13;
 
 const Symbol = enum {
     dot,

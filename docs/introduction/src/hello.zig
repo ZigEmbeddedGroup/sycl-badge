@@ -147,11 +147,11 @@ fn scene_game() void {
 fn set_background() void {
     const ratio = (4095 - @as(f32, @floatFromInt(cart.light_level.*))) / 4095 * 0.2;
 
-    @memset(cart.framebuffer, cart.DisplayColor{
+    @memset(@as(*volatile [cart.screen_width * cart.screen_height]cart.Pixel, @ptrCast(cart.framebuffer)), cart.Pixel.fromColor(.{
         .r = @intFromFloat(ratio * 31),
         .g = @intFromFloat(ratio * 63),
         .b = @intFromFloat(ratio * 31),
-    });
+    }));
 }
 
 fn check_win() bool {

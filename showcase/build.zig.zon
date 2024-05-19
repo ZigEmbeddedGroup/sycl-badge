@@ -17,6 +17,7 @@
         .raytracer = .{ .path = "carts/raytracer" },
         .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
         .dvd = .{ .path = "carts/dvd" },
+        .@"space-shooter" = .{ .path = "carts/space-shooter" },
     },
     .paths = .{
         "README.md",

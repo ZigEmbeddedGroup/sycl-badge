@@ -24,7 +24,6 @@ export class APU {
     }
 
     send(left: number[], right: number[]) {
-        console.log(left, right);
         this.processorPort!.postMessage({left, right});
     }
 

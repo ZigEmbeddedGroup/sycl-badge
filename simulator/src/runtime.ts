@@ -223,6 +223,8 @@ export class Runtime {
             this.bluescreenOnError(start_function);
         }
 
+        this.apu.processorPort?.postMessage("reset");
+
         // new Int16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 2 * 512).fill(0);
     }
 

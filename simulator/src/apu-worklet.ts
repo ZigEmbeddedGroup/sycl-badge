@@ -9,9 +9,14 @@ class APUProcessor extends AudioWorkletProcessor {
         super();
 
         if (this.port != null) {
-            this.port.onmessage = (event: MessageEvent<{left: number[], right: number[]}>) => {
-                this.samplesLeft = this.samplesLeft.concat(event.data.left);
-                this.samplesRight = this.samplesRight.concat(event.data.right);
+            this.port.onmessage = (event: MessageEvent<"reset" | {left: number[], right: number[]}>) => {
+                if (event.data === "reset") {
+                    this.samplesLeft = [];
+                    this.samplesRight = [];
+                } else {
+                    this.samplesLeft = this.samplesLeft.concat(event.data.left);
+                    this.samplesRight = this.samplesRight.concat(event.data.right);
+                }
             };
         }
     }
@@ -24,12 +29,9 @@ class APUProcessor extends AudioWorkletProcessor {
         const pcmRight = this.samplesRight.splice(0, 128);
 
         for (let index = 0; index < pcmLeft.length; index += 1) {
-            pcmLeft[index] = pcmLeft[index] / 32767;
-            pcmRight[index] = pcmRight[index] / 32767;
+            outputLeft[index] = pcmLeft[index] / 32767;
+            outputRight[index] = pcmRight[index] / 32767;
         }
-
-        outputLeft.set(new Float32Array(pcmLeft));
-        outputRight.set(new Float32Array(pcmRight));
 
         return true;
     }

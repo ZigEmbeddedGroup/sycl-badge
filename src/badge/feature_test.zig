@@ -160,6 +160,8 @@ const raw_data = std.mem.bytesAsSlice(i16, @embedFile("pepsi.raw"));
 var audio_offset: usize = 0;
 
 export fn audio(buffer: *volatile [2][512]i16) bool {
+    if (audio_offset >= raw_data.len) return false;
+
     @memcpy(&buffer[0], raw_data[audio_offset..][0..512]);
     @memcpy(&buffer[1], raw_data[audio_offset..][0..512]);
 

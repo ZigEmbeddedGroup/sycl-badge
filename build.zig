@@ -196,7 +196,7 @@ pub fn add_cart(
     wasm.initial_memory = 64 * 65536;
     wasm.max_memory = 64 * 65536;
     wasm.stack_size = 14752;
-    wasm.global_base = 160 * 128 * 2 + 0x1e;
+    wasm.global_base = 2 * 512 * 2 + 0xa01e;
 
     wasm.rdynamic = true;
     wasm.root_module.addImport("cart-api", d.module("cart-api"));

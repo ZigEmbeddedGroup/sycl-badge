@@ -23,16 +23,16 @@ fn write_stored_number(number: u64) void {
 
 export fn update() void {
     if (offset % (60 * 2) == 0) {
-        cart.tone(.{
-            .frequency = 440,
-            .duration = 20,
-            .volume = 10,
-            .flags = .{
-                .channel = .pulse1,
-                .duty_cycle = .@"1/8",
-                .panning = .left,
-            },
-        });
+        // cart.tone(.{
+        //     .frequency = 440,
+        //     .duration = 20,
+        //     .volume = 10,
+        //     .flags = .{
+        //         .channel = .pulse1,
+        //         .duty_cycle = .@"1/8",
+        //         .panning = .left,
+        //     },
+        // });
     }
 
     offset +%= 1;
@@ -153,4 +153,16 @@ export fn update() void {
         .text_color = .{ .r = 0, .g = 0, .b = 0 },
         .background_color = .{ .r = 31, .g = 63, .b = 31 },
     });
+}
+
+var off: f32 = 0;
+export fn audio(buffer: *volatile [2][512]u16) bool {
+    for (&buffer[0], &buffer[1]) |*l, *r| {
+        l.* = @intFromFloat(@sin(off) * std.math.maxInt(u16));
+        r.* = @intFromFloat(@sin(off) * std.math.maxInt(u16));
+
+        off += 0.1;
+    }
+
+    return false;
 }

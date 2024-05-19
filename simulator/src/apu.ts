@@ -23,12 +23,8 @@ export class APU {
         workletNode.connect(audioCtx.destination);
     }
 
-    tick() {
-        this.processorPort!.postMessage("tick");
-    }
-
-    tone(frequency: number, duration: number, volume: number, flags: number) {
-        this.processorPort!.postMessage([frequency, duration, volume, flags]);
+    send(left: number[], right: number[]) {
+        this.processorPort!.postMessage({left, right});
     }
 
     unlockAudio() {

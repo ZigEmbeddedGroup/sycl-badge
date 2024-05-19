@@ -187,6 +187,7 @@ export fn update() void {
         &channels_note_start,
         &song,
     ) |channel_index, *note_index, *note_start, notes| {
+        _ = channel_index; // autofix
         if (note_index.* > notes.len) continue;
         const next_note_time =
             note_start.* + if (note_index.* > 0) notes[note_index.* - 1].duration else 0.0;
@@ -194,15 +195,16 @@ export fn update() void {
             note_index.* += 1;
             if (note_index.* > notes.len) continue;
             const note = notes[note_index.* - 1];
+            _ = note; // autofix
             note_start.* = next_note_time;
-            cart.tone(.{
-                .frequency = @intFromFloat(note.frequency + 0.5),
-                .duration = @intFromFloat(@max(note.duration - 0.04, 0.0) * 60),
-                .volume = 100,
-                .flags = .{
-                    .channel = @enumFromInt(channel_index),
-                },
-            });
+            // cart.tone(.{
+            //     .frequency = @intFromFloat(note.frequency + 0.5),
+            //     .duration = @intFromFloat(@max(note.duration - 0.04, 0.0) * 60),
+            //     .volume = 100,
+            //     .flags = .{
+            //         .channel = @enumFromInt(channel_index),
+            //     },
+            // });
         }
     }
 }

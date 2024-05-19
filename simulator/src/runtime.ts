@@ -124,8 +124,6 @@ export class Runtime {
 
             blit: this.blit.bind(this),
 
-            tone: this.apu.tone.bind(this.apu),
-
             read_flash: this.read_flash.bind(this),
             write_flash_page: this.write_flash_page.bind(this),
 
@@ -224,6 +222,8 @@ export class Runtime {
         if (typeof start_function === "function") {
             this.bluescreenOnError(start_function);
         }
+
+        new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 2 * 512).fill(0);
     }
 
     update () {
@@ -235,7 +235,19 @@ export class Runtime {
         if (typeof update_function === "function") {
             this.bluescreenOnError(update_function);
         }
-        this.apu.tick();
+
+        // TODO: should this be called via a message from the worklet maybe?
+        let audio_function = this.wasm!.exports["audio"] as any;
+        // if (typeof audio_function === "function") {
+        //     this.bluescreenOnError(audio_function);
+        // }
+
+        if (audio_function(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 512 * 2)) {
+            this.apu.send(
+                [...new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 512)],
+                [...new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER + 512, constants.ADDR_AUDIO_BUFFER + 512 * 2)],
+            );
+        }
     }
 
     blueScreen (text: string) {

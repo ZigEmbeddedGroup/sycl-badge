@@ -47,7 +47,6 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ .byte (4f - 0b) / 2
         \\ .byte (5f - 0b) / 2
         \\ .byte (6f - 0b) / 2
-        \\ .byte (7f - 0b) / 2
         \\ .byte (8f - 0b) / 2
         \\ .byte (9f - 0b) / 2
         \\ .byte (10f - 0b) / 2
@@ -77,9 +76,6 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\6:
         \\ ldm r1, {r0-r3}
         \\ b %[vline:P]
-        \\7:
-        \\ ldm r1, {r0-r3}
-        \\ b %[tone:P]
         \\8:
         \\ ldm r1, {r0-r2}
         \\ b %[read_flash:P]
@@ -115,7 +111,6 @@ pub fn svcall_handler() callconv(.Naked) void {
           [text] "X" (&text),
           [hline] "X" (&hline),
           [vline] "X" (&vline),
-          [tone] "X" (&tone),
           [read_flash] "X" (&read_flash),
           [write_flash_page] "X" (&write_flash_page),
           [rand] "X" (&rand),
@@ -544,92 +539,6 @@ fn vline(
 
     const pixel = api.Pixel.fromColor(color);
     @memset(api.framebuffer[@intCast(x)][@max(y, 0)..@intCast(@min(end_y, api.screen_height))], pixel);
-}
-
-fn tone(
-    frequency: u32,
-    duration: u32,
-    volume: u32,
-    flags: api.ToneOptions.Flags,
-) callconv(.C) void {
-    const start_frequency: u16 = @truncate(frequency >> 0);
-    const end_frequency = switch (@as(u16, @truncate(frequency >> 16))) {
-        0 => start_frequency,
-        else => |end_frequency| end_frequency,
-    };
-    const sustain_time: u8 = @truncate(duration >> 0);
-    const release_time: u8 = @truncate(duration >> 8);
-    const decay_time: u8 = @truncate(duration >> 16);
-    const attack_time: u8 = @truncate(duration >> 24);
-    const total_time = @as(u10, attack_time) + decay_time + sustain_time + release_time;
-    const sustain_volume: u8 = @truncate(volume >> 0);
-    const peak_volume = switch (@as(u8, @truncate(volume >> 8))) {
-        0 => 100,
-        else => |attack_volume| attack_volume,
-    };
-
-    var state: audio.Channel = .{
-        .duty = 0,
-        .phase = 0,
-        .phase_step = 0,
-        .phase_step_step = 0,
-
-        .duration = 0,
-        .attack_duration = 0,
-        .decay_duration = 0,
-        .sustain_duration = 0,
-        .release_duration = 0,
-
-        .volume = 0,
-        .volume_step = 0,
-        .peak_volume = 0,
-        .sustain_volume = 0,
-        .attack_volume_step = 0,
-        .decay_volume_step = 0,
-        .release_volume_step = 0,
-    };
-
-    const start_phase_step = @mulWithOverflow((1 << 32) / 44100, @as(u31, start_frequency));
-    const end_phase_step = @mulWithOverflow((1 << 32) / 44100, @as(u31, end_frequency));
-    if (start_phase_step[1] != 0 or end_phase_step[1] != 0) return;
-    state.phase_step = start_phase_step[0];
-    state.phase_step_step = @divTrunc(@as(i32, end_phase_step[0]) - start_phase_step[0], @as(u20, total_time) * @divExact(44100, 60));
-
-    state.attack_duration = @as(u18, attack_time) * @divExact(44100, 60);
-    state.decay_duration = @as(u18, decay_time) * @divExact(44100, 60);
-    state.sustain_duration = @as(u18, sustain_time) * @divExact(44100, 60);
-    state.release_duration = @as(u18, release_time) * @divExact(44100, 60);
-
-    state.peak_volume = @as(u29, peak_volume) << 21;
-    state.sustain_volume = @as(u29, sustain_volume) << 21;
-    if (state.attack_duration > 0) {
-        state.attack_volume_step = @divTrunc(@as(i32, state.peak_volume) - 0, state.attack_duration);
-    }
-    if (state.decay_duration > 0) {
-        state.decay_volume_step = @divTrunc(@as(i32, state.sustain_volume) - state.peak_volume, state.decay_duration);
-    }
-    if (state.release_duration > 0) {
-        state.release_volume_step = @divTrunc(@as(i32, 0) - state.sustain_volume, state.release_duration);
-    }
-
-    switch (flags.channel) {
-        .pulse1, .pulse2 => {
-            state.duty = switch (flags.duty_cycle) {
-                .@"1/8" => (1 << 32) / 8,
-                .@"1/4" => (1 << 32) / 4,
-                .@"1/2" => (1 << 32) / 2,
-                .@"3/4" => (3 << 32) / 4,
-            };
-        },
-        .triangle => {
-            state.duty = (1 << 32) / 2;
-        },
-        .noise => {
-            state.duty = (1 << 32) / 2;
-        },
-    }
-
-    audio.set_channel(@intFromEnum(flags.channel), state);
 }
 
 fn read_flash(

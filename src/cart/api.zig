@@ -1,23 +1,18 @@
+//! API for interacting with the badge.
+//!
+//! To get started, define the following functions:
+//! - `export fn start() void {}`
+//! - `export fn update() void {}`
+//! - `export fn audio(buffer: *volatile [2][512]u16) bool {}`
+
 const std = @import("std");
 const builtin = @import("builtin");
-
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Platform Constants                                                        │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
 
 pub const screen_width: u32 = 160;
 pub const screen_height: u32 = 128;
 
 pub const font_width: u32 = 8;
 pub const font_height: u32 = 8;
-
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Memory Addresses                                                          │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
 
 /// RGB888, true color
 pub const NeopixelColor = extern struct { g: u8, r: u8, b: u8 };
@@ -91,12 +86,6 @@ pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
 pub const framebuffer: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(base + 0x20);
-
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Drawing Functions                                                         │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
 
 pub const BlitOptions = struct {
     pub const Flags = packed struct(u32) {
@@ -426,82 +415,6 @@ pub inline fn vline(options: StraightLineOptions) void {
     }
 }
 
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Sound Functions                                                           │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
-
-pub const ToneOptions = struct {
-    pub const Flags = packed struct(u32) {
-        pub const Channel = enum(u2) {
-            pulse1,
-            pulse2,
-            triangle,
-            noise,
-        };
-
-        pub const DutyCycle = enum(u2) {
-            @"1/8",
-            @"1/4",
-            @"1/2",
-            @"3/4",
-        };
-
-        pub const Panning = enum(u2) {
-            stereo,
-            left,
-            right,
-        };
-
-        channel: Channel,
-        /// `duty_cycle` is only used when `channel` is set to `pulse1` or `pulse2`
-        duty_cycle: DutyCycle = .@"1/8",
-        panning: Panning = .stereo,
-        padding: u26 = undefined,
-    };
-
-    frequency: u32,
-    duration: u32,
-    volume: u32,
-    flags: Flags,
-};
-
-/// Plays a sound tone.
-pub inline fn tone(options: ToneOptions) void {
-    if (builtin.target.isWasm()) {
-        struct {
-            extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
-        }.tone(
-            options.frequency,
-            options.duration,
-            options.volume,
-            options.flags,
-        );
-    } else {
-        var clobber_r0: usize = undefined;
-        var clobber_r1: usize = undefined;
-        var clobber_r2: usize = undefined;
-        var clobber_r3: usize = undefined;
-        asm volatile (" svc #7"
-            : [clobber_r0] "={r0}" (clobber_r0),
-              [clobber_r1] "={r1}" (clobber_r1),
-              [clobber_r2] "={r2}" (clobber_r2),
-              [clobber_r3] "={r3}" (clobber_r3),
-            : [frequency] "{r0}" (options.frequency),
-              [duration] "{r1}" (options.duration),
-              [volume] "{r2}" (options.volume),
-              [flags] "{r3}" (options.flags),
-        );
-    }
-}
-
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Storage Functions                                                         │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
-
 pub const flash_page_size = 256;
 pub const flash_page_count = 8000;
 
@@ -543,12 +456,6 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
         );
     }
 }
-
-// ┌───────────────────────────────────────────────────────────────────────────┐
-// │                                                                           │
-// │ Other Functions                                                           │
-// │                                                                           │
-// └───────────────────────────────────────────────────────────────────────────┘
 
 /// Returns a random number, useful for seeding a faster prng.
 pub inline fn rand() u32 {

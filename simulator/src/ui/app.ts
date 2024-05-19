@@ -373,7 +373,12 @@ export class App extends LitElement {
             }
 
             if (calledUpdate) {
-                runtime.composite();
+                const extraTimePenalty = runtime.composite();
+                const screenDoneTime = timeFrameStart + extraTimePenalty;
+                if (screenDoneTime > timeNextUpdate) {
+                    console.log("throttled by pixels!");
+                    timeNextUpdate = screenDoneTime;
+                }
 
                 // if (import.meta.env.DEV) {
                 //     // FIXED(2023-12-13): Pass the correct FPS for display                    

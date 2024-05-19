@@ -8,17 +8,27 @@ import { FONT } from "./font";
 
 export class Framebuffer {
     bytes: Uint16Array;
+    pixelsChanged: number;
 
     constructor (memory: ArrayBuffer) {
         this.bytes = new Uint16Array(memory, ADDR_FRAMEBUFFER, WIDTH * HEIGHT);
+        this.pixelsChanged = 0;
+    }
+
+    countChangedPixelsAndReset (): number {
+      const result = this.pixelsChanged;
+      this.pixelsChanged = 0;
+      return result;
     }
 
     fillScreen (color: number): void {
         this.bytes.fill(color);
+        this.pixelsChanged += this.bytes.length;
     }
 
     drawPoint (color: number, x: number, y: number) {
         this.bytes[WIDTH * y + x] = color;
+        this.pixelsChanged += 1;
     }
 
     drawPointUnclipped (color: number, x: number, y: number) {
@@ -30,6 +40,7 @@ export class Framebuffer {
     drawHLineFast(color: number, startX: number, y: number, endX: number) {
         const yOff = WIDTH * y;
         this.bytes.fill(color, yOff + startX, yOff + endX);
+        this.pixelsChanged += endX - startX;
     }
 
     drawHLineUnclipped(color: number, startX: number, y: number, endX: number) {

@@ -51,9 +51,11 @@ pub const Pixel = extern struct {
     pub fn fromColor(color: DisplayColor) Pixel {
         return .{ .bits = @byteSwap(@as(u16, @bitCast(color))) };
     }
+
     pub fn toColor(pixel: Pixel) DisplayColor {
         return @bitCast(@byteSwap(pixel.bits));
     }
+
     pub fn setColor(pixel: *volatile Pixel, color: DisplayColor) void {
         pixel.* = fromColor(color);
     }

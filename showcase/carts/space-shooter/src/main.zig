@@ -45,6 +45,7 @@ inline fn rgb565(clr: cart.NeopixelColor) cart.DisplayColor {
     };
 }
 
+// rand implementation "borrowed" from the blobs cart
 var rand: std.rand.DefaultPrng = undefined;
 fn rand_float() f32 {
     const byte_count = 2;

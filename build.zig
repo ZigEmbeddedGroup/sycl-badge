@@ -144,7 +144,7 @@ pub const Cart = struct {
 
     pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build, opt: CartWatcherOptions) *Build.Step.Run {
         if (opt.build_firmware) {
-            c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+            // c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         }
         const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
         b.getInstallStep().dependOn(&install_artifact_step.step);
@@ -196,7 +196,7 @@ pub fn add_cart(
     wasm.initial_memory = 64 * 65536;
     wasm.max_memory = 64 * 65536;
     wasm.stack_size = 14752;
-    wasm.global_base = 2 * 512 * 2 + 0xa01e;
+    wasm.global_base = 100_000;
 
     wasm.rdynamic = true;
     wasm.root_module.addImport("cart-api", d.module("cart-api"));

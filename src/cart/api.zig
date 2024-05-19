@@ -3,7 +3,7 @@
 //! To get started, define the following functions:
 //! - `export fn start() void {}`
 //! - `export fn update() void {}`
-//! - `export fn audio(buffer: *volatile [2][512]u16) bool {}`
+//! - `export fn audio(buffer: *volatile [2][512]i16) bool {}`
 
 const std = @import("std");
 const builtin = @import("builtin");

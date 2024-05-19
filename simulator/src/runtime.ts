@@ -223,7 +223,7 @@ export class Runtime {
             this.bluescreenOnError(start_function);
         }
 
-        new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 2 * 512).fill(0);
+        // new Int16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 2 * 512).fill(0);
     }
 
     update () {
@@ -242,10 +242,10 @@ export class Runtime {
         //     this.bluescreenOnError(audio_function);
         // }
 
-        if (audio_function(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 512 * 2)) {
+        if (audio_function(constants.ADDR_AUDIO_BUFFER)) {
             this.apu.send(
-                [...new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER, constants.ADDR_AUDIO_BUFFER + 512)],
-                [...new Uint16Array(this.memory.buffer).slice(constants.ADDR_AUDIO_BUFFER + 512, constants.ADDR_AUDIO_BUFFER + 512 * 2)],
+                [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER)).slice(0, 512)],
+                [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER + 512 * 2)).slice(0, 512)],
             );
         }
     }

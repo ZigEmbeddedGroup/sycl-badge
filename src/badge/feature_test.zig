@@ -155,14 +155,15 @@ export fn update() void {
     });
 }
 
-var off: f32 = 0;
-export fn audio(buffer: *volatile [2][512]u16) bool {
-    for (&buffer[0], &buffer[1]) |*l, *r| {
-        l.* = @intFromFloat(@sin(off) * std.math.maxInt(u16));
-        r.* = @intFromFloat(@sin(off) * std.math.maxInt(u16));
+const raw_data = std.mem.bytesAsSlice(i16, @embedFile("pepsi.raw"));
 
-        off += 0.1;
-    }
+var audio_offset: usize = 0;
 
-    return false;
+export fn audio(buffer: *volatile [2][512]i16) bool {
+    @memcpy(&buffer[0], raw_data[audio_offset..][0..512]);
+    @memcpy(&buffer[1], raw_data[audio_offset..][0..512]);
+
+    audio_offset += 512;
+
+    return true;
 }

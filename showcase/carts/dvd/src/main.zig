@@ -4,8 +4,10 @@ const gfx = @import("gfx");
 
 export fn start() void {
     // Clear garbage bytes from framebuffer at init since the whole screen is not cleared otherwise.
-    for (cart.framebuffer[0..]) |*pos| {
-        pos.* = .{ .r = 0, .b = 0, .g = 0 };
+    for (cart.framebuffer) |*col| {
+        for (col) |*pos| {
+            pos.* = cart.Pixel.fromColor(.{ .r = 0, .b = 0, .g = 0 });
+        }
     }
 }
 
@@ -66,11 +68,11 @@ pub fn drawDvd(sprite: anytype, pos_x: usize, pos_y: usize, color: Rgb) void {
             const dst_y = pos_y + y;
             const index = y * sprite.width + x;
             const src = sprite.colors[sprite.indices.get(index)];
-            var dst = &cart.framebuffer[dst_y * cart.screen_width + dst_x];
-            dst.r = @intFromFloat(@as(f32, @floatFromInt(src.r)) * color.r);
-            dst.g = @intFromFloat(@as(f32, @floatFromInt(src.g)) * color.g);
-            dst.b = @intFromFloat(@as(f32, @floatFromInt(src.b)) * color.b);
-            cart.framebuffer[dst_y * cart.screen_width + dst_x] = dst.*;
+            cart.framebuffer[dst_x][dst_y] = cart.Pixel.fromColor(.{
+                .r = @intFromFloat(@as(f32, @floatFromInt(src.r)) * color.r),
+                .g = @intFromFloat(@as(f32, @floatFromInt(src.g)) * color.g),
+                .b = @intFromFloat(@as(f32, @floatFromInt(src.b)) * color.b),
+            });
         }
     }
 }

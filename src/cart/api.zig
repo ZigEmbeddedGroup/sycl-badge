@@ -86,7 +86,7 @@ pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
 pub const framebuffer: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(base + 0x20);
-pub const audio_buffer: *volatile [2][512]i16 = @ptrFromInt(base + 0xa020);
+// pub const audio_buffer: *volatile [2][512]i16 = @ptrFromInt(base + 0xa020);
 
 pub const BlitOptions = struct {
     pub const Flags = packed struct(u32) {
@@ -428,7 +428,7 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
     } else {
         var clobber_r1: usize = undefined;
         var clobber_r2: usize = undefined;
-        return asm volatile (" svc #8"
+        return asm volatile (" svc #7"
             : [result] "={r0}" (-> u32),
               [clobber_r1] "={r1}" (clobber_r1),
               [clobber_r2] "={r2}" (clobber_r2),
@@ -448,7 +448,7 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
     } else {
         var clobber_r0: usize = undefined;
         var clobber_r1: usize = undefined;
-        asm volatile (" svc #9"
+        asm volatile (" svc #8"
             : [clobber_r0] "={r0}" (clobber_r0),
               [clobber_r1] "={r1}" (clobber_r1),
             : [page] "{r0}" (page),
@@ -465,7 +465,7 @@ pub inline fn rand() u32 {
             extern fn rand() u32;
         }.rand();
     } else {
-        return asm volatile (" svc #10"
+        return asm volatile (" svc #9"
             : [result] "={r0}" (-> u32),
             :
             : "r1", "r2", "r3"
@@ -482,7 +482,7 @@ pub inline fn trace(x: []const u8) void {
     } else {
         var clobber_r0: usize = undefined;
         var clobber_r1: usize = undefined;
-        asm volatile (" svc #11"
+        asm volatile (" svc #10"
             : [clobber_r0] "={r0}" (clobber_r0),
               [clobber_r1] "={r1}" (clobber_r1),
             : [x_ptr] "{r0}" (x.ptr),

@@ -38,8 +38,8 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ cmp r3, #0xDF
         \\ bne 12f
         \\ ldrb r3, [r2, #0 * 1]
-        \\ cmp r3, #12
-        \\ bhi 13f
+        \\ cmp r3, #11
+        \\ bhi 12f
         \\ tbb [pc, r3]
         \\0:
         \\ .byte (0f - 0b) / 2
@@ -49,12 +49,12 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ .byte (4f - 0b) / 2
         \\ .byte (5f - 0b) / 2
         \\ .byte (6f - 0b) / 2
+        \\ .byte (7f - 0b) / 2
         \\ .byte (8f - 0b) / 2
         \\ .byte (9f - 0b) / 2
         \\ .byte (10f - 0b) / 2
+        \\12:
         \\ .byte (11f - 0b) / 2
-        \\13:
-        \\ .byte (12f - 0b) / 2
         \\ .byte 0xDE
         \\ .align 1
         \\0:
@@ -78,18 +78,18 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\6:
         \\ ldm r1, {r0-r3}
         \\ b %[vline:P]
-        \\8:
+        \\7:
         \\ ldm r1, {r0-r2}
         \\ b %[read_flash:P]
-        \\9:
+        \\8:
         \\ ldm r1, {r0-r1}
         \\ b %[write_flash_page:P]
-        \\10:
+        \\9:
         \\ b %[rand:P]
-        \\11:
+        \\10:
         \\ ldm r1, {r0-r1}
         \\ b %[trace:P]
-        \\12:
+        \\11:
         \\ lsrs r0, #31
         \\ msr control, r0
         \\ it eq

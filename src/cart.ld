@@ -12,8 +12,8 @@ MEMORY
   bootloader    (rx!w) : ORIGIN = 0x00000000, LENGTH = 0x00004000
   runtime_flash (rx!w) : ORIGIN = 0x00004000, LENGTH = 0x0002C000
   cart_flash    (rx!w) : ORIGIN = 0x00030000, LENGTH = 0x00080000
-  cart_fixed    (rw!x) : ORIGIN = 0x20000000, LENGTH = 0x0000A020
-  cart_ram      (rw!x) : ORIGIN = 0x2000A020, LENGTH = 0x00015FE0
+  cart_fixed    (rw!x) : ORIGIN = 0x20000000, LENGTH = 0x0000A820
+  cart_ram      (rw!x) : ORIGIN = 0x2000A820, LENGTH = 0x000157E0
   runtime_ram   (rw!x) : ORIGIN = 0x20020000, LENGTH = 0x00008000
   cart_stack    (rw!x) : ORIGIN = 0x20028000, LENGTH = 0x00004000
   runtime_stack (rw!x) : ORIGIN = 0x2002C000, LENGTH = 0x00004000

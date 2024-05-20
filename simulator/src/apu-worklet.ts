@@ -34,8 +34,6 @@ class APUProcessor extends AudioWorkletProcessor {
             outputRight[index] = pcmRight[index] / 32767;
         }
 
-        console.log(pcmLeft.length);
-
         return true;
     }
 }

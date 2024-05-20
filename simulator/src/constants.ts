@@ -11,7 +11,8 @@ export const ADDR_CONTROLS = 0x04;
 export const ADDR_LIGHT_LEVEL = 0x06;
 export const ADDR_NEOPIXELS = 0x08;
 export const ADDR_RED_LED = 0x1c;
-export const ADDR_FRAMEBUFFER = 0x1e;
+export const ADDR_BATTERY_LEVEL = 0x1e;
+export const ADDR_FRAMEBUFFER = 0x20;
 
 export const CONTROLS_START = 1;
 export const CONTROLS_SELECT = 2;

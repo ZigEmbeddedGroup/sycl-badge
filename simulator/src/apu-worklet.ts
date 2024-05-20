@@ -11,6 +11,7 @@ class APUProcessor extends AudioWorkletProcessor {
         if (this.port != null) {
             this.port.onmessage = (event: MessageEvent<"reset" | {left: number[], right: number[]}>) => {
                 if (event.data === "reset") {
+                    console.log("Reset");
                     this.samplesLeft = [];
                     this.samplesRight = [];
                 } else {
@@ -32,6 +33,8 @@ class APUProcessor extends AudioWorkletProcessor {
             outputLeft[index] = pcmLeft[index] / 32767;
             outputRight[index] = pcmRight[index] / 32767;
         }
+
+        console.log(pcmLeft.length);
 
         return true;
     }

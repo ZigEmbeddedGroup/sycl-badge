@@ -216,7 +216,7 @@ pub fn main() !void {
     });
 
     timer.init();
-    audio.init();
+    audio.init(&cart.call_audio);
 
     // Light sensor adc
     microzig.board.A6_LIGHT.set_mux(.B);

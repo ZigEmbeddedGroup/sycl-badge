@@ -240,15 +240,16 @@ export class Runtime {
 
         // TODO: should this be called via a message from the worklet maybe?
         let audio_function = this.wasm!.exports["audio"] as any;
-        // if (typeof audio_function === "function") {
-        //     this.bluescreenOnError(audio_function);
-        // }
 
-        if (audio_function(constants.ADDR_AUDIO_BUFFER)) {
-            this.apu.send(
-                [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER)).slice(0, 512)],
-                [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER + 512 * 2)).slice(0, 512)],
-            );
+        if (typeof update_function === "function") {
+            // this is terrible
+            for (let i = 0; i < 2; i++) {
+                this.bluescreenOnError(audio_function);
+                this.apu.send(
+                    [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER)).slice(0, 512)],
+                    [...new Int16Array(this.memory.buffer.slice(constants.ADDR_AUDIO_BUFFER + 512 * 2)).slice(0, 512)],
+                );
+            }
         }
     }
 

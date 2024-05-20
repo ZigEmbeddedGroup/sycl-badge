@@ -1,28 +1,9 @@
-pub const sample_buffer: *volatile [2][512]u16 = &sample_buffer_storage;
+pub const sample_buffer: *volatile [2][512]i16 = @ptrFromInt(0x20000000 + 0xa020);
+var call_audio: *const fn () void = undefined;
 
-pub const Channel = struct {
-    duty: u32,
-    phase: u32,
-    phase_step: u31,
-    phase_step_step: i32,
-
-    duration: u31,
-    attack_duration: u31,
-    decay_duration: u31,
-    sustain_duration: u31,
-    release_duration: u31,
-
-    volume: u31,
-    volume_step: i32,
-    peak_volume: u31,
-    sustain_volume: u31,
-    attack_volume_step: i32,
-    decay_volume_step: i32,
-    release_volume_step: i32,
-};
-
-pub fn init() void {
+pub fn init(call_audio_fn: *const fn () void) void {
     @setCold(true);
+    call_audio = call_audio_fn;
 
     board.A0_SPKR.set_dir(.out);
     board.A1_VCC.set_dir(.in);
@@ -204,88 +185,19 @@ pub fn init() void {
 }
 
 pub fn mix() callconv(.C) void {
-    var local_channels = channels.*;
     var speaker_enable: port.Level = .low;
+
+    call_audio();
+
     for (&sample_buffer[
         (dma.get_audio_part() + sample_buffer.len - 1) % sample_buffer.len
-    ]) |*out_sample| {
-        var sample: i32 = 0;
-        inline for (&local_channels) |*channel| {
-            if (channel.duty > 0) {
-                // generate sample;
-                if (channel.phase < channel.duty) {
-                    sample += channel.volume;
-                } else {
-                    sample -= channel.volume;
-                }
-                // update
-                channel.phase +%= channel.phase_step;
-                channel.phase_step = @intCast(channel.phase_step + channel.phase_step_step);
-                if (channel.duration > 0) {
-                    channel.duration -= 1;
-                    channel.volume = @intCast(channel.volume + channel.volume_step);
-                } else if (channel.attack_duration > 0) {
-                    channel.duration = channel.attack_duration;
-                    channel.attack_duration = 0;
-                    channel.volume = 0;
-                    channel.volume_step = channel.attack_volume_step;
-                } else if (channel.decay_duration > 0) {
-                    channel.duration = channel.decay_duration;
-                    channel.decay_duration = 0;
-                    channel.volume = channel.peak_volume;
-                    channel.volume_step = channel.decay_volume_step;
-                } else if (channel.sustain_duration > 0) {
-                    channel.duration = channel.sustain_duration;
-                    channel.sustain_duration = 0;
-                    channel.volume = channel.sustain_volume;
-                    channel.volume_step = 0;
-                } else if (channel.release_duration > 0) {
-                    channel.duration = channel.release_duration;
-                    channel.release_duration = 0;
-                    channel.volume = channel.sustain_volume;
-                    channel.volume_step = channel.release_volume_step;
-                } else {
-                    channel.duty = 0;
-                }
-            }
-        }
+    ]) |sample| {
         if (sample != 0) speaker_enable = .high;
-        out_sample.* = @intCast((sample >> 16) - std.math.minInt(i16));
     }
-    channels.* = local_channels;
+
     board.SPKR_EN.write(speaker_enable);
     dma.ack_audio();
 }
-
-pub fn set_channel(channel: usize, state: Channel) void {
-    NVIC.ICER[32 / 32].write(.{ .CLRENA = 1 << 32 % 32 });
-    channels[channel] = state;
-    NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
-}
-
-var channels_storage: [4]Channel = .{.{
-    .duty = 0,
-    .phase = 0,
-    .phase_step = 0,
-    .phase_step_step = 0,
-
-    .duration = 0,
-    .attack_duration = 0,
-    .decay_duration = 0,
-    .sustain_duration = 0,
-    .release_duration = 0,
-
-    .volume = 0,
-    .volume_step = 0,
-    .peak_volume = 0,
-    .sustain_volume = 0,
-    .attack_volume_step = 0,
-    .decay_volume_step = 0,
-    .release_volume_step = 0,
-}} ** 4;
-const channels: *volatile [4]Channel = &channels_storage;
-
-var sample_buffer_storage: [2][512]u16 = .{.{0} ** 512} ** 2;
 
 const board = @import("../board.zig");
 const std = @import("std");

@@ -86,6 +86,7 @@ pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
 pub const framebuffer: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(base + 0x20);
+pub const audio_buffer: *volatile [2][512]i16 = @ptrFromInt(base + 0xa020);
 
 pub const BlitOptions = struct {
     pub const Flags = packed struct(u32) {

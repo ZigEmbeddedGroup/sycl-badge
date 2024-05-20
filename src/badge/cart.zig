@@ -17,6 +17,8 @@ const libcart = struct {
 
     extern fn start() void;
     extern fn update() void;
+    extern fn audio() void;
+
     export fn __return_thunk__() linksection(".text.cart") noreturn {
         asm volatile (" svc #12");
         unreachable;
@@ -123,7 +125,7 @@ pub const HSRAM = struct {
 };
 
 pub fn start() void {
-    @memset(@as(*[0xA020]u8, @ptrFromInt(0x20000000)), 0);
+    @memset(@as(*[0xA820]u8, @ptrFromInt(0x20000000)), 0);
 
     // fill .bss with zeroes
     {
@@ -186,6 +188,10 @@ fn call(func: *const fn () callconv(.C) void) void {
         .LSPEN = 1,
         .ASPEN = 1,
     });
+}
+
+pub fn call_audio() void {
+    call(libcart.audio);
 }
 
 fn User(comptime T: type) type {

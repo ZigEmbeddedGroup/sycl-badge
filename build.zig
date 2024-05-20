@@ -91,8 +91,8 @@ pub fn build(b: *Build) void {
     }
 
     inline for (.{
-        "neopixels",
-        "song",
+        // "neopixels",
+        // "song",
     }) |name| {
         const mvp = add_cart(&dep, b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
@@ -144,7 +144,7 @@ pub const Cart = struct {
 
     pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build, opt: CartWatcherOptions) *Build.Step.Run {
         if (opt.build_firmware) {
-            // c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+            c.mz.install_firmware(b, c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         }
         const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
         b.getInstallStep().dependOn(&install_artifact_step.step);

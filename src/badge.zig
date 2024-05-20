@@ -216,7 +216,7 @@ pub fn main() !void {
     });
 
     timer.init();
-    audio.init(&cart.call_audio);
+    audio.init();
 
     // Light sensor adc
     microzig.board.A6_LIGHT.set_mux(.B);
@@ -253,6 +253,14 @@ pub fn main() !void {
         };
 
         cart.tick();
+
+        if (!audio.audio_ready) {
+            // microzig.cpu.disable_interrupts();
+            // defer microzig.cpu.enable_interrupts();
+
+            cart.call_audio();
+            audio.audio_ready = true;
+        }
 
         var pixels: [5]board.NeopixelColor = undefined;
         for (&pixels, cart.api.neopixels) |*local, pixel|

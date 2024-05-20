@@ -20,7 +20,7 @@ const libcart = struct {
     extern fn audio() void;
 
     export fn __return_thunk__() linksection(".text.cart") noreturn {
-        asm volatile (" svc #12");
+        asm volatile (" svc #11");
         unreachable;
     }
 };
@@ -28,7 +28,7 @@ const libcart = struct {
 pub fn svcall_handler() callconv(.Naked) void {
     asm volatile (
         \\ mvns r0, lr, lsl #31 - 2
-        \\ bcc 12f
+        \\ bcc 11f
         \\ ite mi
         \\ movmi r1, sp
         \\ mrspl r1, psp
@@ -36,7 +36,7 @@ pub fn svcall_handler() callconv(.Naked) void {
         \\ subs r2, #2
         \\ ldrb r3, [r2, #1 * 1]
         \\ cmp r3, #0xDF
-        \\ bne 12f
+        \\ bne 11f
         \\ ldrb r3, [r2, #0 * 1]
         \\ cmp r3, #11
         \\ bhi 12f
@@ -168,7 +168,7 @@ fn call(func: *const fn () callconv(.C) void) void {
     frame[7] = 1 << 24;
     asm volatile (
         \\ msr psp, %[process_stack]
-        \\ svc #12
+        \\ svc #11
         :
         : [process_stack] "r" (frame.ptr),
         : "r0", "r1", "r2", "r3", "memory"
@@ -191,7 +191,7 @@ fn call(func: *const fn () callconv(.C) void) void {
 }
 
 pub fn call_audio() void {
-    call(libcart.audio);
+    call(&libcart.audio);
 }
 
 fn User(comptime T: type) type {

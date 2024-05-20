@@ -1,9 +1,8 @@
+pub var audio_ready = false;
 pub const sample_buffer: *volatile [2][512]i16 = @ptrFromInt(0x20000000 + 0xa020);
-var call_audio: ?*const fn () void = null;
 
-pub fn init(call_audio_fn: *const fn () void) void {
+pub fn init() void {
     @setCold(true);
-    call_audio = call_audio_fn;
 
     board.A0_SPKR.set_dir(.out);
     board.A1_VCC.set_dir(.in);
@@ -185,16 +184,17 @@ pub fn init(call_audio_fn: *const fn () void) void {
 }
 
 pub fn mix() callconv(.C) void {
-    // var speaker_enable: port.Level = .low;
-    const speaker_enable: port.Level = .low;
+    var speaker_enable: port.Level = .low;
 
-    // if (call_audio) |ca| ca();
+    if (audio_ready) {
+        for (&sample_buffer[
+            (dma.get_audio_part() + sample_buffer.len - 1) % sample_buffer.len
+        ]) |sample| {
+            if (sample != 0) speaker_enable = .high;
+        }
 
-    // for (&sample_buffer[
-    //     (dma.get_audio_part() + sample_buffer.len - 1) % sample_buffer.len
-    // ]) |sample| {
-    //     if (sample != 0) speaker_enable = .high;
-    // }
+        audio_ready = false;
+    }
 
     board.SPKR_EN.write(speaker_enable);
     dma.ack_audio();

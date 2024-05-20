@@ -158,12 +158,12 @@ export fn update() void {
 var wave_t: f32 = 0;
 
 export fn audio() void {
-    // for (&cart.audio_buffer[0], &cart.audio_buffer[1]) |*l, *r| {
-    //     const val: i16 = @intFromFloat(@sin(wave_t) * std.math.maxInt(i16));
+    for (&cart.audio_buffer[0], &cart.audio_buffer[1]) |*l, *r| {
+        const val: i16 = @intFromFloat(@sin(wave_t) * std.math.maxInt(i16));
 
-    //     l.* = val;
-    //     r.* = val;
+        l.* = val;
+        r.* = val;
 
-    //     wave_t += 0.1;
-    // }
+        wave_t += 0.1;
+    }
 }

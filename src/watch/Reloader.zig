@@ -124,10 +124,10 @@ pub fn onChange(reloader: *Reloader, dir_that_changed: usize) void {
 pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
     var buf =
         ("HTTP/1.1 101 Switching Protocols\r\n" ++
-        "Access-Control-Allow-Origin: *\r\n" ++
-        "Upgrade: websocket\r\n" ++
-        "Connection: upgrade\r\n" ++
-        "Sec-Websocket-Accept: 0000000000000000000000000000\r\n\r\n").*;
+            "Access-Control-Allow-Origin: *\r\n" ++
+            "Upgrade: websocket\r\n" ++
+            "Connection: upgrade\r\n" ++
+            "Sec-Websocket-Accept: 0000000000000000000000000000\r\n\r\n").*;
 
     const key_pos = buf.len - 32;
     _ = std.base64.standard.Encoder.encode(buf[key_pos .. key_pos + 28], h[0..]);

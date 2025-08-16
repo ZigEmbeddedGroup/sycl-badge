@@ -69,13 +69,13 @@ pub const EnableGeneratorOptions = struct {
 
 pub fn enable_generator(gen: Generator, source: Source, opts: EnableGeneratorOptions) void {
     GCLK.GENCTRL[@intFromEnum(gen)].write(.{
-        .SRC = .{ .value = source },
+        .SRC = source,
         .reserved8 = 0,
         .GENEN = 1,
         .IDC = 0,
         .OOV = 0,
         .OE = 0,
-        .DIVSEL = .{ .value = opts.divsel },
+        .DIVSEL = opts.divsel,
         .RUNSTDBY = 0,
         .reserved16 = 0,
         .DIV = opts.div,
@@ -88,7 +88,7 @@ pub fn enable_generator(gen: Generator, source: Source, opts: EnableGeneratorOpt
 /// peripheral channel.
 pub fn set_peripheral_clk_gen(peripheral: PeripheralIndex, gen: Generator) void {
     GCLK.PCHCTRL[@intFromEnum(peripheral)].write(.{
-        .GEN = .{ .value = gen },
+        .GEN = gen,
         // TODO: maybe change API to make this more explicit?
         .CHEN = 1,
         .WRTLOCK = 0,

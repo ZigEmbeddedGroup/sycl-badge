@@ -45,7 +45,7 @@ pub fn activate(self: *Self, @"type": Type, box: Box) void {
     self.counter = 0;
 }
 
-pub fn tick(self: *Self, r: std.rand.Random, game: *GameData, attribs: []const Attrib) void {
+pub fn tick(self: *Self, r: std.Random, game: *GameData, attribs: []const Attrib) void {
     if (self.health == 0) {
         self.death_frames += 1;
         if (self.death_frames == 5) {
@@ -79,7 +79,7 @@ const GopherState = enum(u8) {
     walk = 1,
 };
 
-fn tickGopher(self: *Self, r: std.rand.Random, game: *GameData, attribs: []const Attrib) void {
+fn tickGopher(self: *Self, r: std.Random, game: *GameData, attribs: []const Attrib) void {
     const room = game.getCurrentRoom();
     const state: *GopherState = @ptrCast(&self.state);
     switch (state.*) {

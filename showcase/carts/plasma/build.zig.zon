@@ -1,5 +1,6 @@
 .{
-    .name = "plasma",
+    .name = .plasma,
+    .fingerprint = 0xd9e934654f69ac8e,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{ .path = "../../.." },

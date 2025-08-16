@@ -83,7 +83,7 @@ pub const Controls = packed struct(u9) {
     right: bool,
 };
 
-const base = if (builtin.target.isWasm()) 0 else 0x20000000;
+const base = if (is_wasm) 0 else 0x20000000;
 
 pub const controls: *Controls = @ptrFromInt(base + 0x04);
 pub const light_level: *u12 = @ptrFromInt(base + 0x06);
@@ -122,7 +122,7 @@ pub const BlitOptions = struct {
 
 /// Copies pixels to the framebuffer.
 pub inline fn blit(options: BlitOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
         }.blit(
@@ -165,8 +165,7 @@ pub inline fn blit(options: BlitOptions) void {
               [x] "{r1}" (options.x),
               [y] "{r2}" (options.y),
               [rest] "{r3}" (&rest),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -180,7 +179,7 @@ pub const LineOptions = struct {
 
 /// Draws a line between two points.
 pub inline fn line(options: LineOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
         }.line(options.color, options.x1, options.y1, options.x2, options.y2);
@@ -205,8 +204,7 @@ pub inline fn line(options: LineOptions) void {
               [y1] "{r1}" (options.y1),
               [x2] "{r2}" (options.x2),
               [rest] "{r3}" (&rest),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -221,7 +219,7 @@ pub const OvalOptions = struct {
 
 /// Draws an oval (or circle).
 pub inline fn oval(options: OvalOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
         }.oval(
@@ -255,8 +253,7 @@ pub inline fn oval(options: OvalOptions) void {
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
               [rest] "{r3}" (&rest),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -271,7 +268,7 @@ pub const RectOptions = struct {
 
 /// Draws a rectangle.
 pub inline fn rect(options: RectOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
         }.rect(
@@ -305,8 +302,7 @@ pub inline fn rect(options: RectOptions) void {
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
               [rest] "{r3}" (&rest),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -320,7 +316,7 @@ pub const TextOptions = struct {
 
 /// Draws text using the built-in system font.
 pub inline fn text(options: TextOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
         }.text(
@@ -354,8 +350,7 @@ pub inline fn text(options: TextOptions) void {
               [str_len] "{r1}" (options.str.len),
               [x] "{r2}" (options.x),
               [rest] "{r3}" (&rest),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -368,7 +363,7 @@ pub const StraightLineOptions = struct {
 
 /// Draws a horizontal line
 pub inline fn hline(options: StraightLineOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         }.hline(
@@ -391,14 +386,13 @@ pub inline fn hline(options: StraightLineOptions) void {
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
               [color] "{r3}" (options.color),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
 /// Draws a vertical line
 pub inline fn vline(options: StraightLineOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
         }.vline(
@@ -421,8 +415,7 @@ pub inline fn vline(options: StraightLineOptions) void {
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
               [color] "{r3}" (options.color),
-            : "memory"
-        );
+            : "memory");
     }
 }
 
@@ -467,9 +460,14 @@ pub const ToneOptions = struct {
     flags: Flags,
 };
 
+const is_wasm = switch (builtin.target.cpu.arch) {
+    .wasm32, .wasm64 => true,
+    else => false,
+};
+
 /// Plays a sound tone.
 pub inline fn tone(options: ToneOptions) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
         }.tone(
@@ -507,7 +505,7 @@ pub const flash_page_count = 8000;
 
 /// Attempts to fill `dst`, returns the amount of bytes actually read
 pub inline fn read_flash(offset: u32, dst: []u8) u32 {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         return struct {
             extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
         }.read_flash(offset, dst.ptr, dst.len);
@@ -521,13 +519,12 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
             : [offset] "{r0}" (offset),
               [dst_ptr] "{r1}" (dst.ptr),
               [dst_len] "{r2}" (dst.len),
-            : "r3"
-        );
+            : "r3");
     }
 }
 
 pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn write_flash_page(page: u32, src: [*]const u8) void;
         }.write_flash_page(page, &src);
@@ -539,8 +536,7 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
               [clobber_r1] "={r1}" (clobber_r1),
             : [page] "{r0}" (page),
               [src] "{r1}" (&src),
-            : "r2", "r3", "memory"
-        );
+            : "r2", "r3", "memory");
     }
 }
 
@@ -552,7 +548,7 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
 
 /// Returns a random number, useful for seeding a faster prng.
 pub inline fn rand() u32 {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         return struct {
             extern fn rand() u32;
         }.rand();
@@ -560,14 +556,13 @@ pub inline fn rand() u32 {
         return asm volatile (" svc #10"
             : [result] "={r0}" (-> u32),
             :
-            : "r1", "r2", "r3"
-        );
+            : "r1", "r2", "r3");
     }
 }
 
 /// Prints a message to the debug console.
 pub inline fn trace(x: []const u8) void {
-    if (builtin.target.isWasm()) {
+    if (is_wasm) {
         struct {
             extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
         }.trace(x.ptr, x.len);
@@ -579,7 +574,6 @@ pub inline fn trace(x: []const u8) void {
               [clobber_r1] "={r1}" (clobber_r1),
             : [x_ptr] "{r0}" (x.ptr),
               [x_len] "{r1}" (x.len),
-            : "r2", "r3"
-        );
+            : "r2", "r3");
     }
 }

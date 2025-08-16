@@ -14,6 +14,6 @@ pub fn build(b: *std.Build) void {
         .name = "metalgear-timer",
         .optimize = optimize,
         .root_source_file = b.path("src/metalgear-timer.zig"),
-    });
+    }) orelse return;
     cart.install(b);
 }

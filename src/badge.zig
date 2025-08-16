@@ -43,10 +43,10 @@ const adc = hal.adc.num(0);
 
 const utils = @import("utils.zig");
 
-pub const microzig_options = .{
+pub const microzig_options: microzig.Options = .{
     .interrupts = .{
-        .SVCall = microzig.interrupt.Handler{ .Naked = cart.svcall_handler },
-        .DMAC_DMAC_1 = .{ .C = &audio.mix },
+        .SVCall = microzig.interrupt.Handler{ .naked = cart.svcall_handler },
+        .DMAC_DMAC_1 = .{ .c = &audio.mix },
     },
 };
 
@@ -55,16 +55,16 @@ pub fn main() !void {
     SystemControl.CCR.modify(.{
         .NONBASETHRDENA = 0,
         .USERSETMPEND = 0,
-        .UNALIGN_TRP = .{ .value = .VALUE_0 }, // TODO
+        .UNALIGN_TRP = .VALUE_0,
         .DIV_0_TRP = 1,
         .BFHFNMIGN = 0,
-        .STKALIGN = .{ .value = .VALUE_1 },
+        .STKALIGN = .VALUE_1,
     });
     // Enable FPU access.
     SystemControl.CPACR.write(.{
         .reserved20 = 0,
-        .CP10 = .{ .value = .FULL },
-        .CP11 = .{ .value = .FULL },
+        .CP10 = .FULL,
+        .CP11 = .FULL,
         .padding = 0,
     });
 

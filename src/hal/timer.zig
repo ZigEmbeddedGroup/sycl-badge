@@ -13,11 +13,11 @@ pub fn init() void {
     TC0.COUNT32.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -26,20 +26,20 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC0.COUNT32.SYNCBUSY.read().ENABLE != 0) {}
     TC1.COUNT32.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -48,9 +48,9 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC1.COUNT32.SYNCBUSY.read().ENABLE != 0) {}
@@ -58,11 +58,11 @@ pub fn init() void {
     TC0.COUNT32.CTRLA.write(.{
         .SWRST = 1,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -71,20 +71,20 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC0.COUNT32.SYNCBUSY.read().SWRST != 0) {}
     TC1.COUNT32.CTRLA.write(.{
         .SWRST = 1,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -93,9 +93,9 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC1.COUNT32.SYNCBUSY.read().SWRST != 0) {}
@@ -103,11 +103,11 @@ pub fn init() void {
     TC0.COUNT32.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 1,
-        .MODE = .{ .value = .COUNT32 },
-        .PRESCSYNC = .{ .value = .GCLK },
+        .MODE = .COUNT32,
+        .PRESCSYNC = .GCLK,
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .value = .DIV1 },
+        .PRESCALER = .DIV1,
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -116,9 +116,9 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC0.COUNT32.SYNCBUSY.read().ENABLE != 0) {}
@@ -127,7 +127,7 @@ pub fn init() void {
         .LUPD = 0,
         .ONESHOT = 1,
         .reserved5 = 0,
-        .CMD = .{ .value = .STOP },
+        .CMD = .STOP,
     });
     while (TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
 }
@@ -140,7 +140,7 @@ pub fn start_delay_us(us: u32) void {
         .LUPD = 0,
         .ONESHOT = 1,
         .reserved5 = 0,
-        .CMD = .{ .value = .RETRIGGER },
+        .CMD = .RETRIGGER,
     });
     while (TC0.COUNT32.SYNCBUSY.read().CTRLB != 0) {}
 }

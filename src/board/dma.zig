@@ -1,5 +1,5 @@
 pub fn init_lcd(bpp: lcd.Bpp, fb: *const volatile lcd.FrameBuffer) void {
-    @setCold(true);
+    @branchHint(.cold);
 
     init();
     DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.write(.{
@@ -8,12 +8,12 @@ pub fn init_lcd(bpp: lcd.Bpp, fb: *const volatile lcd.FrameBuffer) void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = 0 },
+        .TRIGSRC = @enumFromInt(0),
         .reserved20 = 0,
-        .TRIGACT = .{ .raw = 0 },
+        .TRIGACT = @enumFromInt(0),
         .reserved24 = 0,
-        .BURSTLEN = .{ .raw = 0 },
-        .THRESHOLD = .{ .raw = 0 },
+        .BURSTLEN = @enumFromInt(0),
+        .THRESHOLD = @enumFromInt(0),
         .padding = 0,
     });
     while (DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.read().ENABLE != 0) {}
@@ -23,25 +23,25 @@ pub fn init_lcd(bpp: lcd.Bpp, fb: *const volatile lcd.FrameBuffer) void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = 0 },
+        .TRIGSRC = @enumFromInt(0),
         .reserved20 = 0,
-        .TRIGACT = .{ .raw = 0 },
+        .TRIGACT = @enumFromInt(0),
         .reserved24 = 0,
-        .BURSTLEN = .{ .raw = 0 },
-        .THRESHOLD = .{ .raw = 0 },
+        .BURSTLEN = @enumFromInt(0),
+        .THRESHOLD = @enumFromInt(0),
         .padding = 0,
     });
     while (DMAC.CHANNEL[CHANNEL.LCD].CHCTRLA.read().SWRST != 0) {}
     desc[DESC.LCD].BTCTRL.write(.{
         .VALID = 1,
-        .EVOSEL = .{ .value = .DISABLE },
-        .BLOCKACT = .{ .value = .BOTH },
+        .EVOSEL = .DISABLE,
+        .BLOCKACT = .BOTH,
         .reserved8 = 0,
-        .BEATSIZE = .{ .value = .BYTE },
+        .BEATSIZE = .BYTE,
         .SRCINC = 1,
         .DSTINC = 0,
-        .STEPSEL = .{ .value = .SRC },
-        .STEPSIZE = .{ .value = .X1 },
+        .STEPSEL = .SRC,
+        .STEPSIZE = .X1,
     });
     switch (bpp) {
         inline else => |tag| {
@@ -59,12 +59,12 @@ pub fn init_lcd(bpp: lcd.Bpp, fb: *const volatile lcd.FrameBuffer) void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = TRIGSRC.SERCOM4_TX },
+        .TRIGSRC = @enumFromInt(TRIGSRC.SERCOM4_TX),
         .reserved20 = 0,
-        .TRIGACT = .{ .value = .BURST },
+        .TRIGACT = .BURST,
         .reserved24 = 0,
-        .BURSTLEN = .{ .value = .SINGLE },
-        .THRESHOLD = .{ .value = .@"1BEAT" },
+        .BURSTLEN = .SINGLE,
+        .THRESHOLD = .@"1BEAT",
         .padding = 0,
     });
 }
@@ -91,7 +91,7 @@ pub fn poll_ack_lcd() void {
 
 pub fn resume_lcd() void {
     DMAC.CHANNEL[CHANNEL.LCD].CHCTRLB.write(.{
-        .CMD = .{ .value = .RESUME },
+        .CMD = .RESUME,
         .padding = 0,
     });
 }
@@ -104,12 +104,12 @@ pub fn init_audio() void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = 0 },
+        .TRIGSRC = @enumFromInt(0),
         .reserved20 = 0,
-        .TRIGACT = .{ .raw = 0 },
+        .TRIGACT = @enumFromInt(0),
         .reserved24 = 0,
-        .BURSTLEN = .{ .raw = 0 },
-        .THRESHOLD = .{ .raw = 0 },
+        .BURSTLEN = @enumFromInt(0),
+        .THRESHOLD = @enumFromInt(0),
         .padding = 0,
     });
     while (DMAC.CHANNEL[CHANNEL.AUDIO].CHCTRLA.read().ENABLE != 0) {}
@@ -119,12 +119,12 @@ pub fn init_audio() void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = 0 },
+        .TRIGSRC = @enumFromInt(0),
         .reserved20 = 0,
-        .TRIGACT = .{ .raw = 0 },
+        .TRIGACT = @enumFromInt(0),
         .reserved24 = 0,
-        .BURSTLEN = .{ .raw = 0 },
-        .THRESHOLD = .{ .raw = 0 },
+        .BURSTLEN = @enumFromInt(0),
+        .THRESHOLD = @enumFromInt(0),
         .padding = 0,
     });
     while (DMAC.CHANNEL[CHANNEL.AUDIO].CHCTRLA.read().SWRST != 0) {}
@@ -137,14 +137,14 @@ pub fn init_audio() void {
     const len0 = @sizeOf(@TypeOf(audio.sample_buffer[0]));
     desc[DESC.AUDIO0].BTCTRL.write(.{
         .VALID = 1,
-        .EVOSEL = .{ .value = .DISABLE },
-        .BLOCKACT = .{ .value = .INT },
+        .EVOSEL = .DISABLE,
+        .BLOCKACT = .INT,
         .reserved8 = 0,
-        .BEATSIZE = .{ .value = .HWORD },
+        .BEATSIZE = .HWORD,
         .SRCINC = 1,
         .DSTINC = 0,
-        .STEPSEL = .{ .value = .SRC },
-        .STEPSIZE = .{ .value = .X1 },
+        .STEPSEL = .SRC,
+        .STEPSIZE = .X1,
     });
     desc[DESC.AUDIO0].BTCNT.write(.{ .BTCNT = @divExact(len0, 2) });
     desc[DESC.AUDIO0].SRCADDR.write(.{ .SRCADDR = @intFromPtr(&audio.sample_buffer[0]) + len0 });
@@ -153,14 +153,14 @@ pub fn init_audio() void {
     const len1 = @sizeOf(@TypeOf(audio.sample_buffer[1]));
     desc[DESC.AUDIO1].BTCTRL.write(.{
         .VALID = 1,
-        .EVOSEL = .{ .value = .DISABLE },
-        .BLOCKACT = .{ .value = .INT },
+        .EVOSEL = .DISABLE,
+        .BLOCKACT = .INT,
         .reserved8 = 0,
-        .BEATSIZE = .{ .value = .HWORD },
+        .BEATSIZE = .HWORD,
         .SRCINC = 1,
         .DSTINC = 0,
-        .STEPSEL = .{ .value = .SRC },
-        .STEPSIZE = .{ .value = .X1 },
+        .STEPSEL = .SRC,
+        .STEPSIZE = .X1,
     });
     desc[DESC.AUDIO1].BTCNT.write(.{ .BTCNT = @divExact(len1, 2) });
     desc[DESC.AUDIO1].SRCADDR.write(.{ .SRCADDR = @intFromPtr(&audio.sample_buffer[1]) + len1 });
@@ -173,12 +173,12 @@ pub fn init_audio() void {
         .reserved6 = 0,
         .RUNSTDBY = 0,
         .reserved8 = 0,
-        .TRIGSRC = .{ .raw = TRIGSRC.DAC_EMPTY0 },
+        .TRIGSRC = @enumFromInt(TRIGSRC.DAC_EMPTY0),
         .reserved20 = 0,
-        .TRIGACT = .{ .value = .BURST },
+        .TRIGACT = .BURST,
         .reserved24 = 0,
-        .BURSTLEN = .{ .value = .SINGLE },
-        .THRESHOLD = .{ .value = .@"1BEAT" },
+        .BURSTLEN = .SINGLE,
+        .THRESHOLD = .@"1BEAT",
         .padding = 0,
     });
 }
@@ -348,13 +348,8 @@ const TRIGSRC = enum(u7) {
 };
 
 var initialized = false;
-var desc: [3]DMAC_DESCRIPTOR align(8) = .{.{
-    .BTCTRL = .{ .raw = 0 },
-    .BTCNT = .{ .raw = 0 },
-    .SRCADDR = .{ .raw = 0 },
-    .DSTADDR = .{ .raw = 0 },
-    .DESCADDR = .{ .raw = 0 },
-}} ** 3;
+var desc = std.mem.zeroes([3]DMAC_DESCRIPTOR);
+
 var desc_wb: [2]DMAC_DESCRIPTOR align(8) = undefined;
 
 const std = @import("std");

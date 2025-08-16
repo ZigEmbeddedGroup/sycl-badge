@@ -72,7 +72,7 @@ pub fn main() !void {
     while (true) {
         const message: []const u8 = blk: {
             const buttons = poller.read_from_port();
-            inline for (@typeInfo(ButtonPoller.Buttons).Struct.fields) |field| {
+            inline for (@typeInfo(ButtonPoller.Buttons).@"struct".fields) |field| {
                 if (@field(buttons, field.name) == 1)
                     break :blk field.name;
             }

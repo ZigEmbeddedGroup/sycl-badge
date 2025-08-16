@@ -15,7 +15,7 @@ const light = defColor(0x777777);
 const lblue = defColor(0x7777ff);
 const dark = defColor(0x222222);
 const purp = defColor(0x820eef);
-const punk = .{ .r = 1, .g = 0, .b = 1 };
+const punk: cart.NeopixelColor = .{ .r = 1, .g = 0, .b = 1 };
 const shipTop = defColor(0xF7A41D);
 const shipBottom = defColor(0x934b17);
 const flash = defColor(0x98ff98);
@@ -46,11 +46,11 @@ inline fn rgb565(clr: cart.NeopixelColor) cart.DisplayColor {
 }
 
 // rand implementation "borrowed" from the blobs cart
-var rand: std.rand.DefaultPrng = undefined;
+var rand: std.Random.DefaultPrng = undefined;
 fn rand_float() f32 {
     const byte_count = 2;
     const UInt = @Type(std.builtin.Type{
-        .Int = .{
+        .int = .{
             .signedness = .unsigned,
             .bits = byte_count * 8,
         },
@@ -122,7 +122,7 @@ const MaxBullets = 100;
 var bullets: [MaxBullets]Bullet = undefined;
 
 export fn start() void {
-    rand = std.rand.DefaultPrng.init(5831);
+    rand = std.Random.DefaultPrng.init(5831);
     for (&starfield) |*star| {
         const speed = rand_float();
         star.* = .{
@@ -211,8 +211,7 @@ fn tick_bullets() void {
         if (bullet.x > cart.screen_width or
             bullet.y > cart.screen_height or
             bullet.x < 0 or
-            bullet.y < 0
-        ) bullet.state = .dead;
+            bullet.y < 0) bullet.state = .dead;
         if (bullet.state != .dead and
             bullet.x > player.x and
             bullet.x < player.x + 8 and
@@ -364,7 +363,6 @@ fn draw_player() void {
         }
     }
 }
-
 
 fn reset_game() void {
     level = 0;

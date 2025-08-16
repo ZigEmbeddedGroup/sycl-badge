@@ -1,5 +1,6 @@
 .{
-    .name = "metalgear-timer",
+    .name = .metalgear_timer,
+    .fingerprint = 0xe1bace26b7639d85,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{ .path = "../../.." },

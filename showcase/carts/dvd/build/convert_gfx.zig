@@ -30,7 +30,7 @@ pub fn main() !void {
     defer out_file.close();
 
     const writer = out_file.writer();
-    try writer.writeAll("const PackedIntSlice = @import(\"std\").packed_int_array.PackedIntSlice;\n");
+    try writer.writeAll("const PackedIntSlice = @import(\"packed_int_array\").PackedIntSlice;\n");
     try writer.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
 
     for (in_files.items) |in_file| {

@@ -214,7 +214,7 @@ pub fn main() !void {
     USB.DEVICE.DESCADD.write(.{ .DESCADD = @intFromPtr(endpoint_table) });
     USB.DEVICE.CTRLA.modify(.{ .ENABLE = 0 });
     USB.DEVICE.CTRLB.modify(.{
-        .SPDCONF = .{ .value = .FS },
+        .SPDCONF = .FS,
         .DETACH = 0,
     });
     USB.DEVICE.CTRLA.write(.{
@@ -222,7 +222,7 @@ pub fn main() !void {
         .ENABLE = 1,
         .RUNSTDBY = 0,
         .reserved7 = 0,
-        .MODE = .{ .value = .DEVICE },
+        .MODE = .DEVICE,
     });
 
     while (USB.DEVICE.SYNCBUSY.read().ENABLE != 0) {}
@@ -471,7 +471,7 @@ fn tick() void {
                                                 0x3e, 0x00, //
                                                 0x02, 0x01, 0x00, //
                                                 0x80, 500 / 2, //
-                                                //
+                                                    //
                                                 0x09, @intFromEnum(Setup.standard.DescriptorType.INTERFACE), //
                                                 0x00, 0x00, 0x01, //
                                                 0x02, 0x02, 0x00, //

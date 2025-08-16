@@ -97,11 +97,11 @@ pub const Vec3 = struct {
         return u.div_scalar(u.length());
     }
 
-    pub fn random(random_engine: std.rand.Random) Vec3 {
+    pub fn random(random_engine: std.Random) Vec3 {
         return Vec3.init(random_engine.float(f32), random_engine.float(f32), random_engine.float(f32));
     }
 
-    pub fn random_interval(random_engine: std.rand.Random, interval: Interval) Vec3 {
+    pub fn random_interval(random_engine: std.Random, interval: Interval) Vec3 {
         var vec = Vec3.zero();
         vec.data[0] = interval.min + (interval.max - interval.min) * random_engine.float(f32);
         vec.data[1] = interval.min + (interval.max - interval.min) * random_engine.float(f32);
@@ -110,7 +110,7 @@ pub const Vec3 = struct {
         return vec;
     }
 
-    pub fn random_in_sphere(random_engine: std.rand.Random) Vec3 {
+    pub fn random_in_sphere(random_engine: std.Random) Vec3 {
         while (true) {
             var p = Vec3.random_interval(random_engine, .{ .min = -1, .max = 1 });
 
@@ -119,7 +119,7 @@ pub const Vec3 = struct {
         }
     }
 
-    pub fn random_in_unit_sphere(random_engine: std.rand.Random) Vec3 {
+    pub fn random_in_unit_sphere(random_engine: std.Random) Vec3 {
         return Vec3.random_in_sphere(random_engine).unit_vector();
     }
 
@@ -153,7 +153,7 @@ pub const Vec3 = struct {
         return r_out_perp.add(r_out_parallel);
     }
 
-    pub fn random_in_unit_disk(random_engine: std.rand.Random) Vec3 {
+    pub fn random_in_unit_disk(random_engine: std.Random) Vec3 {
         while (true) {
             var p = Vec3.zero();
             p.data[0] = -1 + 2.0 * random_engine.float(f32);

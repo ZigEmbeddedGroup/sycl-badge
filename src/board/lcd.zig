@@ -29,7 +29,7 @@ pub const blue24: Color24 = .{ .r = 0x00, .g = 0x00, .b = 0xff };
 pub const white24: Color24 = .{ .r = 0xff, .g = 0xff, .b = 0xff };
 
 pub fn init(bpp: Bpp, fb: *const volatile FrameBuffer) void {
-    @setCold(true);
+    @branchHint(.cold);
 
     board.TFT_RST.set_dir(.out);
     board.TFT_LITE.set_dir(.out);
@@ -52,19 +52,19 @@ pub fn init(bpp: Bpp, fb: *const volatile FrameBuffer) void {
     SERCOM4.SPIM.CTRLA.write(.{
         .SWRST = 1,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
         .reserved7 = 0,
         .RUNSTDBY = 0,
         .IBON = 0,
         .reserved16 = 0,
-        .DOPO = .{ .raw = 0 },
+        .DOPO = @enumFromInt(0),
         .reserved20 = 0,
-        .DIPO = .{ .raw = 0 },
+        .DIPO = @enumFromInt(0),
         .reserved24 = 0,
-        .FORM = .{ .raw = 0 },
-        .CPHA = .{ .raw = 0 },
-        .CPOL = .{ .raw = 0 },
-        .DORD = .{ .raw = 0 },
+        .FORM = @enumFromInt(0),
+        .CPHA = @enumFromInt(0),
+        .CPOL = @enumFromInt(0),
+        .DORD = @enumFromInt(0),
         .padding = 0,
     });
     while (SERCOM4.SPIM.SYNCBUSY.read().SWRST != 0) {}
@@ -74,19 +74,19 @@ pub fn init(bpp: Bpp, fb: *const volatile FrameBuffer) void {
     SERCOM4.SPIM.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 1,
-        .MODE = .{ .value = .SPI_MASTER },
+        .MODE = .SPI_MASTER,
         .reserved7 = 0,
         .RUNSTDBY = 0,
         .IBON = 0,
         .reserved16 = 0,
-        .DOPO = .{ .value = .PAD2 },
+        .DOPO = .PAD2,
         .reserved20 = 0,
-        .DIPO = .{ .value = .PAD0 },
+        .DIPO = .PAD0,
         .reserved24 = 0,
-        .FORM = .{ .value = .SPI_FRAME },
-        .CPHA = .{ .value = .LEADING_EDGE },
-        .CPOL = .{ .value = .IDLE_LOW },
-        .DORD = .{ .value = .MSB },
+        .FORM = .SPI_FRAME,
+        .CPHA = .LEADING_EDGE,
+        .CPOL = .IDLE_LOW,
+        .DORD = .MSB,
         .padding = 0,
     });
     while (SERCOM4.SPIM.SYNCBUSY.read().ENABLE != 0) {}

@@ -34,8 +34,12 @@ const global = struct {
 
 const Button = enum {
     start,
-    a, b,
-    up, down, left, right,
+    a,
+    b,
+    up,
+    down,
+    left,
+    right,
     pub fn isDown(self: Button) bool {
         switch (self) {
             .start => return cart.controls.start,
@@ -68,7 +72,7 @@ fn isButtonTriggered(
 }
 
 fn clear() void {
-    cart.neopixels.* =  .{
+    cart.neopixels.* = .{
         .{ .r = 0, .g = 0, .b = 0 },
         .{ .r = 0, .g = 0, .b = 0 },
         .{ .r = 0, .g = 0, .b = 0 },
@@ -82,7 +86,6 @@ export fn start() void {
 }
 
 export fn update() void {
-
     if (isButtonTriggered(.up, &global.up_pressed)) {
         if (global.bright == 0) {
             global.bright += 1;
@@ -100,11 +103,18 @@ export fn update() void {
     }
 }
 
-pub fn on()  cart.NeopixelColor { return .{ .r = 0, .g = global.bright, .b = 0 }; }
-pub fn off() cart.NeopixelColor { return .{ .r = 0, .g =             0, .b = 0 }; }
-pub fn on_select()  cart.NeopixelColor { return .{ .r = 0, .g = global.bright, .b = global.bright/2 }; }
-pub fn off_select() cart.NeopixelColor { return .{ .r = 0, .g =             0, .b = global.bright/2 }; }
-
+pub fn on() cart.NeopixelColor {
+    return .{ .r = 0, .g = global.bright, .b = 0 };
+}
+pub fn off() cart.NeopixelColor {
+    return .{ .r = 0, .g = 0, .b = 0 };
+}
+pub fn on_select() cart.NeopixelColor {
+    return .{ .r = 0, .g = global.bright, .b = global.bright / 2 };
+}
+pub fn off_select() cart.NeopixelColor {
+    return .{ .r = 0, .g = 0, .b = global.bright / 2 };
+}
 
 fn newGame(seed: u32) void {
     clear();
@@ -121,8 +131,8 @@ fn newGame(seed: u32) void {
         },
     };
 
-    var rand = std.rand.DefaultPrng.init(seed);
-    for (0 .. 100) |_| {
+    var rand = std.Random.DefaultPrng.init(seed);
+    for (0..100) |_| {
         var buf: [1]u8 = undefined;
         rand.fill(&buf);
         rotate(&global.mode.play.grid, @intCast(buf[0] % 5));
@@ -141,11 +151,10 @@ fn updateStartMenu(start_menu: *StartMenu) void {
 }
 
 fn updatePlayMode(play: *Play) void {
-
     if (isButtonTriggered(.a, &play.a_pressed)) {
         rotate(&play.grid, play.pos);
     } else if (isButtonTriggered(.b, &play.b_pressed)) {
-        for (0 .. 3) |_| {
+        for (0..3) |_| {
             rotate(&play.grid, play.pos);
         }
     } else if (isButtonTriggered(.right, &play.right_pressed)) {
@@ -158,7 +167,7 @@ fn updatePlayMode(play: *Play) void {
     }
 
     var win = true;
-    for (0 .. 5) |i| {
+    for (0..5) |i| {
         if (!play.grid[i][1]) {
             win = false;
             break;
@@ -171,7 +180,7 @@ fn updatePlayMode(play: *Play) void {
         return;
     }
 
-    for (0 .. 5) |i| {
+    for (0..5) |i| {
         if (play.pos == i or i == ((play.pos + 1) % 5)) {
             cart.neopixels[i] = if (play.grid[i][1]) on_select() else off_select();
         } else {
@@ -194,7 +203,7 @@ fn updateWinMode(win: *Win) void {
 
 fn rotate(grid: *[5][2]bool, pos: u3) void {
     const t = grid[pos][0];
-    const pos2 =  (pos + 1) % 5;
+    const pos2 = (pos + 1) % 5;
     grid[pos][0] = grid[pos][1];
     grid[pos][1] = grid[pos2][1];
     grid[pos2][1] = grid[pos2][0];

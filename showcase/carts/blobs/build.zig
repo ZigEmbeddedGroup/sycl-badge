@@ -14,6 +14,7 @@ pub fn build(b: *std.Build) void {
         .name = "blobs",
         .optimize = optimize,
         .root_source_file = b.path("src/blobs.zig"),
-    });
+    }) orelse return;
+
     cart.install(b);
 }

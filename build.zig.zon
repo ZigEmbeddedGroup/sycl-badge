@@ -19,8 +19,9 @@
             .hash = "zigimg-0.1.0-8_eo2lrXEgBlEihqJdiw_ZtxgL-vO72ajJpmOdO59qxp",
         },
         .microzig = .{
-            .url = "git+https://github.com/zigEmbeddedGroup/microzig#ec738a03fe0000c9cba1e3633aac5e2fc8024875",
-            .hash = "microzig-0.14.2-D20YSac--gD-H2ujNAL4m5IvkYOWYlgO7SlU1j8fJbeX",
+            //.url = "git+https://github.com/zigEmbeddedGroup/microzig#ec738a03fe0000c9cba1e3633aac5e2fc8024875",
+            //.hash = "microzig-0.14.2-D20YSac--gD-H2ujNAL4m5IvkYOWYlgO7SlU1j8fJbeX",
+            .path = "../microzig",
         },
         .ws = .{
             .url = "git+https://github.com/karlseguin/websocket.zig#7240830dc8d1ab426d408cb76144794169943aa9",

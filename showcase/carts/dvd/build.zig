@@ -15,7 +15,7 @@ pub fn build(b: *Build) void {
         .name = "dvd",
         .optimize = optimize,
         .root_source_file = b.path("src/main.zig"),
-    });
+    }) orelse return;
     add_dvd_assets_step(b, sycl_badge_dep, cart);
     cart.install(b);
 }
@@ -29,7 +29,7 @@ fn add_dvd_assets_step(
     const convert = b.addExecutable(.{
         .name = "convert_gfx",
         .root_source_file = b.path("build/convert_gfx.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = cart.options.optimize,
         .link_libc = true,
     });
@@ -46,6 +46,14 @@ fn add_dvd_assets_step(
     const gfx_mod = b.addModule("gfx", .{
         .root_source_file = gfx_zig,
         .optimize = cart.options.optimize,
+        .imports = &.{
+            .{
+                .name = "packed_int_array",
+                .module = b.createModule(.{
+                    .root_source_file = b.path("src/packed_int_array.zig"),
+                }),
+            },
+        },
     });
     gfx_mod.addImport("cart-api", sycl_badge_dep.module("cart-api"));
 

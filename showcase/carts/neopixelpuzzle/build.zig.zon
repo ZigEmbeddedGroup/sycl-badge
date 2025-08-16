@@ -1,5 +1,6 @@
 .{
-    .name = "neopixelpuzzle",
+    .name = .neopixelpuzzle,
+    .fingerprint = 0x35d3ece4036abc,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{ .path = "../../.." },

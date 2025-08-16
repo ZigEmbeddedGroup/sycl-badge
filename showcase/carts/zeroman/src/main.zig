@@ -36,7 +36,7 @@ const text_w = screen_width / 8;
 const text_h = screen_height / 8;
 var text_buffer: [text_w * text_h]u8 = undefined;
 
-var prng = std.rand.DefaultPrng.init(0);
+var prng = std.Random.DefaultPrng.init(0);
 const rng = prng.random();
 
 const GameState = enum {

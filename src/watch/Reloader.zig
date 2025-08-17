@@ -12,7 +12,7 @@ const Watcher = switch (builtin.target.os.tag) {
 };
 
 gpa: std.mem.Allocator,
-//ws_server: ws.Server(WsHandler),
+ws_server: ws.Server,
 zig_exe: []const u8,
 watcher: Watcher,
 output_dir_index: usize,
@@ -25,12 +25,12 @@ pub fn init(
     zig_exe: []const u8,
     dirs_to_watch: []const []const u8,
 ) !Reloader {
-    //const ws_server = try ws.Server.init(gpa, .{});
+    const ws_server = try ws.Server.init(gpa, .{});
 
     return .{
         .gpa = gpa,
         .zig_exe = zig_exe,
-        // .ws_server = ws_server,
+        .ws_server = ws_server,
         .watcher = try Watcher.init(gpa, dirs_to_watch),
         .output_dir_index = dirs_to_watch.len - 1,
     };
@@ -121,10 +121,7 @@ pub fn onChange(reloader: *Reloader, dir_that_changed: usize) void {
     }
 }
 
-const WsHandler = struct {};
-
 pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
-    _ = reloader;
     var buf =
         ("HTTP/1.1 101 Switching Protocols\r\n" ++
             "Access-Control-Allow-Origin: *\r\n" ++
@@ -137,13 +134,12 @@ pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
 
     stream.writeAll(&buf) catch @panic("bad");
 
-    // var conn = reloader.ws_server.newConn(stream);
-    // const conn = reloader.gpa.create(ws.Conn) catch @panic("bad");
-    // conn.* = reloader.ws_server.newConn(stream);
+    const conn = reloader.gpa.create(ws.Conn) catch @panic("bad");
+    conn.* = reloader.ws_server.newConn(stream);
 
-    // var context: Handler.Context = .{ .watcher = reloader };
-    // var handler = Handler.init(undefined, conn, &context) catch @panic("bad");
-    // reloader.ws_server.handle(Handler, &handler, conn);
+    var context: Handler.Context = .{ .watcher = reloader };
+    var handler = Handler.init(undefined, conn, &context) catch @panic("bad");
+    reloader.ws_server.handle(Handler, &handler, conn);
 }
 
 const Handler = struct {

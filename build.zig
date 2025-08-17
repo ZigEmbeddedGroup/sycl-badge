@@ -138,8 +138,8 @@ pub const Cart = struct {
             watch_run.addArgs(&.{"--input-dir"});
             watch_run.addFileArg(c.options.root_source_file.dirname());
         }
-        watch_run.addArgs(&.{ "--cart", b.getInstallPath(install_artifact_step.dest_dir.?, install_artifact_step.dest_sub_path) });
 
+        watch_run.addArgs(&.{ "--cart", b.getInstallPath(install_artifact_step.dest_dir.?, install_artifact_step.dest_sub_path) });
         return watch_run;
     }
 };
@@ -183,22 +183,18 @@ pub fn add_cart(
         .target = wasm_target,
         .optimize = options.optimize,
     });
-
     wasm.entry = .disabled;
     wasm.import_memory = true;
     wasm.initial_memory = 64 * 65536;
     wasm.max_memory = 64 * 65536;
     wasm.stack_size = 14752;
     wasm.global_base = 160 * 128 * 2 + 0x1e;
-
     wasm.rdynamic = true;
     wasm.root_module.addImport("cart-api", d.module("cart-api"));
 
     const microzig_dep = d.builder.dependency("microzig", .{});
     const mb = MicroBuild.init(d.builder, microzig_dep) orelse return null;
-
     const sycl_badge_target = sycl_badge_microzig_target(mb);
-
     const cart_lib = b.addStaticLibrary(.{
         .name = "cart",
         .root_source_file = options.root_source_file,
@@ -232,6 +228,7 @@ pub fn add_cart(
         .cart_lib = cart_lib,
         .options = options,
     };
+
     return cart;
 }
 

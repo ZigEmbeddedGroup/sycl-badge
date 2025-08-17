@@ -237,7 +237,7 @@ fn serve(s: *Server, cart_path: []const u8, listen_port: u16) !void {
     const server_port = tcp_server.listen_address.in.getPort();
     std.debug.assert(server_port == listen_port);
 
-    std.debug.print("\x1b[2K\rSimulator live! Go to https://badgesim.microzig.tech/ to test your cartridge.\n", .{});
+    std.debug.print("\x1b[2K\rSimulator live! Go to https://zigembeddedgroup.github.io/sycl-badge/ to test your cartridge.\n", .{});
 
     var buffer: [1024]u8 = undefined;
     accept: while (true) {

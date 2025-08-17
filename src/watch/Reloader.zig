@@ -12,7 +12,7 @@ const Watcher = switch (builtin.target.os.tag) {
 };
 
 gpa: std.mem.Allocator,
-ws_server: ws.Server,
+ws_server: ws.Server(Handler),
 zig_exe: []const u8,
 watcher: Watcher,
 output_dir_index: usize,
@@ -25,7 +25,7 @@ pub fn init(
     zig_exe: []const u8,
     dirs_to_watch: []const []const u8,
 ) !Reloader {
-    const ws_server = try ws.Server.init(gpa, .{});
+    const ws_server = try ws.Server(Handler).init(gpa, .{});
 
     return .{
         .gpa = gpa,
@@ -122,9 +122,10 @@ pub fn onChange(reloader: *Reloader, dir_that_changed: usize) void {
 }
 
 pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
+    log.debug("handleWs()", .{});
     var buf =
         ("HTTP/1.1 101 Switching Protocols\r\n" ++
-            "Access-Control-Allow-Origin: *\r\n" ++
+            "Access-Control-Allow-Origin: https://zigembeddedgroup.github.io\r\n" ++
             "Upgrade: websocket\r\n" ++
             "Connection: upgrade\r\n" ++
             "Sec-Websocket-Accept: 0000000000000000000000000000\r\n\r\n").*;
@@ -134,12 +135,7 @@ pub fn handleWs(reloader: *Reloader, stream: std.net.Stream, h: [20]u8) void {
 
     stream.writeAll(&buf) catch @panic("bad");
 
-    const conn = reloader.gpa.create(ws.Conn) catch @panic("bad");
-    conn.* = reloader.ws_server.newConn(stream);
-
-    var context: Handler.Context = .{ .watcher = reloader };
-    var handler = Handler.init(undefined, conn, &context) catch @panic("bad");
-    reloader.ws_server.handle(Handler, &handler, conn);
+    _ = reloader;
 }
 
 const Handler = struct {
@@ -151,6 +147,7 @@ const Handler = struct {
     };
 
     pub fn init(h: ws.Handshake, conn: *ws.Conn, context: *Context) !Handler {
+        log.debug("Handler.init()", .{});
         _ = h;
 
         const watcher = context.watcher;
@@ -165,6 +162,7 @@ const Handler = struct {
     }
 
     pub fn handle(handler: *Handler, message: ws.Message) !void {
+        log.debug("Handler.handle()", .{});
         _ = handler;
         _ = message;
     }

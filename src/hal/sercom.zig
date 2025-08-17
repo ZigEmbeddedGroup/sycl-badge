@@ -92,7 +92,7 @@ pub const spi = struct {
             baud_freq_hz: u32,
         };
 
-        const SPIM = for (@typeInfo(SERCOM).Union.fields) |field| {
+        const SPIM = for (@typeInfo(SERCOM).@"union".fields) |field| {
             if (std.mem.eql(u8, field.name, "SPIM"))
                 break field.type;
         } else @compileError("no SPIM field");

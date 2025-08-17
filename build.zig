@@ -12,9 +12,6 @@ pub fn build(b: *Build) void {
 
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
-    _ = mb;
-
-    // TODO: derive target here
 
     const ws_dep = b.dependency("ws", .{});
     const mime_dep = b.dependency("mime", .{});
@@ -51,59 +48,53 @@ pub fn build(b: *Build) void {
     const watch_step = b.step("feature-test", "");
     watch_step.dependOn(&watch_run_step.step);
 
-    // inline for (.{
-    //     "blinky",
-    //     //"blinky_timer",
-    //     //"usb_cdc",
-    //     //"usb_storage",
-    //     "buttons",
-    //     "lcd",
-    //     "spi",
-    //     "audio",
-    //     "light_sensor",
-    //     //"qspi",
-    //     //"qa",
-    //     //"clocks",
-    // }) |name| {
-    //     const mvp = mz.add_firmware(b, .{
-    //         .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
-    //         .optimize = optimize,
-    //         .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
-    //         .target = sycl_badge_microzig_target(&dep),
-    //     });
-    //     mz.install_firmware(b, mvp, .{ .format = .elf });
-    //     mz.install_firmware(b, mvp, .{ .format = .{ .uf2 = .SAMD51 } });
-    // }
-    //
-    // inline for (.{
-    //     "neopixels",
-    //     "song",
-    // }) |name| {
-    //     const mvp = add_cart(&dep, b, .{
-    //         .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
-    //         .optimize = optimize,
-    //         .root_source_file = .{ .path = std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name}) },
-    //     });
-    //     mvp.install(b);
-    // }
+    inline for (.{
+        "blinky",
+        //"blinky_timer",
+        //"usb_cdc",
+        //"usb_storage",
+        "buttons",
+        "lcd",
+        "spi",
+        "audio",
+        "light_sensor",
+        //"qspi",
+        //"qa",
+        //"clocks",
+    }) |name| {
+        const mvp = mb.add_firmware(.{
+            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+            .optimize = optimize,
+            .root_source_file = b.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+            .target = sycl_badge_microzig_target(mb),
+        });
+        mb.install_firmware(mvp, .{ .format = .elf });
+        mb.install_firmware(mvp, .{ .format = .{ .uf2 = .SAMD51 } });
+    }
 
-    // const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
-    // font_export_step.makeFn = struct {
-    //     fn make(_: *std.Build.Step, _: *std.Progress.Node) anyerror!void {
-    //         const font = @import("src/font.zig").font;
-    //         var file = try std.fs.cwd().createFile("simulator/src/font.ts", .{});
-    //         try file.writer().writeAll("export const FONT = Uint8Array.of(\n");
-    //         for (font) |char| {
-    //             try file.writer().writeAll("   ");
-    //             for (char) |byte| {
-    //                 try file.writer().print(" 0x{X:0>2},", .{byte});
-    //             }
-    //             try file.writer().writeByte('\n');
-    //         }
-    //         try file.writer().writeAll(");\n");
-    //         file.close();
-    //     }
-    // }.make;
+    inline for (.{
+        "neopixels",
+        "song",
+    }) |name| {
+        const mvp = add_cart(&dep, b, .{
+            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+            .optimize = optimize,
+            .root_source_file = b.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+        }) orelse return;
+        mvp.install(b);
+    }
+
+    const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
+    const font_export_exe = b.addExecutable(.{
+        .name = "font_export_exe",
+        .target = b.graph.host,
+        .root_source_file = b.path("src/generate_font_ts.zig"),
+    });
+
+    const font_export_run = b.addRunArtifact(font_export_exe);
+    font_export_run.has_side_effects = true;
+
+    font_export_step.dependOn(&font_export_run.step);
 }
 
 pub const CartWatcherOptions = struct {
@@ -168,6 +159,7 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
         },
         .linker_script = .{
             .file = mb.builder.path("src/badge/samd51j19a_self.ld"),
+            .generate = .none,
         },
         .hal = .{
             .root_source_file = mb.builder.path("src/hal.zig"),

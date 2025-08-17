@@ -23,7 +23,8 @@ pub fn init(gpa: std.mem.Allocator, paths: []const []const u8) error{ InvalidHan
         const handle = FindFirstChangeNotificationA(
             @ptrCast(path_buf.items),
             windows.TRUE,
-            windows.FILE_NOTIFY_CHANGE_LAST_WRITE | windows.FILE_NOTIFY_CHANGE_FILE_NAME | windows.FILE_NOTIFY_CHANGE_DIR_NAME,
+            //windows.FILE_NOTIFY_CHANGE_LAST_WRITE |
+            windows.FILE_NOTIFY_CHANGE_FILE_NAME | windows.FILE_NOTIFY_CHANGE_DIR_NAME,
         );
         if (handle == std.os.windows.INVALID_HANDLE_VALUE) return error.InvalidHandle;
         watcher.handles.appendAssumeCapacity(handle);

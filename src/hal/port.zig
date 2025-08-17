@@ -3,7 +3,7 @@ const microzig = @import("microzig");
 const io_types = microzig.chip.types;
 const PORT = microzig.chip.peripherals.PORT;
 
-pub const PinCfg = @typeInfo(std.meta.FieldType(io_types.peripherals.PORT.GROUP, .PINCFG)).Array.child;
+pub const PinCfg = @typeInfo(@FieldType(io_types.peripherals.PORT.GROUP, "PINCFG")).array.child;
 pub const Mux = enum(u4) { A, B, C, D, E, F, G, H, I, J, K, L, M, N };
 pub const Pin = packed struct(u6) {
     num: u5,
@@ -16,12 +16,8 @@ pub const Pin = packed struct(u6) {
     pub inline fn set_mux(p: Pin, mux: Mux) void {
         const pmux = &p.group.ptr().PMUX[p.num / 2];
         switch (@as(u1, @truncate(p.num))) {
-            0 => pmux.modify(.{ .PMUXE = .{
-                .value = @as(io_types.peripherals.PORT.PORT_PMUX__PMUXE, @enumFromInt(@intFromEnum(mux))),
-            } }),
-            1 => pmux.modify(.{ .PMUXO = .{
-                .value = @as(io_types.peripherals.PORT.PORT_PMUX__PMUXO, @enumFromInt(@intFromEnum(mux))),
-            } }),
+            0 => pmux.modify(.{ .PMUXE = @intFromEnum(mux) }),
+            1 => pmux.modify(.{ .PMUXO = @intFromEnum(mux) }),
         }
 
         p.config_ptr().modify(.{ .PMUXEN = 1 });

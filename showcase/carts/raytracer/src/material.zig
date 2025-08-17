@@ -10,7 +10,7 @@ pub const Material = struct {
     ptr: *anyopaque,
     vtable: VTable,
     const VTable = struct {
-        scatter: *const fn (ctx: *anyopaque, random_engine: std.rand.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, scattered: *Ray) bool,
+        scatter: *const fn (ctx: *anyopaque, random_engine: std.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, scattered: *Ray) bool,
     };
 };
 
@@ -23,7 +23,7 @@ pub const LambertianMaterial = struct {
         };
     }
 
-    pub fn scatter(ctx: *anyopaque, random_engine: std.rand.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, ray_out: *Ray) bool {
+    pub fn scatter(ctx: *anyopaque, random_engine: std.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, ray_out: *Ray) bool {
         _ = ray_in;
 
         const self: *LambertianMaterial = @ptrCast(@alignCast(ctx));
@@ -60,7 +60,7 @@ pub const MetalMaterial = struct {
         };
     }
 
-    pub fn scatter(ctx: *anyopaque, random_engine: std.rand.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, ray_out: *Ray) bool {
+    pub fn scatter(ctx: *anyopaque, random_engine: std.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, ray_out: *Ray) bool {
         const self: *MetalMaterial = @ptrCast(@alignCast(ctx));
 
         var reflected = ray_in.direction.unit_vector().reflect(record.normal);
@@ -94,7 +94,7 @@ pub const DialectricMaterial = struct {
         return DialectricMaterial{ .ir = refraction };
     }
 
-    pub fn scatter(ctx: *anyopaque, random_engine: std.rand.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, scattered: *Ray) bool {
+    pub fn scatter(ctx: *anyopaque, random_engine: std.Random, ray_in: Ray, record: HitRecord, attenuation: *Color3, scattered: *Ray) bool {
         const self: *DialectricMaterial = @ptrCast(@alignCast(ctx));
 
         attenuation.* = Color3.init(1.0, 1.0, 1.0);

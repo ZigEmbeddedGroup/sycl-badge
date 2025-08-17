@@ -1,5 +1,6 @@
 .{
-    .name = "sycl-badge/showcase",
+    .name = .sycl_badge_showcase,
+    .fingerprint = 0x53249986100ad559,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{

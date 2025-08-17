@@ -32,8 +32,8 @@ pixel_delta_v: Vec3,
 camera_center: Vec3,
 samples: usize,
 max_children: usize,
-rand_engine: std.rand.DefaultPrng,
-random: std.rand.Random,
+rand_engine: std.Random.DefaultPrng,
+random: std.Random,
 u: Vec3,
 v: Vec3,
 w: Vec3,
@@ -54,7 +54,7 @@ pub fn init(self: *Camera, position: Vec3) void {
     self.pixel_delta_u = viewport_u.div_scalar(@floatFromInt(image_width));
     self.pixel_delta_v = viewport_v.div_scalar(@floatFromInt(image_height));
 
-    self.rand_engine = std.rand.DefaultPrng.init(0);
+    self.rand_engine = std.Random.DefaultPrng.init(0);
     self.random = self.rand_engine.random();
     self.samples = 25;
     self.max_children = 7;

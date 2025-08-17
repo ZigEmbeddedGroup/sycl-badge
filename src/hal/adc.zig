@@ -28,7 +28,7 @@ pub const Adc = enum(u1) {
         adc.reset();
 
         regs.CTRLA.modify(.{
-            .PRESCALER = .{ .value = div },
+            .PRESCALER = div,
         });
         adc.calibrate();
 
@@ -92,11 +92,11 @@ pub const Adc = enum(u1) {
             .SWRST = 1,
             .ENABLE = 0,
             .reserved3 = 0,
-            .DUALSEL = .{ .raw = 0 },
+            .DUALSEL = @enumFromInt(0),
             .SLAVEEN = 0,
             .RUNSTDBY = 0,
             .ONDEMAND = 0,
-            .PRESCALER = .{ .raw = 0 },
+            .PRESCALER = @enumFromInt(0),
             .reserved15 = 0,
             .R2R = 0,
         });
@@ -135,10 +135,10 @@ pub const Adc = enum(u1) {
     ) void {
         const regs = adc.get_regs();
         regs.INPUTCTRL.write(.{
-            .MUXPOS = .{ .value = pos },
+            .MUXPOS = pos,
             .reserved7 = 0,
             .DIFFMODE = @intFromEnum(diff_mode),
-            .MUXNEG = .{ .value = neg },
+            .MUXNEG = neg,
             .reserved15 = 0,
             .DSEQSTOP = @intFromEnum(seq_stop),
         });

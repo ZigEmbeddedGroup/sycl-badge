@@ -48,8 +48,8 @@ pub fn Group(comptime count: u16) type {
         }
 
         pub fn write_buf(neopixels: Self, buf: []const u8) void {
-            microzig.cpu.disable_interrupts();
-            defer microzig.cpu.enable_interrupts();
+            microzig.cpu.interrupt.disable_interrupts();
+            defer microzig.cpu.interrupt.enable_interrupts();
 
             const OUTCLR = &neopixels.pin.group.ptr().OUTCLR;
             const pin_mask = @as(u32, 1) << neopixels.pin.num;

@@ -2,3 +2,7 @@ zig-cache/
 zig-out/
 .DS_Store
 .gdbinit
+
+kicad/#auto_saved_files#
+kicad/~SYCL Badge 2024.kicad_pcb.lck
+kicad/~SYCL Badge 2024.kicad_sch.lck

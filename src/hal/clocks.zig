@@ -114,8 +114,8 @@ pub const Frequencies = struct {
 
                 ret.EVSYS = .{0} ** 12;
 
-                inline for (@typeInfo(Peripherals).Struct.fields) |field| {
-                    if (@typeInfo(field.type) != .Int)
+                inline for (@typeInfo(Peripherals).@"struct".fields) |field| {
+                    if (@typeInfo(field.type) != .int)
                         break;
 
                     @field(ret, field.name) = get_peripheral_clock_freq_hz(@field(gclk.PeripheralIndex, "GCLK_" ++ field.name));
@@ -305,7 +305,7 @@ pub const State = struct {
                 .XOSC1 => @panic("TODO"),
                 _ => unreachable,
             } * (pll.ratio + 1
-            //+ (pll.frac / 32)
+                //+ (pll.frac / 32)
             );
         }
     };
@@ -366,7 +366,7 @@ pub fn get_peripheral(index: u32) State.Peripheral {
     return State.Peripheral{
         .channel_enable = ctrl.CHEN == 1,
         .write_locked = ctrl.WRTLOCK == 1,
-        .generator = ctrl.GEN.value,
+        .generator = ctrl.GEN,
     };
 }
 
@@ -406,16 +406,16 @@ fn get_phase_locked_loop(index: u1) State.PhaseLockedLoop {
         .frac = ratio.LDRFRAC,
         .ratio = ratio.LDR,
         .div = ctrl_b.DIV,
-        .ref_clk = ctrl_b.REFCLK.value,
+        .ref_clk = ctrl_b.REFCLK,
     };
 }
 fn get_generator(index: u32) State.Generator {
     const ctrl = gclk.GCLK.GENCTRL[index].read();
     return State.Generator{
         .enabled = (ctrl.GENEN == 1),
-        .source = ctrl.SRC.value,
+        .source = ctrl.SRC,
         .div = ctrl.DIV,
-        .div_selection = ctrl.DIVSEL.value,
+        .div_selection = ctrl.DIVSEL,
         .output_enable = (ctrl.OE == 1),
         .output_off_value = @enumFromInt(ctrl.OOV),
         .improve_duty_cycle = @enumFromInt(ctrl.IDC),
@@ -448,7 +448,7 @@ pub fn get_state() State {
             .rtc = blk: {
                 const ctrl = OSC32KCTRL.RTCCTRL.read();
                 break :blk .{
-                    .clock_selection = ctrl.RTCSEL.value,
+                    .clock_selection = ctrl.RTCSEL,
                 };
             },
             .xosc32k = blk: {
@@ -479,10 +479,10 @@ pub fn get_state() State {
             },
             .peripherals = blk: {
                 var ret: State.Peripherals = undefined;
-                inline for (@typeInfo(State.Peripherals).Struct.fields, 0..) |field, i| {
-                    if (@typeInfo(field.type) == .Union)
+                inline for (@typeInfo(State.Peripherals).@"struct".fields, 0..) |field, i| {
+                    if (@typeInfo(field.type) == .@"union")
                         ret.slow = .{ .OSCCTRL_FDPLL0_32K = get_peripheral(i) }
-                    else if (@typeInfo(field.type) == .Array) {
+                    else if (@typeInfo(field.type) == .array) {
                         for (0..12) |j| {
                             ret.EVSYS[j] = get_peripheral(i + j);
                         }
@@ -517,12 +517,12 @@ pub fn enable_dpll(index: u1, gen: gclk.Generator, comptime opts: EnableDpllOpti
 
     gclk.set_peripheral_clk_gen(periph_index, gen);
     OSCCTRL.DPLL[index].DPLLCTRLB.write(.{
-        .FILTER = .{ .value = .FILTER1 },
+        .FILTER = .FILTER1,
         .WUF = 0,
-        .REFCLK = .{ .value = .GCLK },
-        .LTIME = .{ .value = .DEFAULT },
+        .REFCLK = .GCLK,
+        .LTIME = .DEFAULT,
         .LBYPASS = 0,
-        .DCOFILTER = .{ .raw = 0 },
+        .DCOFILTER = @enumFromInt(0),
         .DCOEN = 0,
         .DIV = 0,
         .padding = 0,

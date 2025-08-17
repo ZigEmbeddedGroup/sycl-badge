@@ -19,9 +19,9 @@ pub fn init() void {
         .BAUD = 2,
     });
     QSPI.CTRLB.modify(.{
-        .MODE = .{ .value = .MEMORY },
-        .DATALEN = .{ .value = .@"8BITS" },
-        .CSMODE = .{ .value = .LASTXFER },
+        .MODE = .MEMORY,
+        .DATALEN = .@"8BITS",
+        .CSMODE = .LASTXFER,
     });
 
     for (microzig.board.qspi) |qspi_pin|

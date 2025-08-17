@@ -1,5 +1,6 @@
 .{
-    .name = "sycl-badge",
+    .name = .sycl_badge,
+    .fingerprint = 0x758ca7888c865412,
     .version = "0.0.0",
     .paths = .{
         "README.md",
@@ -9,26 +10,21 @@
     },
 
     .dependencies = .{
-        //.showcase = .{ .path = "showcase" },
-        .@"microzig/build" = .{
-            .url = "https://downloads.microzig.tech/microzig-0.12.1/build-0.0.1.tar.gz",
-            .hash = "122066a2dd8e6cfef346bc5cd6de8294fe9d53bde59b65b042750ee25537438df2ad",
-        },
-        .@"microzig/bsp/microchip/atsam" = .{
-            .url = "https://downloads.microzig.tech/microzig-0.12.1/bsp/microchip/atsam-0.0.0.tar.gz",
-            .hash = "122037355c936100684b565d20b32157a067230f7d586874ae291c8ba817e08e8ee1",
-        },
         .mime = .{
-            .url = "git+https://github.com/andrewrk/mime.git#bf80e2e8b1d9413ddf9abe7d94537388b54c83ab",
-            .hash = "122074ce2f776dc9dc4a0d2588a5d76b97212a2c311ef8125d4aadffa4b84e5b8b3e",
-        },
-        .ws = .{
-            .url = "git+https://github.com/karlseguin/websocket.zig.git#c77f87d0e6548865636eb9781106a8be72e5755a",
-            .hash = "12208720b772330f309cfb48957f4152ee0930b716837d0c1d07fee2dea2f4dc712e",
+            .url = "git+https://github.com/andrewrk/mime.git#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
+            .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
         },
         .zigimg = .{
-            .url = "https://github.com/zigimg/zigimg/archive/637974e2d31dcdbc33f1e9cc8ffb2e46abd2e215.tar.gz",
-            .hash = "122012026c3a65ff1d4acba3b3fe80785f7cee9c6b4cdaff7ed0fbf23b0a6c803989",
+            .url = "git+https://github.com/zigimg/zigimg#b1c5beea3b200a949fe7edf15ba8317cb9253efe",
+            .hash = "zigimg-0.1.0-8_eo2lrXEgBlEihqJdiw_ZtxgL-vO72ajJpmOdO59qxp",
+        },
+        .microzig = .{
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#cbbe44943a1f877329214c5697b482d9f3c3b57a",
+            .hash = "microzig-0.14.2-D20YScPb-gAGfmER_MCmiyaGjAdhSL-zll6VWvUm_Vz8",
+        },
+        .ws = .{
+            .url = "git+https://github.com/karlseguin/websocket.zig#7240830dc8d1ab426d408cb76144794169943aa9",
+            .hash = "websocket-0.1.0-ZPISdRJ0AwBHOWGe9mnKAUU2hXEXhfdbsW3smK4zpY97",
         },
     },
 }

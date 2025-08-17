@@ -14,6 +14,6 @@ pub fn build(b: *std.Build) void {
         .name = "space-shooter",
         .optimize = optimize,
         .root_source_file = b.path("src/main.zig"),
-    });
+    }) orelse return;
     cart.install(b);
 }

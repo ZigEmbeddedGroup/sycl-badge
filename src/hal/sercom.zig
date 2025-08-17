@@ -92,7 +92,7 @@ pub const spi = struct {
             baud_freq_hz: u32,
         };
 
-        const SPIM = for (@typeInfo(SERCOM).Union.fields) |field| {
+        const SPIM = for (@typeInfo(SERCOM).@"union".fields) |field| {
             if (std.mem.eql(u8, field.name, "SPIM"))
                 break field.type;
         } else @compileError("no SPIM field");
@@ -111,19 +111,19 @@ pub const spi = struct {
 
             const regs = master.get_regs();
             regs.CTRLA.modify(.{
-                .MODE = .{ .value = .SPI_MASTER },
-                .FORM = .{ .value = .SPI_FRAME },
-                .CPOL = .{ .value = opts.cpol },
-                .CPHA = .{ .value = opts.cpha },
+                .MODE = .SPI_MASTER,
+                .FORM = .SPI_FRAME,
+                .CPOL = opts.cpol,
+                .CPHA = opts.cpha,
                 // TODO: allow for reception
-                .DIPO = .{ .value = .PAD0 },
-                .DOPO = .{ .value = opts.dopo },
-                .DORD = .{ .value = opts.dord },
+                .DIPO = .PAD0,
+                .DOPO = opts.dopo,
+                .DORD = opts.dord,
             });
 
             // CTRLB only needs syncronization if the module is enabled.
             regs.CTRLB.modify(.{
-                .CHSIZE = .{ .value = .@"8_BIT" },
+                .CHSIZE = .@"8_BIT",
                 .MSSEN = 0,
                 // TODO: configure RX
                 .RXEN = 0,

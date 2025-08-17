@@ -1,5 +1,6 @@
 .{
-    .name = "space-shooter",
+    .name = .space_shooter,
+    .fingerprint = 0xa9010b00fa41ea0c,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{ .path = "../../../" },

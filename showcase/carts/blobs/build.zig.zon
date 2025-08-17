@@ -1,5 +1,6 @@
 .{
-    .name = "blobs",
+    .name = .blobs,
+    .fingerprint = 0x896c3e35bdfecc34,
     .version = "0.0.0",
     .dependencies = .{
         .sycl_badge = .{ .path = "../../.." },

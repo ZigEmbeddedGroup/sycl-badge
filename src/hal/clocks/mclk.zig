@@ -11,6 +11,7 @@ pub const BusClockEnable = enum(u1) {
 };
 
 pub const ApbMask = packed struct {
+    HMATRIX: BusClockEnable = .enabled,
     // A
     PAC: BusClockEnable = .enabled,
     PM: BusClockEnable = .enabled,
@@ -73,10 +74,13 @@ pub const AhbMask = packed struct {
     HPB2: BusClockEnable = .enabled,
     HPB3: BusClockEnable = .enabled,
     DSU: BusClockEnable = .enabled,
+    HMATRIX: BusClockEnable = .enabled,
     NVMCTRL: BusClockEnable = .enabled,
+    HSRAM: BusClockEnable = .enabled,
     CMCC: BusClockEnable = .enabled,
     DMAC: BusClockEnable = .enabled,
     USB: BusClockEnable = .enabled,
+    BKUPRAM: BusClockEnable = .enabled,
     PAC: BusClockEnable = .enabled,
     QSPI: BusClockEnable = .enabled,
     SDHC0: BusClockEnable = .enabled,
@@ -88,11 +92,11 @@ pub const AhbMask = packed struct {
 };
 
 pub fn get_cpu_div() CpuDiv {
-    return MCLK.CPUDIV.read().DIV.value;
+    return MCLK.CPUDIV.read().DIV;
 }
 
 pub fn get_hs_div() HsDiv {
-    return MCLK.HSDIV.read().DIV.value;
+    return MCLK.HSDIV.read().DIV;
 }
 
 pub fn get_apb_mask() ApbMask {
@@ -180,6 +184,7 @@ pub fn set_apb_mask(mask: ApbMask) void {
     MCLK.APBBMASK.write(.{
         .USB_ = @intFromEnum(mask.USB),
         .DSU_ = @intFromEnum(mask.DSU),
+        .HMATRIX_ = @intFromEnum(mask.HMATRIX),
         .NVMCTRL_ = @intFromEnum(mask.NVMCTRL),
         .PORT_ = @intFromEnum(mask.PORT),
         .EVSYS_ = @intFromEnum(mask.EVSYS),
@@ -190,11 +195,6 @@ pub fn set_apb_mask(mask: ApbMask) void {
         .TC2_ = @intFromEnum(mask.TC2),
         .TC3_ = @intFromEnum(mask.TC3),
         .RAMECC_ = @intFromEnum(mask.RAMECC),
-        .reserved4 = 0,
-        .reserved7 = 0,
-        .reserved9 = 0,
-        .reserved16 = 0,
-        .padding = 0,
     });
 
     MCLK.APBCMASK.write(.{
@@ -209,10 +209,6 @@ pub fn set_apb_mask(mask: ApbMask) void {
         .ICM_ = @intFromEnum(mask.ICM),
         .QSPI_ = @intFromEnum(mask.QSPI),
         .CCL_ = @intFromEnum(mask.CCL),
-
-        .reserved3 = 0,
-        .reserved13 = 0,
-        .padding = 0,
     });
 
     MCLK.APBDMASK.write(.{
@@ -224,10 +220,6 @@ pub fn set_apb_mask(mask: ApbMask) void {
         .DAC_ = @intFromEnum(mask.DAC),
         .I2S_ = @intFromEnum(mask.I2S),
         .PCC_ = @intFromEnum(mask.PCC),
-
-        .reserved4 = 0,
-        .reserved7 = 0,
-        .padding = 0,
     });
 }
 
@@ -261,10 +253,13 @@ pub fn set_ahb_mask(mask: AhbMask) void {
         .HPB2_ = @intFromEnum(mask.HPB2),
         .HPB3_ = @intFromEnum(mask.HPB3),
         .DSU_ = @intFromEnum(mask.DSU),
+        .HMATRIX_ = @intFromEnum(mask.HMATRIX),
         .NVMCTRL_ = @intFromEnum(mask.NVMCTRL),
+        .HSRAM_ = @intFromEnum(mask.HSRAM),
         .CMCC_ = @intFromEnum(mask.CMCC),
         .DMAC_ = @intFromEnum(mask.DMAC),
         .USB_ = @intFromEnum(mask.USB),
+        .BKUPRAM_ = @intFromEnum(mask.BKUPRAM),
         .PAC_ = @intFromEnum(mask.PAC),
         .QSPI_ = @intFromEnum(mask.QSPI),
         .SDHC0_ = @intFromEnum(mask.SDHC0),
@@ -275,11 +270,7 @@ pub fn set_ahb_mask(mask: AhbMask) void {
         .NVMCTRL_CACHE_ = @intFromEnum(mask.NVMCTRL_CACHE),
 
         // Documentation says all reserved bits should be 1 and padding is 0
-        .reserved6 = 1,
-        .reserved8 = 1,
-        .reserved12 = 1,
         .reserved15 = 1,
         .reserved19 = 7,
-        .padding = 0,
     });
 }

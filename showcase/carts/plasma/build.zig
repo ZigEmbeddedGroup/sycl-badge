@@ -14,6 +14,6 @@ pub fn build(b: *std.Build) void {
         .name = "plasma",
         .optimize = optimize,
         .root_source_file = b.path("src/plasma.zig"),
-    });
+    }) orelse return;
     cart.install(b);
 }

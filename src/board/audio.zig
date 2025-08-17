@@ -22,7 +22,7 @@ pub const Channel = struct {
 };
 
 pub fn init() void {
-    @setCold(true);
+    @branchHint(.cold);
 
     board.A0_SPKR.set_dir(.out);
     board.A1_VCC.set_dir(.in);
@@ -36,7 +36,7 @@ pub fn init() void {
     board.A1_VCC.set_mux(.B);
     DAC.CTRLB.write(.{
         .DIFF = 0,
-        .REFSEL = .{ .value = .VREFPU },
+        .REFSEL = .VREFPU,
         .padding = 0,
     });
     DAC.EVCTRL.write(.{
@@ -52,14 +52,14 @@ pub fn init() void {
     DAC.DACCTRL[0].write(.{
         .LEFTADJ = 0,
         .ENABLE = 1,
-        .CCTRL = .{ .value = .CC12M },
+        .CCTRL = .CC12M,
         .reserved5 = 0,
         .FEXT = 0,
         .RUNSTDBY = 0,
         .DITHER = 1,
-        .REFRESH = .{ .value = .REFRESH_0 },
+        .REFRESH = .REFRESH_0,
         .reserved13 = 0,
-        .OSR = .{ .value = .OSR_1 },
+        .OSR = .OSR_1,
     });
     DAC.CTRLA.write(.{ .SWRST = 0, .ENABLE = 1, .padding = 0 });
     while (DAC.SYNCBUSY.read().ENABLE != 0) {}
@@ -67,11 +67,11 @@ pub fn init() void {
     TC5.COUNT8.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -80,9 +80,9 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC5.COUNT8.SYNCBUSY.read().ENABLE != 0) {}
@@ -91,11 +91,11 @@ pub fn init() void {
     TC5.COUNT8.CTRLA.write(.{
         .SWRST = 1,
         .ENABLE = 0,
-        .MODE = .{ .raw = 0 },
-        .PRESCSYNC = .{ .raw = 0 },
+        .MODE = @enumFromInt(0),
+        .PRESCSYNC = @enumFromInt(0),
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .raw = 0 },
+        .PRESCALER = @enumFromInt(0),
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -104,20 +104,20 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC5.COUNT8.SYNCBUSY.read().SWRST != 0) {}
     TC5.COUNT8.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 0,
-        .MODE = .{ .value = .COUNT8 },
-        .PRESCSYNC = .{ .value = .GCLK },
+        .MODE = .COUNT8,
+        .PRESCSYNC = .GCLK,
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .value = .DIV1 },
+        .PRESCALER = .DIV1,
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -126,13 +126,13 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     TC5.COUNT8.EVCTRL.write(.{
-        .EVACT = .{ .raw = 0 },
+        .EVACT = @enumFromInt(0),
         .reserved4 = 0,
         .TCINV = 0,
         .TCEI = 0,
@@ -147,11 +147,11 @@ pub fn init() void {
     TC5.COUNT8.CTRLA.write(.{
         .SWRST = 0,
         .ENABLE = 1,
-        .MODE = .{ .value = .COUNT8 },
-        .PRESCSYNC = .{ .value = .GCLK },
+        .MODE = .COUNT8,
+        .PRESCSYNC = .GCLK,
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
-        .PRESCALER = .{ .value = .DIV1 },
+        .PRESCALER = .DIV1,
         .ALOCK = 0,
         .reserved16 = 0,
         .CAPTEN0 = 0,
@@ -160,9 +160,9 @@ pub fn init() void {
         .COPEN0 = 0,
         .COPEN1 = 0,
         .reserved24 = 0,
-        .CAPTMODE0 = .{ .raw = 0 },
+        .CAPTMODE0 = @enumFromInt(0),
         .reserved27 = 0,
-        .CAPTMODE1 = .{ .raw = 0 },
+        .CAPTMODE1 = @enumFromInt(0),
         .padding = 0,
     });
     while (TC5.COUNT8.SYNCBUSY.read().ENABLE != 0) {}
@@ -171,15 +171,15 @@ pub fn init() void {
         .LUPD = 0,
         .ONESHOT = 0,
         .reserved5 = 0,
-        .CMD = .{ .value = .RETRIGGER },
+        .CMD = .RETRIGGER,
     });
     while (TC5.COUNT8.SYNCBUSY.read().CTRLB != 0) {}
 
     for (&EVSYS.CHANNEL) |*channel| channel.CHANNEL.write(.{
         .EVGEN = evsys.EVGEN.NONE,
         .reserved8 = 0,
-        .PATH = .{ .raw = 0 },
-        .EDGSEL = .{ .raw = 0 },
+        .PATH = @enumFromInt(0),
+        .EDGSEL = @enumFromInt(0),
         .reserved14 = 0,
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
@@ -189,8 +189,8 @@ pub fn init() void {
     EVSYS.CHANNEL[evsys.CHANNEL.AUDIO].CHANNEL.write(.{
         .EVGEN = evsys.EVGEN.TC5_OVF,
         .reserved8 = 0,
-        .PATH = .{ .value = .ASYNCHRONOUS },
-        .EDGSEL = .{ .value = .NO_EVT_OUTPUT },
+        .PATH = .ASYNCHRONOUS,
+        .EDGSEL = .NO_EVT_OUTPUT,
         .reserved14 = 0,
         .RUNSTDBY = 0,
         .ONDEMAND = 0,
@@ -263,7 +263,7 @@ pub fn set_channel(channel: usize, state: Channel) void {
     NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-var channels_storage: [4]Channel = .{.{
+var channels_storage: [4]Channel = .{Channel{
     .duty = 0,
     .phase = 0,
     .phase_step = 0,

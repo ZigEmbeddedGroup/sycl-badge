@@ -10,20 +10,9 @@
     },
 
     .dependencies = .{
-        .zigimg = .{
-            .path = "../zigimg",
-            //.url = "git+https://github.com/zigimg/zigimg#b1c5beea3b200a949fe7edf15ba8317cb9253efe",
-            //.hash = "zigimg-0.1.0-8_eo2lrXEgBlEihqJdiw_ZtxgL-vO72ajJpmOdO59qxp",
-        },
         .microzig = .{
-            //.url = "git+https://github.com/ZigEmbeddedGroup/microzig#0d836a5c5d1180a441437185b61cb85e3f2ee4fe",
-            //.hash = "microzig-0.14.3-D20YSZrU_ACUL5EvR_Hqo1uFurbTAnJJOZISjzFxFurA",
-            .path = "../microzig",
-        },
-        .websocket = .{
-            .path = "../websocket.zig",
-            //.url = "git+https://github.com/karlseguin/websocket.zig#5cfef4a734cee40c5386f87905ea483313efd4d2",
-            //.hash = "websocket-0.1.0-ZPISdWFwAwDwbZ0Zy7S7QWICrgOsWFxHxDu1t4WesVVm",
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#039d2da63bf507c42a669e2233c52afa89ab1dcb",
+            .hash = "microzig-0.15.0-D20YSTa72gCHaTig_dfQszKY6IPg4nctMYwlvqUwd8-m",
         },
     },
 }

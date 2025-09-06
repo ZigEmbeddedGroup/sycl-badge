@@ -26,6 +26,7 @@ fn add_zeroman_assets_step(
     b: *Build,
     cart: *sycl_badge.Cart,
 ) void {
+    @setEvalBranchQuota(5000);
     const convert = b.addExecutable(.{
         .name = "convert_gfx",
         .root_module = b.createModule(.{

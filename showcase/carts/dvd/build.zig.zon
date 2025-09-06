@@ -5,9 +5,8 @@
     .dependencies = .{
         .sycl_badge = .{ .path = "../../.." },
         .zigimg = .{
-            .path = "../../../../zigimg",
-            //.url = "git+https://github.com/zigimg/zigimg#70a3abe922d65ec13b488b0890970edcf11e0006",
-            //.hash = "zigimg-0.1.0-8_eo2oFJEwDQjDFXp7mdV7KXQiMIRAYCl7Y0z91NdxG2",
+            .url = "git+https://github.com/zigimg/zigimg#70a3abe922d65ec13b488b0890970edcf11e0006",
+            .hash = "zigimg-0.1.0-8_eo2oFJEwDQjDFXp7mdV7KXQiMIRAYCl7Y0z91NdxG2",
         },
     },
     .paths = .{

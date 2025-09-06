@@ -4,13 +4,14 @@ const std = @import("std");
 const root = @import("root");
 // cart imports
 const carts = .{
-    .{ "zeroman", @import("zeroman") },
+    // TODO: Enable these when zigimg comes out with a 0.15.1 update
+    //.{ "zeroman", @import("zeroman") },
+    //.{ "dvd", @import("dvd") },
     .{ "blobs", @import("blobs") },
     .{ "plasma", @import("plasma") },
     .{ "metalgear-timer", @import("metalgear-timer") },
     .{ "raytracer", @import("raytracer") },
     .{ "neopixelpuzzle", @import("neopixelpuzzle") },
-    .{ "dvd", @import("dvd") },
     .{ "space-shooter", @import("space-shooter") },
 };
 
@@ -37,12 +38,4 @@ pub fn build(b: *std.Build) void {
             } else unreachable;
         }
     }
-
-    //zine.addWebsite(b, .{
-    //    .title = "SYCL Badge Showcase",
-    //    .host_url = "https://sample.com",
-    //    .layouts_dir_path = "layouts",
-    //    .content_dir_path = "content",
-    //    .static_dir_path = "static",
-    //}) catch unreachable;
 }

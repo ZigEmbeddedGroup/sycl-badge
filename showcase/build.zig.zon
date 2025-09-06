@@ -3,12 +3,7 @@
     .fingerprint = 0x53249986100ad559,
     .version = "0.0.0",
     .dependencies = .{
-        .sycl_badge = .{
-            .path = "..",
-        },
-        //.zine = .{
-        //    .path = "../../zine",
-        //},
+        .sycl_badge = .{ .path = ".." },
 
         // Carts go here
         .zeroman = .{ .path = "carts/zeroman" },

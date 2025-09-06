@@ -10,21 +10,20 @@
     },
 
     .dependencies = .{
-        .mime = .{
-            .url = "git+https://github.com/andrewrk/mime.git#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
-            .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
-        },
         .zigimg = .{
-            .url = "git+https://github.com/zigimg/zigimg#b1c5beea3b200a949fe7edf15ba8317cb9253efe",
-            .hash = "zigimg-0.1.0-8_eo2lrXEgBlEihqJdiw_ZtxgL-vO72ajJpmOdO59qxp",
+            .path = "../zigimg",
+            //.url = "git+https://github.com/zigimg/zigimg#b1c5beea3b200a949fe7edf15ba8317cb9253efe",
+            //.hash = "zigimg-0.1.0-8_eo2lrXEgBlEihqJdiw_ZtxgL-vO72ajJpmOdO59qxp",
         },
         .microzig = .{
-            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#cbbe44943a1f877329214c5697b482d9f3c3b57a",
-            .hash = "microzig-0.14.2-D20YScPb-gAGfmER_MCmiyaGjAdhSL-zll6VWvUm_Vz8",
+            //.url = "git+https://github.com/ZigEmbeddedGroup/microzig#0d836a5c5d1180a441437185b61cb85e3f2ee4fe",
+            //.hash = "microzig-0.14.3-D20YSZrU_ACUL5EvR_Hqo1uFurbTAnJJOZISjzFxFurA",
+            .path = "../microzig",
         },
-        .ws = .{
-            .url = "git+https://github.com/karlseguin/websocket.zig#7240830dc8d1ab426d408cb76144794169943aa9",
-            .hash = "websocket-0.1.0-ZPISdRJ0AwBHOWGe9mnKAUU2hXEXhfdbsW3smK4zpY97",
+        .websocket = .{
+            .path = "../websocket.zig",
+            //.url = "git+https://github.com/karlseguin/websocket.zig#5cfef4a734cee40c5386f87905ea483313efd4d2",
+            //.hash = "websocket-0.1.0-ZPISdWFwAwDwbZ0Zy7S7QWICrgOsWFxHxDu1t4WesVVm",
         },
     },
 }

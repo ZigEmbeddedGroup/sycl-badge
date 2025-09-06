@@ -23,7 +23,7 @@ const libcart = struct {
     }
 };
 
-pub fn svcall_handler() callconv(.Naked) void {
+pub fn svcall_handler() callconv(.naked) void {
     asm volatile (
         \\ mvns r0, lr, lsl #31 - 2
         \\ bcc 12f
@@ -158,7 +158,7 @@ pub fn tick() void {
     lcd.update();
 }
 
-fn call(func: *const fn () callconv(.C) void) void {
+fn call(func: *const fn () callconv(.c) void) void {
     // initialize new context
     const process_stack = HSRAM.ADDR[HSRAM.SIZE - @divExact(
         HSRAM.SIZE,
@@ -174,8 +174,7 @@ fn call(func: *const fn () callconv(.C) void) void {
         \\ svc #12
         :
         : [process_stack] "r" (frame.ptr),
-        : "r0", "r1", "r2", "r3", "memory"
-    );
+        : .{ .r0 = true, .r1 = true, .r2 = true, .r3 = true, .memory = true });
     // delete fp context
     FPU.FPCCR.write(.{
         .LSPACT = 0,
@@ -240,7 +239,7 @@ fn blit(
         stride: User(u32),
         flags: User(api.BlitOptions.Flags),
     },
-) callconv(.C) void {
+) callconv(.c) void {
     const width = rest.width.load();
     const height = rest.height.load();
     const src_x = rest.src_x.load();
@@ -254,18 +253,18 @@ fn blit(
     // Clip rectangle to screen
     const flip_x, const clip_x_min: u32, const clip_y_min: u32, const clip_x_max: u32, const clip_y_max: u32 =
         if (flags.rotate) .{
-        !flags.flip_x,
-        @intCast(@max(0, dst_y) - dst_y),
-        @intCast(@max(0, dst_x) - dst_x),
-        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_height)) - dst_y)),
-        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_width)) - dst_x)),
-    } else .{
-        flags.flip_x,
-        @intCast(@max(0, dst_x) - dst_x),
-        @intCast(@max(0, dst_y) - dst_y),
-        @intCast(@min(signed_width, @as(i32, @intCast(api.screen_width)) - dst_x)),
-        @intCast(@min(signed_height, @as(i32, @intCast(api.screen_height)) - dst_y)),
-    };
+            !flags.flip_x,
+            @intCast(@max(0, dst_y) - dst_y),
+            @intCast(@max(0, dst_x) - dst_x),
+            @intCast(@min(signed_width, @as(i32, @intCast(api.screen_height)) - dst_y)),
+            @intCast(@min(signed_height, @as(i32, @intCast(api.screen_width)) - dst_x)),
+        } else .{
+            flags.flip_x,
+            @intCast(@max(0, dst_x) - dst_x),
+            @intCast(@max(0, dst_y) - dst_y),
+            @intCast(@min(signed_width, @as(i32, @intCast(api.screen_width)) - dst_x)),
+            @intCast(@min(signed_height, @as(i32, @intCast(api.screen_height)) - dst_y)),
+        };
 
     for (clip_y_min..clip_y_max) |y| {
         for (clip_x_min..clip_x_max) |x| {
@@ -295,7 +294,7 @@ fn line(
         y_2: User(i32),
         color: User(api.DisplayColor),
     },
-) callconv(.C) void {
+) callconv(.c) void {
     var x0 = x_1;
     const x1 = x_2;
     var y0 = y_1;
@@ -335,7 +334,7 @@ fn oval(
         stroke_color: User(api.DisplayColor.Optional),
         fill_color: User(api.DisplayColor.Optional),
     },
-) callconv(.C) void {
+) callconv(.c) void {
     const height = rest.height.load();
     const stroke_color = rest.stroke_color.load();
     const fill_color = rest.fill_color.load();
@@ -429,7 +428,7 @@ fn rect(
         stroke_color: User(api.DisplayColor.Optional),
         fill_color: User(api.DisplayColor.Optional),
     },
-) callconv(.C) void {
+) callconv(.c) void {
     const height = rest.height.load();
     const stroke_color = rest.stroke_color.load().unwrap();
     const fill_color = rest.fill_color.load().unwrap();
@@ -478,7 +477,7 @@ fn text(
         text_color: User(api.DisplayColor.Optional),
         background_color: User(api.DisplayColor.Optional),
     },
-) callconv(.C) void {
+) callconv(.c) void {
     // const str = str_ptr[0].load();
     const y = rest.y.load();
     const text_color = rest.text_color.load();
@@ -523,7 +522,7 @@ fn hline(
     y: i32,
     len: u32,
     color: api.DisplayColor,
-) callconv(.C) void {
+) callconv(.c) void {
     if (len == 0 or y < 0 or y >= api.screen_height or x >= api.screen_width) return;
     const end_x = x +| @min(len, std.math.maxInt(i32));
     if (end_x <= 0) return;
@@ -537,7 +536,7 @@ fn vline(
     y: i32,
     len: u32,
     color: api.DisplayColor,
-) callconv(.C) void {
+) callconv(.c) void {
     if (len == 0 or x < 0 or x >= api.screen_width or y >= api.screen_height) return;
     const end_y = y +| @min(len, std.math.maxInt(i32));
     if (end_y <= 0) return;
@@ -551,7 +550,7 @@ fn tone(
     duration: u32,
     volume: u32,
     flags: api.ToneOptions.Flags,
-) callconv(.C) void {
+) callconv(.c) void {
     const start_frequency: u16 = @truncate(frequency >> 0);
     const end_frequency = switch (@as(u16, @truncate(frequency >> 16))) {
         0 => start_frequency,
@@ -636,7 +635,7 @@ fn read_flash(
     offset: u32,
     dst_ptr: [*]User(u8),
     dst_len: usize,
-) callconv(.C) u32 {
+) callconv(.c) u32 {
     const dst = dst_ptr[0..dst_len];
 
     _ = offset;
@@ -648,19 +647,19 @@ fn read_flash(
 fn write_flash_page(
     page: u16,
     src: *const [api.flash_page_size]User(u8),
-) callconv(.C) void {
+) callconv(.c) void {
     _ = page;
     _ = src;
 }
 
-fn rand() callconv(.C) u32 {
+fn rand() callconv(.c) u32 {
     return 0;
 }
 
 fn trace(
     str_ptr: [*]const User(u8),
     str_len: usize,
-) callconv(.C) void {
+) callconv(.c) void {
     const str = str_ptr[0..str_len];
 
     _ = str;

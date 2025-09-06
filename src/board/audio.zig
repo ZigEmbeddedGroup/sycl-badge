@@ -203,7 +203,7 @@ pub fn init() void {
     NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-pub fn mix() callconv(.C) void {
+pub fn mix() callconv(.c) void {
     var local_channels = channels.*;
     var speaker_enable: port.Level = .low;
     for (&sample_buffer[

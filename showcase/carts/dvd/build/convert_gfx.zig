@@ -1,5 +1,6 @@
 const std = @import("std");
 const allocator = std.heap.c_allocator;
+const ArrayListManaged = std.array_list.Managed;
 const Image = @import("zigimg").Image;
 
 const ConvertFile = struct {
@@ -13,7 +14,7 @@ pub fn main() !void {
     defer args.deinit();
 
     _ = args.next();
-    var in_files = std.ArrayList(ConvertFile).init(allocator);
+    var in_files = ArrayListManaged(ConvertFile).init(allocator);
     var out_path: []const u8 = undefined;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "-i")) {
@@ -29,25 +30,28 @@ pub fn main() !void {
     const out_file = try std.fs.cwd().createFile(out_path, .{});
     defer out_file.close();
 
-    const writer = out_file.writer();
-    try writer.writeAll("const PackedIntSlice = @import(\"packed_int_array\").PackedIntSlice;\n");
-    try writer.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
+    var writer_buf: [4096]u8 = undefined;
+    var writer = out_file.writer(&writer_buf);
+    try writer.interface.writeAll("const PackedIntSlice = @import(\"packed_int_array\").PackedIntSlice;\n");
+    try writer.interface.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
 
     for (in_files.items) |in_file| {
-        try convert(in_file, writer);
+        try convert(in_file, &writer.interface);
     }
+
+    try writer.flush();
 }
 
-fn convert(args: ConvertFile, writer: std.fs.File.Writer) !void {
+fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
     const N = 8 / args.bits;
 
     var image = try Image.fromFilePath(allocator, args.path);
     defer image.deinit();
 
-    var colors = std.ArrayList(Color).init(allocator);
+    var colors = ArrayListManaged(Color).init(allocator);
     defer colors.deinit();
     if (args.transparency) try colors.append(.{ .r = 31, .g = 0, .b = 31 });
-    var indices = try std.ArrayList(usize).initCapacity(allocator, image.width * image.height);
+    var indices = try ArrayListManaged(usize).initCapacity(allocator, image.width * image.height);
     defer indices.deinit();
     var it = image.iterator();
     while (it.next()) |pixel| {
@@ -105,7 +109,7 @@ pub const Color = packed struct(u16) {
     }
 };
 
-fn getIndex(colors: *std.ArrayList(Color), color: Color) !usize {
+fn getIndex(colors: *ArrayListManaged(Color), color: Color) !usize {
     for (colors.items, 0..) |c, i| {
         if (c.eql(color)) return i;
     }

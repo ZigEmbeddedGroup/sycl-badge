@@ -43,13 +43,16 @@ pub fn init_lcd(bpp: lcd.Bpp, fb: *const volatile lcd.FrameBuffer) void {
         .STEPSEL = .SRC,
         .STEPSIZE = .X1,
     });
+
     switch (bpp) {
         inline else => |tag| {
-            const len = @sizeOf(std.meta.FieldType(lcd.FrameBuffer, tag));
+            const field_info = std.meta.fieldInfo(lcd.Bpp, tag);
+            const len = @sizeOf(@FieldType(lcd.FrameBuffer, field_info.name));
             desc[DESC.LCD].BTCNT.write(.{ .BTCNT = @divExact(len, 1) });
             desc[DESC.LCD].SRCADDR.write(.{ .SRCADDR = @intFromPtr(&@field(fb, @tagName(tag))) + len });
         },
     }
+
     desc[DESC.LCD].DSTADDR.write(.{ .CHKINIT = @intFromPtr(&SERCOM4.SPIM.DATA) });
     desc[DESC.LCD].DESCADDR.write(.{ .DESCADDR = @intFromPtr(&desc[DESC.LCD]) });
     microzig.cpu.dmb();

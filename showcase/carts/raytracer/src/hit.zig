@@ -4,6 +4,7 @@ const Point3 = vec.Point3;
 const Interval = @import("interval.zig");
 const Ray = @import("ray.zig");
 const std = @import("std");
+const ArrayListManaged = std.array_list.Managed;
 const material = @import("material.zig");
 const Material = material.Material;
 
@@ -85,11 +86,11 @@ pub const Sphere = struct {
 };
 
 pub const HittableList = struct {
-    objects: std.ArrayList(Hittable),
+    objects: ArrayListManaged(Hittable),
 
     pub fn init(allocator: std.mem.Allocator) !HittableList {
         var self: HittableList = undefined;
-        self.objects = std.ArrayList(Hittable).init(allocator);
+        self.objects = ArrayListManaged(Hittable).init(allocator);
         return self;
     }
 

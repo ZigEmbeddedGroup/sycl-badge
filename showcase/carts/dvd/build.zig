@@ -28,10 +28,12 @@ fn add_dvd_assets_step(
 ) void {
     const convert = b.addExecutable(.{
         .name = "convert_gfx",
-        .root_source_file = b.path("build/convert_gfx.zig"),
-        .target = b.graph.host,
-        .optimize = cart.options.optimize,
-        .link_libc = true,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("build/convert_gfx.zig"),
+            .target = b.graph.host,
+            .optimize = cart.options.optimize,
+            .link_libc = true,
+        }),
     });
     convert.root_module.addImport("zigimg", b.dependency("zigimg", .{}).module("zigimg"));
 

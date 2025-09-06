@@ -33,7 +33,7 @@ pub fn main() void {
     @call(.never_inline, main_impl, .{});
 }
 
-pub fn main_impl() linksection(".qspi") callconv(.C) void {
+pub fn main_impl() linksection(".qspi") callconv(.c) void {
     Buttons.configure();
     led_pin.set_dir(.out);
 

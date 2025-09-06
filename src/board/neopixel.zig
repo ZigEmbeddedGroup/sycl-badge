@@ -101,8 +101,7 @@ pub fn Group(comptime count: u16) type {
                   [pin_mask] "{r1}" (pin_mask),
                   [ptr] "{r2}" (buf.ptr),
                   [count] "{r3}" (buf.len),
-                : "r4", "r5", "r6"
-            );
+                : .{ .r4 = true, .r5 = true, .r6 = true });
         }
     };
 }

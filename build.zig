@@ -13,28 +13,7 @@ pub fn build(b: *Build) void {
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    const ws_dep = b.dependency("ws", .{});
-    const mime_dep = b.dependency("mime", .{});
-
     _ = b.addModule("cart-api", .{ .root_source_file = b.path("src/cart/api.zig") });
-
-    const watch = b.addExecutable(.{
-        .name = "watch",
-        .root_source_file = b.path("src/watch/main.zig"),
-        .target = b.graph.host,
-        .optimize = optimize,
-    });
-    watch.root_module.addImport("ws", ws_dep.module("websocket"));
-    watch.root_module.addImport("mime", mime_dep.module("mime"));
-
-    if (b.graph.host.result.os.tag == .macos) {
-        watch.linkFramework("CoreFoundation");
-        watch.linkFramework("CoreServices");
-    }
-
-    b.getInstallStep().dependOn(&b.addInstallArtifact(watch, .{
-        .dest_dir = .disabled,
-    }).step);
 
     var dep: std.Build.Dependency = .{ .builder = b };
     const feature_test_cart = add_cart(&dep, b, .{
@@ -43,10 +22,6 @@ pub fn build(b: *Build) void {
         .root_source_file = b.path("src/badge/feature_test.zig"),
     }) orelse return;
     feature_test_cart.install(b);
-    const watch_run_step = feature_test_cart.install_with_watcher(&dep, b, .{});
-
-    const watch_step = b.step("feature-test", "");
-    watch_step.dependOn(&watch_run_step.step);
 
     inline for (.{
         "blinky",
@@ -87,8 +62,10 @@ pub fn build(b: *Build) void {
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = b.addExecutable(.{
         .name = "font_export_exe",
-        .target = b.graph.host,
-        .root_source_file = b.path("src/generate_font_ts.zig"),
+        .root_module = b.createModule(.{
+            .target = b.graph.host,
+            .root_source_file = b.path("src/generate_font_ts.zig"),
+        }),
     });
 
     const font_export_run = b.addRunArtifact(font_export_exe);
@@ -96,13 +73,6 @@ pub fn build(b: *Build) void {
 
     font_export_step.dependOn(&font_export_run.step);
 }
-
-pub const CartWatcherOptions = struct {
-    /// Directories for the Watcher to watch.
-    /// If null, defaults to the root source file directory.
-    watch_dirs: ?[]const []const u8 = null,
-    build_firmware: bool = true,
-};
 
 pub const Cart = struct {
     fw: *MicroBuild.Firmware,
@@ -116,31 +86,6 @@ pub const Cart = struct {
         c.mb.install_firmware(c.fw, .{ .format = .elf });
         c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
         b.installArtifact(c.wasm);
-    }
-
-    pub fn install_with_watcher(c: *const Cart, d: *Build.Dependency, b: *Build, opt: CartWatcherOptions) *Build.Step.Run {
-        if (opt.build_firmware) {
-            c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
-        }
-        const install_artifact_step = b.addInstallArtifact(c.wasm, .{});
-        b.getInstallStep().dependOn(&install_artifact_step.step);
-
-        const watch_run = b.addRunArtifact(d.artifact("watch"));
-        watch_run.step.dependOn(&install_artifact_step.step);
-        // watch_run.addArgs(&.{ "serve", b.graph.zig_exe, "--input-dir", b.pathFromRoot(std.fs.path.dirname(options.root_source_file) orelse ""), "--cart", b.pathFromRoot("zig-out/bin/feature_test.wasm") });
-        watch_run.addArgs(&.{ "serve", b.graph.zig_exe });
-        if (opt.watch_dirs) |dirs| {
-            if (dirs.len == 0) @panic("watch input directories should either be empty or null");
-            for (dirs) |dir| {
-                watch_run.addArgs(&.{ "--input-dir", dir });
-            }
-        } else {
-            watch_run.addArgs(&.{"--input-dir"});
-            watch_run.addFileArg(c.options.root_source_file.dirname());
-        }
-
-        watch_run.addArgs(&.{ "--cart", b.getInstallPath(install_artifact_step.dest_dir.?, install_artifact_step.dest_sub_path) });
-        return watch_run;
     }
 };
 
@@ -179,9 +124,11 @@ pub fn add_cart(
 
     const wasm = b.addExecutable(.{
         .name = options.name,
-        .root_source_file = options.root_source_file,
-        .target = wasm_target,
-        .optimize = options.optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = options.root_source_file,
+            .target = wasm_target,
+            .optimize = options.optimize,
+        }),
     });
     wasm.entry = .disabled;
     wasm.import_memory = true;
@@ -195,16 +142,19 @@ pub fn add_cart(
     const microzig_dep = d.builder.dependency("microzig", .{});
     const mb = MicroBuild.init(d.builder, microzig_dep) orelse return null;
     const sycl_badge_target = sycl_badge_microzig_target(mb);
-    const cart_lib = b.addStaticLibrary(.{
+    const cart_lib = b.addLibrary(.{
         .name = "cart",
-        .root_source_file = options.root_source_file,
-        .target = b.resolveTargetQuery(sycl_badge_target.zig_target),
-        .optimize = options.optimize,
-        .link_libc = false,
-        .single_threaded = true,
+        .root_module = b.createModule(.{
+            .root_source_file = options.root_source_file,
+            .target = b.resolveTargetQuery(sycl_badge_target.zig_target),
+            .optimize = options.optimize,
+            .link_libc = false,
+            .single_threaded = true,
+
+            .strip = false,
+        }),
         .use_llvm = true,
         .use_lld = true,
-        .strip = false,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
     cart_lib.linker_script = d.builder.path("src/cart.ld");

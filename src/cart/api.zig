@@ -165,7 +165,7 @@ pub inline fn blit(options: BlitOptions) void {
               [x] "{r1}" (options.x),
               [y] "{r2}" (options.y),
               [rest] "{r3}" (&rest),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -204,7 +204,7 @@ pub inline fn line(options: LineOptions) void {
               [y1] "{r1}" (options.y1),
               [x2] "{r2}" (options.x2),
               [rest] "{r3}" (&rest),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -253,7 +253,7 @@ pub inline fn oval(options: OvalOptions) void {
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
               [rest] "{r3}" (&rest),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -302,7 +302,7 @@ pub inline fn rect(options: RectOptions) void {
               [y] "{r1}" (options.y),
               [width] "{r2}" (options.width),
               [rest] "{r3}" (&rest),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -350,7 +350,7 @@ pub inline fn text(options: TextOptions) void {
               [str_len] "{r1}" (options.str.len),
               [x] "{r2}" (options.x),
               [rest] "{r3}" (&rest),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -386,7 +386,7 @@ pub inline fn hline(options: StraightLineOptions) void {
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
               [color] "{r3}" (options.color),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -415,7 +415,7 @@ pub inline fn vline(options: StraightLineOptions) void {
               [y] "{r1}" (options.y),
               [len] "{r2}" (options.len),
               [color] "{r3}" (options.color),
-            : "memory");
+            : .{ .memory = true });
     }
 }
 
@@ -519,7 +519,7 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
             : [offset] "{r0}" (offset),
               [dst_ptr] "{r1}" (dst.ptr),
               [dst_len] "{r2}" (dst.len),
-            : "r3");
+            : .{ .r3 = true });
     }
 }
 
@@ -536,7 +536,7 @@ pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
               [clobber_r1] "={r1}" (clobber_r1),
             : [page] "{r0}" (page),
               [src] "{r1}" (&src),
-            : "r2", "r3", "memory");
+            : .{ .r2 = true, .r3 = true, .memory = true });
     }
 }
 
@@ -556,7 +556,7 @@ pub inline fn rand() u32 {
         return asm volatile (" svc #10"
             : [result] "={r0}" (-> u32),
             :
-            : "r1", "r2", "r3");
+            : .{ .r1 = true, .r2 = true, .r3 = true });
     }
 }
 
@@ -574,6 +574,6 @@ pub inline fn trace(x: []const u8) void {
               [clobber_r1] "={r1}" (clobber_r1),
             : [x_ptr] "{r0}" (x.ptr),
               [x_len] "{r1}" (x.len),
-            : "r2", "r3");
+            : .{ .r2 = true, .r3 = true });
     }
 }

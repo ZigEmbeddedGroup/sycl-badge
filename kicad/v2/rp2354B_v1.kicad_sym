@@ -9,22 +9,20 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(property "Reference" "IC"
-			(at 62.23 25.4 0)
+		(property "Reference" "IC2"
+			(at 63.8654 -69.85 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "RP2354B"
-			(at 62.23 22.86 0)
+			(at 61.3254 -69.85 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "QFN40P1000X1000X90-81N-D"
@@ -87,7 +85,7 @@
 			)
 		)
 		(property "Manufacturer_Part_Number" "RP2354B"
-			(at 62.23 7.62 0)
+			(at 62.23 6.35 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -138,7 +136,7 @@
 		)
 		(symbol "RP2354B_0_0"
 			(pin passive line
-				(at 0 0 0)
+				(at 0 8.89 0)
 				(length 5.08)
 				(name "GPIO4"
 					(effects
@@ -156,7 +154,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -2.54 0)
+				(at 0 6.35 0)
 				(length 5.08)
 				(name "GPIO5"
 					(effects
@@ -174,7 +172,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -5.08 0)
+				(at 0 3.81 0)
 				(length 5.08)
 				(name "GPIO6"
 					(effects
@@ -192,7 +190,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -7.62 0)
+				(at 0 1.27 0)
 				(length 5.08)
 				(name "GPIO7"
 					(effects
@@ -210,25 +208,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -10.16 0)
-				(length 5.08)
-				(name "IOVDD_1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "5"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 0 -12.7 0)
+				(at 0 -2.54 0)
 				(length 5.08)
 				(name "GPIO8"
 					(effects
@@ -246,7 +226,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -15.24 0)
+				(at 0 -5.08 0)
 				(length 5.08)
 				(name "GPIO9"
 					(effects
@@ -264,7 +244,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -17.78 0)
+				(at 0 -7.62 0)
 				(length 5.08)
 				(name "GPIO10"
 					(effects
@@ -282,7 +262,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -20.32 0)
+				(at 0 -10.16 0)
 				(length 5.08)
 				(name "GPIO11"
 					(effects
@@ -300,25 +280,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -22.86 0)
-				(length 5.08)
-				(name "DVDD_1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "10"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 0 -25.4 0)
+				(at 0 -15.24 0)
 				(length 5.08)
 				(name "GPIO12"
 					(effects
@@ -336,7 +298,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -27.94 0)
+				(at 0 -17.78 0)
 				(length 5.08)
 				(name "GPIO13"
 					(effects
@@ -354,7 +316,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -30.48 0)
+				(at 0 -20.32 0)
 				(length 5.08)
 				(name "GPIO14"
 					(effects
@@ -372,7 +334,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -33.02 0)
+				(at 0 -22.86 0)
 				(length 5.08)
 				(name "GPIO15"
 					(effects
@@ -390,25 +352,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -35.56 0)
-				(length 5.08)
-				(name "IOVDD_2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "15"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 0 -38.1 0)
+				(at 0 -26.67 0)
 				(length 5.08)
 				(name "GPIO16"
 					(effects
@@ -426,7 +370,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -40.64 0)
+				(at 0 -29.21 0)
 				(length 5.08)
 				(name "GPIO17"
 					(effects
@@ -444,7 +388,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -43.18 0)
+				(at 0 -31.75 0)
 				(length 5.08)
 				(name "GPIO18"
 					(effects
@@ -462,7 +406,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -45.72 0)
+				(at 0 -34.29 0)
 				(length 5.08)
 				(name "GPIO19"
 					(effects
@@ -480,7 +424,7 @@
 				)
 			)
 			(pin passive line
-				(at 0 -48.26 0)
+				(at 0 -36.83 0)
 				(length 5.08)
 				(name "GPIO20"
 					(effects
@@ -498,25 +442,7 @@
 				)
 			)
 			(pin passive line
-				(at 7.62 25.4 270)
-				(length 5.08)
-				(name "GND"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "81"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 7.62 -68.58 90)
+				(at 0 -40.64 0)
 				(length 5.08)
 				(name "GPIO21"
 					(effects
@@ -534,25 +460,7 @@
 				)
 			)
 			(pin passive line
-				(at 10.16 25.4 270)
-				(length 5.08)
-				(name "GPIO3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "80"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 10.16 -68.58 90)
+				(at 0 -43.18 0)
 				(length 5.08)
 				(name "GPIO22"
 					(effects
@@ -570,25 +478,7 @@
 				)
 			)
 			(pin passive line
-				(at 12.7 25.4 270)
-				(length 5.08)
-				(name "GPIO2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "79"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 12.7 -68.58 90)
+				(at 0 -45.72 0)
 				(length 5.08)
 				(name "GPIO23"
 					(effects
@@ -606,61 +496,7 @@
 				)
 			)
 			(pin passive line
-				(at 15.24 25.4 270)
-				(length 5.08)
-				(name "GPIO1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "78"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 15.24 -68.58 90)
-				(length 5.08)
-				(name "IOVDD_3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "24"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 17.78 25.4 270)
-				(length 5.08)
-				(name "GPIO0"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "77"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 17.78 -68.58 90)
+				(at 0 -49.53 0)
 				(length 5.08)
 				(name "GPIO24"
 					(effects
@@ -678,25 +514,7 @@
 				)
 			)
 			(pin passive line
-				(at 20.32 25.4 270)
-				(length 5.08)
-				(name "IOVDD_8"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "76"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 20.32 -68.58 90)
+				(at 0 -52.07 0)
 				(length 5.08)
 				(name "GPIO25"
 					(effects
@@ -714,25 +532,7 @@
 				)
 			)
 			(pin passive line
-				(at 22.86 25.4 270)
-				(length 5.08)
-				(name "QSPI_SS"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "75"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 22.86 -68.58 90)
+				(at 0 -54.61 0)
 				(length 5.08)
 				(name "GPIO26"
 					(effects
@@ -750,25 +550,7 @@
 				)
 			)
 			(pin passive line
-				(at 25.4 25.4 270)
-				(length 5.08)
-				(name "QSPI_SD1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "74"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 25.4 -68.58 90)
+				(at 0 -57.15 0)
 				(length 5.08)
 				(name "GPIO27"
 					(effects
@@ -786,16 +568,16 @@
 				)
 			)
 			(pin passive line
-				(at 27.94 25.4 270)
+				(at 12.7 25.4 270)
 				(length 5.08)
-				(name "QSPI_SD2"
+				(name "GND"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "73"
+				(number "81"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -804,16 +586,16 @@
 				)
 			)
 			(pin passive line
-				(at 27.94 -68.58 90)
+				(at 15.24 25.4 270)
 				(length 5.08)
-				(name "IOVDD_4"
+				(name "GPIO3"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "29"
+				(number "80"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -822,25 +604,7 @@
 				)
 			)
 			(pin passive line
-				(at 30.48 25.4 270)
-				(length 5.08)
-				(name "QSPI_SD0"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "72"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 30.48 -68.58 90)
+				(at 15.24 -68.58 90)
 				(length 5.08)
 				(name "XIN"
 					(effects
@@ -858,16 +622,16 @@
 				)
 			)
 			(pin passive line
-				(at 33.02 25.4 270)
+				(at 17.78 25.4 270)
 				(length 5.08)
-				(name "QSPI_SCLK"
+				(name "GPIO2"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "71"
+				(number "79"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -876,7 +640,7 @@
 				)
 			)
 			(pin passive line
-				(at 33.02 -68.58 90)
+				(at 17.78 -68.58 90)
 				(length 5.08)
 				(name "XOUT"
 					(effects
@@ -894,16 +658,16 @@
 				)
 			)
 			(pin passive line
-				(at 35.56 25.4 270)
+				(at 20.32 25.4 270)
 				(length 5.08)
-				(name "QSPI_SD3"
+				(name "GPIO1"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "70"
+				(number "78"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -912,16 +676,16 @@
 				)
 			)
 			(pin passive line
-				(at 35.56 -68.58 90)
+				(at 21.59 -68.58 90)
 				(length 5.08)
-				(name "DVDD_2"
+				(name "RUN"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "32"
+				(number "35"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -930,16 +694,16 @@
 				)
 			)
 			(pin passive line
-				(at 38.1 25.4 270)
+				(at 22.86 25.4 270)
 				(length 5.08)
-				(name "QSPI_IOVDD"
+				(name "GPIO0"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "69"
+				(number "77"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -948,7 +712,7 @@
 				)
 			)
 			(pin passive line
-				(at 38.1 -68.58 90)
+				(at 24.13 -68.58 90)
 				(length 5.08)
 				(name "SWCLK"
 					(effects
@@ -966,16 +730,16 @@
 				)
 			)
 			(pin passive line
-				(at 40.64 25.4 270)
+				(at 26.67 25.4 270)
 				(length 5.08)
-				(name "USB_OTP_VDD"
+				(name "QSPI_SS"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "68"
+				(number "75"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -984,7 +748,7 @@
 				)
 			)
 			(pin passive line
-				(at 40.64 -68.58 90)
+				(at 26.67 -68.58 90)
 				(length 5.08)
 				(name "SWDIO"
 					(effects
@@ -994,6 +758,186 @@
 					)
 				)
 				(number "34"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 29.21 25.4 270)
+				(length 5.08)
+				(name "QSPI_SD0"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "72"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 29.21 -68.58 90)
+				(length 5.08)
+				(name "GPIO28"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "36"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 31.75 25.4 270)
+				(length 5.08)
+				(name "QSPI_SD1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "74"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 31.75 -68.58 90)
+				(length 5.08)
+				(name "GPIO29"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "37"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 34.29 25.4 270)
+				(length 5.08)
+				(name "QSPI_SD2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "73"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 34.29 -68.58 90)
+				(length 5.08)
+				(name "GPIO30"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "38"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 36.83 25.4 270)
+				(length 5.08)
+				(name "QSPI_SD3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "70"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 36.83 -68.58 90)
+				(length 5.08)
+				(name "GPIO31"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "39"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 39.37 25.4 270)
+				(length 5.08)
+				(name "QSPI_SCLK"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "71"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 39.37 -68.58 90)
+				(length 5.08)
+				(name "GPIO32"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "40"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1022,14 +966,14 @@
 			(pin passive line
 				(at 43.18 -68.58 90)
 				(length 5.08)
-				(name "RUN"
+				(name "GPIO33"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "35"
+				(number "42"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1058,14 +1002,14 @@
 			(pin passive line
 				(at 45.72 -68.58 90)
 				(length 5.08)
-				(name "GPIO28"
+				(name "GPIO34"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "36"
+				(number "43"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1094,14 +1038,14 @@
 			(pin passive line
 				(at 48.26 -68.58 90)
 				(length 5.08)
-				(name "GPIO29"
+				(name "GPIO35"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "37"
+				(number "44"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1130,14 +1074,14 @@
 			(pin passive line
 				(at 50.8 -68.58 90)
 				(length 5.08)
-				(name "GPIO30"
+				(name "GPIO36"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "38"
+				(number "45"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1166,14 +1110,14 @@
 			(pin passive line
 				(at 53.34 -68.58 90)
 				(length 5.08)
-				(name "GPIO31"
+				(name "GPIO37"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "39"
+				(number "46"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1202,14 +1146,14 @@
 			(pin passive line
 				(at 55.88 -68.58 90)
 				(length 5.08)
-				(name "GPIO32"
+				(name "GPIO38"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "40"
+				(number "47"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1236,223 +1180,7 @@
 				)
 			)
 			(pin passive line
-				(at 66.04 0 180)
-				(length 5.08)
-				(name "IOVDD_7"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "60"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -2.54 180)
-				(length 5.08)
-				(name "ADC_AVDD"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "59"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -5.08 180)
-				(length 5.08)
-				(name "GPIO47_ADC7"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "58"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -7.62 180)
-				(length 5.08)
-				(name "GPIO46_ADC6"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "57"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -10.16 180)
-				(length 5.08)
-				(name "GPIO45_ADC5"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "56"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -12.7 180)
-				(length 5.08)
-				(name "GPIO44_ADC4"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "55"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -15.24 180)
-				(length 5.08)
-				(name "GPIO43_ADC3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "54"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -17.78 180)
-				(length 5.08)
-				(name "GPIO42_ADC2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "53"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -20.32 180)
-				(length 5.08)
-				(name "GPIO41_ADC1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "52"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -22.86 180)
-				(length 5.08)
-				(name "DVDD_3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "51"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -25.4 180)
-				(length 5.08)
-				(name "IOVDD_6"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "50"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -27.94 180)
-				(length 5.08)
-				(name "GPIO40_ADC0"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "49"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin passive line
-				(at 66.04 -30.48 180)
+				(at 58.42 -68.58 90)
 				(length 5.08)
 				(name "GPIO39"
 					(effects
@@ -1470,16 +1198,250 @@
 				)
 			)
 			(pin passive line
-				(at 66.04 -33.02 180)
+				(at 66.04 6.35 180)
 				(length 5.08)
-				(name "GPIO38"
+				(name "DVDD_1"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "47"
+				(number "10"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 3.81 180)
+				(length 5.08)
+				(name "DVDD_2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "32"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 1.27 180)
+				(length 5.08)
+				(name "DVDD_3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "51"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -2.54 180)
+				(length 5.08)
+				(name "QSPI_IOVDD"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "69"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -6.35 180)
+				(length 5.08)
+				(name "IOVDD_1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -8.89 180)
+				(length 5.08)
+				(name "IOVDD_2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "15"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -11.43 180)
+				(length 5.08)
+				(name "IOVDD_3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "24"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -13.97 180)
+				(length 5.08)
+				(name "IOVDD_4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "29"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -16.51 180)
+				(length 5.08)
+				(name "IOVDD_5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "41"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -19.05 180)
+				(length 5.08)
+				(name "IOVDD_6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "50"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -21.59 180)
+				(length 5.08)
+				(name "IOVDD_7"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "60"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -24.13 180)
+				(length 5.08)
+				(name "IOVDD_8"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "76"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -27.94 180)
+				(length 5.08)
+				(name "USB_OTP_VDD"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "68"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -31.75 180)
+				(length 5.08)
+				(name "ADC_AVDD"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "59"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1490,14 +1452,14 @@
 			(pin passive line
 				(at 66.04 -35.56 180)
 				(length 5.08)
-				(name "GPIO37"
+				(name "GPIO47_ADC7"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "46"
+				(number "58"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1508,14 +1470,14 @@
 			(pin passive line
 				(at 66.04 -38.1 180)
 				(length 5.08)
-				(name "GPIO36"
+				(name "GPIO46_ADC6"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "45"
+				(number "57"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1526,14 +1488,14 @@
 			(pin passive line
 				(at 66.04 -40.64 180)
 				(length 5.08)
-				(name "GPIO35"
+				(name "GPIO45_ADC5"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "44"
+				(number "56"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1544,14 +1506,14 @@
 			(pin passive line
 				(at 66.04 -43.18 180)
 				(length 5.08)
-				(name "GPIO34"
+				(name "GPIO44_ADC4"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "43"
+				(number "55"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1562,14 +1524,14 @@
 			(pin passive line
 				(at 66.04 -45.72 180)
 				(length 5.08)
-				(name "GPIO33"
+				(name "GPIO43_ADC3"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "42"
+				(number "54"
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -1580,14 +1542,50 @@
 			(pin passive line
 				(at 66.04 -48.26 180)
 				(length 5.08)
-				(name "IOVDD_5"
+				(name "GPIO42_ADC2"
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "41"
+				(number "53"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -50.8 180)
+				(length 5.08)
+				(name "GPIO41_ADC1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "52"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 66.04 -53.34 180)
+				(length 5.08)
+				(name "GPIO40_ADC0"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "49"
 					(effects
 						(font
 							(size 1.27 1.27)

@@ -2,4 +2,5 @@
   (version 7)
   (lib (name "component library")(type "KiCad")(uri "${KIPRJMOD}/component library.kicad_sym")(options "")(descr ""))
   (lib (name "rp2354B_v1")(type "KiCad")(uri "${KIPRJMOD}/rp2354B_v1.kicad_sym")(options "")(descr ""))
+  (lib (name "rp2354")(type "KiCad")(uri "${KIPRJMOD}/rp2354.kicad_sym")(options "")(descr ""))
 )

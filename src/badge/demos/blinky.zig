@@ -1,21 +1,21 @@
 const microzig = @import("microzig");
 
-const led_pin = microzig.board.A5_D13;
+// this file has been updated for Raspberry Pi Pico 2 (RP2350)
+const gpio = microzig.hal.gpio;
+const time = microzig.hal.time;
+
+// Pico 2 has LED on GPIO 25
+const led_pin = gpio.num(25);
 
 pub fn main() !void {
-    // Initialize pins
-    led_pin.set_dir(.out);
+    // Initialize the LED pin as output
+    led_pin.set_function(.sio);
+    led_pin.set_direction(.out);
 
-    const period = 200000;
     while (true) {
-        delay_count(period);
-        led_pin.write(.high);
-        delay_count(period);
-        led_pin.write(.low);
+        led_pin.put(1); // Turn LED on
+        time.sleep_ms(250);
+        led_pin.put(0); // Turn LED off
+        time.sleep_ms(250);
     }
-}
-
-fn delay_count(count: u32) void {
-    var i: u32 = 0;
-    while (i < count) : (i += 1) {}
 }

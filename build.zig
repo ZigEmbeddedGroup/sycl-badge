@@ -5,70 +5,75 @@ const microzig = @import("microzig");
 
 const MicroBuild = microzig.MicroBuild(.{
     .atsam = true,
+    .rp2xxx = true,
 });
 
-pub fn build(b: *Build) void {
-    const optimize = b.standardOptimizeOption(.{});
+pub fn build(builder: *Build) void {
+    const optimize = builder.standardOptimizeOption(.{});
 
-    const mz_dep = b.dependency("microzig", .{});
-    const mb = MicroBuild.init(b, mz_dep) orelse return;
+    const mz_dep = builder.dependency("microzig", .{});
+    const mb = MicroBuild.init(builder, mz_dep) orelse return;
 
-    _ = b.addModule("cart-api", .{ .root_source_file = b.path("src/cart/api.zig") });
+    _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/cart/api.zig") });
 
-    var dep: std.Build.Dependency = .{ .builder = b };
-    const feature_test_cart = add_cart(&dep, b, .{
+    // Badge V2 (RP2350) target setup
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb);
+
+    var dep: std.Build.Dependency = .{ .builder = builder };
+    const feature_test_cart = add_cart(&dep, builder, .{
         .name = "feature_test",
         .optimize = optimize,
-        .root_source_file = b.path("src/badge/feature_test.zig"),
+        .root_source_file = builder.path("src/badge/feature_test.zig"),
     }) orelse return;
-    feature_test_cart.install(b);
+    feature_test_cart.install(builder);
 
+    // Badge V2 (RP2350) demo builds (only blinky works for now)
     inline for (.{
         "blinky",
         //"blinky_timer",
         //"usb_cdc",
         //"usb_storage",
-        "buttons",
-        "lcd",
-        "spi",
-        "audio",
-        "light_sensor",
+        // "buttons",
+        // "lcd",
+        // "spi",
+        // "audio",
+        // "light_sensor",
         //"qspi",
         //"qa",
         //"clocks",
     }) |name| {
-        const mvp = mb.add_firmware(.{
-            .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
+        const exe = mb.add_firmware(.{
+            .name = std.fmt.comptimePrint("badge.v2.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = b.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
-            .target = sycl_badge_microzig_target(mb),
+            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+            .target = badge_v2_target,
         });
-        mb.install_firmware(mvp, .{ .format = .elf });
-        mb.install_firmware(mvp, .{ .format = .{ .uf2 = .SAMD51 } });
+        mb.install_firmware(exe, .{ .format = .elf });
+        mb.install_firmware(exe, .{ .format = .{ .uf2 = .RP2350_ARM_S } });
     }
 
     inline for (.{
         "neopixels",
         "song",
     }) |name| {
-        const mvp = add_cart(&dep, b, .{
+        const cart = add_cart(&dep, builder, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = b.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
         }) orelse return;
-        mvp.install(b);
+        cart.install(builder);
     }
 
-    const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
-    const font_export_exe = b.addExecutable(.{
+    const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
+    const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",
-        .root_module = b.createModule(.{
-            .target = b.graph.host,
-            .root_source_file = b.path("src/generate_font_ts.zig"),
+        .root_module = builder.createModule(.{
+            .target = builder.graph.host,
+            .root_source_file = builder.path("src/generate_font_ts.zig"),
         }),
     });
 
-    const font_export_run = b.addRunArtifact(font_export_exe);
+    const font_export_run = builder.addRunArtifact(font_export_exe);
     font_export_run.has_side_effects = true;
 
     font_export_step.dependOn(&font_export_run.step);
@@ -84,7 +89,7 @@ pub const Cart = struct {
 
     pub fn install(c: *const Cart, b: *Build) void {
         c.mb.install_firmware(c.fw, .{ .format = .elf });
-        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .RP2350_ARM_NS } });
         b.installArtifact(c.wasm);
     }
 };
@@ -110,6 +115,11 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
             .root_source_file = mb.builder.path("src/hal.zig"),
         },
     });
+}
+
+fn sycl_badge_v2_microzig_target(mb: *MicroBuild) *microzig.Target {
+    // Use the official Raspberry Pi Pico 2 board from microzig
+    return @constCast(mb.ports.rp2xxx.boards.raspberrypi.pico2_arm);
 }
 
 pub fn add_cart(
@@ -185,5 +195,5 @@ pub fn add_cart(
 pub fn install_cart(b: *Build, cart: *Cart) void {
     _ = b;
     cart.mz.install_firmware(cart.fw, .{ .format = .elf });
-    cart.mz.install_firmware(cart.fw, .{ .format = .{ .uf2 = .SAMD51 } });
+    cart.mz.install_firmware(cart.fw, .{ .format = .{ .uf2 = .RP2350_ARM_S } });
 }

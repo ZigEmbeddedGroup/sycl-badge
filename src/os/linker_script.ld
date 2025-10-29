@@ -27,19 +27,34 @@ The attributes in parentheses specify access/permission flags:
 */
 MEMORY
 {
-  /* On this board/SoC flash is mapped at 0x10000000, 1MB */
-  flash(rx!w)       : ORIGIN = 0x10000000, LENGTH = 1024K
+  /* 
+   * RP2350 OS Memory Map (2MB Flash variant):
+   * - Flash: XIP mapped at 0x10000000 (2MB onboard)
+   * - SRAM: 520KB total at 0x20000000
+   *   - SRAM0-3: 512KB (0x20000000 - 0x20080000)
+   *   - SRAM4-5: 8KB scratch (0x20080000 - 0x20082000)
+   * 
+   * OS Layout:
+   * - OS kernel code/data in flash (512KB - 1/4 of 2MB)
+   * - Application storage in romfs (1.5MB - 3/4 of 2MB for programs/data)
+   * - Kernel RAM: 128KB for OS kernel data/heap
+   * - Process RAM: 384KB for user applications (multiple programs)
+   * - Scratch RAM: 8KB for stacks and fast buffers
+   */
+  
+  /* OS kernel code and read-only data - 512KB (1/4 of 2MB) */
+  flash(rx!w)       : ORIGIN = 0x10000000, LENGTH = 512K
 
-  /* ROM filesystem region (read-only storage), 2MB */
-  romfs(rx!w)       : ORIGIN = 0x10100000, LENGTH = 2048K
+  /* Application storage filesystem - 1.5MB (3/4 of 2MB) for loadable programs */
+  romfs(rx!w)       : ORIGIN = 0x10080000, LENGTH = 1536K
 
-  /* Kernel RAM: main writable RAM for kernel data and code relocation */
-  kernel_ram(rxw)   : ORIGIN = 0x20000000, LENGTH = 256K
+  /* OS kernel RAM - 128KB for kernel data structures, heap, etc */
+  kernel_ram(rxw)   : ORIGIN = 0x20000000, LENGTH = 128K
 
-  /* Process RAM: separate RAM region reserved for processes/stacks */
-  process_ram(rxw)  : ORIGIN = 0x20040000, LENGTH = 128K
+  /* User process RAM - 384KB for running applications */
+  process_ram(rxw)  : ORIGIN = 0x20020000, LENGTH = 384K
 
-  /* Small scratch SRAM regions used for special stacks or fast buffers */
+  /* Scratch SRAM for stacks and DMA buffers - 8KB */
   scratch_x(rxw)    : ORIGIN = 0x20080000, LENGTH = 4K
   scratch_y(rxw)    : ORIGIN = 0x20081000, LENGTH = 4K
 }

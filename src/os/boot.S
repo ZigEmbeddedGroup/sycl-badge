@@ -36,7 +36,7 @@ __vectors:
     .word hang_handler      // 15: sysTick - timer interrupt for os tick 
 
     // other entries - +16 - interrupt irqs
-    .rept 48 // .rept x : repeat next line x times - using 48 since rp2350 has 48 peripherals
+    .rept 52 // .rept x : repeat next line x times - using 52 since rp2350 has 52 IRQ peripherals, source: datasheet
     .word hang_handler // 
     .endr // .endr : end repeat block
 

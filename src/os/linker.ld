@@ -14,7 +14,7 @@ The attributes in parentheses specify access/permission flags:
 MEMORY
 {
   /* 
-   * RP2350 OS Memory Map (2MB Flash variant):
+   * RP235X OS Memory Map (2MB Flash variant):
    * - Flash: XIP mapped at 0x10000000 (2MB onboard)
    * - SRAM: 520KB total at 0x20000000
    *   - SRAM0-3: 512KB (0x20000000 - 0x20080000)
@@ -117,7 +117,7 @@ SECTIONS
   } > kernel_ram AT> flash /* AT> flash tells the linker that this section is loaded from flash but runs in RAM */
 
   /*
-  .bss - zero-initialized data in RAM. NOLOAD means it's not stored in
+  .bss zero-initialized data in RAM. NOLOAD means it's not stored in
   the output image; runtime must clear the region. (basically uninitialized global variables)
   __bss_start__/__bss_end__ mark the zeroing range.
   */

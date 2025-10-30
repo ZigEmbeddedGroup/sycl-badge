@@ -202,6 +202,12 @@ SECTIONS
   /* Default stack pointer symbol used by startup code; points to top of main stack */
   PROVIDE(__stack = __stack_top__);
 
-  /* Sanity check at link time: ensures heap fits inside kernel_ram */
-  ASSERT(__stack_limit__ >= __heap_limit__, "region RAM overflowed")
+  /* All sanity checks */
+  ASSERT(__stack_limit__ >= __heap_limit__, "ERROR: Heap would overflow into stack region")
+  ASSERT(__data_start_flash__ <= 0x10080000, "ERROR: Kernel code exceeds 512KB flash allocation")
+  ASSERT(__data_end__ <= __kernel_ram_end__, "ERROR: .data section too large for kernel_ram")
+  ASSERT(__bss_end__ <= __kernel_ram_end__, "ERROR: .bss section overflows kernel_ram")
+  ASSERT((__stack_top__ & 0x7) == 0, "ERROR: Stack pointer not 8-byte aligned")
+  ASSERT((__irq_stack_top__ & 0x7) == 0, "ERROR: IRQ stack pointer not 8-byte aligned")
+  ASSERT(__stack_limit__ != __irq_stack_limit__, "ERROR: Main and IRQ stacks overlap")
 }

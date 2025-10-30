@@ -1,22 +1,8 @@
-/*
-* exported symbols:
-* __preinit_array_start
-* __preinit_array_end
-* __init_array_start
-* __init_array_end
-* __fini_array_start
-* __fini_array_end
-* __exidx_start
-* __exidx_end
-*/
-
 /* 
-linker_script.ld
-Based on upstream examples (CMSIS & pico-sdk).
+linker.ld
 This file tells the linker where to place sections of the final binary
 in the target memory map and defines symbols used by startup/runtime.
 */
-
 
 /* 
 MEMORY
@@ -67,7 +53,7 @@ code and runtime (e.g. __data_start__, __bss_start__, __end__, stack limits).
 */
 SECTIONS
 {
-    /*
+  /*
   .text - code and read-only data placed in flash.
   KEEP() prevents the linker from discarding sections even if unused
   (important for things like interrupt vectors and init/fini arrays).
@@ -86,62 +72,10 @@ SECTIONS
 
     /* All regular code sections */
     *(.text*)
-    KEEP(*(.init))    /* legacy .init code */
-    KEEP(*(.fini))    /* legacy .init code */
 
-    /* Read-only data and exception frame info */
+    /* Read-only data (constants, strings) */
     *(.rodata*)
-    KEEP(*(.eh_frame*))
-
-    /*
-    Constructors/destructors arrays handling.
-    The crtbegin/crtend handling keeps C/C++ static ctor/dtor lists
-    in a deterministic order so runtime can iterate them.
-    */
-    *crtbegin.o(.ctors)
-    *crtbegin?.o(.ctors)
-    *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
-    *(SORT(.ctors.*))
-    *(.ctors)
-    *crtbegin.o(.dtors)
-    *crtbegin?.o(.dtors)
-    *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
-    *(SORT(.dtors.*))
-    *(.dtors)
-
-    /* preinit/init/fini arrays (static init/fini) */
-    . = ALIGN(4);
-    PROVIDE_HIDDEN(__preinit_array_start = .);
-    KEEP(*(SORT(.preinit_array.*)))
-    KEEP(*(.preinit_array))
-    PROVIDE_HIDDEN(__preinit_array_end = .);
-
-    . = ALIGN(4);
-    PROVIDE_HIDDEN(__init_array_start = .);
-    KEEP(*(SORT(.init_array.*)))
-    KEEP(*(.init_array))
-    PROVIDE_HIDDEN(__init_array_end = .);
-
-    . = ALIGN(4);
-    PROVIDE_HIDDEN(__fini_array_start = .);
-    KEEP(*(SORT(.fini_array.*)))
-    KEEP(*(.fini_array))
-    PROVIDE_HIDDEN(__fini_array_end = .);
   } > flash
-
-  /* ARM exception handling tables - in read-only memory */
-  .ARM.extab :
-  {
-    *(.ARM.extab* .gnu.linkonce.armextab.*)
-  } > flash
-
-  /* Exception index (unwinding) table */
-  __exidx_start = .;
-  .ARM.exidx :
-  {
-    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-  } > flash
-  __exidx_end = .;
 
   /*
   .romfs - a dedicated read-only region for a filesystem or large blobs.
@@ -176,18 +110,15 @@ SECTIONS
   {
     . = ALIGN(4);
     __data_start__ = .;
-    *(vtable)             /* place any vtable fragments */
     *(.time_critical*)    /* specially tagged data needing placement */
-    *(.time_critical)
     *(.data)
     *(.data*)
     __data_end__ = .;
-  } > kernel_ram AT> flash
-
+  } > kernel_ram AT> flash /* AT> flash tells the linker that this section is loaded from flash but runs in RAM */
 
   /*
   .bss - zero-initialized data in RAM. NOLOAD means it's not stored in
-  the output image; runtime must clear the region.
+  the output image; runtime must clear the region. (basically uninitialized global variables)
   __bss_start__/__bss_end__ mark the zeroing range.
   */
   .bss (NOLOAD) :
@@ -217,62 +148,58 @@ SECTIONS
   __heap_limit__ = ORIGIN(kernel_ram) + LENGTH(kernel_ram);
 
   /*
-  scratch_x / scratch_y - small scratch areas allocated in their own
-  RAM regions but whose initial contents are stored in flash (AT > flash).
-  The linker also exposes source load addresses for copying at boot.
+  scratch_x / scratch_y are the fast scratch RAM banks 4KB each (SRAM4/SRAM5).
+  These can hold time-critical data, DMA buffers, or separate stacks.
+  Data can be initialized from flash (AT > flash) or left uninitialized (NOLOAD).
   */
-  .scratch_x :
+  
+  /* Scratch X (SRAM4) - 4KB for IRQ stack and fast buffers */
+  .scratch_x (NOLOAD):
   {
+    . = ALIGN(8); /* needs to be 8 for scratch sections */
     __scratch_x_start__ = .;
-    *(.scratch_x.*)
-    . = ALIGN(4);
+    *(.scratch_x*)
+    . = ALIGN(8);
+    . = . + 2K;  /* Reserve 2KB for IRQ/exception stack */
+    __irq_stack_top__ = .;
+    . = ORIGIN(scratch_x) + LENGTH(scratch_x);
     __scratch_x_end__ = .;
-  } > scratch_x AT > flash
-  __scratch_x_source__ = LOADADDR(.scratch_x);
-
-  .scratch_y :
-  {
-    __scratch_y_start__ = .;
-    *(.scratch_y.*)
-    . = ALIGN(4);
-    __scratch_y_end__ = .;
-  } > scratch_y AT > flash
-  __scratch_y_source__ = LOADADDR(.scratch_y);
-
-  /*
-  Dummy sections used to reserve stack storage in the scratch regions.
-  NOLOAD ensures they do not occupy space in the output image.
-  */
-  .stack1_dummy (NOLOAD):
-  {
-    *(.stack1*)
   } > scratch_x
 
-  .stack_dummy (NOLOAD):
+  /* Scratch Y (SRAM5) - 4KB for main system stack */
+  .scratch_y (NOLOAD):
   {
-    KEEP(*(.stack*))
+    . = ALIGN(8);
+    __scratch_y_start__ = .;
+    *(.scratch_y*)
+    . = ALIGN(8);
+    . = ORIGIN(scratch_y) + LENGTH(scratch_y);
+    __scratch_y_end__ = .;
   } > scratch_y
 
   /*
-  Compute stack-related symbols:
-  - __stack_limit__: top of process RAM (lowest permissible stack address)
-  - __stack_top__/__stack_bottom__: top/bottom of main stack in scratch_y
-  - __stack1_top__/__stack1_bottom__: for alternate/special stack in scratch_x
-  These are used by startup code and by runtime checks.
+  Stack symbols:
+  - Main stack grows down from top of scratch_y
+  - IRQ stack grows down from middle of scratch_x
+  - Allows separate stacks for main thread vs interrupts/exceptions
   */
-  __stack_limit__ = ORIGIN(process_ram) + LENGTH(process_ram);
-  __stack1_top__ = ORIGIN(scratch_x) + LENGTH(scratch_x);
-  __stack1_bottom__ = ORIGIN(scratch_x);
   __stack_top__ = ORIGIN(scratch_y) + LENGTH(scratch_y);
-  __stack_bottom__ = __stack_limit__;
+  __stack_limit__ = ORIGIN(scratch_y);
+  __irq_stack_limit__ = ORIGIN(scratch_x) + 2K; /* IRQ stack is only 2KB, the rest of scratch_x is for fast buffers */
 
-  /* Expose kernel/process RAM region bounds for use by runtime code */
+  /* kernel/process RAM region bounds for use by runtime code */
   __kernel_ram_start__ = ORIGIN(kernel_ram);
   __kernel_ram_end__ = ORIGIN(kernel_ram) + LENGTH(kernel_ram);
   __process_ram_start__ = ORIGIN(process_ram);
   __process_ram_end__ = ORIGIN(process_ram) + LENGTH(process_ram);
+  
+  /* scratch RAM bounds */
+  __scratch_x_region_start__ = ORIGIN(scratch_x);
+  __scratch_x_region_end__ = ORIGIN(scratch_x) + LENGTH(scratch_x);
+  __scratch_y_region_start__ = ORIGIN(scratch_y);
+  __scratch_y_region_end__ = ORIGIN(scratch_y) + LENGTH(scratch_y);
 
-  /* Default stack pointer symbol used by startup code; points to top of stack */
+  /* Default stack pointer symbol used by startup code; points to top of main stack */
   PROVIDE(__stack = __stack_top__);
 
   /* Sanity check at link time: ensures heap fits inside kernel_ram */

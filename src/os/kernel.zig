@@ -13,7 +13,7 @@ export fn kernelMain() noreturn {
     initFilesystem();
 
     // Print boot message
-    consolePrint("RP2350 OS Booting...\n");
+    consolePrint("SYCL OS Booting...\n");
     consolePrint("Kernel RAM: 128KB\n");
     consolePrint("Process RAM: 384KB\n");
     consolePrint("Flash: 2MB (512KB kernel, 1.5MB user)\n");

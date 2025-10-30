@@ -1,3 +1,5 @@
+ENTRY(_start)
+
 /*
 * exported symbols:
 * __preinit_array_start

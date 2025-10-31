@@ -64,6 +64,13 @@ pub fn build(builder: *Build) void {
         cart.install(builder);
     }
 
+    // build the OS Kernel (always use ReleaseSmall for minimal size)
+    const sycl_os = add_os(&dep, builder, mz_dep, .{
+        .name = "sycl-os-kernel",
+        .optimize = .ReleaseSmall,
+    }) orelse return;
+    sycl_os.install(builder);
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",
@@ -120,6 +127,77 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild) *microzig.Target {
     // Use the official Raspberry Pi Pico 2 board from microzig
     return @constCast(mb.ports.rp2xxx.boards.raspberrypi.pico2_arm);
+}
+
+pub const OS = struct {
+    exe: *Build.Step.Compile, // the compiled ELF file
+    uf2_output: Build.LazyPath, // the UF2 file made from the ELF file
+
+    pub fn install(os: *const OS, b: *Build) void {
+        const install_elf = b.addInstallArtifact(os.exe, .{
+            .dest_dir = .{ .override = .{ .custom = "firmware" } },
+        });
+        b.getInstallStep().dependOn(&install_elf.step);
+
+        const uf2_install_path = b.fmt("firmware/{s}.uf2", .{os.exe.name});
+        const install_uf2 = b.addInstallFile(os.uf2_output, uf2_install_path);
+        b.getInstallStep().dependOn(&install_uf2.step);
+    }
+};
+
+pub const OSOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+};
+
+pub fn add_os(
+    d: *Build.Dependency,
+    b: *Build,
+    mz_dep: *Build.Dependency,
+    options: OSOptions,
+) ?*OS {
+    // ARM Cortex-M33 target for Pico 2
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .thumb,
+        .os_tag = .freestanding,
+        .abi = .eabihf,
+        .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
+    });
+
+    // Build kernel executable from kernel.zig + boot.S + linker.ld
+    const exe = b.addExecutable(.{
+        .name = options.name,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = options.optimize,
+            .root_source_file = d.builder.path("src/os/kernel.zig"),
+        }),
+    });
+    exe.addAssemblyFile(d.builder.path("src/os/boot.S"));
+    exe.setLinkerScript(d.builder.path("src/os/linker.ld"));
+
+    // Build elf2uf2 conversion tool
+    const elf2uf2 = mz_dep.builder.addExecutable(.{
+        .name = "elf2uf2",
+        .root_module = mz_dep.builder.createModule(.{
+            .target = b.graph.host,
+            .optimize = .ReleaseSafe,
+            .root_source_file = mz_dep.path("tools/uf2/src/elf2uf2.zig"),
+        }),
+    });
+
+    // Convert ELF to UF2 for Pico 2 bootloader
+    const elf2uf2_run = b.addRunArtifact(elf2uf2);
+    elf2uf2_run.addArgs(&.{"--elf-path"});
+    elf2uf2_run.addFileArg(exe.getEmittedBin());
+    elf2uf2_run.addArgs(&.{"--output-path"});
+    const uf2_filename = b.fmt("{s}.uf2", .{options.name});
+    const uf2_output = elf2uf2_run.addOutputFileArg(uf2_filename);
+    elf2uf2_run.addArgs(&.{ "--family-id", "0xe48bff59", "--verbose" });
+
+    const os: *OS = b.allocator.create(OS) catch @panic("OOM");
+    os.* = .{ .exe = exe, .uf2_output = uf2_output };
+    return os;
 }
 
 pub fn add_cart(

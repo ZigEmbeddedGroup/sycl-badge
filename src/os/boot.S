@@ -4,10 +4,10 @@
 .thumb // thumb is 16/32bit compact instruction set - cortex-m only processes thumb 
 
 // vector table - must be first in flash at 0x10000000 - tells cpu where to find exception/interrupt handlers
+// Everything in .text.boot to ensure proper ordering
 
-// this below places all code in vectors section - 'a' is for allocatable (takes space in output), 'x' is for executable 
-.section .vectors, "ax" 
-.align 2 // align next data to 2^2 = 4byte
+.section .text.boot, "ax"
+.align 4 // align to 16 bytes for ARM
 
 .global __vectors // make __vectors symbol globally visible to linker 
 
@@ -40,15 +40,25 @@ __vectors:
     .word hang_handler // 
     .endr // .endr : end repeat block
 
+// RP2350 IMAGE_DEF block
+// This block is metadata that tells the RP2350 bootloader about the binary format and size.
+// Must come immediately after the vector table (at flash offset 0x110).
+.align 4
+image_def_block:
+    .word 0xffffded3          // IMAGE_DEF marker (identifies start of image definition)
+    .word 0x10210142          // Image type: PICOBIN_IMAGE_TYPE_EXE (ARM executable)
+    .word 0x000001ff          // Size: 511 blocks = ~128KB (0x1FF is the max based on testing which seems to limit kernel size to 128KB)
+                              // 0x1FF * 256 bytes = 130816 bytes (~127.75 KB)
+                              // To use more flash, load additional code at runtime beyond this limit
+    .word 0x00000000          // Entry point: 0 = use reset vector from vector table
+    .word 0xab123579          // End marker (SHORT format - 5 words total)
+
 // reset handler - entry point after power/reset - runs when cpu starts/resets
 
-.section .text.boot // place executable code in .text.boot section 
-
 .global _start // export _start symbol so linker can find entry point
-
 .type _start, %function // telling assembler _start is a function - this for debugging
 
-.thumb_func // mark _start as thumb code - corttex-m specific
+.thumb_func // mark _start as thumb code - cortex-m specific
 
 // reset handler code
 _start:

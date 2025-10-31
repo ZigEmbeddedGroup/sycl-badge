@@ -64,13 +64,8 @@ SECTIONS
   {
     . = ALIGN(4);
 
-    /* Vector table (startup vectors) must be kept at its explicit location */
-    KEEP(*(.vectors))
-
-    /* Boot metadata region */
-    __bootmeta_start__ = .;
-    KEEP(*(.bootmeta))
-    __bootmeta_end__ = .;
+    /* Boot code with vector table and metadata at the very top */
+    KEEP(*(.text.boot))
 
     /* All regular code sections */
     *(.text*)

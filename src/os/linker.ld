@@ -1,3 +1,5 @@
+ENTRY(_start)
+
 /* 
 linker.ld
 This file tells the linker where to place sections of the final binary

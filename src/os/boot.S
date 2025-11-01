@@ -50,15 +50,16 @@ image_def_block:
     .word 0x000001ff          // Size: 511 blocks = ~128KB (0x1FF is the max based on testing which seems to limit kernel size to 128KB)
                               // 0x1FF * 256 bytes = 130816 bytes (~127.75 KB)
                               // To use more flash, load additional code at runtime beyond this limit
+                              // this was found through experimentation, need to find official doc on it
     .word 0x00000000          // Entry point: 0 = use reset vector from vector table
     .word 0xab123579          // End marker (SHORT format - 5 words total)
 
-// reset handler - entry point after power/reset - runs when cpu starts/resets
+// reset handler, entry point after power/reset, runs when cpu starts/resets
 
 .global _start // export _start symbol so linker can find entry point
-.type _start, %function // telling assembler _start is a function - this for debugging
+.type _start, %function // telling assembler _start is a function (for debugging)
 
-.thumb_func // mark _start as thumb code - cortex-m specific
+.thumb_func // mark _start as thumb code (cortex-m specific)
 
 // reset handler code
 _start:
@@ -75,7 +76,7 @@ _start:
     // ble (less than equal to) target (if size <=0 skip copy) - if data section empty, skip copy loop
     ble .Ldata_done
 
-// local label - starting w .L so linker doesn't export
+// local label starting w .L so linker doesn't export
 .Ldata_loop:
     ldr r3, [r0], #4 // load word from addr in r0 into r3, then r0 = r0 + 4
 
@@ -85,7 +86,7 @@ _start:
 
     bgt .Ldata_loop // if counter > 0, keep looping 
 
-// marking end of .data copy 
+// end of .data copy 
 .Ldata_done:
  
     ldr r0, =__bss_start__ // load start addr of .bss (uninitialized global/static variables (is zeroed)) into r0

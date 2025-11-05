@@ -11,8 +11,8 @@
 
     .dependencies = .{
         .microzig = .{
-            .url = "git+https://github.com/ZigEmbeddedGroup/microzig",
-            .hash = "microzig-0.15.0-D20YSTa72gCHaTig_dfQszKY6IPg4nctMYwlvqUwd8-m",
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#74a2053c18b6aac4fa047efde30e4a76c08c4a7c",
+            .hash = "microzig-0.15.0-D20YSctp1ACsdZCdjN2xvWdgAW9MBx_jZ1l1ya3IU2QM",
         },
     },
 }

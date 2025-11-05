@@ -17,7 +17,7 @@ pub fn build(builder: *Build) void {
     _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/cart/api.zig") });
 
     // Badge V2 (RP2350) target setup
-    const badge_v2_target = sycl_badge_v2_microzig_target(mb);
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, builder);
 
     var dep: std.Build.Dependency = .{ .builder = builder };
     const feature_test_cart = add_cart(&dep, builder, .{
@@ -49,7 +49,7 @@ pub fn build(builder: *Build) void {
             .target = badge_v2_target,
         });
         mb.install_firmware(exe, .{ .format = .elf });
-        mb.install_firmware(exe, .{ .format = .{ .uf2 = .RP2350_ARM_S } });
+        mb.install_firmware(exe, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
     }
 
     inline for (.{
@@ -96,7 +96,7 @@ pub const Cart = struct {
 
     pub fn install(c: *const Cart, b: *Build) void {
         c.mb.install_firmware(c.fw, .{ .format = .elf });
-        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .RP2350_ARM_NS } });
+        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_NS } } });
         b.installArtifact(c.wasm);
     }
 };
@@ -124,9 +124,17 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
     });
 }
 
-fn sycl_badge_v2_microzig_target(mb: *MicroBuild) *microzig.Target {
-    // Use the official Raspberry Pi Pico 2 board from microzig
-    return @constCast(mb.ports.rp2xxx.boards.raspberrypi.pico2_arm);
+fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Target {
+    // Use the official Raspberry Pi Pico 2 board as base
+    const base_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm;
+
+    // Derive a custom target with our custom linker script for OS memory layout
+    return base_target.derive(.{
+        .linker_script = .{
+            .generate = .none, // Don't auto-generate, use our custom script
+            .file = builder.path("src/os/linker.ld"),
+        },
+    });
 }
 
 pub const OS = struct {
@@ -156,66 +164,23 @@ pub fn add_os(
     mz_dep: *Build.Dependency,
     options: OSOptions,
 ) ?*OS {
-    // ARM Cortex-M33 target for Pico 2
-    const target = b.resolveTargetQuery(.{
-        .cpu_arch = .thumb,
-        .os_tag = .freestanding,
-        .abi = .eabihf,
-        .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
-    });
-
-    // Get microzig build system to access RP2350 chip/board definitions
+    // Use microzig's firmware builder which provides startup code and HAL access
     const mb = MicroBuild.init(b, mz_dep) orelse return null;
-    const badge_v2_target = sycl_badge_v2_microzig_target(mb); // we do for rp2350
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, d.builder);
 
-    // Create microzig config options for RP2350
-    const microzig_config = b.addOptions();
-    microzig_config.addOption(
-        microzig.Target,
-        "microzig_target",
-        badge_v2_target.*,
-    );
-
-    // Get the microzig module for HAL access
-    const microzig_module = mz_dep.module("microzig");
-
-    // Build kernel executable from kernel.zig + boot.S + linker.ld
-    const exe = b.addExecutable(.{
+    const fw = mb.add_firmware(.{
         .name = options.name,
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = options.optimize,
-            .root_source_file = d.builder.path("src/os/kernel.zig"),
-            .imports = &.{
-                .{ .name = "microzig", .module = microzig_module },
-                .{ .name = "microzig-config", .module = microzig_config.createModule() },
-            },
-        }),
-    });
-    exe.addAssemblyFile(d.builder.path("src/os/boot.S"));
-    exe.setLinkerScript(d.builder.path("src/os/linker.ld"));
-
-    // Build elf2uf2 conversion tool
-    const elf2uf2 = mz_dep.builder.addExecutable(.{
-        .name = "elf2uf2",
-        .root_module = mz_dep.builder.createModule(.{
-            .target = b.graph.host,
-            .optimize = .ReleaseSafe,
-            .root_source_file = mz_dep.path("tools/uf2/src/elf2uf2.zig"),
-        }),
+        .target = badge_v2_target,
+        .optimize = options.optimize,
+        .root_source_file = d.builder.path("src/os/kernel.zig"),
     });
 
-    // Convert ELF to UF2 for Pico 2 bootloader
-    const elf2uf2_run = b.addRunArtifact(elf2uf2);
-    elf2uf2_run.addArgs(&.{"--elf-path"});
-    elf2uf2_run.addFileArg(exe.getEmittedBin());
-    elf2uf2_run.addArgs(&.{"--output-path"});
-    const uf2_filename = b.fmt("{s}.uf2", .{options.name});
-    const uf2_output = elf2uf2_run.addOutputFileArg(uf2_filename);
-    elf2uf2_run.addArgs(&.{ "--family-id", "0xe48bff59", "--verbose" });
+    // Install both ELF and UF2 formats
+    mb.install_firmware(fw, .{ .format = .elf });
+    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 
     const os: *OS = b.allocator.create(OS) catch @panic("OOM");
-    os.* = .{ .exe = exe, .uf2_output = uf2_output };
+    os.* = .{ .exe = fw.artifact, .uf2_output = fw.artifact.getEmittedBin() };
     return os;
 }
 
@@ -292,5 +257,5 @@ pub fn add_cart(
 pub fn install_cart(b: *Build, cart: *Cart) void {
     _ = b;
     cart.mz.install_firmware(cart.fw, .{ .format = .elf });
-    cart.mz.install_firmware(cart.fw, .{ .format = .{ .uf2 = .RP2350_ARM_S } });
+    cart.mz.install_firmware(cart.fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 }

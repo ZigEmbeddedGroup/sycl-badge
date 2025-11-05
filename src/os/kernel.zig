@@ -2,24 +2,28 @@
 const std = @import("std");
 const microzig = @import("microzig");
 
-/// Main kernel entry point - called by boot.S
-// Exported with C calling convention so assembly (boot.S) can call it reliably.
-// Also `pub` so other Zig code can reference it if desired.
-pub export fn kernel_main() callconv(.C) noreturn {
+// MicroZig expects a pub fn main() as the entry point (this is if we don't use our own boot.S and linker.ld)
+pub fn main() noreturn {
     initSystem();
     initScheduler();
-    // Main function which runs forever and doesn't return anything
+    // Main OS loop
     while (true) {
-
+        // TODO: Task scheduler, process management, etc.
     }
 }
 
 fn initSystem() void {
-    // we need to add GPIO, uart, timers, and anything else that needs to be initialized
-    microzig.init();
-    microzig.hal.uart.initDefaultUart();
-    microzig.hal.gpio.initDefaultGpio();
-    microzig.hal.timer.initDefaultTimer();
+    // Initialize system peripherals using microzig HAL
+    // microzig has:
+    // - microzig.chip: RP2350 register definitions
+    // - microzig.hal: High-level hardware abstraction
+    // - microzig.board: Board-specific pins/config
+
+    // TODO: Initialize GPIO, UART, timers, etc.
+    _ = microzig;
+    _ = microzig.hal;
+    _ = microzig.chip;
+    _ = microzig.board;
 }
 
 fn initScheduler() void {

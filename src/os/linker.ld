@@ -103,17 +103,17 @@ SECTIONS
   __data_start__ and __data_end__ bracket the runtime copy range.
   */
   __data_start_flash__ = LOADADDR(.data);
-  microzig_data_load_start = LOADADDR(.data); /* MicroZig compatibility */
+  microzig_data_load_start = LOADADDR(.data);
   .data :
   {
     . = ALIGN(4);
     __data_start__ = .;
-    microzig_data_start = .; /* MicroZig compatibility */
+    microzig_data_start = .;
     *(.time_critical*)    /* specially tagged data needing placement */
     *(.data)
     *(.data*)
     __data_end__ = .;
-    microzig_data_end = .; /* MicroZig compatibility */
+    microzig_data_end = .;
   } > kernel_ram AT> flash /* AT> flash tells the linker that this section is loaded from flash but runs in RAM */
 
   /*
@@ -125,13 +125,13 @@ SECTIONS
   {
     . = ALIGN(4);
     __bss_start__ = .;
-    microzig_bss_start = .; /* MicroZig compatibility */
+    microzig_bss_start = .;
     *(.bss)
     *(.bss.*)
     *(COMMON)
     . = ALIGN(4);
     __bss_end__ = .;
-    microzig_bss_end = .; /* MicroZig compatibility */
+    microzig_bss_end = .;
   } > kernel_ram
 
   /*

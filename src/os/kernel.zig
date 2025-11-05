@@ -1,29 +1,34 @@
 // imports
 const std = @import("std");
 const microzig = @import("microzig");
+const gpio = microzig.hal.gpio;
+const time = microzig.hal.time;
 
-// MicroZig expects a pub fn main() as the entry point (this is if we don't use our own boot.S and linker.ld)
+// Pico 2 has LED on GPIO 25
+const led_pin = gpio.num(25);
+
+// MicroZig expects a pub fn main() as the entry point
 pub fn main() noreturn {
     initSystem();
     initScheduler();
-    // Main OS loop
+
+    // Main OS loop - blink LED to show we're alive
     while (true) {
-        // TODO: Task scheduler, process management, etc.
+        led_pin.put(1); // Turn LED on
+        time.sleep_ms(500);
+        led_pin.put(0); // Turn LED off
+        time.sleep_ms(500);
     }
 }
 
 fn initSystem() void {
     // Initialize system peripherals using microzig HAL
-    // microzig has:
-    // - microzig.chip: RP2350 register definitions
-    // - microzig.hal: High-level hardware abstraction
-    // - microzig.board: Board-specific pins/config
 
-    // TODO: Initialize GPIO, UART, timers, etc.
-    _ = microzig;
-    _ = microzig.hal;
-    _ = microzig.chip;
-    _ = microzig.board;
+    // Initialize LED pin as output
+    led_pin.set_function(.sio);
+    led_pin.set_direction(.out);
+
+    // TODO: Initialize UART, timers, etc. for OS features
 }
 
 fn initScheduler() void {

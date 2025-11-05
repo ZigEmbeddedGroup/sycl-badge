@@ -125,16 +125,17 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
 }
 
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Target {
-    // Use the official Raspberry Pi Pico 2 board as base
+    // Use the Raspberry Pi Pico 2 board as base
     const base_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm;
 
-    // Derive a custom target with our custom linker script for OS memory layout
-    return base_target.derive(.{
-        .linker_script = .{
-            .generate = .none, // Don't auto-generate, use our custom script
-            .file = builder.path("src/os/linker.ld"),
-        },
-    });
+    // Let microzig auto-generate linker script with IMAGE_DEF/picobin support
+    // For now, use default memory layout until we can properly customize it
+    _ = builder;
+    return @constCast(base_target);
+
+    // TODO: Figure out how to customize memory regions while keeping IMAGE_DEF
+    // As far as I can tell providing a custom linker script breaks IMAGE_DEF generation
+    // we want to use our linker.ld though
 }
 
 pub const OS = struct {
@@ -155,7 +156,7 @@ pub const OS = struct {
 
 pub const OSOptions = struct {
     name: []const u8,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.builtin.OptimizeMode, // this massively reduces UF2 file size
 };
 
 pub fn add_os(

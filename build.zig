@@ -164,6 +164,21 @@ pub fn add_os(
         .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
     });
 
+    // Get microzig build system to access RP2350 chip/board definitions
+    const mb = MicroBuild.init(b, mz_dep) orelse return null;
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb); // we do for rp2350
+
+    // Create microzig config options for RP2350
+    const microzig_config = b.addOptions();
+    microzig_config.addOption(
+        microzig.Target,
+        "microzig_target",
+        badge_v2_target.*,
+    );
+
+    // Get the microzig module for HAL access
+    const microzig_module = mz_dep.module("microzig");
+
     // Build kernel executable from kernel.zig + boot.S + linker.ld
     const exe = b.addExecutable(.{
         .name = options.name,
@@ -171,6 +186,10 @@ pub fn add_os(
             .target = target,
             .optimize = options.optimize,
             .root_source_file = d.builder.path("src/os/kernel.zig"),
+            .imports = &.{
+                .{ .name = "microzig", .module = microzig_module },
+                .{ .name = "microzig-config", .module = microzig_config.createModule() },
+            },
         }),
     });
     exe.addAssemblyFile(d.builder.path("src/os/boot.S"));

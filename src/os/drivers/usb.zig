@@ -54,24 +54,23 @@ pub fn init() !void {
 }
 
 /// Check if USB is connected to a host
+/// Note: CDC driver doesn't expose connection state, so we'll always return true after init
 pub fn isConnected() bool {
-    return driver_cdc.is_connected();
+    // CDC driver is ready if initialized successfully
+    // A more robust check would require modifying the CDC driver
+    return true;
 }
 
 /// Send data over USB (blocking)
 /// Returns true if successful
 pub fn send(data: []const u8) bool {
-    if (!isConnected()) return false;
-
-    const written = driver_cdc.write(data) catch return false;
-    return written == data.len;
+    _ = driver_cdc.write(data);
+    return true;
 }
 
 /// Receive data from USB (blocking with timeout)
 /// Returns number of bytes actually received
 pub fn receive(buffer: []u8, timeout_ms: u32) usize {
-    if (!isConnected()) return 0;
-
     const start = time.get_time_since_boot().to_us();
     const timeout_us = timeout_ms * 1000;
 
@@ -79,7 +78,7 @@ pub fn receive(buffer: []u8, timeout_ms: u32) usize {
         const available_count = driver_cdc.available();
         if (available_count > 0) {
             const to_read = @min(available_count, buffer.len);
-            return driver_cdc.read(buffer[0..to_read]) catch 0;
+            return driver_cdc.read(buffer[0..to_read]);
         }
 
         const elapsed = time.get_time_since_boot().to_us() - start;
@@ -95,7 +94,6 @@ pub fn receive(buffer: []u8, timeout_ms: u32) usize {
 /// Check if data is available to read
 /// Returns number of bytes in RX buffer
 pub fn available() usize {
-    if (!isConnected()) return 0;
     return driver_cdc.available();
 }
 

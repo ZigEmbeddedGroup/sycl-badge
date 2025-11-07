@@ -1,7 +1,8 @@
 /// UART driver for RP2350
 /// Thin wrapper around the rp2xxx HAL uart module for having clean kernel
 const std = @import("std");
-const hal = @import("microzig");
+const microzig = @import("microzig");
+const hal = microzig.hal;
 
 // Re-export HAL types
 pub const Config = hal.uart.Config;
@@ -11,8 +12,8 @@ pub const Parity = hal.uart.Parity;
 pub const TransmitError = hal.uart.TransmitError;
 pub const ReceiveError = hal.uart.ReceiveError;
 
-// Use UART0 
-const uart_instance = hal.uart.instance.UART0;
+// Use UART0
+const uart_instance = hal.uart.instance.num(0);
 
 /// UART0 default settings init (115200 baud, 8N1)
 pub fn init() void {
@@ -36,7 +37,7 @@ pub fn init() void {
     });
 }
 
-/// UART init with config 
+/// UART init with config
 pub fn initWithConfig(config: Config) void {
     // Configure GPIO pins for UART0
     const tx_pin = hal.gpio.num(0);
@@ -51,7 +52,7 @@ pub fn initWithConfig(config: Config) void {
 
 /// Write single char to UART
 pub fn putc(c: u8) void {
-    uart_instance.write_blocking(&.{c}) catch {};
+    uart_instance.write_blocking(&.{c}, null) catch {};
 }
 
 /// Read single char from UART (blocking)
@@ -61,9 +62,9 @@ pub fn getc() u8 {
     return byte;
 }
 
-/// Write str to UART
+/// Write string to UART
 pub fn puts(str: []const u8) void {
-    uart_instance.write_blocking(str) catch {};
+    uart_instance.write_blocking(str, null) catch {};
 }
 
 /// Write str with newline

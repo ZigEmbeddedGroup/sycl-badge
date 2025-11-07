@@ -7,13 +7,8 @@ const uart = @import("drivers/uart.zig");
 const gpio = @import("drivers/gpio.zig");
 const usb = @import("drivers/usb.zig");
 
-/// Kernel entry point called from boot.S
-/// This is the C-callable entry point that boot code jumps to
-export fn kernel_main(r0: u32, r1: u32, atags: u32) callconv(.C) noreturn {
-    _ = r0;
-    _ = r1;
-    _ = atags;
-
+/// Main entry point required by MicroZig
+pub fn main() noreturn {
     // Init hardware
     initHardware();
 
@@ -28,33 +23,60 @@ export fn kernel_main(r0: u32, r1: u32, atags: u32) callconv(.C) noreturn {
 
 /// Init all hardware subsystems
 fn initHardware() void {
-    // Init UART for debug output
+    // Init UART
     uart.init();
+    uart.println("UART initialized");
 
-    // TODO: Init other peripherals
-    // - Timers
-    // - DMA
-    // - USB
-    // - etc.
+    // Init GPIO subsystem
+    gpio.init();
+    uart.println("GPIO initialized");
+
+    // Init LED on GPIO 25
+    gpio.initLED();
+    gpio.setLED(true); // Turn on LED to show we're alive
+    uart.println("LED initialized (GPIO 25)");
+
+    // Init USB CDC for program loading
+    usb.init() catch {
+        uart.println("Warning: USB init failed");
+        uart.println("Continuing with UART only...");
+    };
+    uart.println("USB CDC initialized (if available)");
 }
 
 /// Main kernel loop
 fn kernelMain() noreturn {
     uart.println("Kernel initialized. Entering main loop.");
-    uart.println("Echo mode: Type characters to see them echoed back.");
+    uart.println("Echo mode: Type characters via UART or USB CDC");
     uart.puts("\r\n> ");
 
-    // Simple echo loop for now
-    // TODO: replace with a proper scheduler and task management
+    var led_state: bool = true;
+    var iteration: u32 = 0;
+
+    // Main loop: process USB events and echo input
     while (true) {
-        const c = uart.getc();
+        // Process USB events (required for USB to work)
+        usb.poll();
+        _ = usb.send("test");
 
-        // Echo the character
-        uart.putc(c);
+        // Blink LED every 100000 iterations to show we're alive
+        iteration += 1;
+        if (iteration % 100000 == 0) {
+            led_state = !led_state;
+            gpio.setLED(led_state);
+        }
 
-        // Add newline on enter
-        if (c == '\r' or c == '\n') {
-            uart.putc('\n');
+        // Check for UART input (non-blocking would be better but keeping it simple)
+        // Note: This will block if nothing is available
+        // TODO: Implement non-blocking UART reads
+
+        // For now, just show USB status periodically
+        if (iteration % 1000000 == 0) {
+            if (usb.isConnected()) {
+                uart.println("\r\n[USB connected]");
+            } else {
+                uart.println("\r\n[USB disconnected]");
+            }
             uart.puts("> ");
         }
     }

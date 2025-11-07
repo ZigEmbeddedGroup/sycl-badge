@@ -11,6 +11,8 @@ pub const Pull = hal.gpio.Pull;
 pub const SlewRate = hal.gpio.SlewRate;
 pub const DriveStrength = hal.gpio.DriveStrength;
 pub const Mask = hal.gpio.Mask;
+pub const IrqLevel = hal.gpio.IrqLevel;
+pub const IrqCallback = hal.gpio.IrqCallback;
 
 /// Create a Pin from a GPIO num
 pub fn num(n: u9) Pin {

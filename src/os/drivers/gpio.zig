@@ -1,31 +1,50 @@
-﻿/// GPIO driver for RP2350
-/// Thin wrapper around the rp2xxx HAL gpio module
-const std = @import("std");
-const hal = @import("microzig");
+﻿const std = @import("std");
+const microzig = @import("microzig");
 
-// Re-export HAL types and funcs
-pub const Pin = hal.gpio.Pin;
-pub const Function = hal.gpio.Function;
-pub const Direction = hal.gpio.Direction;
-pub const IrqLevel = hal.gpio.IrqLevel;
-pub const IrqCallback = hal.gpio.IrqCallback;
-pub const Override = hal.gpio.Override;
-pub const SlewRate = hal.gpio.SlewRate;
-pub const DriveStrength = hal.gpio.DriveStrength;
-pub const Pull = hal.gpio.Pull;
-pub const Mask = hal.gpio.Mask;
+// Re-export microzig types and funcs
+pub const Pin = microzig.gpio.Pin;
+pub const Function = microzig.gpio.Function;
+pub const Direction = microzig.gpio.Direction;
+pub const IrqLevel = microzig.gpio.IrqLevel;
+pub const IrqCallback = microzig.gpio.IrqCallback;
+pub const Override = microzig.gpio.Override;
+pub const SlewRate = microzig.gpio.SlewRate;
+pub const DriveStrength = microzig.gpio.DriveStrength;
+pub const Pull = microzig.gpio.Pull;
+pub const Mask = microzig.gpio.Mask;
 
-/// Create a Pin from a GPIO num
+// Basic pin operations
 pub fn num(n: u9) Pin {
-    return hal.gpio.num(n);
+    return microzig.gpio.num(n);
 }
 
-/// Create a Mask from a bitmask val
 pub fn mask(m: anytype) Mask {
-    return hal.gpio.mask(m);
+    return microzig.gpio.mask(m);
 }
 
-///pin defs: can be expanded as needed
+// Read and write operations with proper types
+pub fn read(pin: Pin) u1 {
+    return @intFromBool(microzig.gpio.read(pin));
+}
+
+pub fn put(pin: Pin, value: u1) void {
+    microzig.gpio.put(pin, value != 0);
+}
+
+// Convenience functions using the corrected read
+pub fn isHigh(pin: Pin) bool {
+    return read(pin) == 1;
+}
+
+pub fn isLow(pin: Pin) bool {
+    return read(pin) == 0;
+}
+
+pub fn toggle(pin: Pin) void {
+    put(pin, ~read(pin) & 1);
+}
+
+// Rest of your pin definitions...
 pub const Pins = struct {
     pub const UART0_TX = num(0);
     pub const UART0_RX = num(1);

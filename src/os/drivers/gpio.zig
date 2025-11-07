@@ -7,12 +7,13 @@ const hal = @import("microzig");
 pub const Pin = hal.gpio.Pin;
 pub const Function = hal.gpio.Function;
 pub const Direction = hal.gpio.Direction;
-pub const Pull = hal.gpio.Pull;
-pub const SlewRate = hal.gpio.SlewRate;
-pub const DriveStrength = hal.gpio.DriveStrength;
-pub const Mask = hal.gpio.Mask;
 pub const IrqLevel = hal.gpio.IrqLevel;
 pub const IrqCallback = hal.gpio.IrqCallback;
+pub const Override = hal.gpio.Override;
+pub const SlewRate = hal.gpio.SlewRate;
+pub const DriveStrength = hal.gpio.DriveStrength;
+pub const Pull = hal.gpio.Pull;
+pub const Mask = hal.gpio.Mask;
 
 /// Create a Pin from a GPIO num
 pub fn num(n: u9) Pin {

@@ -5,6 +5,7 @@ const std = @import("std");
 // Import drivers and sys modules
 const uart = @import("drivers/uart.zig");
 const gpio = @import("drivers/gpio.zig");
+const usb = @import("drivers/usb.zig");
 
 /// Kernel entry point called from boot.S
 /// This is the C-callable entry point that boot code jumps to

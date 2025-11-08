@@ -15449,7 +15449,7 @@
 		)
 		(uuid "a819b4b3-4794-40f4-b237-bbcda43c3cf3")
 	)
-	(label "DB_NEOPIX"
+	(label "D8_NEOPIX"
 		(at 318.77 245.11 90)
 		(effects
 			(font

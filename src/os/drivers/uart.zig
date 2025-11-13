@@ -1,27 +1,28 @@
 /// UART driver for RP2350
-/// Thin wrapper around the rp2xxx HAL uart module for having clean kernel
+/// Thin wrapper around the rp2xxx microzig uart module for having clean kernel
 const std = @import("std");
-const hal = @import("microzig");
+const microzig = @import("microzig");
+const gpio = microzig.gpio;
 
-// Re-export HAL types
-pub const Config = hal.uart.Config;
-pub const WordBits = hal.uart.WordBits;
-pub const StopBits = hal.uart.StopBits;
-pub const Parity = hal.uart.Parity;
-pub const TransmitError = hal.uart.TransmitError;
-pub const ReceiveError = hal.uart.ReceiveError;
+// Re-export microzig types
+pub const Config = microzig.uart.Config;
+pub const WordBits = microzig.uart.WordBits;
+pub const StopBits = microzig.uart.StopBits;
+pub const Parity = microzig.uart.Parity;
+pub const TransmitError = microzig.uart.TransmitError;
+pub const ReceiveError = microzig.uart.ReceiveError;
 
-// Use UART0 
-const uart_instance = hal.uart.instance.UART0;
+// Use UART0
+const uart_instance = microzig.uart.instance.UART0;
 
 /// UART0 default settings init (115200 baud, 8N1)
 pub fn init() void {
     // Get the clock config
-    const clock_config = hal.clock_config;
+    const clock_config = microzig.clock_config;
 
     // GPIO pins config for UART0 (GPIO 0 = TX, GPIO 1 = RX)
-    const tx_pin = hal.gpio.num(0);
-    const rx_pin = hal.gpio.num(1);
+    const tx_pin = gpio.num(0);
+    const rx_pin = gpio.num(1);
 
     tx_pin.set_function(.uart);
     rx_pin.set_function(.uart);
@@ -39,8 +40,8 @@ pub fn init() void {
 /// UART init with config 
 pub fn initWithConfig(config: Config) void {
     // Configure GPIO pins for UART0
-    const tx_pin = hal.gpio.num(0);
-    const rx_pin = hal.gpio.num(1);
+    const tx_pin = gpio.num(0);
+    const rx_pin = gpio.num(1);
 
     tx_pin.set_function(.uart);
     rx_pin.set_function(.uart);
@@ -74,7 +75,7 @@ pub fn println(str: []const u8) void {
 }
 
 /// Get a writer with std.fmt
-pub fn writer() hal.uart.UART.Writer {
+pub fn writer() microzig.uart.UART.Writer {
     return uart_instance.writer();
 }
 

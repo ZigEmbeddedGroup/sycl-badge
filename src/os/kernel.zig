@@ -1,78 +1,72 @@
 ﻿/// SYCL Badge OS Kernel
-/// Main entry point for os
+/// USB CDC and UART communication
 const std = @import("std");
+const microzig = @import("microzig");
 
-// Import drivers and sys modules
+const rp2xxx = microzig.hal;
+const time = rp2xxx.time;
+const gpio = rp2xxx.gpio;
+
+const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
-const gpio = @import("drivers/gpio.zig");
 
-/// Kernel entry point called from boot.S
-/// This is the C-callable entry point that boot code jumps to
-export fn kernel_main(r0: u32, r1: u32, atags: u32) callconv(.C) noreturn {
-    _ = r0;
-    _ = r1;
-    _ = atags;
+const led = gpio.num(25);
 
-    // Init hardware
-    initHardware();
+pub fn main() !void {
+    led.set_function(.sio);
+    led.set_direction(.out);
+    led.put(1);
 
-    // Print boot message
-    uart.println("SYCL Badge OS v0.1");
-    uart.println("Booting on RP2350...");
-    uart.puts("\r\n");
-
-    // Run main kernel loop
-    kernelMain();
-}
-
-/// Init all hardware subsystems
-fn initHardware() void {
-    // Init UART for debug output
+    // Initialize UART for debug output
     uart.init();
+    uart.println("SYCL Badge OS starting...");
 
-    // TODO: Init other peripherals
-    // - Timers
-    // - DMA
-    // - USB
-    // - etc.
-}
+    // Initialize USB
+    try usb.init();
+    uart.println("USB initialized");
 
-/// Main kernel loop
-fn kernelMain() noreturn {
-    uart.println("Kernel initialized. Entering main loop.");
-    uart.println("Echo mode: Type characters to see them echoed back.");
-    uart.puts("\r\n> ");
+    var old: u64 = time.get_time_since_boot().to_us();
+    var new: u64 = 0;
+    var i: u32 = 0;
 
-    // Simple echo loop for now
-    // TODO: replace with a proper scheduler and task management
+    uart.println("Entering main loop");
+
+    // Main loop - call usb.poll() as often as possible!
     while (true) {
-        const c = uart.getc();
+        // CRITICAL: Poll USB frequently
+        usb.poll();
 
-        // Echo the character
-        uart.putc(c);
+        new = time.get_time_since_boot().to_us();
+        if (new - old > 1_000_000) { // Every 1 second
+            old = new;
+            led.toggle();
+            i += 1;
 
-        // Add newline on enter
-        if (c == '\r' or c == '\n') {
-            uart.putc('\n');
-            uart.puts("> ");
+            // Send to both USB and UART
+            _ = usb.printf("USB message {}\r\n", .{i});
+
+            var uart_buffer: [64]u8 = undefined;
+            const uart_msg = std.fmt.bufPrint(&uart_buffer, "UART message {}", .{i}) catch "Error";
+            uart.println(uart_msg);
+
+            // Check for incoming USB data
+            var rx_buffer: [256]u8 = undefined;
+            const bytes_read = usb.receive(&rx_buffer, 0); // Non-blocking read
+            if (bytes_read > 0) {
+                _ = usb.printf("USB received: {s}\r\n", .{rx_buffer[0..bytes_read]});
+                uart.puts("USB received: ");
+                uart.println(rx_buffer[0..bytes_read]);
+            }
         }
     }
 }
 
-/// Panic handler required by Zig runtime
-/// Called when an unrecoverable error occurs
-pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = error_return_trace;
-    _ = ret_addr;
-
-    // Try to output panic message if UART is available
-    uart.puts("\r\n\r\n*** KERNEL PANIC ***\r\n");
-    uart.puts("Error: ");
-    uart.puts(msg);
-    uart.puts("\r\n");
-
-    // Hang forever
+pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
+    _ = message;
     while (true) {
-        asm volatile ("wfe"); // Wait for event (low power)
+        led.put(1);
+        time.sleep_ms(100);
+        led.put(0);
+        time.sleep_ms(100);
     }
 }

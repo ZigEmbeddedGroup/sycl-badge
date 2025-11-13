@@ -2,7 +2,7 @@
 /// Thin wrapper around the rp2xxx microzig uart module for having clean kernel
 const std = @import("std");
 const microzig = @import("microzig");
-const gpio = microzig.gpio;
+const hal = microzig.hal;
 
 // Re-export microzig types
 pub const Config = microzig.uart.Config;
@@ -13,7 +13,7 @@ pub const TransmitError = microzig.uart.TransmitError;
 pub const ReceiveError = microzig.uart.ReceiveError;
 
 // Use UART0
-const uart_instance = microzig.uart.instance.UART0;
+const uart_instance = hal.uart.instance.num(0);
 
 /// UART0 default settings init (115200 baud, 8N1)
 pub fn init() void {
@@ -37,7 +37,7 @@ pub fn init() void {
     });
 }
 
-/// UART init with config 
+/// UART init with config
 pub fn initWithConfig(config: Config) void {
     // Configure GPIO pins for UART0
     const tx_pin = gpio.num(0);
@@ -52,7 +52,7 @@ pub fn initWithConfig(config: Config) void {
 
 /// Write single char to UART
 pub fn putc(c: u8) void {
-    uart_instance.write_blocking(&.{c}) catch {};
+    uart_instance.write_blocking(&.{c}, null) catch {};
 }
 
 /// Read single char from UART (blocking)
@@ -62,9 +62,9 @@ pub fn getc() u8 {
     return byte;
 }
 
-/// Write str to UART
+/// Write string to UART
 pub fn puts(str: []const u8) void {
-    uart_instance.write_blocking(str) catch {};
+    uart_instance.write_blocking(str, null) catch {};
 }
 
 /// Write str with newline

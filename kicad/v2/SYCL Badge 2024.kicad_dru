@@ -1,5 +1,5 @@
 (version 1)
-# Custom Design Rules (DRC) for KiCAD 7.0 (Stored in '<project>.kicad_dru' file).
+# Custom Design Rules (DRC) for KiCAD 9.0 (Stored in '<project>.kicad_dru' file).
 #
 # Matching JLCPCB capabilities: https://jlcpcb.com/capabilities/pcb-capabilities
 #
@@ -46,7 +46,7 @@
 (rule "Silkscreen text"
 	(layer "?.Silkscreen")
 	(condition "A.Type == 'Text' || A.Type == 'Text Box'")
-	(constraint text_thickness (min 0.15mm))
+	(constraint text_thickness (min 0.16mm))
 	(constraint text_height (min 1mm))
 )
 
@@ -89,10 +89,16 @@
 
 # JLCPCB: "Via diameter should be 0.1mm(0.15mm preferred) larger than Via hole size" (illustration shows diameters for both dimensions)
 # JLCPCB: PTH: "The annular ring size will be enlarged to 0.15mm in production."
-(rule "Annular ring width (via and PTH)"
+(rule "Annular ring width (PTH)"
 	(layer outer)
-	(condition "A.isPlated()")
-	(constraint annular_width (min 0.075mm))
+	(condition "A.Pad_Type == 'Through-hole'")
+	(constraint annular_width (min 0.2mm))
+)
+
+(rule "Annular ring width (via)"
+	(layer outer)
+	(condition "A.Pad_Type == 'Via'")
+	(constraint annular_width (min 0.3mm))
 )
 
 (rule "Clearance: hole to hole (perimeter), different nets"

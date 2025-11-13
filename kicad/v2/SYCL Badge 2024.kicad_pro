@@ -37,9 +37,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.0,
-          "height": 0.95,
-          "width": 0.975
+          "drill": 2.159,
+          "height": 1.1684,
+          "width": 2.667
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -167,7 +167,7 @@
         "min_track_width": 0.16,
         "min_via_annular_width": 0.15,
         "min_via_diameter": 0.6,
-        "solder_mask_to_copper_clearance": 0.1,
+        "solder_mask_to_copper_clearance": 0.005,
         "use_height_for_length_calcs": true
       },
       "teardrop_options": [
@@ -257,7 +257,7 @@
           "drill": 0.0
         },
         {
-          "diameter": 0.6,
+          "diameter": 0.7,
           "drill": 0.3
         }
       ],
@@ -558,6 +558,10 @@
       {
         "netclass": "Default",
         "pattern": "D-"
+      },
+      {
+        "netclass": "Default",
+        "pattern": "GND"
       }
     ]
   },
@@ -566,7 +570,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "v2_rev1/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
@@ -753,6 +757,12 @@
           "label": "#",
           "name": "${ITEM_NUMBER}",
           "show": false
+        },
+        {
+          "group_by": false,
+          "label": "LCSC",
+          "name": "LCSC",
+          "show": true
         }
       ],
       "filter_string": "",

@@ -65,7 +65,7 @@
 	)
 	(fp_line
 		(start -4.5974 4.0767)
-		(end -4.5974 3.5)
+		(end -4.5974 4)
 		(stroke
 			(width 0.1524)
 			(type solid)
@@ -84,7 +84,7 @@
 		(uuid "00809007-326f-472d-b7a3-7ed3fc97c236")
 	)
 	(fp_line
-		(start 4.5974 3.5)
+		(start 4.5974 4)
 		(end 4.5974 4.0767)
 		(stroke
 			(width 0.1524)
@@ -619,6 +619,19 @@
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
 		(uuid "40b6a1ce-86f3-46a5-9930-0e7e687870b4")
+		(padstack
+			(mode front_inner_back)
+			(layer "Inner"
+				(shape oval)
+				(size 2.159 1.1684)
+				(zone_connect -1)
+			)
+			(layer "B.Cu"
+				(shape oval)
+				(size 2.159 1.1684)
+				(zone_connect -1)
+			)
+		)
 	)
 	(pad "SH2" thru_hole oval
 		(at 4.320002 -3.3607 90)
@@ -627,6 +640,19 @@
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
 		(uuid "ff6630e4-52c0-4f89-8d52-ff3781d1e5e0")
+		(padstack
+			(mode front_inner_back)
+			(layer "Inner"
+				(shape oval)
+				(size 2.159 1.1684)
+				(zone_connect -1)
+			)
+			(layer "B.Cu"
+				(shape oval)
+				(size 2.159 1.1684)
+				(zone_connect -1)
+			)
+		)
 	)
 	(pad "SH3" thru_hole oval
 		(at -4.320002 1.9993 90)
@@ -635,6 +661,19 @@
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
 		(uuid "9d521967-22d9-41a2-9bef-a3b3b3c6f1b0")
+		(padstack
+			(mode front_inner_back)
+			(layer "Inner"
+				(shape oval)
+				(size 2.667 1.1684)
+				(zone_connect -1)
+			)
+			(layer "B.Cu"
+				(shape oval)
+				(size 2.667 1.1684)
+				(zone_connect -1)
+			)
+		)
 	)
 	(pad "SH4" thru_hole oval
 		(at 4.320002 1.9993 90)
@@ -643,6 +682,19 @@
 		(layers "*.Cu" "*.Mask")
 		(remove_unused_layers no)
 		(uuid "48c3094d-8654-49ca-ab6e-e24baac3fab9")
+		(padstack
+			(mode front_inner_back)
+			(layer "Inner"
+				(shape oval)
+				(size 2.667 1.1684)
+				(zone_connect -1)
+			)
+			(layer "B.Cu"
+				(shape oval)
+				(size 2.667 1.1684)
+				(zone_connect -1)
+			)
+		)
 	)
 	(embedded_fonts no)
 )

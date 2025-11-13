@@ -4,11 +4,11 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const rp2xxx = microzig.hal;
-const time = rp2xxx.time;
 const gpio = rp2xxx.gpio;
 
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
+const timer = @import("drivers/timer.zig");
 
 const led = gpio.num(25);
 
@@ -25,7 +25,7 @@ pub fn main() !void {
     try usb.init();
     uart.println("USB initialized");
 
-    var old: u64 = time.get_time_since_boot().to_us();
+    var old: u64 = timer.micros();
     var new: u64 = 0;
     var i: u32 = 0;
 
@@ -36,7 +36,7 @@ pub fn main() !void {
         // CRITICAL: Poll USB frequently
         usb.poll();
 
-        new = time.get_time_since_boot().to_us();
+        new = timer.micros();
         if (new - old > 1_000_000) { // Every 1 second
             old = new;
             led.toggle();
@@ -65,8 +65,8 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     _ = message;
     while (true) {
         led.put(1);
-        time.sleep_ms(100);
+        timer.sleep_ms(100);
         led.put(0);
-        time.sleep_ms(100);
+        timer.sleep_ms(100);
     }
 }

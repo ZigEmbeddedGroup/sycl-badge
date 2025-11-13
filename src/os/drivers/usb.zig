@@ -20,16 +20,16 @@ var driver_cdc: usb.cdc.CdcClassDriver(usb_dev) = .{};
 var drivers = [_]usb.types.UsbClassDriver{driver_cdc.driver()};
 
 // Device configuration
-var device_configuration: usb.DeviceConfiguration = .{
+pub var device_configuration: usb.DeviceConfiguration = .{
     .device_descriptor = &.{
         .descriptor_type = usb.DescType.Device,
         .bcd_usb = 0x0200,
-        .device_class = 0xEF, // Miscellaneous Device Class
-        .device_subclass = 2, // Common Class
-        .device_protocol = 1, // Interface Association Descriptor
+        .device_class = 0xEF,
+        .device_subclass = 2,
+        .device_protocol = 1,
         .max_packet_size0 = 64,
-        .vendor = 0x2E8A, // Raspberry Pi
-        .product = 0x000a, // Pico SDK CDC
+        .vendor = 0x2E8A,
+        .product = 0x000a,
         .bcd_device = 0x0100,
         .manufacturer_s = 1,
         .product_s = 2,
@@ -37,10 +37,12 @@ var device_configuration: usb.DeviceConfiguration = .{
         .num_configurations = 1,
     },
     .config_descriptor = &usb_config_descriptor,
-    .lang_descriptor = "\x04\x03\x09\x04", // English (US)
+    .lang_descriptor = "\x04\x03\x09\x04", // length || string descriptor (0x03) || Engl (0x0409)
     .descriptor_strings = &.{
-        &usb.utils.utf8_to_utf16_le("SYCL Badge"),
-        &usb.utils.utf8_to_utf16_le("Program Loader"),
+        &usb.utils.utf8_to_utf16_le("Raspberry Pi"),
+        &usb.utils.utf8_to_utf16_le("Pico Test Device"),
+        &usb.utils.utf8_to_utf16_le("someserial"),
+        &usb.utils.utf8_to_utf16_le("Board CDC"),
     },
     .drivers = &drivers,
 };
@@ -61,26 +63,44 @@ pub fn isConnected() bool {
     return true;
 }
 
-/// Send data over USB (blocking)
+/// Send data over USB (non-blocking with retry limit)
 /// Returns true if successful
 pub fn send(data: []const u8) bool {
-    _ = driver_cdc.write(data);
-    return true;
+    // Write the data in chunks with limited attempts to prevent blocking
+    var write_data: []const u8 = data;
+    var attempts: u32 = 0;
+
+    while (write_data.len > 0 and attempts < 100) : (attempts += 1) {
+        write_data = driver_cdc.write(write_data);
+        usb_dev.task(false) catch {};
+    }
+
+    // CRITICAL: Flush to actually send short messages!
+    _ = driver_cdc.write_flush();
+
+    return write_data.len == 0; // Return true if all data was written
 }
 
-/// Receive data from USB (blocking with timeout)
+/// Receive data from USB (non-blocking with timeout)
 /// Returns number of bytes actually received
 pub fn receive(buffer: []u8, timeout_ms: u32) usize {
     const start = time.get_time_since_boot().to_us();
     const timeout_us = timeout_ms * 1000;
 
-    while (true) {
-        const available_count = driver_cdc.available();
-        if (available_count > 0) {
-            const to_read = @min(available_count, buffer.len);
-            return driver_cdc.read(buffer[0..to_read]);
+    var total_read: usize = 0;
+    var read_buffer = buffer;
+
+    while (read_buffer.len > 0) {
+        const len = driver_cdc.read(read_buffer);
+        read_buffer = read_buffer[len..];
+        total_read += len;
+
+        if (len == 0) {
+            // No more data available
+            break;
         }
 
+        // Check timeout
         const elapsed = time.get_time_since_boot().to_us() - start;
         if (elapsed >= timeout_us) break;
 
@@ -88,7 +108,7 @@ pub fn receive(buffer: []u8, timeout_ms: u32) usize {
         usb_dev.task(false) catch {};
     }
 
-    return 0;
+    return total_read;
 }
 
 /// Check if data is available to read
@@ -97,8 +117,19 @@ pub fn available() usize {
     return driver_cdc.available();
 }
 
-/// Process USB events (we need to call regularly from main loop)
-/// Handles enumeration, control requests, etc.
+/// Process USB events (MUST be called frequently from main loop!)
+/// This is critical for USB to work - call as often as possible
+/// Handles enumeration, control requests, and data transfers
 pub fn poll() void {
     usb_dev.task(false) catch {};
+}
+
+// Buffer for formatted printing
+var print_buffer: [512]u8 = undefined;
+
+/// Send formatted string over USB (like printf)
+/// Returns true if successful
+pub fn printf(comptime fmt: []const u8, args: anytype) bool {
+    const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return false;
+    return send(text);
 }

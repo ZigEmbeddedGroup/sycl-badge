@@ -1,101 +1,72 @@
 ﻿/// SYCL Badge OS Kernel
-/// Main entry point for os
+/// USB CDC and UART communication
 const std = @import("std");
+const microzig = @import("microzig");
 
-// Import drivers and sys modules
-const uart = @import("drivers/uart.zig");
-const gpio = @import("drivers/gpio.zig");
+const rp2xxx = microzig.hal;
+const time = rp2xxx.time;
+const gpio = rp2xxx.gpio;
+
 const usb = @import("drivers/usb.zig");
+const uart = @import("drivers/uart.zig");
 
-/// Main entry point required by MicroZig
-pub fn main() noreturn {
-    // Init hardware
-    initHardware();
+const led = gpio.num(25);
 
-    // Print boot message
-    uart.println("SYCL Badge OS v0.1");
-    uart.println("Booting on RP2350...");
-    uart.puts("\r\n");
+pub fn main() !void {
+    led.set_function(.sio);
+    led.set_direction(.out);
+    led.put(1);
 
-    // Run main kernel loop
-    kernelMain();
-}
-
-/// Init all hardware subsystems
-fn initHardware() void {
-    // Init UART
+    // Initialize UART for debug output
     uart.init();
-    uart.println("UART initialized");
+    uart.println("SYCL Badge OS starting...");
 
-    // Init GPIO subsystem
-    gpio.init();
-    uart.println("GPIO initialized");
+    // Initialize USB
+    try usb.init();
+    uart.println("USB initialized");
 
-    // Init LED on GPIO 25
-    gpio.initLED();
-    gpio.setLED(true); // Turn on LED to show we're alive
-    uart.println("LED initialized (GPIO 25)");
+    var old: u64 = time.get_time_since_boot().to_us();
+    var new: u64 = 0;
+    var i: u32 = 0;
 
-    // Init USB CDC for program loading
-    usb.init() catch {
-        uart.println("Warning: USB init failed");
-        uart.println("Continuing with UART only...");
-    };
-    uart.println("USB CDC initialized (if available)");
-}
+    uart.println("Entering main loop");
 
-/// Main kernel loop
-fn kernelMain() noreturn {
-    uart.println("Kernel initialized. Entering main loop.");
-    uart.println("Echo mode: Type characters via UART or USB CDC");
-    uart.puts("\r\n> ");
-
-    var led_state: bool = true;
-    var iteration: u32 = 0;
-
-    // Main loop: process USB events and echo input
+    // Main loop - call usb.poll() as often as possible!
     while (true) {
-        // Process USB events (required for USB to work)
+        // CRITICAL: Poll USB frequently
         usb.poll();
-        _ = usb.send("test");
 
-        // Blink LED every 100000 iterations to show we're alive
-        iteration += 1;
-        if (iteration % 100000 == 0) {
-            led_state = !led_state;
-            gpio.setLED(led_state);
-        }
+        new = time.get_time_since_boot().to_us();
+        if (new - old > 1_000_000) { // Every 1 second
+            old = new;
+            led.toggle();
+            i += 1;
 
-        // Check for UART input (non-blocking would be better but keeping it simple)
-        // Note: This will block if nothing is available
-        // TODO: Implement non-blocking UART reads
+            // Send to both USB and UART
+            _ = usb.printf("USB message {}\r\n", .{i});
 
-        // For now, just show USB status periodically
-        if (iteration % 1000000 == 0) {
-            if (usb.isConnected()) {
-                uart.println("\r\n[USB connected]");
-            } else {
-                uart.println("\r\n[USB disconnected]");
+            var uart_buffer: [64]u8 = undefined;
+            const uart_msg = std.fmt.bufPrint(&uart_buffer, "UART message {}", .{i}) catch "Error";
+            uart.println(uart_msg);
+
+            // Check for incoming USB data
+            var rx_buffer: [256]u8 = undefined;
+            const bytes_read = usb.receive(&rx_buffer, 0); // Non-blocking read
+            if (bytes_read > 0) {
+                _ = usb.printf("USB received: {s}\r\n", .{rx_buffer[0..bytes_read]});
+                uart.puts("USB received: ");
+                uart.println(rx_buffer[0..bytes_read]);
             }
-            uart.puts("> ");
         }
     }
 }
 
-/// Panic handler required by Zig runtime
-/// Called when an unrecoverable error occurs
-pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = error_return_trace;
-    _ = ret_addr;
-
-    // Try to output panic message if UART is available
-    uart.puts("\r\n\r\n*** KERNEL PANIC ***\r\n");
-    uart.puts("Error: ");
-    uart.puts(msg);
-    uart.puts("\r\n");
-
-    // Hang forever
+pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
+    _ = message;
     while (true) {
-        asm volatile ("wfe"); // Wait for event (low power)
+        led.put(1);
+        time.sleep_ms(100);
+        led.put(0);
+        time.sleep_ms(100);
     }
 }

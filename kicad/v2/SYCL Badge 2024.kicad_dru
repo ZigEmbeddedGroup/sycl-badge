@@ -127,7 +127,7 @@
 # TODO: try combining with rule "Clearance: PTH to track, different nets"
 (rule "Clearance: track to pad"
 	(condition "A.Type == 'pad' && B.Type == 'track' &&  A.Net != B.Net")
-	(constraint clearance (min 0.2mm))
+	(constraint clearance (min 0.1mm))
 )
 
 (rule "Clearance: pad/via to pad/via"

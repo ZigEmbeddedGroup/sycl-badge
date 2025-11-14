@@ -56,11 +56,12 @@ pub fn init() !void {
 }
 
 /// Check if USB is connected to a host
-/// Note: CDC driver doesn't expose connection state, so we'll always return true after init
+/// Returns true if the host has opened the COM port (DTR is set)
 pub fn isConnected() bool {
-    // CDC driver is ready if initialized successfully
-    // A more robust check would require modifying the CDC driver
-    return true;
+    // Check if DTR (Data Terminal Ready) is set by the host
+    // Bit 0 of line_state is DTR
+    // When a terminal program opens the COM port, it sets DTR=1
+    return (driver_cdc.line_state & 0x01) != 0;
 }
 
 /// Send data over USB (non-blocking with retry limit)

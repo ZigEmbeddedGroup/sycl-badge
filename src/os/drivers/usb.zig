@@ -126,7 +126,7 @@ pub fn poll() void {
 }
 
 // Buffer for formatted printing
-var print_buffer: [512]u8 = undefined;
+var print_buffer: [2048]u8 = undefined;
 
 /// Send formatted string over USB (like printf)
 /// Returns true if successful

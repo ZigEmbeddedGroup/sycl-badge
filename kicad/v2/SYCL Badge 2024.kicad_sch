@@ -10309,16 +10309,6 @@
 		)
 		(uuid "4ddb479b-0ab6-4044-bfed-aab19cb0717d")
 	)
-	(text "This is the other one i found for the same part... I think it might be better but I am so unsure I actually don't know"
-		(exclude_from_sim no)
-		(at 78.994 169.672 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-		)
-		(uuid "5944b5d0-3e10-4e91-bc3d-5bca476c9eb6")
-	)
 	(text "LED Backlight Driver"
 		(exclude_from_sim no)
 		(at 16.51 236.22 0)
@@ -16338,7 +16328,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "03315822-ca71-4b1d-8879-7a3760685899")
 		(property "Reference" "TP1"
@@ -16407,7 +16397,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "04ecbcc8-824f-4124-be55-d7b7b7be03cd")
-		(property "Reference" "R1"
+		(property "Reference" "R3"
 			(at 359.156 40.894 90)
 			(effects
 				(font
@@ -16468,7 +16458,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R1")
+					(reference "R3")
 					(unit 1)
 				)
 			)
@@ -16481,7 +16471,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "063d0874-b86b-442f-b689-a280e96ba4b0")
 		(property "Reference" "TP20"
@@ -16746,7 +16736,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "09bf60d4-1068-4732-838a-aa9ba47e8447")
 		(property "Reference" "H4"
@@ -16878,7 +16868,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "0d717d5a-1f13-4dbe-ac10-014896cf46dc")
-		(property "Reference" "R42"
+		(property "Reference" "R8"
 			(at 320.04 99.06 90)
 			(effects
 				(font
@@ -16974,7 +16964,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R42")
+					(reference "R8")
 					(unit 1)
 				)
 			)
@@ -17053,7 +17043,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "0d8ebc6c-0ac7-40f4-ad4d-b631c639e8da")
-		(property "Reference" "R22"
+		(property "Reference" "R7"
 			(at 134.62 106.68 90)
 			(effects
 				(font
@@ -17149,7 +17139,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R22")
+					(reference "R7")
 					(unit 1)
 				)
 			)
@@ -17164,7 +17154,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "10832df4-171f-402b-b946-ee2dfd17041b")
-		(property "Reference" "R6"
+		(property "Reference" "R19"
 			(at 92.075 190.5 90)
 			(effects
 				(font
@@ -17260,7 +17250,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R6")
+					(reference "R19")
 					(unit 1)
 				)
 			)
@@ -17273,7 +17263,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1112f832-6d96-42e4-8b42-b0133c3c2ad5")
 		(property "Reference" "TP5"
@@ -17574,7 +17564,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "132286ca-d758-4cb8-90c7-521785950c58")
-		(property "Reference" "R32"
+		(property "Reference" "R26"
 			(at 247.65 157.226 90)
 			(effects
 				(font
@@ -17635,7 +17625,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R32")
+					(reference "R26")
 					(unit 1)
 				)
 			)
@@ -18036,7 +18026,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "18146635-17fb-4772-a98a-c13a85481a8d")
 		(property "Reference" "TP6"
@@ -18170,7 +18160,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "195d7db8-16ec-433d-9f47-c43b71f4d920")
 		(property "Reference" "U3"
@@ -18287,7 +18277,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "1979882e-a3ca-4bf4-b4fc-5992a97d85bd")
-		(property "Reference" "R12"
+		(property "Reference" "R16"
 			(at 62.865 210.82 90)
 			(effects
 				(font
@@ -18383,7 +18373,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R12")
+					(reference "R16")
 					(unit 1)
 				)
 			)
@@ -18576,7 +18566,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "208ee9bf-7448-4fd4-bc67-53df2774d7d0")
-		(property "Reference" "R41"
+		(property "Reference" "R11"
 			(at 397.256 86.233 90)
 			(effects
 				(font
@@ -18672,7 +18662,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R41")
+					(reference "R11")
 					(unit 1)
 				)
 			)
@@ -18754,7 +18744,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "231672c4-cb00-4856-9992-8a35050e4db3")
-		(property "Reference" "R9"
+		(property "Reference" "R13"
 			(at 24.765 210.82 90)
 			(effects
 				(font
@@ -18850,7 +18840,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R9")
+					(reference "R13")
 					(unit 1)
 				)
 			)
@@ -18863,7 +18853,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2537a7df-e2ec-40b7-b608-a5b6e06ce259")
 		(property "Reference" "TP10"
@@ -18932,7 +18922,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "258ab319-01d3-4e85-a18d-b9c392559a6c")
-		(property "Reference" "R24"
+		(property "Reference" "R21"
 			(at 147.32 233.68 90)
 			(effects
 				(font
@@ -19028,7 +19018,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R24")
+					(reference "R21")
 					(unit 1)
 				)
 			)
@@ -19043,7 +19033,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "25bcb22d-ed39-479c-8d67-a8ddf6c0613d")
-		(property "Reference" "C47"
+		(property "Reference" "C12"
 			(at 353.06 91.694 0)
 			(effects
 				(font
@@ -19141,7 +19131,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C47")
+					(reference "C12")
 					(unit 1)
 				)
 			)
@@ -19221,7 +19211,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "27de12e7-713c-432a-9c5b-fb00fda1e20a")
-		(property "Reference" "R10"
+		(property "Reference" "R14"
 			(at 29.845 210.82 90)
 			(effects
 				(font
@@ -19317,7 +19307,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R10")
+					(reference "R14")
 					(unit 1)
 				)
 			)
@@ -19456,15 +19446,15 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 116.84 62.23 0)
+		(at 116.84 63.5 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
 		(uuid "2c66c5cd-c36b-472a-8ddb-32cc31cebee8")
-		(property "Reference" "C5"
-			(at 119.38 60.96 0)
+		(property "Reference" "C4"
+			(at 119.38 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19473,7 +19463,7 @@
 			)
 		)
 		(property "Value" "1u"
-			(at 119.38 63.5 0)
+			(at 119.38 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19482,7 +19472,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder"
-			(at 117.8052 66.04 0)
+			(at 117.8052 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19491,7 +19481,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19500,7 +19490,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19508,7 +19498,7 @@
 			)
 		)
 		(property "Part Number" "1276-1066-1-ND"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19517,7 +19507,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19526,7 +19516,7 @@
 			)
 		)
 		(property "Manufacturer Part Number" "CL21B105KAFNNNE"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19535,7 +19525,7 @@
 			)
 		)
 		(property "Package" "0805"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19544,7 +19534,7 @@
 			)
 		)
 		(property "LCSC" "C28323"
-			(at 116.84 62.23 0)
+			(at 116.84 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19561,7 +19551,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C5")
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -19640,7 +19630,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "2e045081-f4bd-48ec-b9c6-a265268e3410")
-		(property "Reference" "R43"
+		(property "Reference" "R9"
 			(at 339.09 90.17 90)
 			(effects
 				(font
@@ -19736,7 +19726,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R43")
+					(reference "R9")
 					(unit 1)
 				)
 			)
@@ -19817,7 +19807,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "2f96b1ea-9699-4c61-9212-1af1c80d5d0d")
-		(property "Reference" "R20"
+		(property "Reference" "R6"
 			(at 129.54 106.68 90)
 			(effects
 				(font
@@ -19913,7 +19903,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R20")
+					(reference "R6")
 					(unit 1)
 				)
 			)
@@ -20106,7 +20096,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "354fb67e-b284-48b2-a6d7-45511a65ed74")
-		(property "Reference" "R8"
+		(property "Reference" "R12"
 			(at 19.685 210.82 90)
 			(effects
 				(font
@@ -20202,7 +20192,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R8")
+					(reference "R12")
 					(unit 1)
 				)
 			)
@@ -20215,7 +20205,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3595889a-9c3c-4775-9aa4-0a5e91c045f3")
 		(property "Reference" "TP22"
@@ -20282,7 +20272,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "38624064-4297-471b-8233-efdbc562cf12")
 		(property "Reference" "TP16"
@@ -20351,7 +20341,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "38a71770-1728-4626-82b7-eba44144e128")
-		(property "Reference" "C6"
+		(property "Reference" "C5"
 			(at 144.78 62.23 0)
 			(effects
 				(font
@@ -20449,7 +20439,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C6")
+					(reference "C5")
 					(unit 1)
 				)
 			)
@@ -20465,7 +20455,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "398cf839-bc64-4bff-b5f7-cef90f350d78")
-		(property "Reference" "C30"
+		(property "Reference" "C28"
 			(at 227.33 175.2599 0)
 			(effects
 				(font
@@ -20528,7 +20518,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C30")
+					(reference "C28")
 					(unit 1)
 				)
 			)
@@ -20544,7 +20534,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3a97b378-e734-4433-9053-bed68957ab2b")
-		(property "Reference" "C34"
+		(property "Reference" "C19"
 			(at 309.88 138.4299 0)
 			(effects
 				(font
@@ -20607,7 +20597,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C34")
+					(reference "C19")
 					(unit 1)
 				)
 			)
@@ -20719,7 +20709,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "3cf27789-9443-4e06-a41e-ee2de9a45567")
-		(property "Reference" "C44"
+		(property "Reference" "C6"
 			(at 276.86 27.178 90)
 			(effects
 				(font
@@ -20780,7 +20770,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C44")
+					(reference "C6")
 					(unit 1)
 				)
 			)
@@ -20795,7 +20785,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "3d6641e9-f1b0-497f-8dfd-b9f87be6f8d2")
-		(property "Reference" "C9"
+		(property "Reference" "C14"
 			(at 183.769 223.52 0)
 			(effects
 				(font
@@ -20893,7 +20883,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C9")
+					(reference "C14")
 					(unit 1)
 				)
 			)
@@ -20908,7 +20898,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "41b6c575-6fa3-4164-9164-f10f8515f467")
-		(property "Reference" "R40"
+		(property "Reference" "R10"
 			(at 364.49 87.63 90)
 			(effects
 				(font
@@ -21004,7 +20994,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R40")
+					(reference "R10")
 					(unit 1)
 				)
 			)
@@ -21152,7 +21142,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "44cfc5f5-4d9e-4144-954e-33cb6f86a775")
-		(property "Reference" "R4"
+		(property "Reference" "R17"
 			(at 81.915 190.5 90)
 			(effects
 				(font
@@ -21248,7 +21238,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R4")
+					(reference "R17")
 					(unit 1)
 				)
 			)
@@ -21264,7 +21254,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "486955c1-7c1b-4e86-8254-5275c3581680")
-		(property "Reference" "C38"
+		(property "Reference" "C23"
 			(at 356.87 138.4299 0)
 			(effects
 				(font
@@ -21327,7 +21317,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C38")
+					(reference "C23")
 					(unit 1)
 				)
 			)
@@ -21343,7 +21333,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "48a8879c-df2c-49e3-9474-b2ab6ef78264")
-		(property "Reference" "C36"
+		(property "Reference" "C21"
 			(at 332.74 138.4299 0)
 			(effects
 				(font
@@ -21406,7 +21396,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C36")
+					(reference "C21")
 					(unit 1)
 				)
 			)
@@ -21947,7 +21937,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "53ea1eaf-b4a3-4e47-8ca1-62ae47d99f85")
-		(property "Reference" "C7"
+		(property "Reference" "C9"
 			(at 27.94 106.68 0)
 			(effects
 				(font
@@ -22045,7 +22035,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C7")
+					(reference "C9")
 					(unit 1)
 				)
 			)
@@ -22061,7 +22051,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "55b1ee69-7d24-47ac-85db-c296b62b9b41")
-		(property "Reference" "C33"
+		(property "Reference" "C16"
 			(at 259.08 138.4299 0)
 			(effects
 				(font
@@ -22124,7 +22114,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C33")
+					(reference "C16")
 					(unit 1)
 				)
 			)
@@ -22202,7 +22192,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "58bf9314-c763-4a1f-8d51-9280cec75aa7")
 		(property "Reference" "H1"
@@ -22268,7 +22258,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "59643862-0365-486f-b3bf-2ff2fc133775")
-		(property "Reference" "C37"
+		(property "Reference" "C22"
 			(at 345.44 138.4299 0)
 			(effects
 				(font
@@ -22331,7 +22321,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C37")
+					(reference "C22")
 					(unit 1)
 				)
 			)
@@ -22411,7 +22401,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "5a59fa9b-be8e-4f3d-a0a6-0a9f53b84035")
-		(property "Reference" "R38"
+		(property "Reference" "R30"
 			(at 105.664 262.89 0)
 			(effects
 				(font
@@ -22474,7 +22464,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R38")
+					(reference "R30")
 					(unit 1)
 				)
 			)
@@ -22554,7 +22544,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5ee595c9-9479-4599-a6e1-48f43e9b61c6")
 		(property "Reference" "TP23"
@@ -22623,7 +22613,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "602a6cfd-148e-4b68-9d94-7f96f003d584")
-		(property "Reference" "C25"
+		(property "Reference" "C15"
 			(at 207.01 223.774 0)
 			(effects
 				(font
@@ -22719,7 +22709,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C25")
+					(reference "C15")
 					(unit 1)
 				)
 			)
@@ -22797,7 +22787,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "63d90bed-9dc3-4ca3-80cf-86106868b9af")
 		(property "Reference" "TP8"
@@ -22930,7 +22920,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "63f5f9c5-fa0e-43ce-986a-60d62e6e9192")
 		(property "Reference" "SW3"
 			(at 351.79 81.28 90)
@@ -23047,7 +23037,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "65fa13a5-87dc-4018-985d-6958925c846c")
 		(property "Reference" "TP14"
@@ -23181,7 +23171,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6951cbba-1d14-429a-84cd-29e65ab3c904")
 		(property "Reference" "H5"
@@ -23268,7 +23258,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6afcc0df-87be-4cd8-9d08-a1cf02d0b293")
 		(property "Reference" "TP7"
@@ -23338,7 +23328,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "6c0a9c40-d378-41dd-bd73-b36181923eeb")
-		(property "Reference" "R13"
+		(property "Reference" "R23"
 			(at 199.009 226.06 0)
 			(effects
 				(font
@@ -23435,7 +23425,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R13")
+					(reference "R23")
 					(unit 1)
 				)
 			)
@@ -23450,7 +23440,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "6c8534c2-2af7-4b2f-b4fc-b11a398edf11")
-		(property "Reference" "C8"
+		(property "Reference" "C14"
 			(at 131.445 205.74 0)
 			(effects
 				(font
@@ -23548,7 +23538,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C8")
+					(reference "C14")
 					(unit 1)
 				)
 			)
@@ -23563,7 +23553,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "6d4113e3-192c-42ba-94a3-b44c5bee8c0e")
-		(property "Reference" "R18"
+		(property "Reference" "R22"
 			(at 156.21 233.68 90)
 			(effects
 				(font
@@ -23659,7 +23649,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R18")
+					(reference "R22")
 					(unit 1)
 				)
 			)
@@ -23737,7 +23727,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "71bd51aa-b3d6-4e57-8cbb-5b62529d2b68")
 		(property "Reference" "SELECT1"
 			(at 75.565 215.9 0)
@@ -23844,7 +23834,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "72f6099d-2177-4705-8f32-c010874ee2c6")
-		(property "Reference" "C13"
+		(property "Reference" "C11"
 			(at 118.11 152.4 0)
 			(effects
 				(font
@@ -23942,7 +23932,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C13")
+					(reference "C11")
 					(unit 1)
 				)
 			)
@@ -23958,7 +23948,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "73d73cf3-fc3f-45cf-834d-34d6b99e3045")
-		(property "Reference" "C46"
+		(property "Reference" "C31"
 			(at 91.44 252.73 90)
 			(effects
 				(font
@@ -24019,7 +24009,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C46")
+					(reference "C31")
 					(unit 1)
 				)
 			)
@@ -24220,7 +24210,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "751f0270-68c4-4658-996f-eff94278c1fa")
-		(property "Reference" "R25"
+		(property "Reference" "R8"
 			(at 127.889 154.051 0)
 			(effects
 				(font
@@ -24316,7 +24306,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R25")
+					(reference "R8")
 					(unit 1)
 				)
 			)
@@ -24332,7 +24322,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "76199382-d0fd-477c-b9e7-12205e73824c")
-		(property "Reference" "C31"
+		(property "Reference" "C18"
 			(at 281.94 138.4299 0)
 			(effects
 				(font
@@ -24395,7 +24385,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C31")
+					(reference "C18")
 					(unit 1)
 				)
 			)
@@ -24475,7 +24465,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "7d13d404-2122-4bd7-8650-52a4b102971e")
 		(property "Reference" "SP1"
 			(at 204.47 261.62 90)
@@ -24646,7 +24636,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7fbcbd05-520d-4db6-b0d8-6efd8fbc8d1d")
 		(property "Reference" "TP9"
@@ -24979,7 +24969,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "88020a26-a507-4ef2-a264-bdee72b9fd54")
-		(property "Reference" "R37"
+		(property "Reference" "R1"
 			(at 217.932 49.53 0)
 			(effects
 				(font
@@ -25042,7 +25032,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R37")
+					(reference "R1")
 					(unit 1)
 				)
 			)
@@ -25238,7 +25228,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8a0059b1-9c08-454b-a7a4-6b20c66a9ce3")
 		(property "Reference" "TP4"
@@ -25305,7 +25295,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8a32654b-88ef-4c4e-ba4d-262112caf98c")
 		(property "Reference" "TP3"
@@ -25439,7 +25429,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8d49e479-bfdd-42a3-a1da-d9fc0515952f")
 		(property "Reference" "H2"
@@ -25684,7 +25674,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "92b85961-03ca-44b2-9cfd-9b7c241a8ac4")
-		(property "Reference" "R5"
+		(property "Reference" "R18"
 			(at 86.995 190.5 90)
 			(effects
 				(font
@@ -25780,7 +25770,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R5")
+					(reference "R18")
 					(unit 1)
 				)
 			)
@@ -25938,7 +25928,7 @@
 	(symbol
 		(lib_name "GND_1")
 		(lib_id "power:GND")
-		(at 116.84 66.04 0)
+		(at 116.84 67.31 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -25947,7 +25937,7 @@
 		(fields_autoplaced yes)
 		(uuid "9986e1a8-9b86-405e-afc8-196fb0b2750b")
 		(property "Reference" "#PWR030"
-			(at 116.84 72.39 0)
+			(at 116.84 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25956,7 +25946,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 116.84 71.12 0)
+			(at 116.84 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25964,7 +25954,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 116.84 66.04 0)
+			(at 116.84 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25973,7 +25963,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 116.84 66.04 0)
+			(at 116.84 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25982,7 +25972,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 116.84 66.04 0)
+			(at 116.84 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26011,7 +26001,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "99a50ae5-ebeb-49b6-a74d-70a1ce48d6b0")
-		(property "Reference" "C43"
+		(property "Reference" "C30"
 			(at 385.572 217.17 0)
 			(effects
 				(font
@@ -26107,7 +26097,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C43")
+					(reference "C30")
 					(unit 1)
 				)
 			)
@@ -26120,7 +26110,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9b2773ab-a57f-4c41-a416-93d1cdebebc3")
 		(property "Reference" "TP17"
@@ -26187,7 +26177,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9c0b5fc5-423f-42b0-8cc9-7956b8b7e2a2")
 		(property "Reference" "TP12"
@@ -26321,7 +26311,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "9f2a2e9c-a4c1-46f1-9a43-c71ce0a9c079")
 		(property "Reference" "J2"
 			(at 138.43 194.31 0)
@@ -26428,7 +26418,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "9fc780f5-3d87-44c8-91dd-d40b38fffc8a")
-		(property "Reference" "R19"
+		(property "Reference" "R5"
 			(at 57.15 106.68 90)
 			(effects
 				(font
@@ -26524,7 +26514,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R19")
+					(reference "R5")
 					(unit 1)
 				)
 			)
@@ -26540,7 +26530,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a0db492a-99f0-44c3-8fa2-3ab4c7cdfd1a")
-		(property "Reference" "C28"
+		(property "Reference" "C27"
 			(at 262.89 165.0999 0)
 			(effects
 				(font
@@ -26603,7 +26593,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C28")
+					(reference "C27")
 					(unit 1)
 				)
 			)
@@ -26618,7 +26608,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a1672570-0f8f-44d8-a808-214be60c4096")
-		(property "Reference" "R31"
+		(property "Reference" "R24"
 			(at 263.652 185.674 90)
 			(effects
 				(font
@@ -26679,7 +26669,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R31")
+					(reference "R24")
 					(unit 1)
 				)
 			)
@@ -26692,7 +26682,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a2180b56-f3dd-4ecc-9462-03aa0d97db7a")
 		(property "Reference" "TP21"
@@ -26826,7 +26816,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a3375e81-fee7-4ae6-8834-0379db3f53b9")
 		(property "Reference" "TP2"
@@ -27004,7 +26994,7 @@
 	)
 	(symbol
 		(lib_id "Adafruit PyBadge-eagle-import:V+")
-		(at 116.84 55.88 0)
+		(at 116.84 57.15 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -27012,7 +27002,7 @@
 		(dnp no)
 		(uuid "a71e183d-459b-45f9-9bb8-b8d0445c7342")
 		(property "Reference" "#P+012"
-			(at 116.84 55.88 0)
+			(at 116.84 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27021,7 +27011,7 @@
 			)
 		)
 		(property "Value" "V+"
-			(at 114.3 58.42 90)
+			(at 114.3 59.69 90)
 			(effects
 				(font
 					(size 1.778 1.5113)
@@ -27030,7 +27020,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 116.84 55.88 0)
+			(at 116.84 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27039,7 +27029,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 116.84 55.88 0)
+			(at 116.84 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27048,7 +27038,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 116.84 55.88 0)
+			(at 116.84 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27138,7 +27128,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "aaaabf67-6816-4579-88cb-143d3123dc52")
 		(property "Reference" "U4"
 			(at 202.819 203.2 90)
@@ -27309,7 +27299,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "acdcddd8-82cd-4330-ae02-b02bec5a97a6")
-		(property "Reference" "C21"
+		(property "Reference" "C33"
 			(at 146.685 262.89 90)
 			(effects
 				(font
@@ -27407,7 +27397,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C21")
+					(reference "C33")
 					(unit 1)
 				)
 			)
@@ -27422,7 +27412,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b01ad8f0-0415-44a8-ae2a-057c5ad94092")
-		(property "Reference" "C45"
+		(property "Reference" "C7"
 			(at 276.86 47.244 90)
 			(effects
 				(font
@@ -27483,7 +27473,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C45")
+					(reference "C7")
 					(unit 1)
 				)
 			)
@@ -27498,7 +27488,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b0ca8667-e27b-4cf8-9bf3-e02fa1def4ce")
-		(property "Reference" "R33"
+		(property "Reference" "R25"
 			(at 263.652 188.214 90)
 			(effects
 				(font
@@ -27559,7 +27549,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R33")
+					(reference "R25")
 					(unit 1)
 				)
 			)
@@ -27641,7 +27631,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b38c5475-93ec-4c56-ba0d-5db86339292d")
-		(property "Reference" "R36"
+		(property "Reference" "R2"
 			(at 311.15 40.894 90)
 			(effects
 				(font
@@ -27702,7 +27692,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R36")
+					(reference "R2")
 					(unit 1)
 				)
 			)
@@ -28558,7 +28548,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b688f9fc-97c6-4131-bdf9-31cecc0dc768")
 		(property "Reference" "TP24"
@@ -28627,7 +28617,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b72c69e6-15b7-49e5-911b-c5401bb3749f")
-		(property "Reference" "C48"
+		(property "Reference" "C13"
 			(at 405.13 93.98 0)
 			(effects
 				(font
@@ -28725,7 +28715,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C48")
+					(reference "C13")
 					(unit 1)
 				)
 			)
@@ -28738,7 +28728,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b73ec317-7d1a-406a-b66b-660f67b09922")
 		(property "Reference" "TP19"
@@ -29270,7 +29260,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "bb04432f-6ebb-4c51-8654-05599776992b")
 		(property "Reference" "A1"
 			(at 100.965 215.9 0)
@@ -29377,7 +29367,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "bf5f042d-cfd7-4fd1-9486-77933e1e8c4a")
-		(property "Reference" "R34"
+		(property "Reference" "R27"
 			(at 388.874 213.106 90)
 			(effects
 				(font
@@ -29438,7 +29428,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R34")
+					(reference "R27")
 					(unit 1)
 				)
 			)
@@ -29714,7 +29704,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "c5f50bd3-a21b-4a90-8282-f854c682d479")
-		(property "Reference" "C18"
+		(property "Reference" "C32"
 			(at 134.112 265.811 0)
 			(effects
 				(font
@@ -29812,7 +29802,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C18")
+					(reference "C32")
 					(unit 1)
 				)
 			)
@@ -29953,7 +29943,7 @@
 	)
 	(symbol
 		(lib_id "Adafruit PyBadge-eagle-import:V+")
-		(at 41.91 58.42 0)
+		(at 41.91 57.15 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -29961,7 +29951,7 @@
 		(dnp no)
 		(uuid "cae67041-2fe1-44ef-b0bb-ebbe9bc79270")
 		(property "Reference" "#P+09"
-			(at 41.91 58.42 0)
+			(at 41.91 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29970,7 +29960,7 @@
 			)
 		)
 		(property "Value" "V+"
-			(at 39.37 60.96 90)
+			(at 39.37 59.69 90)
 			(effects
 				(font
 					(size 1.778 1.5113)
@@ -29979,7 +29969,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 41.91 58.42 0)
+			(at 41.91 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29988,7 +29978,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 41.91 58.42 0)
+			(at 41.91 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29997,7 +29987,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 41.91 58.42 0)
+			(at 41.91 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -30209,7 +30199,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "cd21ee15-b835-4619-ba68-76c2d1d3d0fb")
-		(property "Reference" "R11"
+		(property "Reference" "R15"
 			(at 57.785 210.82 90)
 			(effects
 				(font
@@ -30305,7 +30295,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R11")
+					(reference "R15")
 					(unit 1)
 				)
 			)
@@ -30516,7 +30506,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "d0af8f88-9ed0-4a03-8cd5-25bb8ac0b28e")
-		(property "Reference" "C4"
+		(property "Reference" "C8"
 			(at 406.4 38.1 0)
 			(effects
 				(font
@@ -30614,7 +30604,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C4")
+					(reference "C8")
 					(unit 1)
 				)
 			)
@@ -30627,7 +30617,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d294b013-3436-4056-a6c6-62500d970a8e")
 		(property "Reference" "TP13"
@@ -30694,7 +30684,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d2d7b009-ab64-4eb8-89eb-c0ebe69770d9")
 		(property "Reference" "TP29"
@@ -30761,7 +30751,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d67114f9-84fa-44bf-a91c-2bf8cc7e0804")
 		(property "Reference" "H3"
@@ -30954,7 +30944,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "d814d363-cdfd-4f78-adb6-4ecedbacfb17")
 		(property "Reference" "START1"
 			(at 88.265 215.9 0)
@@ -31192,7 +31182,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "de79c5d1-4792-4432-8969-5cc25480a72e")
-		(property "Reference" "R35"
+		(property "Reference" "R28"
 			(at 388.62 205.994 90)
 			(effects
 				(font
@@ -31253,7 +31243,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R35")
+					(reference "R28")
 					(unit 1)
 				)
 			)
@@ -31398,7 +31388,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e02d2571-f687-4892-8b9b-0fd52920ddf4")
 		(property "Reference" "TP18"
@@ -31597,7 +31587,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e34a7268-1fe4-47a8-8ff2-de2d0c85844b")
 		(property "Reference" "TP15"
@@ -31666,7 +31656,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "e87d0543-f9f4-45e3-9b99-ce5e6eaab6aa")
-		(property "Reference" "R7"
+		(property "Reference" "R20"
 			(at 97.155 190.5 90)
 			(effects
 				(font
@@ -31762,7 +31752,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R7")
+					(reference "R20")
 					(unit 1)
 				)
 			)
@@ -31775,7 +31765,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "eb85f818-f3df-4e2e-8634-73ee5efba021")
 		(property "Reference" "TP11"
@@ -31977,7 +31967,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ec26126d-893c-419b-9ddd-5b3006d80a67")
-		(property "Reference" "C41"
+		(property "Reference" "C26"
 			(at 391.16 138.4299 0)
 			(effects
 				(font
@@ -32040,7 +32030,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C41")
+					(reference "C26")
 					(unit 1)
 				)
 			)
@@ -32053,7 +32043,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "efe04bec-d3ea-439f-a3b0-49b4f3ddc8eb")
 		(property "Reference" "B1"
 			(at 113.665 215.9 0)
@@ -32158,7 +32148,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f03427f6-c61e-4872-8ee2-dea6bfdffdbb")
 		(property "Reference" "U7"
@@ -32278,7 +32268,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f0622cd2-edb9-4d09-8c7f-90a205eddc8e")
-		(property "Reference" "C32"
+		(property "Reference" "C17"
 			(at 270.51 138.4299 0)
 			(effects
 				(font
@@ -32341,7 +32331,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C32")
+					(reference "C17")
 					(unit 1)
 				)
 			)
@@ -32769,7 +32759,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f368e66b-b708-41a1-9be0-296b787b0ae4")
-		(property "Reference" "C39"
+		(property "Reference" "C24"
 			(at 368.3 138.4299 0)
 			(effects
 				(font
@@ -32832,7 +32822,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C39")
+					(reference "C24")
 					(unit 1)
 				)
 			)
@@ -32972,7 +32962,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 41.91 64.77 0)
+		(at 41.91 63.5 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -32980,7 +32970,7 @@
 		(dnp no)
 		(uuid "f512e021-5584-463b-8fe9-90664ea2b5af")
 		(property "Reference" "C1"
-			(at 44.45 63.5 0)
+			(at 44.45 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32989,7 +32979,7 @@
 			)
 		)
 		(property "Value" "1u"
-			(at 44.45 66.04 0)
+			(at 44.45 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32998,7 +32988,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder"
-			(at 42.8752 68.58 0)
+			(at 42.8752 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33007,7 +32997,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33016,7 +33006,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33024,7 +33014,7 @@
 			)
 		)
 		(property "Part Number" "1276-1066-1-ND"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33033,7 +33023,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33042,7 +33032,7 @@
 			)
 		)
 		(property "Manufacturer Part Number" "CL21B105KAFNNNE"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33051,7 +33041,7 @@
 			)
 		)
 		(property "Package" "0805"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33060,7 +33050,7 @@
 			)
 		)
 		(property "LCSC" "C28323"
-			(at 41.91 64.77 0)
+			(at 41.91 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33158,7 +33148,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "f72a6be1-3403-400f-ad2f-05a7ace03f27")
-		(property "Reference" "R39"
+		(property "Reference" "R29"
 			(at 74.422 259.08 0)
 			(effects
 				(font
@@ -33221,7 +33211,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R39")
+					(reference "R29")
 					(unit 1)
 				)
 			)
@@ -33230,7 +33220,7 @@
 	(symbol
 		(lib_name "GND_1")
 		(lib_id "power:GND")
-		(at 41.91 68.58 0)
+		(at 41.91 67.31 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -33239,7 +33229,7 @@
 		(fields_autoplaced yes)
 		(uuid "f7eb58cc-2d74-48d3-99cd-44f0b94928f1")
 		(property "Reference" "#PWR048"
-			(at 41.91 74.93 0)
+			(at 41.91 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33248,7 +33238,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 41.91 73.66 0)
+			(at 41.91 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33256,7 +33246,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 41.91 68.58 0)
+			(at 41.91 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33265,7 +33255,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 41.91 68.58 0)
+			(at 41.91 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33274,7 +33264,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 41.91 68.58 0)
+			(at 41.91 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -33371,7 +33361,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f96a6728-088c-4842-b254-99c96030d35a")
-		(property "Reference" "C40"
+		(property "Reference" "C25"
 			(at 379.73 138.4299 0)
 			(effects
 				(font
@@ -33434,7 +33424,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C40")
+					(reference "C25")
 					(unit 1)
 				)
 			)
@@ -33450,7 +33440,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "fb0d5493-28f5-44e0-857b-6ead92da177f")
-		(property "Reference" "C35"
+		(property "Reference" "C20"
 			(at 321.31 138.4299 0)
 			(effects
 				(font
@@ -33513,7 +33503,7 @@
 		(instances
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C35")
+					(reference "C20")
 					(unit 1)
 				)
 			)
@@ -33528,7 +33518,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "fbf19cb5-059e-4a1b-b25f-bc316af8b06b")
-		(property "Reference" "C12"
+		(property "Reference" "C10"
 			(at 38.1 106.68 0)
 			(effects
 				(font
@@ -33626,7 +33616,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C12")
+					(reference "C10")
 					(unit 1)
 				)
 			)
@@ -33708,7 +33698,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "fd4e88fe-f562-47cc-8650-019dd9dda006")
-		(property "Reference" "R16"
+		(property "Reference" "R4"
 			(at 52.07 106.68 90)
 			(effects
 				(font
@@ -33804,7 +33794,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R16")
+					(reference "R4")
 					(unit 1)
 				)
 			)

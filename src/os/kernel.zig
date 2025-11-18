@@ -10,6 +10,9 @@ const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 
+// Use panic handler from system
+pub const panic = @import("system/panic.zig").panic;
+
 const led = gpio.num(25);
 
 pub fn main() !void {
@@ -58,15 +61,5 @@ pub fn main() !void {
                 uart.println(rx_buffer[0..bytes_read]);
             }
         }
-    }
-}
-
-pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
-    _ = message;
-    while (true) {
-        led.put(1);
-        timer.sleep_ms(100);
-        led.put(0);
-        timer.sleep_ms(100);
     }
 }

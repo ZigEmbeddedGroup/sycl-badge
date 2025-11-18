@@ -1,6 +1,7 @@
 /// Multicore management
 const std = @import("std");
 const microzig = @import("microzig");
+const cart = @import("../cart.zig");
 const hal = microzig.hal;
 const interrupt = microzig.interrupts;
 const peripherals = microzig.chip.peripherals;

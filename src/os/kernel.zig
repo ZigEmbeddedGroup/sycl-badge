@@ -65,11 +65,6 @@ pub fn main() !void {
 }
 
 
-// TODO: - Kernel printf implementation
-//       - Number formatting (hex, decimal, binary)
-//       - String formatting
-//       - Maybe a simple allocator for dynamic strings (or fixed buffers)
-
 // TODO: implement line buffering
 // - Character accumulation buffer (e.g., 256 bytes)
 // - Echo characters back to terminal

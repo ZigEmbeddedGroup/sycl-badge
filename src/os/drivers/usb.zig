@@ -125,11 +125,31 @@ pub fn poll() void {
     usb_dev.task(false) catch {};
 }
 
-// Buffer for formatted printing
+// Buffer for formatted printing (max 2KB)
 var print_buffer: [2048]u8 = undefined;
 
-/// Send formatted string over USB (like printf)
-/// Returns true if successful
+/// Send formatted string over USB with full printf-style formatting
+///
+/// Supports all Zig format specifiers:
+/// - {} or {any}     - Default formatting for any type
+/// - {d}            - Decimal integer
+/// - {x}            - Lowercase hexadecimal
+/// - {X}            - Uppercase hexadecimal
+/// - {o}            - Octal
+/// - {b}            - Binary
+/// - {c}            - Character
+/// - {s}            - String/slice
+/// - {e}            - Lowercase scientific notation
+/// - {E}            - Uppercase scientific notation
+/// - {[precision]}  - Decimal precision (e.g., {d:4} for width 4)
+///
+/// Examples:
+///   printf("Number: {d}\r\n", .{42})           -> "Number: 42"
+///   printf("Hex: 0x{x:0>4}\r\n", .{255})       -> "Hex: 0x00ff"
+///   printf("String: {s}\r\n", .{"hello"})      -> "String: hello"
+///   printf("Mixed: {} and {d}\r\n", .{1, 2})   -> "Mixed: 1 and 2"
+///
+/// Returns true if successful, false if buffer overflow or send failed
 pub fn printf(comptime fmt: []const u8, args: anytype) bool {
     const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return false;
     return send(text);

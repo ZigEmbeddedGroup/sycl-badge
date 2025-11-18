@@ -1,5 +1,5 @@
 ﻿/// SYCL Badge OS Kernel
-/// USB CDC and UART communication
+/// USB CDC and UART communication with interactive console
 const std = @import("std");
 const microzig = @import("microzig");
 
@@ -9,6 +9,7 @@ const gpio = rp2xxx.gpio;
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
+const console = @import("system/console.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -28,42 +29,36 @@ pub fn main() !void {
     try usb.init();
     uart.println("USB initialized");
 
+    // Wait a moment for USB to enumerate
+    timer.sleep_ms(500);
+
+    // Initialize console (shows welcome message and prompt)
+    console.init();
+
     var old: u64 = timer.micros();
-    var new: u64 = 0;
-    var i: u32 = 0;
 
     uart.println("Entering main loop");
 
-    // Main loop - call usb.poll() as often as possible!
+    // Main loop - console-based interaction
     while (true) {
         // CRITICAL: Poll USB frequently
         usb.poll();
 
-        new = timer.micros();
+        // Process console input (handles echo, line buffering, commands)
+        console.processInput();
+
+        const new = timer.micros();
         if (new - old > 1_000_000) { // Every 1 second
             old = new;
-            led.toggle();
-            i += 1;
-
-            // Send to both USB and UART
-            _ = usb.printf("USB message {}\r\n", .{i});
-
-            var uart_buffer: [64]u8 = undefined;
-            const uart_msg = std.fmt.bufPrint(&uart_buffer, "UART message {}", .{i}) catch "Error";
-            uart.println(uart_msg);
-
-            // Check for incoming USB data
-            var rx_buffer: [256]u8 = undefined;
-            const bytes_read = usb.receive(&rx_buffer, 0); // Non-blocking read
-            if (bytes_read > 0) {
-                _ = usb.printf("USB received: {s}\r\n", .{rx_buffer[0..bytes_read]});
-                uart.puts("USB received: ");
-                uart.println(rx_buffer[0..bytes_read]);
-            }
+            led.toggle(); // Heartbeat
         }
     }
 }
 
+// TODO: - Kernel printf implementation
+//       - Number formatting (hex, decimal, binary)
+//       - String formatting
+//       - Maybe a simple allocator for dynamic strings (or fixed buffers)
 
 // TODO: implement line buffering
 // - Character accumulation buffer (e.g., 256 bytes)
@@ -96,25 +91,23 @@ pub fn main() !void {
 // Call the appropriate handler function
 // Send response back to USB
 
-// TODO: 
+// TODO:
 // - Move USB polling into a proper input handler
 // - Call command processor when a line is complete
 // - Send command output back through USB
 // - Keep the timing loop for periodic tasks
 
-
 // TODO: add error handling (here or in usb)
 // - Check USB init errors
 // - Handle buffer overflow in line input
 // - Validate command arguments
-// - Send error messages back to user 
+// - Send error messages back to user
 
 // TODO: create printf
 // - A kernel_printf() or console_print() function
 // - Handles formatting internally
 // - Sends to both USB and UART automatically
 // - Returns errors gracefully
-
 
 // [x] 1. Build system compiles OS kernel to .uf2
 // [x] 2. Flash to RP2350 chip and it boots (LED blinks)

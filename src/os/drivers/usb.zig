@@ -134,3 +134,8 @@ pub fn printf(comptime fmt: []const u8, args: anytype) bool {
     const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return false;
     return send(text);
 }
+
+//TODO: line buffering (accumulate chars until enter is pressed)
+//TODO: echo chars back to the terminal
+//TODO: handle special chars and keys (backspace, ctrl + c)
+//TODO: ANSI escape code handling for proper terminal interaction

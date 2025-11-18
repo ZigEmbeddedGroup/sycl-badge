@@ -34,6 +34,9 @@ pub fn main() !void {
 
     uart.println("Entering main loop");
 
+    // Print initial prompt
+    _ = usb.printf("\r\nSYCL Badge Shell\r\n> ", .{});
+
     // Main loop - call usb.poll() as often as possible!
     while (true) {
         // CRITICAL: Poll USB frequently
@@ -42,28 +45,128 @@ pub fn main() !void {
         new = timer.micros();
         if (new - old > 1_000_000) { // Every 1 second
             old = new;
-            led.toggle();
+            // led.toggle(); // Disabled to allow shell control
             i += 1;
 
             // Send to both USB and UART
-            _ = usb.printf("USB message {}\r\n", .{i});
+            // _ = usb.printf("USB message {}\r\n", .{i}); // Disabled to not break shell prompt
 
             var uart_buffer: [64]u8 = undefined;
             const uart_msg = std.fmt.bufPrint(&uart_buffer, "UART message {}", .{i}) catch "Error";
             uart.println(uart_msg);
+        }
 
-            // Check for incoming USB data
-            var rx_buffer: [256]u8 = undefined;
-            const bytes_read = usb.receive(&rx_buffer, 0); // Non-blocking read
-            if (bytes_read > 0) {
-                _ = usb.printf("USB received: {s}\r\n", .{rx_buffer[0..bytes_read]});
-                uart.puts("USB received: ");
-                uart.println(rx_buffer[0..bytes_read]);
+        // Check for incoming USB data
+        var rx_buffer: [64]u8 = undefined;
+        const bytes_read = usb.receive(&rx_buffer, 0); // Non-blocking read
+
+        if (bytes_read > 0) {
+            for (rx_buffer[0..bytes_read]) |c| {
+                // Handle backspace (0x08 is BS, 0x7F is DEL)
+                if (c == '\x08' or c == '\x7F') {
+                    if (cmd_index > 0) {
+                        cmd_index -= 1;
+                        // Erase character from terminal: Backspace, Space, Backspace
+                        _ = usb.printf("\x08 \x08", .{});
+                    }
+                }
+                // Handle newline (Enter)
+                else if (c == '\r' or c == '\n') {
+                    _ = usb.printf("\r\n", .{}); // Echo newline
+
+                    if (cmd_index > 0) {
+                        processCommand(cmd_buffer[0..cmd_index]);
+                        cmd_index = 0;
+                    }
+
+                    _ = usb.printf("> ", .{}); // Print prompt
+                }
+                // Handle regular characters
+                else if (cmd_index < cmd_buffer.len) {
+                    cmd_buffer[cmd_index] = c;
+                    cmd_index += 1;
+                    _ = usb.printf("{c}", .{c}); // Echo character
+                }
             }
         }
     }
 }
 
+// Command Registry and Shell Implementation
+
+const CommandHandler = *const fn (iter: *std.mem.TokenIterator(u8, .scalar)) void;
+
+const Command = struct {
+    name: []const u8,
+    description: []const u8,
+    handler: CommandHandler,
+};
+
+const commands = [_]Command{
+    .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
+    .{ .name = "led", .description = "Control LED (on/off/toggle)", .handler = cmdLed },
+    .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
+    .{ .name = "reboot", .description = "Reboot the system", .handler = cmdReboot },
+};
+
+// Command buffer
+var cmd_buffer: [256]u8 = undefined;
+var cmd_index: usize = 0;
+
+fn processCommand(cmd: []const u8) void {
+    var iter = std.mem.tokenizeScalar(u8, cmd, ' ');
+    const command_name = iter.next() orelse return;
+
+    for (commands) |cmd_entry| {
+        if (std.mem.eql(u8, command_name, cmd_entry.name)) {
+            cmd_entry.handler(&iter);
+            return;
+        }
+    }
+
+    _ = usb.printf("Unknown command: {s}\r\n", .{command_name});
+}
+
+fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    _ = usb.printf("Available commands:\r\n", .{});
+    for (commands) |cmd| {
+        _ = usb.printf("  {s: <8} - {s}\r\n", .{ cmd.name, cmd.description });
+    }
+}
+
+fn cmdLed(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const arg = iter.next();
+    if (arg) |a| {
+        if (std.mem.eql(u8, a, "on")) {
+            led.put(1);
+            _ = usb.printf("LED turned ON\r\n", .{});
+        } else if (std.mem.eql(u8, a, "off")) {
+            led.put(0);
+            _ = usb.printf("LED turned OFF\r\n", .{});
+        } else if (std.mem.eql(u8, a, "toggle")) {
+            led.toggle();
+            _ = usb.printf("LED toggled\r\n", .{});
+        } else {
+            _ = usb.printf("Usage: led [on|off|toggle]\r\n", .{});
+        }
+    } else {
+        _ = usb.printf("Usage: led [on|off|toggle]\r\n", .{});
+    }
+}
+
+fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    const now = timer.micros();
+    const seconds = now / 1_000_000;
+    _ = usb.printf("Uptime: {} seconds\r\n", .{seconds});
+}
+
+fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    _ = usb.printf("Rebooting...\r\n", .{});
+    // TODO: Implement reboot
+}
 
 // TODO: implement line buffering
 // - Character accumulation buffer (e.g., 256 bytes)
@@ -96,25 +199,23 @@ pub fn main() !void {
 // Call the appropriate handler function
 // Send response back to USB
 
-// TODO: 
+// TODO:
 // - Move USB polling into a proper input handler
 // - Call command processor when a line is complete
 // - Send command output back through USB
 // - Keep the timing loop for periodic tasks
 
-
 // TODO: add error handling (here or in usb)
 // - Check USB init errors
 // - Handle buffer overflow in line input
 // - Validate command arguments
-// - Send error messages back to user 
+// - Send error messages back to user
 
 // TODO: create printf
 // - A kernel_printf() or console_print() function
 // - Handles formatting internally
 // - Sends to both USB and UART automatically
 // - Returns errors gracefully
-
 
 // [x] 1. Build system compiles OS kernel to .uf2
 // [x] 2. Flash to RP2350 chip and it boots (LED blinks)

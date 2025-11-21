@@ -1,6 +1,7 @@
 /// Console system for SYCL Badge OS
 /// Handles line buffering, command parsing, and interactive shell
 const std = @import("std");
+const microzig = @import("microzig");
 const usb = @import("../drivers/usb.zig");
 const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
@@ -55,6 +56,8 @@ const commands = [_]Command{
     .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
+    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio },
+    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
 };
 
 // Unified Console Output (sends to both USB and UART)
@@ -567,8 +570,180 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-//TODO: 
-// - done -- up direction key (recall last command) 
+// GPIO Command Handler
+fn cmdGpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const subcmd = iter.next();
+    if (subcmd == null) {
+        println("\r\nUsage: gpio <read|write|toggle|list> [args]\r\n");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd.?, "read")) {
+        cmdGpioRead(iter);
+    } else if (std.mem.eql(u8, subcmd.?, "write")) {
+        cmdGpioWrite(iter);
+    } else if (std.mem.eql(u8, subcmd.?, "toggle")) {
+        cmdGpioToggle(iter);
+    } else if (std.mem.eql(u8, subcmd.?, "list")) {
+        cmdGpioList(iter);
+    } else {
+        println("\r\nUsage: gpio <read|write|toggle|list> [args]\r\n");
+    }
+}
+
+fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const pin_str = iter.next();
+    if (pin_str == null) {
+        println("\r\nUsage: gpio read <pin>\r\n");
+        return;
+    }
+
+    const pin_num = std.fmt.parseInt(u9, pin_str.?, 10) catch {
+        printf("\r\nError: Invalid pin number: {s}\r\n\r\n", .{pin_str.?});
+        return;
+    };
+
+    if (pin_num > 29) {
+        println("\r\nError: Pin number must be 0-29\r\n");
+        return;
+    }
+
+    const pin = gpio.num(pin_num);
+    const value = gpio.read(pin);
+    printf("\r\nGPIO {d}: {d}\r\n\r\n", .{ pin_num, value });
+}
+
+fn cmdGpioWrite(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const pin_str = iter.next();
+    if (pin_str == null) {
+        println("\r\nUsage: gpio write <pin> <value>\r\n");
+        return;
+    }
+
+    const pin_num = std.fmt.parseInt(u9, pin_str.?, 10) catch {
+        printf("\r\nError: Invalid pin number: {s}\r\n\r\n", .{pin_str.?});
+        return;
+    };
+
+    if (pin_num > 29) {
+        println("\r\nError: Pin number must be 0-29\r\n");
+        return;
+    }
+
+    const value_str = iter.next();
+    if (value_str == null) {
+        println("\r\nUsage: gpio write <pin> <value>\r\n");
+        return;
+    }
+
+    const value = std.fmt.parseInt(u1, value_str.?, 10) catch {
+        printf("\r\nError: Invalid value: {s} (must be 0 or 1)\r\n\r\n", .{value_str.?});
+        return;
+    };
+
+    const pin = gpio.num(pin_num);
+    // Configure as output if not already configured
+    pin.set_function(.sio);
+    pin.set_direction(.out);
+    pin.put(value);
+    printf("\r\nGPIO {d} set to {d}\r\n\r\n", .{ pin_num, value });
+}
+
+fn cmdGpioToggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const pin_str = iter.next();
+    if (pin_str == null) {
+        println("\r\nUsage: gpio toggle <pin>\r\n");
+        return;
+    }
+
+    const pin_num = std.fmt.parseInt(u9, pin_str.?, 10) catch {
+        printf("\r\nError: Invalid pin number: {s}\r\n\r\n", .{pin_str.?});
+        return;
+    };
+
+    if (pin_num > 29) {
+        println("\r\nError: Pin number must be 0-29\r\n");
+        return;
+    }
+
+    const pin = gpio.num(pin_num);
+    // Configure as output if not already configured
+    pin.set_function(.sio);
+    pin.set_direction(.out);
+    gpio.toggle(pin);
+    const new_value = gpio.read(pin);
+    printf("\r\nGPIO {d} toggled to {d}\r\n\r\n", .{ pin_num, new_value });
+}
+
+fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    var start_pin: u9 = 0;
+    var end_pin: u9 = 29;
+
+    const start_str = iter.next();
+    if (start_str) |s| {
+        start_pin = std.fmt.parseInt(u9, s, 10) catch {
+            printf("\r\nError: Invalid start pin: {s}\r\n\r\n", .{s});
+            return;
+        };
+        if (start_pin > 29) {
+            println("\r\nError: Start pin must be 0-29\r\n");
+            return;
+        }
+
+        const end_str = iter.next();
+        if (end_str) |e| {
+            end_pin = std.fmt.parseInt(u9, e, 10) catch {
+                printf("\r\nError: Invalid end pin: {s}\r\n\r\n", .{e});
+                return;
+            };
+            if (end_pin > 29) {
+                println("\r\nError: End pin must be 0-29\r\n");
+                return;
+            }
+            if (end_pin < start_pin) {
+                println("\r\nError: End pin must be >= start pin\r\n");
+                return;
+            }
+        } else {
+            end_pin = start_pin;
+        }
+    }
+
+    println("\r\nGPIO Status:");
+    var pin_num = start_pin;
+    while (pin_num <= end_pin) : (pin_num += 1) {
+        const pin = gpio.num(pin_num);
+        const value = gpio.read(pin);
+        printf("  GPIO {d: >2}: {d}\r\n", .{ pin_num, value });
+    }
+    println("");
+}
+
+// Reboot Command (does not work properly)
+fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    println("\r\nRebooting system...\r\n");
+
+    // Small delay to allow message to be sent
+    timer.sleep_ms(100);
+
+    // Trigger system reset via SCB (System Control Block)
+    // RP2350 uses Cortex-M33, same reset mechanism as other ARM Cortex-M
+    const SCB_BASE = 0xE000ED00;
+    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+
+    // Write SYSRESETREQ bit with VECTKEY
+    // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+    microzig.cpu.dsb();
+    AIRCR.* = 0x05FA0004; // VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+    microzig.cpu.dsb();
+
+    // If reset doesn't happen, hang
+    // microzig.hang();
+}
+
+//TODO:
+// - done -- up direction key (recall last command)
 // - done -- left direction key
 // - done -- right direction key
 // - done -- down direction key (future command history navigation)
@@ -576,3 +751,4 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // - done -- right direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
 // - done -- delete key
+// - get reboot command working properly

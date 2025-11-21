@@ -25,11 +25,11 @@ pub fn mask(m: anytype) Mask {
 
 // Read and write operations with proper types
 pub fn read(pin: Pin) u1 {
-    return @intFromBool(hal.gpio.read(pin));
+    return pin.read();
 }
 
 pub fn put(pin: Pin, value: u1) void {
-    hal.gpio.put(pin, value != 0);
+    pin.put(value);
 }
 
 // Convenience functions using the corrected read

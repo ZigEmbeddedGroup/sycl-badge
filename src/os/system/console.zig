@@ -55,6 +55,7 @@ const commands = [_]Command{
     .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
+    .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
 };
 
 // Unified Console Output (sends to both USB and UART)
@@ -80,6 +81,9 @@ pub fn println(text: []const u8) void {
 
 /// Show the prompt
 pub fn showPrompt() void {
+    if (line_length != 0 or cursor_pos != 0) {
+        print("\r\n");
+    }
     print(PROMPT);
 }
 
@@ -91,19 +95,17 @@ pub fn init() void {
     history_index = 0;
     in_history_mode = false;
     escape_state = .normal;
-
     println("");
     println("========================================");
     println("  SYCL Badge OS v0.1.0");
     println("  RP2350 Console");
     println("========================================");
     println("Type 'help' for available commands");
-    println("");
     showPrompt();
 }
 
 /// Input Processing
-/// Call this frequently from main loop
+/// Call this frequently from kernel
 pub fn processInput() void {
     var rx_buffer: [64]u8 = undefined;
 
@@ -566,9 +568,14 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
     println("");
 }
+fn cmdPs(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    println("\r\nProcess listing not implemented yet.\r\n");
+    return;
+}
 
-//TODO: 
-// - done -- up direction key (recall last command) 
+//TODO:
+// - done -- up direction key (recall last command)
 // - done -- left direction key
 // - done -- right direction key
 // - done -- down direction key (future command history navigation)

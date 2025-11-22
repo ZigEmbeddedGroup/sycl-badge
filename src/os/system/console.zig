@@ -56,12 +56,9 @@ const commands = [_]Command{
     .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
-<<<<<<< HEAD
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
-=======
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
->>>>>>> fb359aace46eb909d61e5344f55b12029cb6dd06
 };
 
 // Unified Console Output (sends to both USB and UART)
@@ -580,8 +577,6 @@ fn cmdPs(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     return;
 }
 
-<<<<<<< HEAD
-=======
 // GPIO Command Handler
 fn cmdGpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next();
@@ -754,7 +749,6 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // microzig.hang();
 }
 
->>>>>>> fb359aace46eb909d61e5344f55b12029cb6dd06
 //TODO:
 // - done -- up direction key (recall last command)
 // - done -- left direction key
@@ -764,7 +758,4 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // - done -- right direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
 // - done -- delete key
-<<<<<<< HEAD
-=======
 // - get reboot command working properly
->>>>>>> fb359aace46eb909d61e5344f55b12029cb6dd06

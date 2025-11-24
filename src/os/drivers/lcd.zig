@@ -12,13 +12,25 @@ const timer = @import("timer.zig");
 pub const width = 128;
 pub const height = 160;
 
-// Pin assignments
+// Pin assignments (control pins only)
 pub const Pins = struct {
     cs: gpio.Pin, // Chip Select
     dc: gpio.Pin, // Data/Command
-    rst: gpio.Pin, // Reset
-    bl: ?gpio.Pin, // Backlight ???
-    //TODO: go over pin assignments
+    // rst: gpio.Pin, // Reset (connected to RP2354B RUN pin)
+    bl: ?gpio.Pin, // Backlight (optional)
+};
+
+/// Combined LCD pin configuration (control pins + SPI pins + TE pin)
+pub const LCDPins = struct {
+    /// Control pins for LCD driver
+    control: Pins,
+    /// SPI pins (LCD_SCL and LCD_SDIO)
+    spi: struct {
+        scl: gpio.Pin, // LCD_SCL - Serial Clock
+        sdo: gpio.Pin, // LCD_SDIO - Serial Data I/O (MOSI)
+    },
+    /// TE (Tearing Effect) pin - optional, used for frame synchronization
+    te: ?gpio.Pin = null,
 };
 
 // Color formats
@@ -151,6 +163,8 @@ pub const Config = struct {
     rotation: u8 = 0, // 0, 1, 2, or 3 (0/90/180/270 degrees)
 };
 
+/// Low-level initialization (control pins only)
+/// Use initWithAllPins() for full initialization including SPI and TE pins
 pub fn init(pin_config: Pins, config: Config) !void {
     pins = pin_config;
 
@@ -162,10 +176,6 @@ pub fn init(pin_config: Pins, config: Config) !void {
     pins.dc.set_function(.sio);
     pins.dc.set_direction(.out);
     pins.dc.put(1);
-
-    pins.rst.set_function(.sio);
-    pins.rst.set_direction(.out);
-    pins.rst.put(1);
 
     if (pins.bl) |bl| {
         bl.set_function(.sio);
@@ -186,22 +196,10 @@ pub fn init(pin_config: Pins, config: Config) !void {
     //     .baud_rate = config.spi_baudrate,
     // });
 
-    // Hardware reset
-    hardwareReset();
-
-    // Initialize display
+    // Initialize display (no hardware reset needed since LCD is connected to RUN pin)
     initDisplay(config.rotation);
 
     initialized = true;
-}
-
-fn hardwareReset() void {
-    pins.rst.put(1);
-    timer.sleep_ms(10);
-    pins.rst.put(0);
-    timer.sleep_ms(10);
-    pins.rst.put(1);
-    timer.sleep_ms(120);
 }
 
 fn initDisplay(rotation: u8) void {
@@ -428,4 +426,91 @@ pub fn testText() void {
     fillScreen(BLACK);
     drawString(10, 10, "SYCL Badge OS", WHITE, BLACK, 2);
     drawString(10, 30, "LCD Driver Test", GREEN, BLACK, 1);
+}
+
+/// Create complete LCD pin configuration for DT018BTFT-SHB display
+///
+/// Pin Mapping:
+/// Control Pins:
+/// - LCD_CS -> cs (Chip Select)
+/// - LCD_D/CX -> dc (Data/Command)
+/// - RST -> rst (Reset, connected to RP2354B RUN pin)
+/// - BKLT_PWM -> bl (Backlight)
+///
+/// SPI Pins:
+/// - LCD_SCL -> scl (Serial Clock)
+/// - LCD_SDIO -> sdo (Serial Data I/O / MOSI)
+///
+/// Optional Pins:
+/// - TE -> te (Tearing Effect) (technically optional, used for frame synchronization)
+pub fn createDT018BTFTPins() LCDPins {
+    const hal_gpio = microzig.hal.gpio;
+
+    return .{
+        .control = .{
+            // LCD_CS - Chip Select
+            .cs = hal_gpio.num(19),
+
+            // LCD_D/CX - Data/Command
+            .dc = hal_gpio.num(22),
+
+            // RST - Reset (connected to RP2354B RUN pin)
+            // .rst = hal_gpio.num(0), // There is no pin assignment needed since it is wired to the RUN pin
+
+            // BKLT_PWM - Backlight PWM control
+            .bl = hal_gpio.num(18), // Set to null if backlight is not controlled via GPIO
+        },
+        .spi = .{
+            // LCD_SCL - Serial Clock
+            .scl = hal_gpio.num(23),
+
+            // LCD_SDIO - Serial Data I/O (MOSI)
+            .sdo = hal_gpio.num(21),
+        },
+        // TE - Tearing Effect
+        .te = hal_gpio.num(20),
+    };
+}
+
+/// Create default LCD configuration for DT018BTFT-SHB
+pub fn createDT018BTFTConfig() Config {
+    return .{
+        .spi_instance_num = 0, // SPI instance number (typically 0)
+        .spi_baudrate = 8_000_000, // 8 MHz SPI speed
+        .rotation = 0, // Display rotation: 0=portrait, 1=landscape, 2=portrait inverted, 3=landscape inverted
+    };
+}
+
+/// Configure SPI pins for LCD communication
+/// This sets the GPIO pins to their SPI function
+fn configureLCDSPIPins(spi_pins: LCDPins.spi) void {
+    // Configure SCK (Serial Clock) pin for SPI function
+    spi_pins.scl.set_function(.spi);
+    spi_pins.scl.set_direction(.out);
+
+    // Configure MOSI (Master Out Slave In) pin for SPI function
+    spi_pins.sdo.set_function(.spi);
+    spi_pins.sdo.set_direction(.out);
+}
+
+/// Configure TE (Tearing Effect) pin if provided
+/// TE pin is used for frame synchronization and is optional
+fn configureLCDTEPin(te: ?gpio.Pin) void {
+    if (te) |te_pin| {
+        // Configure TE pin as input (it's driven by the display)
+        te_pin.set_function(.sio);
+        te_pin.set_direction(.in);
+    }
+}
+
+/// High-level initialization function that handles all pin configuration
+pub fn initWithAllPins(all_pins: LCDPins, config: Config) !void {
+    // Configure SPI pins
+    configureLCDSPIPins(all_pins.spi);
+
+    // Configure TE pin if provided
+    configureLCDTEPin(all_pins.te);
+
+    // Initialize LCD with control pins
+    try init(all_pins.control, config);
 }

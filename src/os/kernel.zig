@@ -3,37 +3,18 @@
 const std = @import("std");
 const microzig = @import("microzig");
 
-const rp2xxx = microzig.hal;
-const gpio = rp2xxx.gpio;
-
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 const console = @import("system/console.zig");
+const init = @import("system/init.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
 
-const led = gpio.num(25);
-
 pub fn main() !void {
-    led.set_function(.sio);
-    led.set_direction(.out);
-    led.put(1);
-
-    // Initialize UART for debug output
-    uart.init();
-    uart.println("SYCL Badge OS starting...");
-
-    // Initialize USB
-    try usb.init();
-    uart.println("USB initialized");
-
-    // Wait a moment for USB to enumerate
-    timer.sleep_ms(500);
-
-    // Initialize console (shows welcome message and prompt)
-    console.init();
+    // Initialize all drivers and kernel systems
+    try init.init(.{});
 
     var old: u64 = timer.micros();
 

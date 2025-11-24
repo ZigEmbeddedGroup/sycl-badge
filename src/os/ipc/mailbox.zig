@@ -27,13 +27,13 @@ pub const Error = error{
 /// Send a message to the other core (blocking)
 /// Blocks until there's space in the FIFO
 pub fn send(msg: Message) void {
-    fifo.push_blocking(msg);
+    fifo.write_blocking(msg);
 }
 
 /// Send a message to the other core (non-blocking)
 /// Returns error if FIFO is full
 pub fn trySend(msg: Message) Error!void {
-    if (fifo.try_push(msg)) {
+    if (fifo.write(msg)) {
         return;
     } else {
         return Error.FIFOFull;
@@ -43,18 +43,18 @@ pub fn trySend(msg: Message) Error!void {
 /// Receive a message from the other core (blocking)
 /// Blocks until a message is available
 pub fn receive() Message {
-    return fifo.pop_blocking();
+    return fifo.read_blocking();
 }
 
 /// Receive a message from the other core (non-blocking)
 /// Returns null if no message is available
 pub fn tryReceive() ?Message {
-    return fifo.try_pop();
+    return fifo.read();
 }
 
 /// Clear all messages from the FIFO
 pub fn clear() void {
-    while (fifo.try_pop()) |_| {}
+    while (fifo.read()) |_| {}
 }
 
 /// Message type constants for common operations

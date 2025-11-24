@@ -1,4 +1,4 @@
-/// LCD Driver for RP2350 SYCL Badge OS
+/// LCD Driver for RP2354B SYCL Badge OS
 /// Supports ST7735/ST7789 based displays (like DT018BTFT)
 /// 1.8" TFT Display - 128x160 RGB
 const std = @import("std");
@@ -20,15 +20,18 @@ pub const Pins = struct {
     bl: ?gpio.Pin, // Backlight (optional)
 };
 
+/// SPI pin configuration for LCD
+pub const SPIPins = struct {
+    scl: gpio.Pin, // LCD_SCL - Serial Clock
+    sdo: gpio.Pin, // LCD_SDIO - Serial Data I/O (MOSI)
+};
+
 /// Combined LCD pin configuration (control pins + SPI pins + TE pin)
 pub const LCDPins = struct {
     /// Control pins for LCD driver
     control: Pins,
     /// SPI pins (LCD_SCL and LCD_SDIO)
-    spi: struct {
-        scl: gpio.Pin, // LCD_SCL - Serial Clock
-        sdo: gpio.Pin, // LCD_SDIO - Serial Data I/O (MOSI)
-    },
+    spi: SPIPins,
     /// TE (Tearing Effect) pin - optional, used for frame synchronization
     te: ?gpio.Pin = null,
 };
@@ -127,14 +130,24 @@ const ColorMode = enum(u8) {
 fn writeCommand(cmd: Command) void {
     pins.dc.put(0); // Command mode
     pins.cs.put(0); // Select
-    spi_instance.transceive_blocking(&.{@intFromEnum(cmd)});
+    const data = [_]u8{@intFromEnum(cmd)};
+    var dummy: [1]u8 = undefined;
+    spi_instance.transceive_blocking(u8, &data, &dummy);
     pins.cs.put(1); // Deselect
 }
 
 fn writeData(data: []const u8) void {
     pins.dc.put(1); // Data mode
     pins.cs.put(0); // Select
-    spi_instance.transceive_blocking(data);
+    // Allocate dummy buffer for receive (we don't need the data)
+    var dummy = std.mem.zeroes([256]u8);
+    const chunk_size = @min(data.len, dummy.len);
+    var offset: usize = 0;
+    while (offset < data.len) {
+        const len = @min(chunk_size, data.len - offset);
+        spi_instance.transceive_blocking(u8, data[offset..][0..len], dummy[0..len]);
+        offset += len;
+    }
     pins.cs.put(1); // Deselect
 }
 
@@ -158,7 +171,7 @@ fn writeU16(value: u16) void {
 
 /// Initialization
 pub const Config = struct {
-    spi_instance_num: u8 = 0, // Which SPI peripheral to use
+    spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2350)
     spi_baudrate: u32 = 8_000_000, // 8 MHz
     rotation: u8 = 0, // 0, 1, 2, or 3 (0/90/180/270 degrees)
 };
@@ -333,12 +346,15 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     pins.cs.put(0); // Select
 
     // Send color data for each pixel
+    const color_data = [_]u8{
+        @truncate(color_bytes >> 8),
+        @truncate(color_bytes & 0xFF),
+    };
+    var dummy: [2]u8 = undefined;
+
     var i: u32 = 0;
     while (i < pixel_count) : (i += 1) {
-        spi_instance.transceive_blocking(&.{
-            @truncate(color_bytes >> 8),
-            @truncate(color_bytes & 0xFF),
-        });
+        spi_instance.transceive_blocking(u8, &color_data, &dummy);
     }
 
     pins.cs.put(1); // Deselect
@@ -483,7 +499,7 @@ pub fn createDT018BTFTConfig() Config {
 
 /// Configure SPI pins for LCD communication
 /// This sets the GPIO pins to their SPI function
-fn configureLCDSPIPins(spi_pins: LCDPins.spi) void {
+fn configureLCDSPIPins(spi_pins: SPIPins) void {
     // Configure SCK (Serial Clock) pin for SPI function
     spi_pins.scl.set_function(.spi);
     spi_pins.scl.set_direction(.out);

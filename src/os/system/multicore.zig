@@ -78,13 +78,13 @@ pub fn initCore1WithEntrypoint(entrypoint: *const fn () void) void {
 /// Launch Core 1 with default stack
 /// Lower-level function - prefer initCore1() for proper initialization
 pub fn launch_core1(entrypoint: *const fn () void) void {
-    hal.multicore.launch_with_stack(entrypoint, &core1_stack);
+    hal.multicore.launch_core1(entrypoint);
 }
 
 /// Launch Core 1 with custom stack
 /// Lower-level function - prefer initCore1() for proper initialization
 pub fn launch_core1_with_stack(entrypoint: *const fn () void, stack: []u32) void {
-    hal.multicore.launch_with_stack(entrypoint, stack);
+    hal.multicore.launch_core1_with_stack(entrypoint, stack);
 }
 
 /// Wait for Core 1 to signal it's ready

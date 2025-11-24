@@ -1,5 +1,5 @@
 /// Shared memory region for inter-core communication
-/// RP2350 Memory Layout:
+/// RP2354B Memory Layout:
 /// - Kernel RAM (Core 0): 0x20000000 - 0x20020000 (128KB, 1/4 of SRAM)
 /// - Process RAM (Core 1): 0x20020000 - 0x20080000 (384KB, 3/4 of SRAM)
 /// - Shared memory is placed at a fixed address accessible to both cores
@@ -62,14 +62,13 @@ pub fn init() void {
     const registry = getRegistryPtr();
 
     // Only initialize on first call (use a simple flag check)
-    // In a real system, you might want to use a more sophisticated init flag
-    registry.lock.acquire();
-    defer registry.lock.release();
+    registry.lock.lock();
+    defer registry.lock.unlock();
 
     // Check if already initialized (next_region_id != 0 means initialized)
     if (registry.next_region_id == 0) {
         // Initialize registry
-        for (registry.regions) |*region| {
+        for (&registry.regions) |*region| {
             region.* = .{
                 .id = 0,
                 .base = undefined,
@@ -79,6 +78,7 @@ pub fn init() void {
         }
         registry.next_region_id = 1;
         registry.pool_offset = 0;
+        registry.lock = hal.multicore.Spinlock.init(0); // Use hardware spinlock 0
 
         // Clear the pool
         const pool = getPoolPtr();
@@ -102,8 +102,8 @@ pub fn create(size: usize) ?struct { id: RegionId, mem: []u8 } {
     const registry = getRegistryPtr();
     const pool = getPoolPtr();
 
-    registry.lock.acquire();
-    defer registry.lock.release();
+    registry.lock.lock();
+    defer registry.lock.unlock();
 
     // Check if we have space in the pool
     if (registry.pool_offset + aligned_size > POOL_SIZE) {
@@ -159,8 +159,8 @@ pub fn attach(id: RegionId) ?[]u8 {
 
     const registry = getRegistryPtr();
 
-    registry.lock.acquire();
-    defer registry.lock.release();
+    registry.lock.lock();
+    defer registry.lock.unlock();
 
     // Memory barrier to ensure we see the latest state
     microzig.cpu.dmb();

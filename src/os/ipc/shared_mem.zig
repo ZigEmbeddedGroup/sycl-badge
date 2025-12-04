@@ -112,7 +112,7 @@ pub fn create(size: usize) ?struct { id: RegionId, mem: []u8 } {
 
     // Find an available region slot
     var slot: ?usize = null;
-    for (registry.regions, 0..) |*region, i| {
+    for (&registry.regions, 0..) |*region, i| {
         if (!region.in_use) {
             slot = i;
             break;
@@ -124,7 +124,7 @@ pub fn create(size: usize) ?struct { id: RegionId, mem: []u8 } {
     }
 
     // Allocate from the pool
-    const base = &pool[registry.pool_offset];
+    const base: [*]u8 = @ptrCast(&pool[registry.pool_offset]);
     registry.pool_offset += aligned_size;
 
     // Register the region
@@ -166,7 +166,7 @@ pub fn attach(id: RegionId) ?[]u8 {
     microzig.cpu.dmb();
 
     // Find the region
-    for (registry.regions) |*region| {
+    for (&registry.regions) |*region| {
         if (region.in_use and region.id == id) {
             // Memory barrier before returning
             microzig.cpu.dmb();

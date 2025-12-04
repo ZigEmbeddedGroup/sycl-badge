@@ -55,7 +55,7 @@ pub fn initCore1() void {
 /// Initialize Core 1 with custom entrypoint
 pub fn initCore1WithEntrypoint(entrypoint: *const fn () void) void {
     if (core1_initialized) {
-        return; // Already initialized
+        return; // If already initialized
     }
 
     // Initialize IPC systems on Core 0 first

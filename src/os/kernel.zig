@@ -6,6 +6,7 @@ const microzig = @import("microzig");
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
+const lcd = @import("drivers/lcd.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 
@@ -13,8 +14,17 @@ const init = @import("system/init.zig");
 pub const panic = @import("system/panic.zig").panic;
 
 pub fn main() !void {
-    // Initialize all drivers and kernel systems
-    try init.init(.{});
+    // Initialize all drivers and kernel systems (including LCD)
+    try init.init(.{
+        .lcd_pins = lcd.createDT018BTFTPins(),
+        .lcd_config = lcd.createDT018BTFTConfig(),
+    });
+
+    // Display startup message on LCD
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "RP2350 Kernel", lcd.GREEN, lcd.BLACK, 1);
+    lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
 
     var old: u64 = timer.micros();
 

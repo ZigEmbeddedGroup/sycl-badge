@@ -125,17 +125,15 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
 }
 
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Target {
-    // Use the Raspberry Pi Pico 2 board as base
+    // Use the Raspberry Pi Pico 2 board as base, then customize with our board config
     const base_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm;
 
-    // Let microzig auto-generate linker script with IMAGE_DEF/picobin support
-    // For now, use default memory layout until we can properly customize it
-    _ = builder;
-    return @constCast(base_target);
-
-    // TODO: Figure out how to customize memory regions while keeping IMAGE_DEF
-    // As far as I can tell providing a custom linker script breaks IMAGE_DEF generation
-    // we want to use our linker.ld though
+    return base_target.derive(.{
+        .board = .{
+            .name = "SYCL Badge V2 (RP2350)",
+            .root_source_file = builder.path("src/board_v2.zig"),
+        },
+    });
 }
 
 pub const OS = struct {

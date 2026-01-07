@@ -7,16 +7,20 @@ const hal = microzig.hal;
 const gpio = hal.gpio;
 const spi = hal.spi;
 const timer = @import("timer.zig");
+const board = microzig.board;
+const font = board.font;
 
 /// Display Configuration
-pub const width = 128;
-pub const height = 160;
+pub const width: u16 = 128;
+pub const height: u16 = 160;
+pub const xstart: u16 = 0;
+pub const ystart: u16 = 0;
 
 // Pin assignments (control pins only)
 pub const Pins = struct {
     cs: gpio.Pin, // Chip Select
     dc: gpio.Pin, // Data/Command
-    // rst: gpio.Pin, // Reset (connected to RP2354B RUN pin)
+    rst: gpio.Pin, // Reset
     bl: ?gpio.Pin, // Backlight (optional)
 };
 
@@ -37,6 +41,7 @@ pub const LCDPins = struct {
 };
 
 // Color formats
+// RGB565: High byte = RRRRR GGG, Low byte = GGG BBBBB
 pub const Color16 = packed struct(u16) {
     b: u5,
     g: u6,
@@ -48,6 +53,13 @@ pub const Color16 = packed struct(u16) {
             .g = @truncate(g >> 2),
             .b = @truncate(b >> 3),
         };
+    }
+
+    pub fn toBytes(self: Color16) [2]u8 {
+        // ST7735 expects BGR565 format: [BBBBB GGG] [GGG RRRRR]
+        const hi: u8 = (@as(u8, self.b) << 3) | @as(u8, self.g >> 3);
+        const lo: u8 = (@as(u8, self.g & 0x07) << 5) | @as(u8, self.r);
+        return .{ hi, lo };
     }
 };
 
@@ -128,6 +140,7 @@ const ColorMode = enum(u8) {
 
 /// Low-level SPI communication
 fn writeCommand(cmd: Command) void {
+    pins.cs.put(1); // Deselect first
     pins.dc.put(0); // Command mode
     pins.cs.put(0); // Select
     const data = [_]u8{@intFromEnum(cmd)};
@@ -137,6 +150,7 @@ fn writeCommand(cmd: Command) void {
 }
 
 fn writeData(data: []const u8) void {
+    pins.cs.put(1); // Deselect first
     pins.dc.put(1); // Data mode
     pins.cs.put(0); // Select
     // Allocate dummy buffer for receive (we don't need the data)
@@ -190,32 +204,43 @@ pub fn init(pin_config: Pins, config: Config) !void {
     pins.dc.set_direction(.out);
     pins.dc.put(1);
 
+    pins.rst.set_function(.sio);
+    pins.rst.set_direction(.out);
+    pins.rst.put(0);
+
     if (pins.bl) |bl| {
         bl.set_function(.sio);
         bl.set_direction(.out);
         bl.put(1); // Turn on backlight
     }
 
-    // Initialize SPI
-    // TODO: configure SPI pins (SCK, MOSI) separately
-    // based on hardware setup - datasheet says SCK=18, MOSI=19 ??
+    // Initialize SPI peripheral
     spi_instance = spi.instance.num(config.spi_instance_num);
 
-    // TODO: configure SPI with proper clock config and baudrate
-    // Depends on MicroZig HAL's SPI API - haven't checked
+    // Reset and configure SPI peripheral
+    // This is critical - without this the SPI peripheral won't work
+    const spi_config = spi.Config{
+        .clock_config = hal.clock_config,
+    };
+    try spi_instance.apply(spi_config);
 
-    // spi_instance.apply(.{
-    //     .clock_config = hal.clock_config,
-    //     .baud_rate = config.spi_baudrate,
-    // });
+    // Hardware reset sequence (matches Python code)
+    pins.rst.put(1);
+    timer.sleep_ms(5);
+    pins.rst.put(0);
+    timer.sleep_ms(20);
+    pins.rst.put(1);
+    timer.sleep_ms(150);
 
-    // Initialize display (no hardware reset needed since LCD is connected to RUN pin)
+    // Initialize display
     initDisplay(config.rotation);
 
     initialized = true;
 }
 
 fn initDisplay(rotation: u8) void {
+    _ = rotation; // Ignore rotation parameter, use fixed MADCTL
+
     // Software reset
     writeCommand(.SWRESET);
     timer.sleep_ms(150);
@@ -224,32 +249,52 @@ fn initDisplay(rotation: u8) void {
     writeCommand(.SLPOUT);
     timer.sleep_ms(120);
 
-    // Color mode - 16-bit RGB565
-    writeCommandWithData(.COLMOD, &.{@intFromEnum(ColorMode.RGB565)});
+    // Frame rate control - normal mode (ST7735S values)
+    writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x3C, 0x3C });
+    timer.sleep_ms(10);
 
-    // Set rotation
-    setRotation(rotation);
+    // Frame rate control - idle mode
+    writeCommandWithData(.FRMCTR2, &.{ 0x05, 0x3C, 0x3C });
+    timer.sleep_ms(10);
 
-    // Frame rate control (normal mode)
-    writeCommandWithData(.FRMCTR1, &.{ 0x01, 0x2C, 0x2D });
-    writeCommandWithData(.FRMCTR2, &.{ 0x01, 0x2C, 0x2D });
-    writeCommandWithData(.FRMCTR3, &.{ 0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D });
+    // Frame rate control - partial mode
+    writeCommandWithData(.FRMCTR3, &.{ 0x05, 0x3C, 0x3C, 0x05, 0x3C, 0x3C });
+    timer.sleep_ms(10);
 
-    // Inversion control
-    writeCommandWithData(.INVCTR, &.{0x07});
+    // Display inversion control
+    writeCommandWithData(.INVCTR, &.{0x03});
 
-    // Power control
-    writeCommandWithData(.PWCTR1, &.{ 0xA2, 0x02, 0x84 });
-    writeCommandWithData(.PWCTR2, &.{0xC5});
-    writeCommandWithData(.PWCTR3, &.{ 0x0A, 0x00 });
-    writeCommandWithData(.PWCTR4, &.{ 0x8A, 0x2A });
-    writeCommandWithData(.PWCTR5, &.{ 0x8A, 0xEE });
+    // Power control settings (ST7735S values)
+    writeCommandWithData(.PWCTR1, &.{ 0x28, 0x08, 0x04 }); // GVDD = 4.7V, 1.0uA
+    writeCommandWithData(.PWCTR2, &.{0xC0}); // VGH=14.7V, VGL=-7.35V
+    writeCommandWithData(.PWCTR3, &.{ 0x0D, 0x00 }); // Opamp current small
+    writeCommandWithData(.PWCTR4, &.{ 0x8D, 0x2A }); // BCLK/2
+    writeCommandWithData(.PWCTR5, &.{ 0x8D, 0xEE }); // BCLK/2
 
     // VCOM control
-    writeCommandWithData(.VMCTR1, &.{0x0E});
+    writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
 
-    // Inversion off
-    writeCommand(.INVOFF);
+    // Memory access control - ST7735S uses 0xC0
+    writeCommandWithData(.MADCTL, &.{0xC0}); // Row/column exchange, RGB
+
+    // Color mode - 16-bit RGB565
+    writeCommandWithData(.COLMOD, &.{0x05});
+
+    // Gamma correction (positive) - ST7735S values
+    writeCommandWithData(.GMCTRP1, &.{
+        0x04, 0x22, 0x07, 0x0A,
+        0x2E, 0x30, 0x25, 0x2A,
+        0x28, 0x26, 0x2E, 0x3A,
+        0x00, 0x01, 0x03, 0x13,
+    });
+
+    // Gamma correction (negative) - ST7735S values
+    writeCommandWithData(.GMCTRN1, &.{
+        0x04, 0x16, 0x06, 0x0D,
+        0x2D, 0x26, 0x23, 0x27,
+        0x27, 0x25, 0x2D, 0x3B,
+        0x00, 0x01, 0x04, 0x13,
+    });
 
     // Normal display mode
     writeCommand(.NORON);
@@ -257,10 +302,7 @@ fn initDisplay(rotation: u8) void {
 
     // Display on
     writeCommand(.DISPON);
-    timer.sleep_ms(100);
-
-    // Clear screen to black
-    fillScreen(BLACK);
+    timer.sleep_ms(120);
 }
 
 /// Display Control
@@ -305,18 +347,24 @@ pub fn invertDisplay(invert: bool) void {
 }
 
 /// Drawing Functions
-pub fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
-    // Column address set
+fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
+    const x0_offset = x0 + xstart;
+    const x1_offset = x1 + xstart;
+    const y0_offset = y0 + ystart;
+    const y1_offset = y1 + ystart;
+
     writeCommand(.CASET);
-    writeU16(x0);
-    writeU16(x1);
+    writeU8(0x00);
+    writeU8(@truncate(x0_offset));
+    writeU8(0x00);
+    writeU8(@truncate(x1_offset));
 
-    // Row address set
     writeCommand(.RASET);
-    writeU16(y0);
-    writeU16(y1);
+    writeU8(0x00);
+    writeU8(@truncate(y0_offset));
+    writeU8(0x00);
+    writeU8(@truncate(y1_offset));
 
-    // Write to RAM
     writeCommand(.RAMWR);
 }
 
@@ -324,7 +372,8 @@ pub fn drawPixel(x: u16, y: u16, color: Color16) void {
     if (x >= width or y >= height) return;
 
     setWindow(x, y, x, y);
-    writeU16(@bitCast(color));
+    const bytes = color.toBytes();
+    writeData(&bytes);
 }
 
 pub fn fillScreen(color: Color16) void {
@@ -334,30 +383,36 @@ pub fn fillScreen(color: Color16) void {
 pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     if (x >= width or y >= height) return;
 
-    const x1 = @min(x + w - 1, width - 1);
-    const y1 = @min(y + h - 1, height - 1);
+    const x_clamped = @min(x, width - 1);
+    const y_clamped = @min(y, height - 1);
+    const w_actual = @min(w, width - x_clamped);
+    const h_actual = @min(h, height - y_clamped);
 
-    setWindow(x, y, x1, y1);
+    if (w_actual == 0 or h_actual == 0) return;
 
-    const color_bytes: u16 = @bitCast(color);
-    const pixel_count = (x1 - x + 1) * (y1 - y + 1);
+    const x1 = x_clamped + w_actual - 1;
+    const y1 = y_clamped + h_actual - 1;
 
-    pins.dc.put(1); // Data mode
-    pins.cs.put(0); // Select
+    setWindow(x_clamped, y_clamped, x1, y1);
 
-    // Send color data for each pixel
-    const color_data = [_]u8{
-        @truncate(color_bytes >> 8),
-        @truncate(color_bytes & 0xFF),
-    };
-    var dummy: [2]u8 = undefined;
+    const color_bytes = color.toBytes();
 
-    var i: u32 = 0;
-    while (i < pixel_count) : (i += 1) {
-        spi_instance.transceive_blocking(u8, &color_data, &dummy);
+    // Write line by line for better reliability (matches Python)
+    // Create a line buffer with width pixels
+    var line: [256]u8 = undefined; // 128 pixels * 2 bytes = 256 bytes max
+    const line_bytes = w_actual * 2;
+
+    var i: usize = 0;
+    while (i < w_actual) : (i += 1) {
+        line[i * 2] = color_bytes[0];
+        line[i * 2 + 1] = color_bytes[1];
     }
 
-    pins.cs.put(1); // Deselect
+    // Write each line
+    var row: u16 = 0;
+    while (row < h_actual) : (row += 1) {
+        writeData(line[0..line_bytes]);
+    }
 }
 
 pub fn drawHLine(x: u16, y: u16, w: u16, color: Color16) void {
@@ -376,20 +431,41 @@ pub fn drawRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
 }
 
 pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, size: u8) void {
-    _ = x;
-    _ = y;
-    _ = char;
-    _ = color;
-    _ = bg_color;
-    _ = size;
-    // TODO: Import fonts?
+    if (x >= width or y >= height) return;
+    if (size == 0) return;
+
+    // Get font data for this character (font starts at space ' ')
+    const char_index = if (char >= ' ') char - ' ' else 0;
+    if (char_index >= font.font.len) return;
+
+    const glyph = font.font[char_index];
+
+    // Draw the character bitmap
+    var row: u8 = 0;
+    while (row < 8) : (row += 1) {
+        const line = glyph[row];
+        var col: u8 = 0;
+        while (col < 8) : (col += 1) {
+            // Check if pixel is set (0 = foreground, 1 = background in this font)
+            const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
+            const pixel_color = if (bit_set) color else bg_color;
+
+            // Draw scaled pixel
+            if (size == 1) {
+                drawPixel(x + col, y + row, pixel_color);
+            } else {
+                // Draw size x size block for each font pixel
+                fillRect(x + @as(u16, col) * size, y + @as(u16, row) * size, size, size, pixel_color);
+            }
+        }
+    }
 }
 
 pub fn drawString(x: u16, y: u16, text: []const u8, color: Color16, bg_color: Color16, size: u8) void {
     var cursor_x = x;
     for (text) |char| {
         drawChar(cursor_x, y, char, color, bg_color, size);
-        cursor_x += 6 * size; // 5 pixels + 1 space
+        cursor_x += 8 * size; // 8 pixels per character
     }
 }
 
@@ -412,19 +488,11 @@ pub fn writeFramebuffer(framebuffer: []const Color16) void {
 
     setWindow(0, 0, width - 1, height - 1);
 
-    pins.dc.put(1); // Data mode
-    pins.cs.put(0); // Select
-
-    // Write entire framebuffer
+    // Write entire framebuffer pixel by pixel
     for (framebuffer) |pixel| {
-        const color_bytes: u16 = @bitCast(pixel);
-        spi_instance.transceive_blocking(&.{
-            @truncate(color_bytes >> 8),
-            @truncate(color_bytes & 0xFF),
-        });
+        const data = pixel.toBytes();
+        writeData(&data);
     }
-
-    pins.cs.put(1); // Deselect
 }
 
 /// Test Functions
@@ -464,27 +532,27 @@ pub fn createDT018BTFTPins() LCDPins {
 
     return .{
         .control = .{
-            // LCD_CS - Chip Select
-            .cs = hal_gpio.num(19),
+            // LCD_CS - Chip Select (GP17 - SPI0 CSn)
+            .cs = hal_gpio.num(17),
 
-            // LCD_D/CX - Data/Command
-            .dc = hal_gpio.num(22),
+            // LCD_D/CX - Data/Command (GP21)
+            .dc = hal_gpio.num(21),
 
-            // RST - Reset (connected to RP2354B RUN pin)
-            // .rst = hal_gpio.num(0), // There is no pin assignment needed since it is wired to the RUN pin
+            // RST - Reset (GP20)
+            .rst = hal_gpio.num(20),
 
-            // BKLT_PWM - Backlight PWM control
-            .bl = hal_gpio.num(18), // Set to null if backlight is not controlled via GPIO
+            // BKLT_PWM - Backlight (connected to VBUS/5V, no GPIO control)
+            .bl = null,
         },
         .spi = .{
-            // LCD_SCL - Serial Clock
-            .scl = hal_gpio.num(23),
+            // LCD_SCL - Serial Clock (GP18 - SPI0 SCK)
+            .scl = hal_gpio.num(18),
 
-            // LCD_SDIO - Serial Data I/O (MOSI)
-            .sdo = hal_gpio.num(21),
+            // LCD_SDIO - Serial Data I/O MOSI (GP19 - SPI0 TX)
+            .sdo = hal_gpio.num(19),
         },
-        // TE - Tearing Effect
-        .te = hal_gpio.num(20),
+        // TE - Tearing Effect (optional, leave disconnected)
+        .te = null,
     };
 }
 
@@ -492,7 +560,7 @@ pub fn createDT018BTFTPins() LCDPins {
 pub fn createDT018BTFTConfig() Config {
     return .{
         .spi_instance_num = 0, // SPI instance number (typically 0)
-        .spi_baudrate = 8_000_000, // 8 MHz SPI speed
+        .spi_baudrate = 20_000_000, // 20 MHz SPI speed (matches Python)
         .rotation = 0, // Display rotation: 0=portrait, 1=landscape, 2=portrait inverted, 3=landscape inverted
     };
 }

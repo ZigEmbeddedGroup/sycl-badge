@@ -6,6 +6,7 @@ const usb = @import("../drivers/usb.zig");
 const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
+const lcd = @import("../drivers/lcd.zig");
 
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
@@ -58,6 +59,7 @@ const commands = [_]Command{
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
 };
 
@@ -747,6 +749,59 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     // If reset doesn't happen, hang
     // microzig.hang();
+}
+
+// LCD Test Command
+fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const action = iter.next() orelse {
+        println("\r\nUsage: lcd <test|pattern|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
+        return;
+    };
+
+    if (std.mem.eql(u8, action, "test")) {
+        println("\r\nRunning LCD test pattern...");
+        lcd.testPattern();
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "pattern")) {
+        println("\r\nDisplaying test pattern...");
+        lcd.testPattern();
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "red")) {
+        println("\r\nFilling LCD with RED...");
+        lcd.fillScreen(lcd.RED);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "green")) {
+        println("\r\nFilling LCD with GREEN...");
+        lcd.fillScreen(lcd.GREEN);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "blue")) {
+        println("\r\nFilling LCD with BLUE...");
+        lcd.fillScreen(lcd.BLUE);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "yellow")) {
+        println("\r\nFilling LCD with YELLOW...");
+        lcd.fillScreen(lcd.YELLOW);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "cyan")) {
+        println("\r\nFilling LCD with CYAN...");
+        lcd.fillScreen(lcd.CYAN);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "magenta")) {
+        println("\r\nFilling LCD with MAGENTA...");
+        lcd.fillScreen(lcd.MAGENTA);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "white")) {
+        println("\r\nFilling LCD with WHITE...");
+        lcd.fillScreen(lcd.WHITE);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "black")) {
+        println("\r\nFilling LCD with BLACK...");
+        lcd.fillScreen(lcd.BLACK);
+        println("Done\r\n");
+    } else {
+        printf("\r\nUnknown LCD action: {s}\r\n", .{action});
+        println("Available: test, pattern, red, green, blue, yellow, cyan, magenta, white, black\r\n");
+    }
 }
 
 //TODO:

@@ -11966,16 +11966,6 @@
 	)
 	(wire
 		(pts
-			(xy 170.18 109.22) (xy 170.18 107.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2ba3bdf3-5128-48f4-aa37-d39314a4b753")
-	)
-	(wire
-		(pts
 			(xy 59.055 191.77) (xy 59.055 189.23)
 		)
 		(stroke
@@ -12153,16 +12143,6 @@
 			(type default)
 		)
 		(uuid "3396aca0-f865-4d67-adb4-3dd1cd4082aa")
-	)
-	(wire
-		(pts
-			(xy 185.42 90.17) (xy 185.42 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "33f1b5e5-95c3-44ee-8181-3786218b6082")
 	)
 	(wire
 		(pts
@@ -12436,16 +12416,6 @@
 	)
 	(wire
 		(pts
-			(xy 171.45 99.06) (xy 171.45 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4300145f-e9c6-4ffd-ab0d-693c64c0cb39")
-	)
-	(wire
-		(pts
 			(xy 400.939 83.82) (xy 402.59 83.82)
 		)
 		(stroke
@@ -12546,16 +12516,6 @@
 	)
 	(wire
 		(pts
-			(xy 185.42 99.06) (xy 185.42 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "47c8ba89-a43a-4540-88b8-c2ea591f04ee")
-	)
-	(wire
-		(pts
 			(xy 294.64 245.11) (xy 294.64 232.41)
 		)
 		(stroke
@@ -12653,16 +12613,6 @@
 			(type default)
 		)
 		(uuid "51f4215b-513e-47f0-a128-f242a2236a61")
-	)
-	(wire
-		(pts
-			(xy 153.67 90.17) (xy 153.67 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "521ad285-4e4e-40cd-889c-cd37824ed46d")
 	)
 	(wire
 		(pts
@@ -13243,16 +13193,6 @@
 			(type default)
 		)
 		(uuid "73fa7bbb-ea71-47ec-af07-bc76dca5c3c6")
-	)
-	(wire
-		(pts
-			(xy 153.67 99.06) (xy 153.67 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "741e0dc1-3f7a-4dce-bd90-b591d8c5f5f3")
 	)
 	(wire
 		(pts
@@ -14126,7 +14066,7 @@
 	)
 	(wire
 		(pts
-			(xy 170.18 118.11) (xy 170.18 116.84)
+			(xy 175.26 90.17) (xy 175.26 88.9)
 		)
 		(stroke
 			(width 0)
@@ -14393,16 +14333,6 @@
 			(type default)
 		)
 		(uuid "bd177843-9782-43df-8b64-f00207979b7e")
-	)
-	(wire
-		(pts
-			(xy 171.45 90.17) (xy 171.45 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bd2e3212-39a2-4f4f-9a2f-6334faf8f1f8")
 	)
 	(wire
 		(pts
@@ -15415,7 +15345,7 @@
 		(uuid "1652c9e6-dac1-460f-9a0c-e2ab2ce92678")
 	)
 	(label "QSPI_SCK"
-		(at 170.18 118.11 0)
+		(at 175.26 90.17 0)
 		(effects
 			(font
 				(size 1.2446 1.2446)
@@ -15515,7 +15445,7 @@
 		(uuid "33660e92-abfd-4002-be98-30d63f07a0d9")
 	)
 	(label "QSPI_CS"
-		(at 152.4 124.46 0)
+		(at 175.26 97.79 0)
 		(effects
 			(font
 				(size 1.2446 1.2446)
@@ -15523,16 +15453,6 @@
 			(justify left bottom)
 		)
 		(uuid "361db748-f3e8-44d2-aebf-799bca7adc5c")
-	)
-	(label "BUTTON7"
-		(at 170.18 109.22 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "406e2881-ac9f-4530-a617-729f7d1d3cda")
 	)
 	(label "D-"
 		(at 64.77 107.95 0)
@@ -15654,16 +15574,6 @@
 		)
 		(uuid "566ed4f1-f01b-4bd7-bd9a-432790e81cba")
 	)
-	(label "BUTTON8"
-		(at 152.4 116.84 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "59408d87-caed-4e72-87d9-64b4c0306a7d")
-	)
 	(label "QSPI_DATA[0]"
 		(at 257.81 203.2 0)
 		(effects
@@ -15703,16 +15613,6 @@
 			(justify right bottom)
 		)
 		(uuid "5ab547bf-0e62-44bb-b6e7-632edaa66e7e")
-	)
-	(label "BUTTON5"
-		(at 185.42 99.06 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "6205be40-02f8-4665-8c3c-2fea613530ee")
 	)
 	(label "LED_K1"
 		(at 209.55 66.04 180)
@@ -15814,26 +15714,6 @@
 		)
 		(uuid "7a1c4236-6c3c-49fe-ac86-3b8cbbadea8f")
 	)
-	(label "BUTTON1"
-		(at 171.45 90.17 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "7b070ef4-72b9-43f6-bcf6-5952083e7e6d")
-	)
-	(label "BUTTON2"
-		(at 185.42 90.17 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "7d259caf-cd73-4b20-b7cb-c2dfae572b62")
-	)
 	(label "BUTTON6"
 		(at 22.225 205.74 90)
 		(effects
@@ -15873,16 +15753,6 @@
 			(justify left bottom)
 		)
 		(uuid "87fb78c8-84b9-4bb4-9e01-6cd8629c2974")
-	)
-	(label "BUTTON6"
-		(at 152.4 107.95 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "8dbfac60-4352-46ed-b444-a883d57bab12")
 	)
 	(label "QSPI_DATA[0]"
 		(at 346.71 36.83 0)
@@ -16034,16 +15904,6 @@
 		)
 		(uuid "b133225d-fec1-460d-8339-198691738c4d")
 	)
-	(label "BUTTON4"
-		(at 171.45 99.06 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "b3537a3c-033a-4f0e-a5da-cebda2a63e07")
-	)
 	(label "BUTTON1"
 		(at 289.56 245.11 90)
 		(effects
@@ -16124,16 +15984,6 @@
 		)
 		(uuid "c8a55895-280e-4204-aa1b-32da84884a71")
 	)
-	(label "BUTTON0"
-		(at 153.67 90.17 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "c908bf35-c91b-43e0-968f-bca357ae38a0")
-	)
 	(label "BUTTON3"
 		(at 294.64 245.11 90)
 		(effects
@@ -16193,16 +16043,6 @@
 			(justify right bottom)
 		)
 		(uuid "d7355620-32a6-4d41-905c-76ce7d269027")
-	)
-	(label "BUTTON3"
-		(at 153.67 99.06 180)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify right bottom)
-		)
-		(uuid "d8eb4cfc-7692-421f-becc-617c5979cb50")
 	)
 	(label "BUTTON3"
 		(at 117.475 207.01 90)
@@ -16615,73 +16455,6 @@
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "R3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 171.45 97.79 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "063d0874-b86b-442f-b689-a280e96ba4b0")
-		(property "Reference" "TP20"
-			(at 173.99 93.2179 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 173.99 95.7579 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 176.53 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 176.53 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 171.45 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "e5f87c8f-811f-41ac-b24e-33d67bca0f9d")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP20")
 					(unit 1)
 				)
 			)
@@ -20356,73 +20129,6 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 152.4 116.84 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3595889a-9c3c-4775-9aa4-0a5e91c045f3")
-		(property "Reference" "TP22"
-			(at 154.94 112.2679 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 154.94 114.8079 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 157.48 116.84 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 157.48 116.84 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 152.4 116.84 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "2784ecb0-6115-4579-89a0-785f70765dc9")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP22")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
 		(at 203.2 97.79 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -22759,73 +22465,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 170.18 107.95 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5ee595c9-9479-4599-a6e1-48f43e9b61c6")
-		(property "Reference" "TP23"
-			(at 172.72 103.3779 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 172.72 105.9179 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 175.26 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 175.26 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 170.18 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "a8190006-40b2-4d17-bece-c983bdb78b28")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP23")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:C")
 		(at 204.47 226.06 180)
 		(unit 1)
@@ -23246,73 +22885,6 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "SW3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 185.42 97.79 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "65fa13a5-87dc-4018-985d-6958925c846c")
-		(property "Reference" "TP14"
-			(at 187.96 93.2179 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 187.96 95.7579 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 190.5 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 190.5 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 185.42 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "aac7e61e-4a9c-429a-9efa-8a2c19bfd03d")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP14")
 					(unit 1)
 				)
 			)
@@ -26326,73 +25898,6 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 153.67 88.9 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "9b2773ab-a57f-4c41-a416-93d1cdebebc3")
-		(property "Reference" "TP17"
-			(at 156.21 84.3279 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 156.21 86.8679 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 158.75 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 158.75 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 153.67 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "087bfac9-9b71-471c-afc4-1e573ba7d296")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP17")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
 		(at 240.03 97.79 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -26891,73 +26396,6 @@
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "R25")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 152.4 107.95 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "a2180b56-f3dd-4ecc-9462-03aa0d97db7a")
-		(property "Reference" "TP21"
-			(at 154.94 103.3779 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 154.94 105.9179 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 157.48 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 157.48 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 152.4 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "912f2d6f-ca6f-4efa-82de-4e0a4a35de10")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP21")
 					(unit 1)
 				)
 			)
@@ -28764,7 +28202,7 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 170.18 116.84 0)
+		(at 175.26 88.9 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -28773,7 +28211,7 @@
 		(fields_autoplaced yes)
 		(uuid "b688f9fc-97c6-4131-bdf9-31cecc0dc768")
 		(property "Reference" "TP24"
-			(at 172.72 112.2679 0)
+			(at 177.8 84.3279 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28782,7 +28220,7 @@
 			)
 		)
 		(property "Value" "TestPoint"
-			(at 172.72 114.8079 0)
+			(at 177.8 86.8679 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28791,7 +28229,7 @@
 			)
 		)
 		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 175.26 116.84 0)
+			(at 180.34 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28800,7 +28238,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 175.26 116.84 0)
+			(at 180.34 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28809,7 +28247,7 @@
 			)
 		)
 		(property "Description" "test point"
-			(at 170.18 116.84 0)
+			(at 175.26 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28937,73 +28375,6 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "C13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 171.45 88.9 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "b73ec317-7d1a-406a-b66b-660f67b09922")
-		(property "Reference" "TP19"
-			(at 173.99 84.3279 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 173.99 86.8679 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 176.53 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 176.53 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 171.45 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "55210ba3-0384-46a3-8595-cf52e466ac96")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP19")
 					(unit 1)
 				)
 			)
@@ -30938,74 +30309,7 @@
 	)
 	(symbol
 		(lib_id "Connector:TestPoint")
-		(at 185.42 88.9 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "d294b013-3436-4056-a6c6-62500d970a8e")
-		(property "Reference" "TP13"
-			(at 187.96 84.3279 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 187.96 86.8679 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 190.5 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 190.5 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 185.42 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "7a16c396-60a5-40b4-80ff-0c22762e2c1d")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 152.4 124.46 0)
+		(at 175.26 97.79 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -31014,7 +30318,7 @@
 		(fields_autoplaced yes)
 		(uuid "d2d7b009-ab64-4eb8-89eb-c0ebe69770d9")
 		(property "Reference" "TP29"
-			(at 154.94 119.8879 0)
+			(at 177.8 93.2179 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31023,7 +30327,7 @@
 			)
 		)
 		(property "Value" "TestPoint"
-			(at 154.94 122.4279 0)
+			(at 177.8 95.7579 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31032,7 +30336,7 @@
 			)
 		)
 		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 157.48 124.46 0)
+			(at 180.34 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31041,7 +30345,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 157.48 124.46 0)
+			(at 180.34 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31050,7 +30354,7 @@
 			)
 		)
 		(property "Description" "test point"
-			(at 152.4 124.46 0)
+			(at 175.26 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31702,73 +31006,6 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "#P+014")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 153.67 97.79 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e02d2571-f687-4892-8b9b-0fd52920ddf4")
-		(property "Reference" "TP18"
-			(at 156.21 93.2179 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 156.21 95.7579 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_THTPad_D2.0mm_Drill1.0mm"
-			(at 158.75 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 158.75 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 153.67 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "36f3467d-d33d-4478-b611-e1b644d1dabd")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP18")
 					(unit 1)
 				)
 			)

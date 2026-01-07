@@ -153,7 +153,7 @@ fn writeU16(value: u16) void {
 /// Initialization
 pub const Config = struct {
     spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2350)
-    spi_baudrate: u32 = 8_000_000, // 8 MHz
+    spi_baudrate: u32 = 62_500_000, // 62.5 MHz
 };
 
 /// Low-level initialization (control pins only)
@@ -235,9 +235,9 @@ fn initDisplay() void {
     // VCOM control
     writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
 
-    // Memory access control with 90° counter-clockwise rotation
-    // MV (0x20) = Row/Column exchange, MX (0x40) = Column address order
-    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CCW rotation, RGB
+    // Memory access control with 90° clockwise rotation
+    // MV (0x20) = Row/Column exchange, MY (0x80) = Row address order
+    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
 
     // Color mode (16-bit RGB565)
     writeCommandWithData(.COLMOD, &.{0x05});
@@ -289,17 +289,25 @@ fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
     const y0_offset = y0 + ystart;
     const y1_offset = y1 + ystart;
 
+    // Column address set - send all 4 bytes at once
     writeCommand(.CASET);
-    writeU8(0x00);
-    writeU8(@truncate(x0_offset));
-    writeU8(0x00);
-    writeU8(@truncate(x1_offset));
+    const col_data = [_]u8{
+        0x00,
+        @truncate(x0_offset),
+        0x00,
+        @truncate(x1_offset),
+    };
+    writeData(&col_data);
 
+    // Row address set - send all 4 bytes at once
     writeCommand(.RASET);
-    writeU8(0x00);
-    writeU8(@truncate(y0_offset));
-    writeU8(0x00);
-    writeU8(@truncate(y1_offset));
+    const row_data = [_]u8{
+        0x00,
+        @truncate(y0_offset),
+        0x00,
+        @truncate(y1_offset),
+    };
+    writeData(&row_data);
 
     writeCommand(.RAMWR);
 }
@@ -333,8 +341,7 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
 
     const color_bytes = color.toBytes();
 
-    // Write line by line for better reliability (matches Python)
-    // Create a line buffer with width pixels
+    // Create a line buffer
     var line: [320]u8 = undefined; // 160 pixels * 2 bytes = 320 bytes max
     const line_bytes = w_actual * 2;
 
@@ -344,11 +351,19 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
         line[i * 2 + 1] = color_bytes[1];
     }
 
+    // Keep CS selected for entire fill operation to reduce overhead
+    pins.dc.put(1); // Data mode
+    pins.cs.put(0); // Select
+
+    var dummy = std.mem.zeroes([320]u8);
+
     // Write each line
     var row: u16 = 0;
     while (row < h_actual) : (row += 1) {
-        writeData(line[0..line_bytes]);
+        spi_instance.transceive_blocking(u8, line[0..line_bytes], dummy[0..line_bytes]);
     }
+
+    pins.cs.put(1); // Deselect
 }
 
 pub fn drawHLine(x: u16, y: u16, w: u16, color: Color16) void {
@@ -481,7 +496,7 @@ pub fn createDT018BTFTPins() LCDPins {
 pub fn createDT018BTFTConfig() Config {
     return .{
         .spi_instance_num = 0, // SPI instance number
-        .spi_baudrate = 20_000_000, // 20 MHz SPI speed
+        .spi_baudrate = 62_500_000, // 62.5 MHz (maximum)
     };
 }
 

@@ -518,3 +518,11 @@ pub fn initWithAllPins(all_pins: LCDPins, config: Config) !void {
     // Initialize LCD with control pins
     try init(all_pins.control, config);
 }
+
+pub fn drawImg (x: u16, y: u16, w: u16, h: u16, img_data: []const u8) void {
+    _ = x;
+    _ = y;
+    _ = w;
+    _ = h;
+    writeBuffer(0, 0, width, height, img_data);
+}

@@ -7,6 +7,7 @@ const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
+const pug_image = @import("../drivers/pug_image_data.zig");
 
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
@@ -793,6 +794,10 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
         lcd.fillScreen(lcd.BLACK);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "image")) {
+        println("\r\nDisplaying pug image on LCD...");
+        lcd.drawImg(0, 0, lcd.width, lcd.height, &pug_image.pug_image_data);
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});

@@ -754,16 +754,12 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|pattern|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
         return;
     };
 
     if (std.mem.eql(u8, action, "test")) {
         println("\r\nRunning LCD test pattern...");
-        lcd.testPattern();
-        println("Done\r\n");
-    } else if (std.mem.eql(u8, action, "pattern")) {
-        println("\r\nDisplaying test pattern...");
         lcd.testPattern();
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "red")) {
@@ -800,7 +796,7 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
-        println("Available: test, pattern, red, green, blue, yellow, cyan, magenta, white, black\r\n");
+        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black\r\n");
     }
 }
 
@@ -814,3 +810,4 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // - ctrl + shift + left/right to select text
 // - done -- delete key
 // - get reboot command working properly
+// - command to print text to LCD screen

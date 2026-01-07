@@ -23,30 +23,20 @@ pub fn main() !void {
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);
     lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(10, 40, "RP2350 Kernel", lcd.GREEN, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "VIKES is the best", lcd.GREEN, lcd.BLACK, 1);
     lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
 
-    var old: u64 = timer.micros();
+    // var old: u64 = timer.micros();
 
     uart.println("Entering main loop");
 
-    // Main loop - console-based interaction
+    // Main loop
     while (true) {
         // CRITICAL: Poll USB frequently
         usb.poll();
 
         // Process console input (handles echo, line buffering, commands)
         console.processInput();
-
-        const new = timer.micros();
-        if (new - old > 1_000_000) { // Every 1 second - heartbeat
-            old = new;
-
-            // Debug heartbeat to UART only (not USB to avoid breaking console)
-            var uart_buffer: [64]u8 = undefined;
-            const uart_msg = std.fmt.bufPrint(&uart_buffer, "Heartbeat: {d}s", .{new / 1_000_000}) catch "Error";
-            uart.println(uart_msg);
-        }
     }
 }
 

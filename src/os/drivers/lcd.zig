@@ -1,6 +1,5 @@
 /// LCD Driver for RP2354B SYCL Badge OS
-/// Supports ST7735/ST7789 based displays (like DT018BTFT)
-/// 1.8" TFT Display - 128x160 RGB
+/// 160x128 LCD (90° counter-clockwise rotation for the badge)
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
@@ -11,8 +10,8 @@ const board = microzig.board;
 const font = board.font;
 
 /// Display Configuration
-pub const width: u16 = 128;
-pub const height: u16 = 160;
+pub const width: u16 = 160;
+pub const height: u16 = 128;
 pub const xstart: u16 = 0;
 pub const ystart: u16 = 0;
 
@@ -21,22 +20,22 @@ pub const Pins = struct {
     cs: gpio.Pin, // Chip Select
     dc: gpio.Pin, // Data/Command
     rst: gpio.Pin, // Reset
-    bl: ?gpio.Pin, // Backlight (optional)
+    bl: ?gpio.Pin, // Backlight (this pin is tied to ground)
 };
 
 /// SPI pin configuration for LCD
 pub const SPIPins = struct {
-    scl: gpio.Pin, // LCD_SCL - Serial Clock
-    sdo: gpio.Pin, // LCD_SDIO - Serial Data I/O (MOSI)
+    scl: gpio.Pin, // LCD_SCL (Serial Clock)
+    sdo: gpio.Pin, // LCD_SDIO (Serial Data I/O (MOSI))
 };
 
-/// Combined LCD pin configuration (control pins + SPI pins + TE pin)
+/// Combined LCD pin configuration
 pub const LCDPins = struct {
     /// Control pins for LCD driver
     control: Pins,
     /// SPI pins (LCD_SCL and LCD_SDIO)
     spi: SPIPins,
-    /// TE (Tearing Effect) pin - optional, used for frame synchronization
+    /// TE (Tearing Effect) pin (optional and we aren't using for now)
     te: ?gpio.Pin = null,
 };
 
@@ -63,14 +62,8 @@ pub const Color16 = packed struct(u16) {
     }
 };
 
-pub const Color24 = extern struct {
-    r: u8,
-    g: u8,
-    b: u8,
-};
-
 // Common colors (RGB565 format)
-// TODO: add more colours if needed... like purple!!
+// TODO: add more colours
 pub const BLACK: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
 pub const WHITE: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x1F };
 pub const RED: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x00 };
@@ -83,17 +76,11 @@ pub const MAGENTA: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x1F };
 /// Driver State
 var pins: Pins = undefined;
 var spi_instance: spi.SPI = undefined;
-var initialized: bool = false;
 
 /// ST7735/ST7789 Commands
 const Command = enum(u8) {
-    NOP = 0x00,
     SWRESET = 0x01,
-    RDDID = 0x04,
-    RDDST = 0x09,
-    SLPIN = 0x10,
     SLPOUT = 0x11,
-    PTLON = 0x12,
     NORON = 0x13,
     INVOFF = 0x20,
     INVON = 0x21,
@@ -102,8 +89,6 @@ const Command = enum(u8) {
     CASET = 0x2A, // Column Address Set
     RASET = 0x2B, // Row Address Set
     RAMWR = 0x2C, // Memory Write
-    RAMRD = 0x2E, // Memory Read
-    PTLAR = 0x30,
     MADCTL = 0x36, // Memory Access Control
     COLMOD = 0x3A, // Color Mode
     FRMCTR1 = 0xB1,
@@ -118,24 +103,6 @@ const Command = enum(u8) {
     VMCTR1 = 0xC5,
     GMCTRP1 = 0xE0,
     GMCTRN1 = 0xE1,
-};
-
-// MADCTL bits
-const MADCTL = struct {
-    const MY: u8 = 0x80; // Row address order
-    const MX: u8 = 0x40; // Column address order
-    const MV: u8 = 0x20; // Row/Column exchange
-    const ML: u8 = 0x10; // Vertical refresh order
-    const RGB: u8 = 0x00; // RGB color order
-    const BGR: u8 = 0x08; // BGR color order
-    const MH: u8 = 0x04; // Horizontal refresh order
-};
-
-// Color modes
-const ColorMode = enum(u8) {
-    RGB444 = 0x03, // 12-bit
-    RGB565 = 0x05, // 16-bit
-    RGB666 = 0x06, // 18-bit
 };
 
 /// Low-level SPI communication
@@ -187,7 +154,6 @@ fn writeU16(value: u16) void {
 pub const Config = struct {
     spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2350)
     spi_baudrate: u32 = 8_000_000, // 8 MHz
-    rotation: u8 = 0, // 0, 1, 2, or 3 (0/90/180/270 degrees)
 };
 
 /// Low-level initialization (control pins only)
@@ -218,7 +184,6 @@ pub fn init(pin_config: Pins, config: Config) !void {
     spi_instance = spi.instance.num(config.spi_instance_num);
 
     // Reset and configure SPI peripheral
-    // This is critical - without this the SPI peripheral won't work
     const spi_config = spi.Config{
         .clock_config = hal.clock_config,
     };
@@ -233,14 +198,10 @@ pub fn init(pin_config: Pins, config: Config) !void {
     timer.sleep_ms(150);
 
     // Initialize display
-    initDisplay(config.rotation);
-
-    initialized = true;
+    initDisplay();
 }
 
-fn initDisplay(rotation: u8) void {
-    _ = rotation; // Ignore rotation parameter, use fixed MADCTL
-
+fn initDisplay() void {
     // Software reset
     writeCommand(.SWRESET);
     timer.sleep_ms(150);
@@ -249,15 +210,15 @@ fn initDisplay(rotation: u8) void {
     writeCommand(.SLPOUT);
     timer.sleep_ms(120);
 
-    // Frame rate control - normal mode (ST7735S values)
+    // Frame rate control (normal mode (ST7735S values))
     writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x3C, 0x3C });
     timer.sleep_ms(10);
 
-    // Frame rate control - idle mode
+    // Frame rate control (idle mode)
     writeCommandWithData(.FRMCTR2, &.{ 0x05, 0x3C, 0x3C });
     timer.sleep_ms(10);
 
-    // Frame rate control - partial mode
+    // Frame rate control (partial mode)
     writeCommandWithData(.FRMCTR3, &.{ 0x05, 0x3C, 0x3C, 0x05, 0x3C, 0x3C });
     timer.sleep_ms(10);
 
@@ -274,13 +235,14 @@ fn initDisplay(rotation: u8) void {
     // VCOM control
     writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
 
-    // Memory access control - ST7735S uses 0xC0
-    writeCommandWithData(.MADCTL, &.{0xC0}); // Row/column exchange, RGB
+    // Memory access control with 90° counter-clockwise rotation
+    // MV (0x20) = Row/Column exchange, MX (0x40) = Column address order
+    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CCW rotation, RGB
 
-    // Color mode - 16-bit RGB565
+    // Color mode (16-bit RGB565)
     writeCommandWithData(.COLMOD, &.{0x05});
 
-    // Gamma correction (positive) - ST7735S values
+    // Gamma correction (positive)
     writeCommandWithData(.GMCTRP1, &.{
         0x04, 0x22, 0x07, 0x0A,
         0x2E, 0x30, 0x25, 0x2A,
@@ -288,7 +250,7 @@ fn initDisplay(rotation: u8) void {
         0x00, 0x01, 0x03, 0x13,
     });
 
-    // Gamma correction (negative) - ST7735S values
+    // Gamma correction (negative)
     writeCommandWithData(.GMCTRN1, &.{
         0x04, 0x16, 0x06, 0x0D,
         0x2D, 0x26, 0x23, 0x27,
@@ -306,32 +268,6 @@ fn initDisplay(rotation: u8) void {
 }
 
 /// Display Control
-pub fn setRotation(rotation: u8) void {
-    var madctl: u8 = MADCTL.RGB; // Use RGB order
-
-    switch (rotation & 0x03) {
-        0 => {
-            // Portrait
-            madctl |= MADCTL.MX;
-        },
-        1 => {
-            // Landscape
-            madctl |= MADCTL.MV;
-        },
-        2 => {
-            // Portrait inverted
-            madctl |= MADCTL.MY;
-        },
-        3 => {
-            // Landscape inverted
-            madctl |= MADCTL.MV | MADCTL.MY | MADCTL.MX;
-        },
-        else => unreachable,
-    }
-
-    writeCommandWithData(.MADCTL, &.{madctl});
-}
-
 pub fn setBacklight(on: bool) void {
     if (pins.bl) |bl| {
         bl.put(if (on) 1 else 0);
@@ -399,7 +335,7 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
 
     // Write line by line for better reliability (matches Python)
     // Create a line buffer with width pixels
-    var line: [256]u8 = undefined; // 128 pixels * 2 bytes = 256 bytes max
+    var line: [320]u8 = undefined; // 160 pixels * 2 bytes = 320 bytes max
     const line_bytes = w_actual * 2;
 
     var i: usize = 0;
@@ -512,46 +448,31 @@ pub fn testText() void {
     drawString(10, 30, "LCD Driver Test", GREEN, BLACK, 1);
 }
 
-/// Create complete LCD pin configuration for DT018BTFT-SHB display
-///
-/// Pin Mapping:
-/// Control Pins:
-/// - LCD_CS -> cs (Chip Select)
-/// - LCD_D/CX -> dc (Data/Command)
-/// - RST -> rst (Reset, connected to RP2354B RUN pin)
-/// - BKLT_PWM -> bl (Backlight)
-///
-/// SPI Pins:
-/// - LCD_SCL -> scl (Serial Clock)
-/// - LCD_SDIO -> sdo (Serial Data I/O / MOSI)
-///
-/// Optional Pins:
-/// - TE -> te (Tearing Effect) (technically optional, used for frame synchronization)
 pub fn createDT018BTFTPins() LCDPins {
     const hal_gpio = microzig.hal.gpio;
 
     return .{
         .control = .{
-            // LCD_CS - Chip Select (GP17 - SPI0 CSn)
+            // LCD_CS: Chip Select (GP17 -> SPI0 CSn)
             .cs = hal_gpio.num(17),
 
-            // LCD_D/CX - Data/Command (GP21)
+            // LCD_D/CX: Data/Command (GP21)
             .dc = hal_gpio.num(21),
 
-            // RST - Reset (GP20)
+            // RST: Reset (GP20)
             .rst = hal_gpio.num(20),
 
-            // BKLT_PWM - Backlight (connected to VBUS/5V, no GPIO control)
+            // BKLT_PWM: Backlight (connected to VBUS/5V, no GPIO control)
             .bl = null,
         },
         .spi = .{
-            // LCD_SCL - Serial Clock (GP18 - SPI0 SCK)
+            // LCD_SCL: Serial Clock (GP18 -> SPI0 SCK)
             .scl = hal_gpio.num(18),
 
-            // LCD_SDIO - Serial Data I/O MOSI (GP19 - SPI0 TX)
+            // LCD_SDIO: Serial Data I/O MOSI (GP19 -> SPI0 TX)
             .sdo = hal_gpio.num(19),
         },
-        // TE - Tearing Effect (optional, leave disconnected)
+        // TE: Tearing Effect (optional, leave it disconnected for now)
         .te = null,
     };
 }
@@ -559,9 +480,8 @@ pub fn createDT018BTFTPins() LCDPins {
 /// Create default LCD configuration for DT018BTFT-SHB
 pub fn createDT018BTFTConfig() Config {
     return .{
-        .spi_instance_num = 0, // SPI instance number (typically 0)
-        .spi_baudrate = 20_000_000, // 20 MHz SPI speed (matches Python)
-        .rotation = 0, // Display rotation: 0=portrait, 1=landscape, 2=portrait inverted, 3=landscape inverted
+        .spi_instance_num = 0, // SPI instance number
+        .spi_baudrate = 20_000_000, // 20 MHz SPI speed
     };
 }
 

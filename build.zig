@@ -111,7 +111,7 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
     return mb.ports.atsam.chips.atsamd51j19.derive(.{
         .preferred_binary_format = .elf,
         .board = .{
-            .name = "SYCL Badge Rev A",
+            .name = "SYCL Badge V2",
             .root_source_file = mb.builder.path("src/board.zig"),
         },
         .linker_script = .{
@@ -130,7 +130,7 @@ fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Tar
 
     return base_target.derive(.{
         .board = .{
-            .name = "SYCL Badge V2 (RP2350)",
+            .name = "SYCL Badge V2",
             .root_source_file = builder.path("src/board_v2.zig"),
         },
     });

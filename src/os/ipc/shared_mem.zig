@@ -61,12 +61,16 @@ fn getPoolPtr() *[POOL_SIZE]u8 {
 pub fn init() void {
     const registry = getRegistryPtr();
 
-    // Only initialize on first call (use a simple flag check)
-    registry.lock.lock();
-    defer registry.lock.unlock();
-
     // Check if already initialized (next_region_id != 0 means initialized)
+    // Do this check WITHOUT locking first, since the lock isn't initialized yet
     if (registry.next_region_id == 0) {
+        // Initialize the spinlock FIRST before using it
+        registry.lock = hal.multicore.Spinlock.init(0); // Use hardware spinlock 0
+
+        // Now we can safely lock
+        registry.lock.lock();
+        defer registry.lock.unlock();
+
         // Initialize registry
         for (&registry.regions) |*region| {
             region.* = .{
@@ -78,7 +82,6 @@ pub fn init() void {
         }
         registry.next_region_id = 1;
         registry.pool_offset = 0;
-        registry.lock = hal.multicore.Spinlock.init(0); // Use hardware spinlock 0
 
         // Clear the pool
         const pool = getPoolPtr();

@@ -33,6 +33,7 @@ pub fn main() !void {
     // Main loop
     while (true) {
         // CRITICAL: Poll USB frequently
+        uart.println("UART test :)");
         usb.poll();
 
         // Process console input (handles echo, line buffering, commands)

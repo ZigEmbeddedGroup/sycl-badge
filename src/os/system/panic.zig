@@ -5,6 +5,7 @@ const multicore = @import("multicore.zig");
 
 const rp2xxx = microzig.hal;
 const gpio = rp2xxx.gpio;
+const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 
 const led = gpio.num(25);
@@ -19,6 +20,7 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     // Blink fast for 5 seconds to indicate panic
     var i: usize = 0;
     while (i < 50) : (i += 1) {
+        uart.println("PANIC!");
         led.put(1);
         timer.sleep_ms(50);
         led.put(0);

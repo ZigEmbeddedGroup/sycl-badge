@@ -39,29 +39,68 @@ var escape_state: EscapeState = .normal;
 var escape_buffer: [8]u8 = undefined; // Store escape sequence params
 var escape_length: usize = 0;
 
+// Tab Completion State
+var completion_original_input: [MAX_LINE_LENGTH]u8 = undefined; // Original input before completion
+var completion_original_length: usize = 0; // Length of original input
+var completion_index: usize = 0; // Current completion index
+var in_completion_mode: bool = false; // Are we cycling through completions?
+
 // Command Handler Type
 // CommandFn - function pointer type that takes a token iterator
 pub const CommandFn = *const fn (iter: *std.mem.TokenIterator(u8, .scalar)) void;
+
+// Completion Provider Type - returns list of valid completions for a given argument position
+pub const CompletionFn = *const fn (arg_index: usize, partial: []const u8) []const []const u8;
 
 // Command Structure
 pub const Command = struct {
     name: []const u8,
     description: []const u8,
     handler: CommandFn, // function this cmd calls
+    completion_provider: ?CompletionFn = null, // optional argument completion
 };
+
+// Completion providers for specific commands
+fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
+fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{ "read", "write", "toggle", "list" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
+fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{ "on", "off", "toggle" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
 
 // Command Registry
 const commands = [_]Command{
     .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
-    .{ .name = "led", .description = "Control LED (on/off/toggle)", .handler = cmdLed },
+    .{ .name = "led", .description = "Control LED (on/off/toggle)", .handler = cmdLed, .completion_provider = ledCompletions },
     .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
     .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
-    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio },
-    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd },
+    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
+    .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
 
 // Unified Console Output (sends to both USB and UART)
@@ -182,6 +221,7 @@ fn processChar(char: u8) void {
             }
 
             in_history_mode = false;
+            in_completion_mode = false;
             history_index = history_count;
             showPrompt();
         },
@@ -198,6 +238,7 @@ fn processChar(char: u8) void {
             line_length = 0;
             cursor_pos = 0;
             in_history_mode = false;
+            in_completion_mode = false;
             print("^C\r\n");
             showPrompt();
         },
@@ -226,8 +267,14 @@ fn processChar(char: u8) void {
             redrawLine();
         },
 
+        0x09 => {
+            // Ctrl + I - command line comletion (TAB)
+            commandLineCompletion();
+        },
+
         0x20...0x7E => {
             // Printable characters
+            in_completion_mode = false; // Exit completion mode
             insertCharAt(cursor_pos, char);
         },
 
@@ -400,7 +447,168 @@ fn deleteCharAt(pos: usize) void {
         }
     }
 }
+fn commandLineCompletion() void {
+    // If not in completion mode, save original input and start
+    if (!in_completion_mode) {
+        if (line_length == 0) {
+            // Nothing to complete
+            print("\x07"); // Beep
+            return;
+        }
 
+        // Save original input
+        @memcpy(completion_original_input[0..line_length], line_buffer[0..line_length]);
+        completion_original_length = line_length;
+        completion_index = 0;
+        in_completion_mode = true;
+    } else {
+        // Already in completion mode, move to next match
+        completion_index += 1;
+    }
+
+    const search_input = completion_original_input[0..completion_original_length];
+
+    // Parse the input to determine what we're completing
+    var iter = std.mem.tokenizeScalar(u8, search_input, ' ');
+    const first_word = iter.next() orelse {
+        print("\x07");
+        in_completion_mode = false;
+        return;
+    };
+
+    // Count how many complete words we have
+    var word_count: usize = 1;
+    var last_word_start: usize = 0;
+    var in_word = false;
+
+    for (search_input, 0..) |c, i| {
+        if (c == ' ') {
+            if (in_word) {
+                word_count += 1;
+                in_word = false;
+            }
+        } else {
+            if (!in_word) {
+                last_word_start = i;
+                in_word = true;
+            }
+        }
+    }
+
+    const last_word = if (in_word) search_input[last_word_start..] else "";
+    const is_first_word = (word_count == 1 and search_input[search_input.len - 1] != ' ');
+
+    var match_count: usize = 0;
+    var current_match: ?[]const u8 = null;
+
+    if (is_first_word) {
+        // Complete command name
+        for (commands) |cmd| {
+            if (std.mem.startsWith(u8, cmd.name, last_word)) {
+                if (match_count == completion_index) {
+                    current_match = cmd.name;
+                }
+                match_count += 1;
+            }
+        }
+    } else {
+        // Complete argument/subcommand
+        // Find the command
+        for (commands) |cmd| {
+            if (std.mem.eql(u8, cmd.name, first_word)) {
+                if (cmd.completion_provider) |provider| {
+                    const arg_index = word_count - 2; // -1 for command, -1 for 0-based
+                    const options = provider(arg_index, last_word);
+
+                    for (options) |option| {
+                        // If last_word is empty, show all options; otherwise filter by prefix
+                        if (last_word.len == 0 or std.mem.startsWith(u8, option, last_word)) {
+                            if (match_count == completion_index) {
+                                current_match = option;
+                            }
+                            match_count += 1;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // If we've cycled past the end, wrap around
+    if (match_count == 0) {
+        // No matches at all - beep and reset
+        print("\x07");
+        in_completion_mode = false;
+        return;
+    }
+
+    if (completion_index >= match_count) {
+        // Cycled past end, wrap to beginning
+        completion_index = 0;
+
+        // Find first match again
+        if (is_first_word) {
+            for (commands) |cmd| {
+                if (std.mem.startsWith(u8, cmd.name, last_word)) {
+                    current_match = cmd.name;
+                    break;
+                }
+            }
+        } else {
+            for (commands) |cmd| {
+                if (std.mem.eql(u8, cmd.name, first_word)) {
+                    if (cmd.completion_provider) |provider| {
+                        const arg_index = word_count - 2;
+                        const options = provider(arg_index, last_word);
+                        for (options) |option| {
+                            // If last_word is empty, show all options; otherwise filter by prefix
+                            if (last_word.len == 0 or std.mem.startsWith(u8, option, last_word)) {
+                                current_match = option;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    if (current_match) |m| {
+        // Build the completed line
+        var new_line: [MAX_LINE_LENGTH]u8 = undefined;
+        var new_length: usize = 0;
+
+        if (is_first_word) {
+            // Just replace with matched command
+            const copy_len = @min(m.len, MAX_LINE_LENGTH);
+            @memcpy(new_line[0..copy_len], m[0..copy_len]);
+            new_length = copy_len;
+        } else {
+            // Keep everything before the last word, append match
+            const prefix_len = last_word_start;
+            @memcpy(new_line[0..prefix_len], search_input[0..prefix_len]);
+            const match_len = @min(m.len, MAX_LINE_LENGTH - prefix_len);
+            @memcpy(new_line[prefix_len .. prefix_len + match_len], m[0..match_len]);
+            new_length = prefix_len + match_len;
+        }
+
+        // Clear current line and rewrite
+        print("\r\x1b[K"); // Move to start, clear line
+        print(PROMPT); // Show prompt directly without newline
+
+        // Copy to line buffer
+        @memcpy(line_buffer[0..new_length], new_line[0..new_length]);
+        line_length = new_length;
+        cursor_pos = new_length;
+
+        // Display completed line
+        if (echo_enabled and new_length > 0) {
+            print(line_buffer[0..new_length]);
+        }
+    }
+}
 fn clearCurrentLine() void {
     // Clear entire line and move cursor to start
     print("\r\x1b[K");
@@ -752,6 +960,31 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // microzig.hang();
 }
 
+// Reboot to BootSelect Command (does not work properly)
+fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    println("\r\nRebooting to BootSelect...\r\n");
+
+    // Small delay to allow message to be sent
+    timer.sleep_ms(100);
+
+    // Set BootSelect flag in a known RAM location
+    const BOOTSEL_FLAG_ADDR = 0x2003FFFC; // Last 4 bytes of RAM (adjust as needed)
+    const boot_sel_flag = @as(*volatile u32, @ptrFromInt(BOOTSEL_FLAG_ADDR));
+    boot_sel_flag.* = 0xDEADBEEF; // Arbitrary magic value
+
+    // Trigger system reset via SCB (System Control Block)
+    const SCB_BASE = 0xE000ED00;
+    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+
+    // Write SYSRESETREQ bit with VECTKEY
+    microzig.cpu.dsb();
+    AIRCR.* = 0x05FA0004; // VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+    microzig.cpu.dsb();
+
+    // If reset doesn't happen, hang
+    // microzig.hang();
+}
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {

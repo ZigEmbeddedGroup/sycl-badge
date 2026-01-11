@@ -8,7 +8,7 @@ const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
 const pug_image = @import("../drivers/pug_image_data.zig");
-
+const rom = @import("../drivers/rom.zig");
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
 const MAX_ARGS = 8; // Maximum number of command arguments
@@ -968,27 +968,13 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Small delay to allow message to be sent
     timer.sleep_ms(100);
 
-    // Set BootSelect flag in a known RAM location
-    const BOOTSEL_FLAG_ADDR = 0x2003FFFC; // Last 4 bytes of RAM (adjust as needed)
-    const boot_sel_flag = @as(*volatile u32, @ptrFromInt(BOOTSEL_FLAG_ADDR));
-    boot_sel_flag.* = 0xDEADBEEF; // Arbitrary magic value
-
-    // Trigger system reset via SCB (System Control Block)
-    const SCB_BASE = 0xE000ED00;
-    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
-
-    // Write SYSRESETREQ bit with VECTKEY
-    microzig.cpu.dsb();
-    AIRCR.* = 0x05FA0004; // VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-    microzig.cpu.dsb();
-
-    // If reset doesn't happen, hang
-    // microzig.hang();
+    // Use ROM function to reset to USB bootloader
+    rom.reset_to_usb_boot();
 }
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|image>\r\n");
         return;
     };
 

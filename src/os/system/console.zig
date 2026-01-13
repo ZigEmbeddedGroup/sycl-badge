@@ -937,7 +937,7 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-// Reboot Command (does not work properly)
+// Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting system...\r\n");
@@ -952,15 +952,23 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     // Write SYSRESETREQ bit with VECTKEY
     // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+    // Need to preserve other bits in AIRCR, so read-modify-write
     microzig.cpu.dsb();
-    AIRCR.* = 0x05FA0004; // VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-    microzig.cpu.dsb();
+    microzig.cpu.isb();
 
-    // If reset doesn't happen, hang
-    // microzig.hang();
+    // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+    AIRCR.* = 0x05FA0004;
+
+    microzig.cpu.dsb();
+    microzig.cpu.isb();
+
+    // Wait for reset to occur (should happen immediately)
+    while (true) {
+        microzig.cpu.wfi();
+    }
 }
 
-// Reboot to BootSelect Command (does not work properly)
+// Reboot to BootSelect Command
 fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting to BootSelect...\r\n");

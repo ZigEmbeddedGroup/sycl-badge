@@ -56,6 +56,23 @@ code and runtime (e.g. __data_start__, __bss_start__, __end__, stack limits).
 SECTIONS
 {
   /*
+  .flash_start - microzig places the vector table here.
+  Must be at the very start of flash (0x10000000) for ARM Cortex-M.
+  microzig also places the bootmeta (IMAGE_DEF) in this section.
+  */
+  .flash_start :
+  {
+    . = ALIGN(4);
+    KEEP(*(microzig_flash_start))
+    KEEP(*(.vectors .vectors.*))
+    /* RP2350 IMAGE_DEF block - bootmeta must follow vector table */
+    . = ALIGN(4);
+    __bootmeta_start__ = .;
+    KEEP(*(.bootmeta))
+    __bootmeta_end__ = .;
+  } > flash
+
+  /*
   .text - code and read-only data placed in flash.
   KEEP() prevents the linker from discarding sections even if unused
   (important for things like interrupt vectors and init/fini arrays).
@@ -63,9 +80,6 @@ SECTIONS
   .text :
   {
     . = ALIGN(4);
-
-    /* Boot code with vector table and metadata at the very top */
-    KEEP(*(.text.boot))
 
     /* All regular code sections */
     *(.text*)
@@ -84,16 +98,17 @@ SECTIONS
     KEEP(*(.romfs))
     __romfs_end__ = .;
   } > romfs
-  /* keep this at beginning of ram or align to arm alignment requirement for
-   cortex-m0plus */
+
   /*
-  .ram_vector_table - a RAM copy of the vector table if the system relocates
+  .ram_vectors - RAM copy of the vector table if the system relocates
   the vector table to RAM (NOLOAD ensures it isn't stored in the output image).
   Placed at the start of kernel_ram so the CPU can use it after relocation.
+  microzig uses this section name for RAM vector table support.
   */
-  .ram_vector_table (NOLOAD) :
+  .ram_vectors (NOLOAD) :
   {
-    *(.ram_vector_table)
+    KEEP(*(ram_vectors))
+    KEEP(*(.ram_vector_table))
   } > kernel_ram
 
   /*

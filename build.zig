@@ -172,6 +172,10 @@ pub fn add_os(
         .target = badge_v2_target,
         .optimize = options.optimize,
         .root_source_file = d.builder.path("src/os/kernel.zig"),
+        .linker_script = .{
+            .file = d.builder.path("src/os/linker.ld"),
+            .generate = .none, // Don't generate microzig's default linker script
+        },
     });
 
     // Install both ELF and UF2 formats

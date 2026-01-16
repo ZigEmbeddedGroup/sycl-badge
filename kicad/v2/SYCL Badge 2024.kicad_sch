@@ -11717,10 +11717,6 @@
 		(uuid "ff65e068-2124-431c-9863-000544799f22")
 	)
 	(no_connect
-		(at 298.45 232.41)
-		(uuid "1053f9b9-7596-4ee8-b30b-b17e30cceb21")
-	)
-	(no_connect
 		(at 364.49 195.58)
 		(uuid "181ac4bf-bdc2-49fd-bb13-a955236d30e8")
 	)
@@ -11747,10 +11743,6 @@
 	(no_connect
 		(at 306.07 232.41)
 		(uuid "3cd58789-2174-40a4-b882-758c75e4fc24")
-	)
-	(no_connect
-		(at 300.99 232.41)
-		(uuid "3eeb742d-94d3-460e-b149-49ed3ba39862")
 	)
 	(no_connect
 		(at 30.48 269.24)
@@ -12467,6 +12459,16 @@
 			(type default)
 		)
 		(uuid "24506603-3c7b-404b-b862-057d8fb31208")
+	)
+	(wire
+		(pts
+			(xy 300.99 232.41) (xy 300.99 245.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "247000cc-9afd-4224-8a1a-d48fb0572645")
 	)
 	(wire
 		(pts
@@ -15270,6 +15272,16 @@
 	)
 	(wire
 		(pts
+			(xy 298.45 232.41) (xy 298.45 245.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d96ceb95-94b3-44b9-9df0-ecc73aad70c1")
+	)
+	(wire
+		(pts
 			(xy 359.41 97.79) (xy 359.41 96.52)
 		)
 		(stroke
@@ -15928,16 +15940,6 @@
 		)
 		(uuid "1bde1337-f5a2-46c9-8456-2e5776d9844d")
 	)
-	(label "SPKR+"
-		(at 144.78 257.81 0)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "1fb80d9c-e8b9-498f-90af-75ab5c80e8ba")
-	)
 	(label "D8_NEOPIX"
 		(at 16.51 35.56 0)
 		(effects
@@ -16047,6 +16049,16 @@
 			(justify left bottom)
 		)
 		(uuid "45201b37-ae76-4871-976d-993317fc3812")
+	)
+	(label "A0"
+		(at 300.99 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "4522f140-a596-4a62-94ef-704b7dd285f0")
 	)
 	(label "BUTTON0"
 		(at 377.19 176.53 180)
@@ -16358,6 +16370,16 @@
 		)
 		(uuid "9054234a-30f7-4727-8e28-d4bda9f6f24a")
 	)
+	(label "SPKR_EN"
+		(at 298.45 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "93c52892-d639-4338-bb0b-5c30617f84f1")
+	)
 	(label "XIN"
 		(at 240.03 90.17 180)
 		(effects
@@ -16659,7 +16681,7 @@
 		(uuid "e4a7272c-f7e0-4aa4-bf78-9db9184ee86e")
 	)
 	(label "SWO"
-		(at 154.94 213.36 90)
+		(at 154.94 213.36 0)
 		(effects
 			(font
 				(size 1.2446 1.2446)
@@ -16697,16 +16719,6 @@
 			(justify left bottom)
 		)
 		(uuid "ea83834d-624f-40da-89d0-2e075f08375d")
-	)
-	(label "SPKR-"
-		(at 137.16 257.81 0)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "f14cbe38-89eb-4d64-a8b5-915b221fe557")
 	)
 	(label "TE"
 		(at 214.63 57.15 180)

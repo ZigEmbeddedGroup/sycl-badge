@@ -9,6 +9,10 @@ const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
 const pug_image = @import("../drivers/pug_image_data.zig");
 const rom = @import("../drivers/rom.zig");
+const mailbox = @import("../ipc/mailbox.zig");
+const shared_mem = @import("../ipc/shared_mem.zig");
+const storage = @import("../loader/storage.zig");
+const loader = @import("../loader/loader.zig");
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
 const MAX_ARGS = 8; // Maximum number of command arguments
@@ -88,6 +92,15 @@ fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
+fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{ "list", "run", "stop", "info", "delete" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
 // Command Registry
 const commands = [_]Command{
     .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
@@ -99,6 +112,7 @@ const commands = [_]Command{
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
@@ -1030,6 +1044,77 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
         println("Available: test, red, green, blue, yellow, cyan, magenta, white, black\r\n");
     }
+}
+
+fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const subcmd = iter.next() orelse {
+        println("\r\nUsage: cart <list|run|stop|info|delete> [name]\r\n");
+        return;
+    };
+
+    if (std.mem.eql(u8, subcmd, "list")) {
+        println("\r\nCarts:");
+        storage.listCarts(struct {
+            fn visit(name: []const u8, size: u32) void {
+                printf("  {s: <12} {d} bytes\r\n", .{ name, size });
+            }
+        }.visit);
+        println("");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "stop")) {
+        mailbox.send(mailbox.MessageType.withPayload(mailbox.MessageType.CART_STOP, 0));
+        println("\r\nCart stopped\r\n");
+        return;
+    }
+
+    const name = iter.next() orelse {
+        println("\r\nCart name required\r\n");
+        return;
+    };
+
+    if (std.mem.eql(u8, subcmd, "run")) {
+        const cart = storage.findCart(name) orelse {
+            printf("\r\nCart not found: {s}\r\n\r\n", .{name});
+            return;
+        };
+        if (shared_mem.create(@sizeOf(loader.CartLoadRequest))) |region| {
+            const req: loader.CartLoadRequest = .{
+                .start_cluster = cart.start_cluster,
+                .size = cart.size,
+            };
+            @memcpy(region.mem[0..@sizeOf(loader.CartLoadRequest)], std.mem.asBytes(&req));
+            const msg = mailbox.MessageType.withPayload(mailbox.MessageType.CART_LOAD, region.id);
+            mailbox.send(msg);
+            println("\r\nCart load requested\r\n");
+        } else {
+            println("\r\nFailed to allocate shared memory\r\n");
+        }
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "info")) {
+        const cart = storage.findCart(name) orelse {
+            printf("\r\nCart not found: {s}\r\n\r\n", .{name});
+            return;
+        };
+        const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
+        const display_name = cart.short_name[0..end];
+        printf("\r\n{s}\r\n  Size: {d} bytes\r\n  Cluster: {d}\r\n\r\n", .{ display_name, cart.size, cart.start_cluster });
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "delete")) {
+        if (storage.deleteCart(name)) {
+            println("\r\nCart deleted\r\n");
+        } else {
+            printf("\r\nCart not found: {s}\r\n\r\n", .{name});
+        }
+        return;
+    }
+
+    println("\r\nUnknown cart subcommand\r\n");
 }
 
 //TODO:

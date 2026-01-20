@@ -47,6 +47,10 @@ MEMORY
   scratch_y(rxw)    : ORIGIN = 0x20081000, LENGTH = 4K
 }
 
+/* Expose ROMFS region bounds for runtime storage */
+__romfs_region_start__ = ORIGIN(romfs);
+__romfs_region_end__ = ORIGIN(romfs) + LENGTH(romfs);
+
 /*
 SECTIONS
 Map input object file sections to output sections and to memory regions.
@@ -117,6 +121,16 @@ SECTIONS
   directive tells the linker the load origin).
   __data_start__ and __data_end__ bracket the runtime copy range.
   */
+  __ram_text_load__ = LOADADDR(.ram_text);
+  .ram_text :
+  {
+    . = ALIGN(4);
+    __ram_text_start__ = .;
+    *(.ram_text*)
+    . = ALIGN(4);
+    __ram_text_end__ = .;
+  } > kernel_ram AT> flash
+
   __data_start_flash__ = LOADADDR(.data);
   microzig_data_load_start = LOADADDR(.data);
   .data :
@@ -148,6 +162,19 @@ SECTIONS
     __bss_end__ = .;
     microzig_bss_end = .;
   } > kernel_ram
+
+  /*
+  .process_ram - user process data (Core 1 runtime buffers)
+  Placed in the dedicated process RAM region.
+  */
+  .process_ram (NOLOAD) :
+  {
+    . = ALIGN(8);
+    __process_ram_start__ = .;
+    *(.process_ram*)
+    . = ALIGN(8);
+    __process_ram_end__ = .;
+  } > process_ram
 
   /*
   .heap - optional heap region placed after bss.

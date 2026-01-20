@@ -18,6 +18,7 @@ pub fn main() !void {
     try init.init(.{
         .lcd_pins = lcd.createDT018BTFTPins(),
         .lcd_config = lcd.createDT018BTFTConfig(),
+        .init_core1 = true,
     });
 
     // Display startup message on LCD
@@ -33,7 +34,7 @@ pub fn main() !void {
     // Main loop
     while (true) {
         // CRITICAL: Poll USB frequently
-        uart.println("UART test :)");
+        // Avoid spamming UART; keep USB polling tight for CDC/MSC.
         usb.poll();
 
         // Process console input (handles echo, line buffering, commands)

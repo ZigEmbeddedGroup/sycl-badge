@@ -7,6 +7,9 @@ const std = @import("std");
 extern const __data_start_flash__: u8;
 extern var __data_start__: u8;
 extern var __data_end__: u8;
+extern const __ram_text_load__: u8;
+extern var __ram_text_start__: u8;
+extern var __ram_text_end__: u8;
 extern var __bss_start__: u8;
 extern var __bss_end__: u8;
 extern const __stack_top__: u32;
@@ -71,13 +74,16 @@ export fn resetHandler() callconv(.C) noreturn {
     // 1. Copy .data section from flash to RAM
     copyDataSection();
 
-    // 2. Zero out .bss section (these are the uninitialized variables)
+    // 2. Copy .ram_text section from flash to RAM
+    copyRamTextSection();
+
+    // 3. Zero out .bss section (these are the uninitialized variables)
     zeroBssSection();
 
-    // 3. Initialize hardware
+    // 4. Initialize hardware
     initHardware();
 
-    // 4. Jump to kernel main
+    // 5. Jump to kernel main
     kernelMain();
 }
 
@@ -92,6 +98,20 @@ fn copyDataSection() void {
         const src = @as([*]const u8, @ptrFromInt(data_flash_start));
         const dst = @as([*]u8, @ptrFromInt(data_ram_start));
         @memcpy(dst[0..data_size], src[0..data_size]);
+    }
+}
+
+// Copy RAM-resident text (flash programming helpers) from flash to RAM
+fn copyRamTextSection() void {
+    const text_flash_start = @intFromPtr(&__ram_text_load__);
+    const text_ram_start = @intFromPtr(&__ram_text_start__);
+    const text_ram_end = @intFromPtr(&__ram_text_end__);
+    const text_size = text_ram_end - text_ram_start;
+
+    if (text_size > 0) {
+        const src = @as([*]const u8, @ptrFromInt(text_flash_start));
+        const dst = @as([*]u8, @ptrFromInt(text_ram_start));
+        @memcpy(dst[0..text_size], src[0..text_size]);
     }
 }
 

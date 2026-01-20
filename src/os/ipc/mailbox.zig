@@ -70,6 +70,10 @@ pub const MessageType = struct {
     pub const LOAD_COMPLETE: Message = 0x10000001;
     pub const LOAD_ERROR: Message = 0x10000002;
 
+    // Cart control message types (use withPayload)
+    pub const CART_LOAD: u8 = 0x11;
+    pub const CART_STOP: u8 = 0x12;
+
     // Application messages (user-defined range: 0x20000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x20000000;
 

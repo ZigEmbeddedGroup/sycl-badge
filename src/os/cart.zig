@@ -5,6 +5,8 @@ const microzig = @import("microzig");
 const multicore = @import("system/multicore.zig");
 const mailbox = @import("ipc/mailbox.zig");
 const loader = @import("loader/loader.zig");
+const storage = @import("loader/storage.zig");
+const shared_mem = @import("ipc/shared_mem.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -47,8 +49,8 @@ fn mainLoop() noreturn {
             handleMessage(msg);
         }
 
-        // TODO: Check if a user program is running and needs to be ticked
-        // TODO: Handle program execution
+        // Run current cart (if loaded)
+        loader.tick();
         // TODO: Some code for switching programs
 
         // Small delay to prevent busy-waiting
@@ -88,6 +90,13 @@ fn handleMessage(msg: mailbox.Message) void {
                 handleLoadRequest(payload);
             }
         },
+        mailbox.MessageType.CART_LOAD => {
+            const payload = mailbox.MessageType.getPayload(msg);
+            handleCartLoad(payload);
+        },
+        mailbox.MessageType.CART_STOP => {
+            loader.stop();
+        },
         else => {
             // Unknown message type (ignoring for now but might want to log?)
         },
@@ -102,4 +111,27 @@ fn handleLoadRequest(payload: u24) void {
     // temp because we don't have multicore setup yet
     _ = payload;
     mailbox.send(mailbox.MessageType.LOAD_COMPLETE);
+}
+
+fn handleCartLoad(payload: u24) void {
+    const region_id: shared_mem.RegionId = @intCast(payload);
+    const mem = shared_mem.attach(region_id) orelse {
+        mailbox.send(mailbox.MessageType.LOAD_ERROR);
+        return;
+    };
+    if (mem.len < @sizeOf(loader.CartLoadRequest)) {
+        mailbox.send(mailbox.MessageType.LOAD_ERROR);
+        return;
+    }
+    const req = std.mem.bytesAsValue(loader.CartLoadRequest, mem[0..@sizeOf(loader.CartLoadRequest)]).*;
+    const info: storage.CartInfo = .{
+        .start_cluster = req.start_cluster,
+        .size = req.size,
+        .short_name = [_]u8{0} ** 12,
+    };
+    if (loader.loadCart(info)) {
+        mailbox.send(mailbox.MessageType.LOAD_COMPLETE);
+    } else {
+        mailbox.send(mailbox.MessageType.LOAD_ERROR);
+    }
 }

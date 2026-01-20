@@ -11,8 +11,6 @@ const timer = @import("../drivers/timer.zig");
 const led = gpio.num(25);
 
 pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
-    _ = message;
-
     // Ensure LED is configured
     led.set_function(.sio);
     led.set_direction(.out);
@@ -21,6 +19,9 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     var i: usize = 0;
     while (i < 50) : (i += 1) {
         uart.println("PANIC!");
+        if (message.len > 0) {
+            uart.println(message);
+        }
         led.put(1);
         timer.sleep_ms(50);
         led.put(0);

@@ -18,7 +18,7 @@ const PPB = peripherals.PPB;
 
 /// Core 1 stack (4 kB)
 /// Located in process RAM (Core 1's memory)
-var core1_stack: [1024]u32 align(8) = undefined;
+var core1_stack: [1024]u32 align(8) linksection(".process_ram") = undefined;
 
 extern const _external_interrupt_table: usize; // For riscv only
 

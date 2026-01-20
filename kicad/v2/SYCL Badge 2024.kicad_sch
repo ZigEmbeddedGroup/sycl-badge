@@ -18117,6 +18117,15 @@
 				(hide yes)
 			)
 		)
+		(property "LCSC" "C262664"
+			(at 180.34 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
 		(pin "1"
 			(uuid "759155dc-5e54-4daa-a450-47ca82cb120e")
 		)
@@ -18855,6 +18864,15 @@
 			)
 		)
 		(property "Package" "SMD"
+			(at 41.275 193.04 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C7502489"
 			(at 41.275 193.04 0)
 			(effects
 				(font
@@ -21376,6 +21394,15 @@
 			)
 		)
 		(property "Description" ""
+			(at 152.4 153.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2979170"
 			(at 152.4 153.67 0)
 			(effects
 				(font
@@ -30634,6 +30661,15 @@
 				(hide yes)
 			)
 		)
+		(property "LCSC" "C22828"
+			(at 179.07 266.7 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
 		(pin "1"
 			(uuid "86be803b-69fe-4038-8b9e-3debdba583b1")
 		)
@@ -31385,6 +31421,15 @@
 			)
 		)
 		(property "Description" "N-MOSFET transistor, drain/gate/source"
+			(at 189.23 266.7 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C105164"
 			(at 189.23 266.7 0)
 			(effects
 				(font
@@ -33070,6 +33115,15 @@
 			)
 		)
 		(property "Package" "SOT-23-6"
+			(at 163.83 269.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C3001605"
 			(at 163.83 269.24 0)
 			(effects
 				(font

@@ -18031,7 +18031,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2922787"
+		(property "LCSC" "C2886570"
 			(at 116.84 35.56 0)
 			(effects
 				(font
@@ -22640,7 +22640,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2922787"
+		(property "LCSC" "C2886570"
 			(at 142.24 35.56 0)
 			(effects
 				(font
@@ -23521,6 +23521,15 @@
 			)
 		)
 		(property "Description" "USB 2.0-only 16P Type-C Receptacle connector"
+			(at 77.47 118.11 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2988369"
 			(at 77.47 118.11 0)
 			(effects
 				(font
@@ -25086,7 +25095,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2922787"
+		(property "LCSC" "C2886570"
 			(at 40.64 35.56 0)
 			(effects
 				(font
@@ -28721,7 +28730,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2922787"
+		(property "LCSC" "C2886570"
 			(at 91.44 35.56 0)
 			(effects
 				(font
@@ -30993,7 +31002,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2922787"
+		(property "LCSC" "C2886570"
 			(at 66.04 35.56 0)
 			(effects
 				(font

@@ -464,28 +464,26 @@ pub fn testText() void {
 }
 
 pub fn createDT018BTFTPins() LCDPins {
-    const hal_gpio = microzig.hal.gpio;
-
     return .{
         .control = .{
-            // LCD_CS: Chip Select (GP17 -> SPI0 CSn)
-            .cs = hal_gpio.num(17),
+            // LCD_CS: Chip Select
+            .cs = board.TFT_CS,
 
-            // LCD_D/CX: Data/Command (GP21)
-            .dc = hal_gpio.num(21),
+            // LCD_D/CX: Data/Command
+            .dc = board.TFT_DC,
 
-            // RST: Reset (GP20)
-            .rst = hal_gpio.num(20),
+            // RST: Reset
+            .rst = board.TFT_RST,
 
             // BKLT_PWM: Backlight (connected to VBUS/5V, no GPIO control)
             .bl = null,
         },
         .spi = .{
-            // LCD_SCL: Serial Clock (GP18 -> SPI0 SCK)
-            .scl = hal_gpio.num(18),
+            // LCD_SCL: Serial Clock
+            .scl = board.TFT_SCK,
 
-            // LCD_SDIO: Serial Data I/O MOSI (GP19 -> SPI0 TX)
-            .sdo = hal_gpio.num(19),
+            // LCD_SDIO: Serial Data I/O MOSI
+            .sdo = board.TFT_MOSI,
         },
         // TE: Tearing Effect (optional, leave it disconnected for now)
         .te = null,
@@ -534,7 +532,7 @@ pub fn initWithAllPins(all_pins: LCDPins, config: Config) !void {
     try init(all_pins.control, config);
 }
 
-pub fn drawImg (x: u16, y: u16, w: u16, h: u16, img_data: []const u8) void {
+pub fn drawImg(x: u16, y: u16, w: u16, h: u16, img_data: []const u8) void {
     _ = x;
     _ = y;
     _ = w;

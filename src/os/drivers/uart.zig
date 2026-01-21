@@ -3,6 +3,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
+const board = microzig.board;
 
 // Re-export HAL types
 pub const Config = hal.uart.Config;
@@ -20,9 +21,9 @@ pub fn init() void {
     // Get the clock config
     const clock_config = hal.clock_config;
 
-    // GPIO pins config for UART0 (GPIO 0 = TX, GPIO 1 = RX)
-    const tx_pin = hal.gpio.num(0);
-    const rx_pin = hal.gpio.num(1);
+    // GPIO pins config for UART0
+    const tx_pin = board.UART0_TX;
+    const rx_pin = board.UART0_RX;
 
     tx_pin.set_function(.uart);
     rx_pin.set_function(.uart);
@@ -40,8 +41,8 @@ pub fn init() void {
 /// UART init with config
 pub fn initWithConfig(config: Config) void {
     // Configure GPIO pins for UART0
-    const tx_pin = hal.gpio.num(0);
-    const rx_pin = hal.gpio.num(1);
+    const tx_pin = board.UART0_TX;
+    const rx_pin = board.UART0_RX;
 
     tx_pin.set_function(.uart);
     rx_pin.set_function(.uart);

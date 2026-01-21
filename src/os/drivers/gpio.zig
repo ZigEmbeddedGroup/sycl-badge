@@ -1,6 +1,7 @@
 ﻿const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
+const board = microzig.board;
 
 // Re-export microzig types and funcs
 pub const Pin = hal.gpio.Pin;
@@ -51,22 +52,20 @@ pub fn init() void {
     // This function exists for consistency with other drivers
 }
 
-// LED control functions (GPIO 25 on Pico 2)
-const LED_PIN = num(25);
-
+// LED control functions
 pub fn initLED() void {
-    const pin = LED_PIN;
+    const pin = board.led_pin;
     pin.set_function(.sio);
     pin.set_direction(.out);
     pin.put(0);
 }
 
 pub fn setLED(state: bool) void {
-    LED_PIN.put(@intFromBool(state));
+    board.led_pin.put(@intFromBool(state));
 }
 
 pub fn toggleLED() void {
-    toggle(LED_PIN);
+    toggle(board.led_pin);
 }
 
 // Rest of your pin definitions...

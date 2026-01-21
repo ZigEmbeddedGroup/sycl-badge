@@ -1,4 +1,4 @@
-/// USB Mass Storage Class (MSC) driver using Bulk-Only Transport
+/// USB Mass Storage Class (MSC) driver
 const std = @import("std");
 const microzig = @import("microzig");
 const storage = @import("../loader/storage.zig");
@@ -19,12 +19,12 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         state: State = .await_cbw,
         cbw_buf: [CBW_SIZE]u8 = undefined,
         cbw_len: usize = 0,
-        out_buf: [512]u8 = undefined, // Buffer for receiving USB OUT data (increased for bulk transfers)
+        out_buf: [512]u8 = undefined, // Buffer for receiving USB OUT data
         cbw_tag: u32 = 0,
         cbw_transfer_len: u32 = 0,
         cbw_flags: u8 = 0,
         cbw_cmd: [16]u8 = undefined,
-        need_arm_out: bool = false, // Flag to defer OUT endpoint arming (avoid re-entrancy)
+        need_arm_out: bool = false, // Flag to defer OUT endpoint arming
 
         csw_buf: [CSW_SIZE]u8 = undefined,
         sense: Sense = .{},
@@ -144,9 +144,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
 
             if (ep_addr == self.ep_out) {
                 self.handle_out(data);
-                // DON'T call prepare_out here - even deferred doesn't work!
-                // The need_arm_out flag will be checked in poll() which runs
-                // in a completely external context (USB poll loop).
             } else if (ep_addr == self.ep_in) {
                 self.handle_in();
             }
@@ -175,9 +172,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                         self.cbw_flags = self.cbw_buf[12];
                         @memcpy(self.cbw_cmd[0..], self.cbw_buf[15 .. 15 + 16]);
                         self.process_cbw();
-                        // CRITICAL: For data_out state, defer arming OUT endpoint to avoid re-entrancy!
-                        // The flag will be checked in poll() which runs in external context.
-                        // For other states, OUT will be armed after IN transfer completes in handle_in().
                         if (self.state == .data_out) {
                             self.need_arm_out = true;
                         }
@@ -202,7 +196,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                                 self.data_residue = 0;
                             }
                             if (self.block_offset == self.block_buf.len) {
-                                // CRITICAL: Pass a slice, not an array pointer!
                                 storage.writeSector(self.current_lba, self.block_buf[0..]);
                                 self.current_lba += 1;
                                 self.remaining_blocks -= 1;
@@ -211,22 +204,20 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                             }
                         } else {
                             // Already written all blocks but packet has more data
-                            // CRITICAL: Must consume all data in packet to keep USB in sync!
-                            // Decrement residue for any extra bytes (shouldn't happen but handle it)
                             const remaining_in_packet = data.len - offset;
                             if (self.data_residue >= remaining_in_packet) {
                                 self.data_residue -= @intCast(remaining_in_packet);
                             } else {
                                 self.data_residue = 0;
                             }
-                            break; // Exit loop, we've accounted for all data
+                            break; // Exit loop when all data is processed
                         }
                     }
                     if (self.remaining_blocks == 0) {
                         uart.puts("Write complete\r\n");
                         self.send_csw(0);
                     } else {
-                        // More data needed - defer arming OUT endpoint to avoid re-entrancy
+                        // More data needed, defer arming OUT endpoint
                         self.need_arm_out = true;
                     }
                 },
@@ -244,9 +235,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                 },
                 .send_csw => {
                     self.resetState();
-                    // CRITICAL: Re-arm OUT endpoint to receive next CBW
-                    // This is safe because we're in handle_in(), not handle_out()
-                    // (no re-entrancy issue)
                     self.prepare_out();
                 },
                 else => {},
@@ -261,14 +249,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
             self.block_offset = 0;
             self.remaining_blocks = 0;
             self.data_residue = self.cbw_transfer_len;
-            // ALWAYS log CBW for debugging freeze issues
-            var buf: [96]u8 = undefined;
-            const text = std.fmt.bufPrint(
-                &buf,
-                "MSC CBW op=0x{x:0>2} flags=0x{x} xfer={d}\r\n",
-                .{ self.cbw_cmd[0], self.cbw_flags, self.cbw_transfer_len },
-            ) catch "";
-            uart.puts(text);
 
             switch (self.cbw_cmd[0]) {
                 SCSI_TEST_UNIT_READY => {
@@ -301,9 +281,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                 },
                 SCSI_SYNCHRONIZE_CACHE => {
                     uart.puts("SYNC_CACHE: Flushing pending writes to flash\r\n");
-                    // CRITICAL: This WILL block USB for ~100ms, but it's necessary
-                    // for data persistence. The host calls this when ejecting or
-                    // after completing file operations.
                     storage.flushPendingWrites();
                     uart.puts("SYNC_CACHE: Flush complete\r\n");
                     self.data_residue = 0;
@@ -327,7 +304,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     self.start_write10();
                 },
                 else => {
-                    // ALWAYS log unknown commands to debug spinning icon
                     var buf2: [96]u8 = undefined;
                     const msg = std.fmt.bufPrint(
                         &buf2,
@@ -335,7 +311,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                         .{ self.cbw_cmd[0], self.cbw_transfer_len },
                     ) catch "";
                     uart.puts(msg);
-                    self.set_sense(0x05, 0x20, 0x00); // ILLEGAL_REQUEST: Invalid Command
+                    self.set_sense(0x05, 0x20, 0x00); // Illegal request/Invalid Command
                     self.data_residue = 0;
                     self.send_csw(1);
                 },
@@ -436,8 +412,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
             resp[12] = self.sense.asc;
             resp[13] = self.sense.ascq;
             self.queue_in(resp[0..resp.len]);
-            // CRITICAL: Clear sense after reporting it!
-            // Otherwise Windows sees the same error on every REQUEST_SENSE
+            // Clear sense after reporting it otherwise Windows sees the same error on every "REQUEST_SENSE"
             self.sense = .{ .key = 0, .asc = 0, .ascq = 0 };
         }
 
@@ -502,8 +477,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
 
             // Prepare to receive data
             self.block_offset = 0;
-            // CRITICAL: Clear block buffer to ensure no stale data
-            // Windows can detect corruption if buffer has old data
+            // Clear block buffer to ensure no stale data, windows can detect corruption if buffer has old data
             @memset(&self.block_buf, 0);
             self.state = .data_out;
         }
@@ -538,7 +512,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         }
 
         fn load_block(self: *Self) void {
-            // CRITICAL: Pass a slice, not an array pointer!
+            // Pass a slice, not an array pointer
             storage.readSector(self.current_lba, self.block_buf[0..]);
             self.current_lba += 1;
             self.block_offset = 0;
@@ -585,7 +559,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
 
         fn prepare_out(self: *Self) void {
             if (self.device != null) {
-                // CRITICAL: Pass only max_packet_size bytes, not the full buffer!
                 // The endpoint max packet size is 64 bytes for bulk transfers
                 const buf_size = @min(max_packet_size, self.out_buf.len);
                 self.device.?.endpoint_transfer(self.ep_out, self.out_buf[0..buf_size]);

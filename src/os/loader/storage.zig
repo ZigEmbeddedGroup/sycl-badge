@@ -1,4 +1,4 @@
-/// FAT16-based cart storage in the romfs flash region
+/// FAT12-based cart storage in the romfs flash region
 const std = @import("std");
 const rom = @import("../drivers/rom.zig");
 const uart = @import("../drivers/uart.zig");
@@ -45,7 +45,7 @@ var pending_dirty: bool = false;
 var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
 
 pub fn init() void {
-    uart.puts("\r\n=== STORAGE INIT ===\r\n");
+    uart.puts("\r\nStorage Init\r\n");
 
     var buf: [96]u8 = undefined;
     const base = romfsBase();
@@ -53,11 +53,11 @@ pub fn init() void {
     uart.puts(msg);
 
     if (!isFormatted()) {
-        uart.puts("NOT FORMATTED - Formatting now...\r\n");
+        uart.puts("Not Formatted, Formatting now.\r\n");
         formatVolume();
         uart.puts("Format complete\r\n");
     } else {
-        uart.puts("Already formatted - preserving existing data\r\n");
+        uart.puts("Already formatted, preserving existing data\r\n");
     }
 
     // Test: Read LBA 19 and show first 16 bytes to verify persistence
@@ -72,7 +72,7 @@ pub fn init() void {
     uart.puts("\r\n");
 
     debugDump();
-    uart.puts("=== STORAGE INIT COMPLETE ===\r\n");
+    uart.puts("Storage Init Complete\r\n");
 }
 
 fn romfsBase() u32 {
@@ -172,7 +172,7 @@ fn formatVolume() void {
     boot_sector[36] = 0x80;
     boot_sector[38] = 0x29;
     writeU32(boot_sector[0..], 39, 0x20260120);
-    @memcpy(boot_sector[43..54], "SYCLCARTS  ");
+    @memcpy(boot_sector[43..54], "SYCLBADGE  ");
     @memcpy(boot_sector[BS_FS_TYPE .. BS_FS_TYPE + 8], "FAT12   ");
     writeU16(boot_sector[0..], BS_SIGNATURE, 0xAA55);
 
@@ -210,7 +210,7 @@ fn formatVolume() void {
 
     // Write a volume label entry in the first root directory sector.
     var label_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
-    @memcpy(label_sector[DIR_NAME .. DIR_NAME + 11], "SYCLCARTS  ");
+    @memcpy(label_sector[DIR_NAME .. DIR_NAME + 11], "SYCLBADGE  ");
     label_sector[DIR_ATTR] = 0x08; // Volume label
     writeSector(root_lba, label_sector[0..]);
     flushPendingWrites();
@@ -307,14 +307,10 @@ pub fn writeSector(lba: u32, src: []const u8) linksection(".ram_text") void {
     const msg = std.fmt.bufPrint(&buf, "WRITE LBA={d} data[0..4]={x:0>2}{x:0>2}{x:0>2}{x:0>2}\r\n", .{ lba, src[0], src[1], src[2], src[3] }) catch "";
     uart.puts(msg);
 
-    // CRITICAL: Do NOT flush here - it blocks USB for 100ms+!
-    // Only flush on explicit SYNCHRONIZE_CACHE from host.
     // For now, we can only buffer one 4KB block, so if switching blocks,
     // we must flush the old block first.
     if (!pending_valid or pending_block_addr != block_addr) {
         if (pending_valid and pending_dirty and pending_block_addr != block_addr) {
-            // Switching to different block while having pending writes
-            // We MUST flush the old block (no choice with limited RAM)
             uart.puts("Switching blocks, flushing old\r\n");
             flushPending();
         }
@@ -335,10 +331,10 @@ pub fn flushPendingWrites() linksection(".ram_text") void {
 
 fn flushPending() linksection(".ram_text") void {
     if (!pending_valid) {
-        return; // Silent - no pending data
+        return; // Silent (no pending data)
     }
     if (!pending_dirty) {
-        return; // Silent - nothing to flush
+        return; // Silent (nothing to flush)
     }
 
     var buf: [96]u8 = undefined;

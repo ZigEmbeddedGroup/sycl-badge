@@ -112,7 +112,7 @@ pub fn send(data: []const u8) bool {
         usb_dev.task(false) catch {};
     }
 
-    // CRITICAL: Flush to actually send short messages!
+    // Flush to send messages
     _ = driver_cdc.write_flush();
 
     return write_data.len == 0; // Return true if all data was written
@@ -159,7 +159,7 @@ pub fn available() usize {
 /// Handles enumeration, control requests, and data transfers
 pub fn poll() void {
     usb_dev.task(false) catch {};
-    // CRITICAL: Poll MSC driver to handle deferred OUT endpoint arming
+    // Poll MSC driver to handle deferred OUT endpoint arming
     // This must be done outside of USB transfer callbacks
     driver_msc.poll();
 }

@@ -60,17 +60,6 @@ pub fn init() void {
         uart.puts("Already formatted, preserving existing data\r\n");
     }
 
-    // Test: Read LBA 19 and show first 16 bytes to verify persistence
-    var test_sector: [SECTOR_SIZE]u8 = undefined;
-    readSector(19, test_sector[0..]);
-    uart.puts("LBA 19 data[0..16]: ");
-    for (test_sector[0..16]) |byte| {
-        var hex_buf: [3]u8 = undefined;
-        const hex = std.fmt.bufPrint(&hex_buf, "{x:0>2}", .{byte}) catch "";
-        uart.puts(hex);
-    }
-    uart.puts("\r\n");
-
     debugDump();
     uart.puts("Storage Init Complete\r\n");
 }
@@ -115,11 +104,13 @@ fn dataStartLba() u32 {
 }
 
 fn isFormatted() bool {
-    const base_ptr: [*]const u8 = @ptrFromInt(romfsBase());
-    const boot = base_ptr[0..SECTOR_SIZE];
-    const signature = readU16(boot, BS_SIGNATURE);
-    const bytes_per_sector = readU16(boot, BS_BYTES_PER_SECTOR);
-    const root_entries = readU16(boot, 17);
+    // Use readSector() instead of direct flash access to ensure we see any pending/buffered data
+    var boot: [SECTOR_SIZE]u8 = undefined;
+    readSector(0, boot[0..]);
+
+    const signature = readU16(boot[0..], BS_SIGNATURE);
+    const bytes_per_sector = readU16(boot[0..], BS_BYTES_PER_SECTOR);
+    const root_entries = readU16(boot[0..], 17);
     const fs_type = boot[BS_FS_TYPE .. BS_FS_TYPE + 8];
 
     // Debug: Show what we found
@@ -141,7 +132,7 @@ fn isFormatted() bool {
     }
     var fat0: [SECTOR_SIZE]u8 = undefined;
     readSector(1, fat0[0..]);
-    const valid = fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0x00;
+    const valid = fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0xFF;
     if (!valid) {
         var buf2: [64]u8 = undefined;
         const msg2 = std.fmt.bufPrint(&buf2, "Format check FAILED (FAT: {x:0>2} {x:0>2} {x:0>2} {x:0>2})\r\n", .{ fat0[0], fat0[1], fat0[2], fat0[3] }) catch "";
@@ -184,20 +175,25 @@ fn formatVolume() void {
     sector_buf[0] = MEDIA_DESCRIPTOR;
     sector_buf[1] = 0xFF;
     sector_buf[2] = 0xFF;
-    sector_buf[3] = 0x00;
+    sector_buf[3] = 0xFF;
 
     var fat_index: u8 = 0;
     while (fat_index < NUM_FATS) : (fat_index += 1) {
         var i: u16 = 0;
         while (i < fat_secs) : (i += 1) {
             const lba = fat_start + (@as(u32, fat_index) * fat_secs) + i;
+            if (i == 0) {
+                // First sector of FAT has media descriptor
+                sector_buf[0] = MEDIA_DESCRIPTOR;
+                sector_buf[1] = 0xFF;
+                sector_buf[2] = 0xFF;
+                sector_buf[3] = 0x00;
+            } else {
+                // Subsequent FAT sectors are all zeros
+                @memset(sector_buf[0..], 0);
+            }
             writeSector(lba, sector_buf[0..]);
-            @memset(sector_buf[0..], 0);
         }
-        sector_buf[0] = MEDIA_DESCRIPTOR;
-        sector_buf[1] = 0xFF;
-        sector_buf[2] = 0xFF;
-        sector_buf[3] = 0x00;
     }
 
     const root_lba = fat_start + (@as(u32, NUM_FATS) * fat_secs);
@@ -337,10 +333,6 @@ fn flushPending() linksection(".ram_text") void {
         return; // Silent (nothing to flush)
     }
 
-    var buf: [96]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "FLUSH: 4KB @ 0x{x}\r\n", .{pending_block_addr}) catch "";
-    uart.puts(msg);
-
     const flash_offset = pending_block_addr - XIP_BASE;
     interrupts.disableInterrupts();
     defer interrupts.enableInterrupts();
@@ -351,7 +343,6 @@ fn flushPending() linksection(".ram_text") void {
     rom.flash_flush_cache();
     rom.flash_enter_cmd_xip();
     pending_dirty = false;
-    uart.puts("FLUSH: complete\r\n");
 }
 
 pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {

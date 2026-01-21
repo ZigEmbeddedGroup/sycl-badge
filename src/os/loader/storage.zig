@@ -45,10 +45,34 @@ var pending_dirty: bool = false;
 var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
 
 pub fn init() void {
+    uart.puts("\r\n=== STORAGE INIT ===\r\n");
+
+    var buf: [96]u8 = undefined;
+    const base = romfsBase();
+    const msg = std.fmt.bufPrint(&buf, "ROMFS base: 0x{x} size: {d}KB\r\n", .{ base, romfsSize() / 1024 }) catch "";
+    uart.puts(msg);
+
     if (!isFormatted()) {
+        uart.puts("NOT FORMATTED - Formatting now...\r\n");
         formatVolume();
+        uart.puts("Format complete\r\n");
+    } else {
+        uart.puts("Already formatted - preserving existing data\r\n");
     }
+
+    // Test: Read LBA 19 and show first 16 bytes to verify persistence
+    var test_sector: [SECTOR_SIZE]u8 = undefined;
+    readSector(19, test_sector[0..]);
+    uart.puts("LBA 19 data[0..16]: ");
+    for (test_sector[0..16]) |byte| {
+        var hex_buf: [3]u8 = undefined;
+        const hex = std.fmt.bufPrint(&hex_buf, "{x:0>2}", .{byte}) catch "";
+        uart.puts(hex);
+    }
+    uart.puts("\r\n");
+
     debugDump();
+    uart.puts("=== STORAGE INIT COMPLETE ===\r\n");
 }
 
 fn romfsBase() u32 {
@@ -97,13 +121,33 @@ fn isFormatted() bool {
     const bytes_per_sector = readU16(boot, BS_BYTES_PER_SECTOR);
     const root_entries = readU16(boot, 17);
     const fs_type = boot[BS_FS_TYPE .. BS_FS_TYPE + 8];
+
+    // Debug: Show what we found
+    var buf: [128]u8 = undefined;
+    const msg = std.fmt.bufPrint(&buf, "Check format: sig=0x{x:0>4} bps={d} root={d} fstype=", .{ signature, bytes_per_sector, root_entries }) catch "";
+    uart.puts(msg);
+    for (fs_type) |c| {
+        var cbuf: [2]u8 = undefined;
+        cbuf[0] = if (c >= 32 and c < 127) c else '.';
+        cbuf[1] = 0;
+        uart.puts(cbuf[0..1]);
+    }
+    uart.puts("\r\n");
+
     // Check all BPB fields match expected values
     if (signature != 0xAA55 or bytes_per_sector != SECTOR_SIZE or root_entries != ROOT_ENTRIES or !std.mem.eql(u8, fs_type, "FAT12   ")) {
+        uart.puts("Format check FAILED (boot sector invalid)\r\n");
         return false;
     }
     var fat0: [SECTOR_SIZE]u8 = undefined;
-    readSector(1, &fat0);
-    return fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0x00;
+    readSector(1, fat0[0..]);
+    const valid = fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0x00;
+    if (!valid) {
+        var buf2: [64]u8 = undefined;
+        const msg2 = std.fmt.bufPrint(&buf2, "Format check FAILED (FAT: {x:0>2} {x:0>2} {x:0>2} {x:0>2})\r\n", .{ fat0[0], fat0[1], fat0[2], fat0[3] }) catch "";
+        uart.puts(msg2);
+    }
+    return valid;
 }
 
 fn formatVolume() void {
@@ -132,7 +176,7 @@ fn formatVolume() void {
     @memcpy(boot_sector[BS_FS_TYPE .. BS_FS_TYPE + 8], "FAT12   ");
     writeU16(boot_sector[0..], BS_SIGNATURE, 0xAA55);
 
-    writeSector(0, &boot_sector);
+    writeSector(0, boot_sector[0..]);
 
     const fat_start = RESERVED_SECTORS;
     const fat_secs = fatSectors();
@@ -147,7 +191,7 @@ fn formatVolume() void {
         var i: u16 = 0;
         while (i < fat_secs) : (i += 1) {
             const lba = fat_start + (@as(u32, fat_index) * fat_secs) + i;
-            writeSector(lba, &sector_buf);
+            writeSector(lba, sector_buf[0..]);
             @memset(sector_buf[0..], 0);
         }
         sector_buf[0] = MEDIA_DESCRIPTOR;
@@ -161,20 +205,20 @@ fn formatVolume() void {
     var j: u16 = 0;
     var zero_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
     while (j < root_secs) : (j += 1) {
-        writeSector(root_lba + j, &zero_sector);
+        writeSector(root_lba + j, zero_sector[0..]);
     }
 
     // Write a volume label entry in the first root directory sector.
     var label_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
     @memcpy(label_sector[DIR_NAME .. DIR_NAME + 11], "SYCLCARTS  ");
     label_sector[DIR_ATTR] = 0x08; // Volume label
-    writeSector(root_lba, &label_sector);
+    writeSector(root_lba, label_sector[0..]);
     flushPendingWrites();
 }
 
 fn debugDump() void {
     var sector: [SECTOR_SIZE]u8 = undefined;
-    readSector(0, &sector);
+    readSector(0, sector[0..]);
     const bytes_per_sector = readU16(sector[0..], BS_BYTES_PER_SECTOR);
     const sectors_per_cluster = sector[13];
     const reserved = readU16(sector[0..], 14);
@@ -202,13 +246,13 @@ fn debugDump() void {
     uart.puts("\r\n");
 
     // Dump FAT0 (first sector) and ROOT (first sector) for debugging.
-    readSector(1, &sector);
+    readSector(1, sector[0..]);
     uart.puts("  FAT0 HEX: ");
     dumpHex(sector[0..64]);
     uart.puts("\r\n");
 
     const root_lba = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
-    readSector(root_lba, &sector);
+    readSector(root_lba, sector[0..]);
     uart.puts("  ROOT0 HEX: ");
     dumpHex(sector[0..64]);
     uart.puts("\r\n");
@@ -243,20 +287,46 @@ pub fn readSector(lba: u32, dst: []u8) void {
 
 pub fn writeSector(lba: u32, src: []const u8) linksection(".ram_text") void {
     if (lba >= totalSectors()) {
+        uart.puts("ERROR: writeSector LBA out of range\r\n");
         return;
     }
+
+    if (src.len != SECTOR_SIZE) {
+        var buf: [64]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, "ERROR: writeSector wrong size: {d}\r\n", .{src.len}) catch "";
+        uart.puts(msg);
+        return;
+    }
+
     const addr = romfsBase() + lba * SECTOR_SIZE;
     const block_addr = addr & ~@as(u32, FLASH_ERASE_BLOCK - 1);
     const block_offset = addr - block_addr;
+
+    // Log every write with first 4 bytes to verify data
+    var buf: [96]u8 = undefined;
+    const msg = std.fmt.bufPrint(&buf, "WRITE LBA={d} data[0..4]={x:0>2}{x:0>2}{x:0>2}{x:0>2}\r\n", .{ lba, src[0], src[1], src[2], src[3] }) catch "";
+    uart.puts(msg);
+
+    // CRITICAL: Do NOT flush here - it blocks USB for 100ms+!
+    // Only flush on explicit SYNCHRONIZE_CACHE from host.
+    // For now, we can only buffer one 4KB block, so if switching blocks,
+    // we must flush the old block first.
     if (!pending_valid or pending_block_addr != block_addr) {
-        flushPending();
+        if (pending_valid and pending_dirty and pending_block_addr != block_addr) {
+            // Switching to different block while having pending writes
+            // We MUST flush the old block (no choice with limited RAM)
+            uart.puts("Switching blocks, flushing old\r\n");
+            flushPending();
+        }
         const block_ptr: [*]const u8 = @ptrFromInt(block_addr);
         @memcpy(pending_buf[0..FLASH_ERASE_BLOCK], block_ptr[0..FLASH_ERASE_BLOCK]);
         pending_block_addr = block_addr;
         pending_valid = true;
     }
+
     @memcpy(pending_buf[block_offset .. block_offset + SECTOR_SIZE], src[0..SECTOR_SIZE]);
     pending_dirty = true;
+    uart.puts("Marked dirty=true\r\n");
 }
 
 pub fn flushPendingWrites() linksection(".ram_text") void {
@@ -264,7 +334,17 @@ pub fn flushPendingWrites() linksection(".ram_text") void {
 }
 
 fn flushPending() linksection(".ram_text") void {
-    if (!pending_valid or !pending_dirty) return;
+    if (!pending_valid) {
+        return; // Silent - no pending data
+    }
+    if (!pending_dirty) {
+        return; // Silent - nothing to flush
+    }
+
+    var buf: [96]u8 = undefined;
+    const msg = std.fmt.bufPrint(&buf, "FLUSH: 4KB @ 0x{x}\r\n", .{pending_block_addr}) catch "";
+    uart.puts(msg);
+
     const flash_offset = pending_block_addr - XIP_BASE;
     interrupts.disableInterrupts();
     defer interrupts.enableInterrupts();
@@ -275,6 +355,7 @@ fn flushPending() linksection(".ram_text") void {
     rom.flash_flush_cache();
     rom.flash_enter_cmd_xip();
     pending_dirty = false;
+    uart.puts("FLUSH: complete\r\n");
 }
 
 pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
@@ -289,7 +370,7 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
         lba += 1;
         remaining -= 1;
     }) {
-        readSector(lba, &sector_buf);
+        readSector(lba, sector_buf[0..]);
         var i: usize = 0;
         while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
             const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
@@ -320,7 +401,7 @@ pub fn findCart(name: []const u8) ?CartInfo {
         lba += 1;
         remaining -= 1;
     }) {
-        readSector(lba, &sector_buf);
+        readSector(lba, sector_buf[0..]);
         var i: usize = 0;
         while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
             const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
@@ -357,7 +438,7 @@ pub fn deleteCart(name: []const u8) bool {
         lba += 1;
         remaining -= 1;
     }) {
-        readSector(lba, &sector_buf);
+        readSector(lba, sector_buf[0..]);
         var i: usize = 0;
         while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
             const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
@@ -370,7 +451,7 @@ pub fn deleteCart(name: []const u8) bool {
             const short = formatShortName(entry, &name_buf);
             if (std.mem.eql(u8, short, target[0..target_len])) {
                 sector_buf[i] = 0xE5;
-                writeSector(lba, &sector_buf);
+                writeSector(lba, sector_buf[0..]);
                 clearFatChain(readU16(entry, DIR_FIRST_CLUSTER));
                 return true;
             }
@@ -390,7 +471,7 @@ pub fn readCart(cart: CartInfo, dst: []u8) u32 {
         var sector_index: u8 = 0;
         while (sector_index < SECTORS_PER_CLUSTER and bytes_left > 0) : (sector_index += 1) {
             const lba = clusterToLba(cluster) + sector_index;
-            readSector(lba, &sector_buf);
+            readSector(lba, sector_buf[0..]);
             const copy_len = @min(bytes_left, SECTOR_SIZE);
             @memcpy(dst[dst_offset .. dst_offset + copy_len], sector_buf[0..copy_len]);
             bytes_left -= @intCast(copy_len);
@@ -411,14 +492,14 @@ fn fatEntry(cluster: u16) u16 {
     const lba = fat_start + (offset / SECTOR_SIZE);
     const index = @as(usize, offset % SECTOR_SIZE);
     var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    readSector(lba, &sector_buf);
+    readSector(lba, sector_buf[0..]);
     const b0: u8 = sector_buf[index];
     var b1: u8 = 0;
     if (index + 1 < SECTOR_SIZE) {
         b1 = sector_buf[index + 1];
     } else {
         var next_buf: [SECTOR_SIZE]u8 = undefined;
-        readSector(lba + 1, &next_buf);
+        readSector(lba + 1, next_buf[0..]);
         b1 = next_buf[0];
     }
     if ((cluster & 1) == 0) {
@@ -439,10 +520,10 @@ fn setFatEntry(cluster: u16, value: u16) void {
     const val = value & 0x0FFF;
     while (fat_index < NUM_FATS) : (fat_index += 1) {
         const lba = base_lba + (@as(u32, fat_index) * fatSectors());
-        readSector(lba, &sector_buf);
+        readSector(lba, sector_buf[0..]);
         var use_next = false;
         if (index + 1 >= SECTOR_SIZE) {
-            readSector(lba + 1, &next_buf);
+            readSector(lba + 1, next_buf[0..]);
             use_next = true;
         }
         if ((cluster & 1) == 0) {
@@ -450,7 +531,7 @@ fn setFatEntry(cluster: u16, value: u16) void {
             const upper: u8 = @intCast((val >> 8) & 0x0F);
             if (use_next) {
                 next_buf[0] = (next_buf[0] & 0xF0) | upper;
-                writeSector(lba + 1, &next_buf);
+                writeSector(lba + 1, next_buf[0..]);
             } else {
                 sector_buf[index + 1] = (sector_buf[index + 1] & 0xF0) | upper;
             }
@@ -460,12 +541,12 @@ fn setFatEntry(cluster: u16, value: u16) void {
             const upper: u8 = @intCast((val >> 4) & 0xFF);
             if (use_next) {
                 next_buf[0] = upper;
-                writeSector(lba + 1, &next_buf);
+                writeSector(lba + 1, next_buf[0..]);
             } else {
                 sector_buf[index + 1] = upper;
             }
         }
-        writeSector(lba, &sector_buf);
+        writeSector(lba, sector_buf[0..]);
     }
 }
 

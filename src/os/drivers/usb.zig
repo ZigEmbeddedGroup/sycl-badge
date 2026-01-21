@@ -159,6 +159,9 @@ pub fn available() usize {
 /// Handles enumeration, control requests, and data transfers
 pub fn poll() void {
     usb_dev.task(false) catch {};
+    // CRITICAL: Poll MSC driver to handle deferred OUT endpoint arming
+    // This must be done outside of USB transfer callbacks
+    driver_msc.poll();
 }
 
 // Buffer for formatted printing (max 2KB)

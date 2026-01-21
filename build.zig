@@ -178,36 +178,6 @@ pub fn add_os(
         },
     });
 
-    // WASM runtime (wasm3) integration
-    fw.artifact.addIncludePath(b.path("src/os/loader"));
-    fw.artifact.addIncludePath(mz_dep.path("modules/foundation-libc/include"));
-    fw.artifact.addIncludePath(b.path("lib/wasm3/source"));
-    const wasm3_flags = &.{
-        "-Dd_m3LogParse=0",
-        "-Dd_m3LogModule=0",
-        "-Dd_m3LogCompile=0",
-        "-Dd_m3LogRuntime=0",
-    };
-    const wasm3_files = [_][]const u8{
-        "lib/wasm3/source/m3_bind.c",
-        "lib/wasm3/source/m3_code.c",
-        "lib/wasm3/source/m3_compile.c",
-        "lib/wasm3/source/m3_core.c",
-        "lib/wasm3/source/m3_env.c",
-        "lib/wasm3/source/m3_exec.c",
-        "lib/wasm3/source/m3_function.c",
-        "lib/wasm3/source/m3_info.c",
-        "lib/wasm3/source/m3_module.c",
-        "lib/wasm3/source/m3_parse.c",
-        "src/os/loader/wasm3_host.c",
-        "src/os/loader/stdio_stub.c",
-        "src/os/loader/stdlib_stub.c",
-        "src/os/loader/string_stub.c",
-    };
-    for (wasm3_files) |file| {
-        fw.artifact.addCSourceFile(.{ .file = b.path(file), .flags = wasm3_flags });
-    }
-
     // Install both ELF and UF2 formats
     mb.install_firmware(fw, .{ .format = .elf });
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });

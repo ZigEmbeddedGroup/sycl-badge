@@ -63,7 +63,6 @@ pub const Color16 = packed struct(u16) {
 };
 
 // Common colors (RGB565 format)
-// TODO: add more colours
 pub const BLACK: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
 pub const WHITE: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x1F };
 pub const RED: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x00 };

@@ -55,6 +55,7 @@ pub fn build(builder: *Build) void {
     inline for (.{
         "neopixels",
         "song",
+        "blinky_red",
     }) |name| {
         const cart = add_cart(&dep, builder, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
@@ -232,7 +233,9 @@ pub fn add_cart(
         .root_module = b.createModule(.{
             .root_source_file = options.root_source_file,
             .target = wasm_target,
-            .optimize = options.optimize,
+            // Always use ReleaseSmall for WASM to minimize file size
+            .optimize = .ReleaseSmall,
+            .strip = true,
         }),
     });
     wasm.entry = .disabled;

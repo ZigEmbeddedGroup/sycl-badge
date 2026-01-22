@@ -113,6 +113,8 @@ const commands = [_]Command{
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "ls", .description = "List files in SYCL cart directory", .handler = cmdLs },
+    .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
@@ -1046,6 +1048,51 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
 }
 
+// Static counter for ls command (needed because callbacks can't capture locals)
+var ls_file_count: usize = 0;
+
+fn lsVisitor(name: []const u8, size: u32) void {
+    ls_file_count += 1;
+    printf("  {s}  ({d} bytes)\r\n", .{ name, size });
+}
+
+fn cmdLs(_: *std.mem.TokenIterator(u8, .scalar)) void {
+    println("\r\n");
+    ls_file_count = 0;
+    storage.listCarts(lsVisitor);
+    if (ls_file_count == 0) {
+        println("No files exist\r\n");
+    }
+    println("");
+}
+
+fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const name = iter.next() orelse {
+        println("\r\nUsage: load <filename>\r\n");
+        return;
+    };
+
+    const cart = storage.findCart(name) orelse {
+        printf("\r\nFile not found: {s}\r\n\r\n", .{name});
+        return;
+    };
+
+    if (shared_mem.create(@sizeOf(loader.CartLoadRequest))) |region| {
+        const req: loader.CartLoadRequest = .{
+            .start_cluster = cart.start_cluster,
+            .size = cart.size,
+        };
+        @memcpy(region.mem[0..@sizeOf(loader.CartLoadRequest)], std.mem.asBytes(&req));
+        const msg = mailbox.MessageType.withPayload(mailbox.MessageType.CART_LOAD, region.id);
+        mailbox.send(msg);
+        // Use cart.short_name which is the actual stored name
+        const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
+        printf("\r\nLoading {s} ({d} bytes)...\r\n", .{ cart.short_name[0..end], cart.size });
+    } else {
+        println("\r\nFailed to allocate shared memory\r\n");
+    }
+}
+
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
         println("\r\nUsage: cart <list|run|stop|info|delete> [name]\r\n");
@@ -1056,7 +1103,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("\r\nCarts:");
         storage.listCarts(struct {
             fn visit(name: []const u8, size: u32) void {
-                printf("  {s: <12} {d} bytes\r\n", .{ name, size });
+                printf("  {s}  ({d} bytes)\r\n", .{ name, size });
             }
         }.visit);
         println("");

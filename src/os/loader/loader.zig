@@ -1,40 +1,40 @@
 /// Program loader, loads user programs from flash to RAM
 const std = @import("std");
 const storage = @import("storage.zig");
-const wasm = @import("wasm.zig");
 
 pub const CartLoadRequest = extern struct {
     start_cluster: u16,
     size: u32,
 };
 
-var runtime: wasm.Runtime = .{};
 var cart_loaded: bool = false;
 
+// Cart buffer placed in dedicated process_ram region (384KB available)
+// Using 320KB for cart data, leaving 64KB for interpreter runtime overhead
+var cart_buffer: [320 * 1024]u8 linksection(".process_ram") = undefined;
+var cart_size: usize = 0;
+
 pub fn loadCart(info: storage.CartInfo) bool {
-    if (info.size == 0 or info.size > wasm.MAX_CART_SIZE) {
+    if (info.size == 0 or info.size > cart_buffer.len) {
         return false;
     }
-    const bytes = storage.readCart(info, wasm.cartBuffer()[0..info.size]);
+    const bytes = storage.readCart(info, cart_buffer[0..info.size]);
     if (bytes != info.size) {
         return false;
     }
-    runtime.stop();
-    if (runtime.load(wasm.cartBuffer()[0..bytes])) {
-        runtime.start();
-        cart_loaded = true;
-        return true;
-    }
-    return false;
+    // TODO: Load cart with new interpreter here
+    cart_size = bytes;
+    cart_loaded = true;
+    return true;
 }
 
 pub fn tick() void {
     if (cart_loaded) {
-        runtime.update();
+        // TODO: Execute cart with new interpreter here
     }
 }
 
 pub fn stop() void {
-    runtime.stop();
+    // TODO: Stop cart execution with new interpreter here
     cart_loaded = false;
 }

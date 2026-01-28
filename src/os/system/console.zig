@@ -1050,18 +1050,27 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 // Static counter for ls command (needed because callbacks can't capture locals)
 var ls_file_count: usize = 0;
+var ls_lcd_y: u16 = 0;
 
 fn lsVisitor(name: []const u8, size: u32) void {
     ls_file_count += 1;
     printf("  {s}  ({d} bytes)\r\n", .{ name, size });
+    lcd.drawString(10, ls_lcd_y, name, lcd.GREEN, lcd.BLACK, 1);
+    ls_lcd_y += 15;
 }
 
 fn cmdLs(_: *std.mem.TokenIterator(u8, .scalar)) void {
     println("\r\n");
     ls_file_count = 0;
+
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(10, 10, "Files:", lcd.WHITE, lcd.BLACK, 1);
+    ls_lcd_y = 30;
+
     storage.listCarts(lsVisitor);
     if (ls_file_count == 0) {
         println("No files exist\r\n");
+        lcd.drawString(10, ls_lcd_y, "no files available", lcd.RED, lcd.BLACK, 1);
     }
     println("");
 }

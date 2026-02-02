@@ -102,6 +102,13 @@ fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
         const sp = candidate[0];
         const entry = candidate[1];
 
+        // Debug: show what we're scanning
+        {
+            var buf: [128]u8 = undefined;
+            const msg = std.fmt.bufPrint(&buf, "Scan 0x{x}: SP=0x{x}, Entry=0x{x}\r\n", .{ addr, sp, entry }) catch "";
+            uart.puts(msg);
+        }
+
         // Check if SP is valid (in RAM range and 8-byte aligned)
         const sp_valid = (sp >= RAM_START) and (sp <= RAM_END) and ((sp & 0x7) == 0);
 

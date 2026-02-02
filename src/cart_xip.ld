@@ -34,8 +34,16 @@ MEMORY
 
 SECTIONS
 {
-    /* Vector table MUST be at the VERY start of flash (offset 0) */
+    /* MicroZig vector table - MUST be at the VERY start of flash (offset 0) */
+    /* MicroZig exports this in "microzig_flash_start" section */
     /* ARM Cortex-M: [0] = initial SP, [1] = Reset_Handler */
+    .microzig_flash_start :
+    {
+        KEEP(*(.microzig_flash_start))
+        KEEP(*(microzig_flash_start))
+    } > FLASH
+
+    /* Legacy vector table sections (for non-MicroZig carts) */
     .isr_vector :
     {
         KEEP(*(.isr_vector))

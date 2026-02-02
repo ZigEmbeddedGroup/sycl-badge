@@ -71,11 +71,18 @@ pub fn build(builder: *Build) void {
     }) orelse return;
     sycl_os.install(builder);
 
-    // Build test XIP cart (runs on Core 1 with cart_runtime)
+    // Build test XIP cart (runs on Core 1 with cart_runtime - no microzig)
     add_xip_cart(builder, &dep, .{
         .name = "test-xip-cart",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/test-xip-cart/src/main.zig"),
+    });
+
+    // Build test MicroZig cart (runs on Core 1 with full MicroZig HAL)
+    add_microzig_cart(builder, &dep, .{
+        .name = "test-microzig-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/test-microzig-cart/src/main.zig"),
     });
 
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -340,6 +347,62 @@ pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOpti
     // Generate UF2 from binary
     const uf2_step = Uf2Step.create(b, bin.getOutput(), options.name, 0x101C0000); // cart_xip base
     b.getInstallStep().dependOn(&uf2_step.step);
+}
+
+/// MicroZig Cart - runs from cart_xip flash region on Core 1
+/// Uses MicroZig's HAL but with automatic init override to prevent Core 0 crash
+pub const MicroZigCartOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+    root_source_file: Build.LazyPath,
+};
+
+/// Add a MicroZig cart that runs from cart_xip flash region on Core 1
+/// Carts built this way:
+/// - Use cart_entry.zig as wrapper (auto-provides init override)
+/// - User's code is injected as "user_main" module
+/// - Full access to MicroZig HAL (GPIO, SPI, I2C, timers, etc.)
+/// - Run on Core 1 while OS runs on Core 0
+pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCartOptions) void {
+    const mz_dep = dep.builder.dependency("microzig", .{});
+    const mb = MicroBuild.init(b, mz_dep) orelse return;
+
+    // Get the badge v2 target (RP2350)
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
+
+    // Create module for user's main.zig with microzig access
+    const user_main_module = b.createModule(.{
+        .root_source_file = options.root_source_file,
+    });
+
+    // Give user_main access to microzig (will be available after firmware is created)
+    // We'll add the import after fw is created since we need the core_mod
+
+    // Create firmware with cart_entry.zig as root (provides init override)
+    // Pass linker_script in add_firmware options (like the OS does)
+    const fw = mb.add_firmware(.{
+        .name = options.name,
+        .target = badge_v2_target,
+        .optimize = options.optimize,
+        .root_source_file = dep.builder.path("src/cart_entry.zig"),
+        .linker_script = .{
+            .file = dep.builder.path("src/cart_xip.ld"),
+            .generate = .none, // Don't generate microzig's default linker script
+        },
+    });
+
+    // Inject user's main.zig as "user_main" module into the app module
+    // (app_mod is cart_entry.zig, which imports user_main)
+    fw.app_mod.addImport("user_main", user_main_module);
+
+    // Give user_main access to microzig so they can use the HAL
+    user_main_module.addImport("microzig", fw.core_mod);
+
+    // Install ELF to firmware directory
+    mb.install_firmware(fw, .{ .format = .elf });
+
+    // Install UF2 for RP2350
+    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 }
 
 /// UF2 generation step

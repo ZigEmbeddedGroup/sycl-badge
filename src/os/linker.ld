@@ -24,17 +24,22 @@ MEMORY
    * 
    * OS Layout:
    * - OS kernel code/data in flash (512KB - 1/4 of 2MB)
-   * - Application storage in romfs (1.5MB - 3/4 of 2MB for programs/data)
+   * - Application storage in romfs (1.25MB for FAT12 filesystem)
+   * - Cart execution region (256KB for XIP cart execution)
    * - Kernel RAM: 128KB for OS kernel data/heap
-   * - Process RAM: 384KB for user applications (multiple programs)
+   * - Process RAM: 384KB for user applications (runtime data)
    * - Scratch RAM: 8KB for stacks and fast buffers
    */
   
   /* OS kernel code and read-only data - 512KB (1/4 of 2MB) */
   flash(rx!w)       : ORIGIN = 0x10000000, LENGTH = 512K
 
-  /* Application storage filesystem - 1.5MB (3/4 of 2MB) for loadable programs */
-  romfs(rx!w)       : ORIGIN = 0x10080000, LENGTH = 1536K
+  /* Application storage filesystem - 1.25MB for FAT12 (stores UF2 files) */
+  romfs(rx!w)       : ORIGIN = 0x10080000, LENGTH = 1280K
+
+  /* Cart execution region - 256KB for XIP execution of loaded carts */
+  /* Carts are copied here from romfs and executed in-place by Core 1 */
+  cart_xip(rx!w)    : ORIGIN = 0x101C0000, LENGTH = 256K
 
   /* OS kernel RAM - 128KB for kernel data structures, heap, etc */
   kernel_ram(rxw)   : ORIGIN = 0x20000000, LENGTH = 128K
@@ -50,6 +55,11 @@ MEMORY
 /* Expose ROMFS region bounds for runtime storage */
 __romfs_region_start__ = ORIGIN(romfs);
 __romfs_region_end__ = ORIGIN(romfs) + LENGTH(romfs);
+
+/* Expose Cart XIP region bounds for cart execution */
+__cart_xip_start__ = ORIGIN(cart_xip);
+__cart_xip_end__ = ORIGIN(cart_xip) + LENGTH(cart_xip);
+__cart_xip_size__ = LENGTH(cart_xip);
 
 /*
 SECTIONS
@@ -102,6 +112,18 @@ SECTIONS
     KEEP(*(.romfs))
     __romfs_end__ = .;
   } > romfs
+
+  /*
+  .cart_xip - Cart execution region for XIP (execute-in-place) execution.
+  Carts are programmed here at runtime and executed directly from flash.
+  This section is managed dynamically - not populated at link time.
+  */
+  .cart_xip (NOLOAD) :
+  {
+    __cart_xip_load_start__ = .;
+    . = ORIGIN(cart_xip) + LENGTH(cart_xip);
+    __cart_xip_load_end__ = .;
+  } > cart_xip
 
   /*
   .ram_vectors - RAM copy of the vector table if the system relocates

@@ -71,6 +71,13 @@ pub fn build(builder: *Build) void {
     }) orelse return;
     sycl_os.install(builder);
 
+    // Build test XIP cart (minimal, for testing cart loading)
+    add_minimal_cart(builder, &dep, .{
+        .name = "test-xip-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/test-xip-cart/src/main.zig"),
+    });
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",
@@ -263,3 +270,232 @@ pub fn install_cart(b: *Build, cart: *Cart) void {
     cart.mz.install_firmware(cart.fw, .{ .format = .elf });
     cart.mz.install_firmware(cart.fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 }
+
+/// XIP Cart - runs from cart_xip flash region on Core 1
+pub const XIPCart = struct {
+    fw: *MicroBuild.Firmware,
+    mb: *MicroBuild,
+
+    pub fn install(c: *const XIPCart, b: *Build) void {
+        _ = b;
+        // Install ELF and UF2 to firmware/ directory
+        c.mb.install_firmware(c.fw, .{ .format = .elf });
+        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+    }
+};
+
+pub const XIPCartOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+    root_source_file: Build.LazyPath,
+};
+
+/// Add an XIP cart that runs from cart_xip flash region
+pub fn add_xip_cart(
+    d: *Build.Dependency,
+    b: *Build,
+    mz_dep: *Build.Dependency,
+    options: XIPCartOptions,
+) ?*XIPCart {
+    const mb = MicroBuild.init(b, mz_dep) orelse return null;
+
+    // Use RP2350 target (Pico 2)
+    const cart_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.derive(.{
+        .board = null, // No board config for carts
+    });
+
+    const fw = mb.add_firmware(.{
+        .name = options.name,
+        .target = cart_target,
+        .optimize = options.optimize,
+        .root_source_file = options.root_source_file,
+        .linker_script = .{
+            // Use cart_xip linker script for 0x101C0000 base address
+            .file = d.builder.path("src/cart_xip.ld"),
+            .generate = .none,
+        },
+    });
+
+    const cart: *XIPCart = b.allocator.create(XIPCart) catch @panic("OOM");
+    cart.* = .{
+        .fw = fw,
+        .mb = mb,
+    };
+
+    return cart;
+}
+
+/// Options for cart builds
+pub const CartOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+    root_source_file: Build.LazyPath,
+};
+
+/// Add a cart that uses the cart runtime (with microzig HAL access)
+/// Carts built this way:
+/// - Use cart_runtime.zig for safe startup (no peripheral reinitialization)
+/// - Can use microzig HAL for GPIO, timers, etc.
+/// - Run on Core 1 while OS runs on Core 0
+pub fn add_cart(b: *Build, dep: *Build.Dependency, mz_dep: *Build.Dependency, options: CartOptions) void {
+    const mb = MicroBuild.init(b, mz_dep) orelse return;
+
+    // Use RP2350 target
+    const cart_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.derive(.{
+        .board = null, // No board config for carts
+    });
+
+    // Create cart_runtime module that imports microzig
+    const cart_runtime_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/cart_runtime.zig"),
+        .imports = &.{
+            .{ .name = "microzig", .module = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.get_configured_microzig_module() },
+        },
+    });
+
+    // Build the cart firmware
+    const fw = mb.add_firmware(.{
+        .name = options.name,
+        .target = cart_target,
+        .optimize = options.optimize,
+        .root_source_file = options.root_source_file,
+        .linker_script = .{
+            .file = dep.builder.path("src/cart_xip.ld"),
+            .generate = .none,
+        },
+        .imports = &.{
+            .{ .name = "cart_runtime", .module = cart_runtime_module },
+        },
+    });
+
+    // Install ELF and UF2
+    mb.install_firmware(fw, .{ .format = .elf });
+    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+}
+
+/// Add a minimal cart without microzig (for advanced use cases)
+/// This builds a cart with direct register access only
+pub fn add_minimal_cart(b: *Build, dep: *Build.Dependency, options: CartOptions) void {
+    // ARM Cortex-M33 target (RP2350)
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .thumb,
+        .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
+        .os_tag = .freestanding,
+        .abi = .eabi,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = options.name,
+        .root_module = b.createModule(.{
+            .root_source_file = options.root_source_file,
+            .target = target,
+            .optimize = options.optimize,
+        }),
+    });
+
+    // Use cart_xip linker script
+    exe.setLinkerScript(dep.builder.path("src/cart_xip.ld"));
+
+    // Install ELF
+    b.installArtifact(exe);
+
+    // Generate binary and UF2
+    const bin = exe.addObjCopy(.{ .format = .bin });
+    const bin_install = b.addInstallBinFile(bin.getOutput(), b.fmt("firmware/{s}.bin", .{options.name}));
+    b.getInstallStep().dependOn(&bin_install.step);
+
+    // Generate UF2 from binary using a custom step
+    const uf2_step = Uf2Step.create(b, bin.getOutput(), options.name, 0x101C0000); // cart_xip base
+    b.getInstallStep().dependOn(&uf2_step.step);
+}
+
+/// UF2 generation step
+const Uf2Step = struct {
+    step: Build.Step,
+    input_bin: Build.LazyPath,
+    name: []const u8,
+    base_address: u32,
+    output_file: Build.GeneratedFile,
+
+    pub fn create(b: *Build, input_bin: Build.LazyPath, name: []const u8, base_address: u32) *Uf2Step {
+        const self = b.allocator.create(Uf2Step) catch @panic("OOM");
+        self.* = .{
+            .step = Build.Step.init(.{
+                .id = .custom,
+                .name = b.fmt("Generate UF2 for {s}", .{name}),
+                .owner = b,
+                .makeFn = make,
+            }),
+            .input_bin = input_bin,
+            .name = name,
+            .base_address = base_address,
+            .output_file = .{ .step = &self.step },
+        };
+        input_bin.addStepDependencies(&self.step);
+
+        // Install the output using lazy path
+        const output_lazy: Build.LazyPath = .{ .generated = .{ .file = &self.output_file } };
+        const install = b.addInstallFile(output_lazy, b.fmt("firmware/{s}.uf2", .{name}));
+        install.step.dependOn(&self.step);
+        b.getInstallStep().dependOn(&install.step);
+
+        return self;
+    }
+
+    fn make(step: *Build.Step, _: Build.Step.MakeOptions) !void {
+        const self: *Uf2Step = @fieldParentPtr("step", step);
+        const b = step.owner;
+
+        const input_path = self.input_bin.getPath2(b, step);
+        const input_data = try std.fs.cwd().readFileAlloc(b.allocator, input_path, 256 * 1024);
+
+        // UF2 constants
+        const MAGIC_START0: u32 = 0x0A324655; // "UF2\n"
+        const MAGIC_START1: u32 = 0x9E5D5157;
+        const MAGIC_END: u32 = 0x0AB16F30;
+        const FLAG_FAMILY_PRESENT: u32 = 0x00002000;
+        const RP2350_FAMILY: u32 = 0xe48bff59; // RP2350 ARM-S
+
+        const payload_size: u32 = 256;
+        const block_count = @as(u32, @intCast((input_data.len + payload_size - 1) / payload_size));
+
+        var uf2_data = std.ArrayListUnmanaged(u8){};
+
+        var block_no: u32 = 0;
+        var offset: u32 = 0;
+        while (offset < input_data.len) : ({
+            block_no += 1;
+            offset += payload_size;
+        }) {
+            const chunk_size = @min(payload_size, @as(u32, @intCast(input_data.len)) - offset);
+
+            // Block header (32 bytes)
+            try uf2_data.writer(b.allocator).writeInt(u32, MAGIC_START0, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, MAGIC_START1, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, FLAG_FAMILY_PRESENT, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, self.base_address + offset, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, chunk_size, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, block_no, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, block_count, .little);
+            try uf2_data.writer(b.allocator).writeInt(u32, RP2350_FAMILY, .little);
+
+            // Payload (476 bytes, padded)
+            try uf2_data.appendSlice(b.allocator, input_data[offset..][0..chunk_size]);
+            try uf2_data.appendNTimes(b.allocator, 0, 476 - chunk_size);
+
+            // Magic end
+            try uf2_data.writer(b.allocator).writeInt(u32, MAGIC_END, .little);
+        }
+
+        // Write output
+        const cache_dir = b.cache_root.handle;
+        try cache_dir.makePath("uf2");
+        const output_path = try std.fmt.allocPrint(b.allocator, "uf2/{s}.uf2", .{self.name});
+        try cache_dir.writeFile(.{ .sub_path = output_path, .data = uf2_data.items });
+
+        self.output_file.path = try std.fmt.allocPrint(b.allocator, "{s}/{s}", .{
+            b.cache_root.path orelse "zig-cache",
+            output_path,
+        });
+    }
+};

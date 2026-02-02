@@ -13,6 +13,7 @@ const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
+const multicore = @import("multicore.zig");
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
 const MAX_ARGS = 8; // Maximum number of command arguments
@@ -95,7 +96,7 @@ fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "info", "delete" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete" };
         return &options;
     }
     return &[_][]const u8{};
@@ -1077,34 +1078,32 @@ fn cmdLs(_: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const name = iter.next() orelse {
-        println("\r\nUsage: load <filename>\r\n");
+        println("\r\nUsage: load <filename.uf2>\r\n");
         return;
     };
 
-    const cart = storage.findCart(name) orelse {
-        printf("\r\nFile not found: {s}\r\n\r\n", .{name});
+    // Load the UF2 cart
+    println("\r\n");
+    const entry_point = loader.loadUF2Cart(name) catch |err| {
+        switch (err) {
+            loader.LoadError.FileNotFound => printf("File not found: {s}\r\n\r\n", .{name}),
+            loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
+            loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
+            loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2350)\r\n"),
+            loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
+            loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
+            loader.LoadError.ReadError => println("Storage read error\r\n"),
+        }
         return;
     };
 
-    if (shared_mem.create(@sizeOf(loader.CartLoadRequest))) |region| {
-        const req: loader.CartLoadRequest = .{
-            .start_cluster = cart.start_cluster,
-            .size = cart.size,
-        };
-        @memcpy(region.mem[0..@sizeOf(loader.CartLoadRequest)], std.mem.asBytes(&req));
-        const msg = mailbox.MessageType.withPayload(mailbox.MessageType.CART_LOAD, region.id);
-        mailbox.send(msg);
-        // Use cart.short_name which is the actual stored name
-        const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
-        printf("\r\nLoading {s} ({d} bytes)...\r\n", .{ cart.short_name[0..end], cart.size });
-    } else {
-        println("\r\nFailed to allocate shared memory\r\n");
-    }
+    printf("Cart loaded at entry point 0x{x}\r\n", .{entry_point});
+    println("Use 'run' to execute, or 'cart run <name>' for one-step load+run\r\n");
 }
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|info|delete> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete> [name]\r\n");
         return;
     };
 
@@ -1121,7 +1120,46 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     if (std.mem.eql(u8, subcmd, "stop")) {
         mailbox.send(mailbox.MessageType.withPayload(mailbox.MessageType.CART_STOP, 0));
+        loader.stop();
         println("\r\nCart stopped\r\n");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "status")) {
+        println("\r\nCart Status:");
+        const state = loader.getState();
+        const state_str = switch (state) {
+            .none => "none",
+            .loading => "loading",
+            .ready => "ready",
+            .running => "running",
+            .error_state => "error",
+        };
+        printf("  State: {s}\r\n", .{state_str});
+        if (state == .ready or state == .running) {
+            printf("  Entry point: 0x{x}\r\n", .{loader.getEntryPoint()});
+        }
+        printf("  Cart XIP region: 0x{x} - 0x{x} ({d}KB)\r\n", .{
+            loader.getCartXipStart(),
+            loader.getCartXipEnd(),
+            loader.getCartXipSize() / 1024,
+        });
+        println("");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "exec")) {
+        // Execute already-loaded cart
+        if (!loader.isReady()) {
+            println("\r\nNo cart loaded. Use 'load <file.uf2>' first.\r\n");
+            return;
+        }
+        const entry = loader.getEntryPoint();
+        if (multicore.executeCart(entry)) {
+            printf("\r\nExecuting cart at 0x{x}...\r\n", .{entry});
+        } else {
+            println("\r\nFailed to execute cart\r\n");
+        }
         return;
     }
 
@@ -1131,22 +1169,33 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     };
 
     if (std.mem.eql(u8, subcmd, "run")) {
-        const cart = storage.findCart(name) orelse {
-            printf("\r\nCart not found: {s}\r\n\r\n", .{name});
+        // Load and execute UF2 cart in one step
+        println("\r\n");
+        uart.puts("[DEBUG] Starting cart load...\r\n");
+        const entry_point = loader.loadUF2Cart(name) catch |err| {
+            switch (err) {
+                loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
+                loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
+                loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
+                loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2350)\r\n"),
+                loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
+                loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
+                loader.LoadError.ReadError => println("Storage read error\r\n"),
+            }
             return;
         };
-        if (shared_mem.create(@sizeOf(loader.CartLoadRequest))) |region| {
-            const req: loader.CartLoadRequest = .{
-                .start_cluster = cart.start_cluster,
-                .size = cart.size,
-            };
-            @memcpy(region.mem[0..@sizeOf(loader.CartLoadRequest)], std.mem.asBytes(&req));
-            const msg = mailbox.MessageType.withPayload(mailbox.MessageType.CART_LOAD, region.id);
-            mailbox.send(msg);
-            println("\r\nCart load requested\r\n");
+
+        uart.puts("[DEBUG] Cart loaded, sending execute message...\r\n");
+
+        // Execute the loaded cart
+        if (multicore.executeCart(entry_point)) {
+            uart.puts("[DEBUG] Execute message sent successfully\r\n");
+            printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {
-            println("\r\nFailed to allocate shared memory\r\n");
+            uart.puts("[DEBUG] Execute message failed\r\n");
+            println("Failed to start cart execution\r\n");
         }
+        uart.puts("[DEBUG] Returning from cart run command\r\n");
         return;
     }
 
@@ -1157,7 +1206,13 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         };
         const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
         const display_name = cart.short_name[0..end];
-        printf("\r\n{s}\r\n  Size: {d} bytes\r\n  Cluster: {d}\r\n\r\n", .{ display_name, cart.size, cart.start_cluster });
+        printf("\r\n{s}\r\n  Size: {d} bytes\r\n  Cluster: {d}\r\n", .{ display_name, cart.size, cart.start_cluster });
+
+        // Check if it's a UF2 file
+        if (cart.size >= 512) {
+            println("  Format: Likely UF2 (check with 'load' command)");
+        }
+        println("\r\n");
         return;
     }
 

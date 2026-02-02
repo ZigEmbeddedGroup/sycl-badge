@@ -65,17 +65,30 @@ pub const MessageType = struct {
     pub const CORE_STOP: Message = 0x00000003;
     pub const CORE_RESET: Message = 0x00000004;
 
-    // Loader messages
+    // Loader messages (legacy)
     pub const LOAD_REQUEST: Message = 0x10000000;
     pub const LOAD_COMPLETE: Message = 0x10000001;
     pub const LOAD_ERROR: Message = 0x10000002;
+
+    // UF2 loader messages
+    pub const UF2_LOAD_START: Message = 0x10000010; // Core 0 starting UF2 load
+    pub const UF2_LOAD_COMPLETE: Message = 0x10000011; // UF2 load complete, ready to execute
+    pub const UF2_LOAD_ERROR: Message = 0x10000012; // UF2 load failed
+
+    // Cart execution messages
+    // CART_EXECUTE: payload contains entry point address (lower 24 bits)
+    // For full 32-bit entry point, use shared memory
+    pub const CART_EXECUTE: u8 = 0x20; // Execute cart at entry point
+    pub const CART_RUNNING: Message = 0x20000001; // Core 1 confirms cart is running
+    pub const CART_FINISHED: Message = 0x20000002; // Cart execution completed
+    pub const CART_CRASHED: Message = 0x20000003; // Cart crashed/faulted
 
     // Cart control message types (use withPayload)
     pub const CART_LOAD: u8 = 0x11;
     pub const CART_STOP: u8 = 0x12;
 
-    // Application messages (user-defined range: 0x20000000 - 0xFFFFFFFF)
-    pub const APP_BASE: Message = 0x20000000;
+    // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
+    pub const APP_BASE: Message = 0x30000000;
 
     /// Create a custom message type with payload
     /// Usage: MessageType.withPayload(0x01, 0x12345678) -> 0x0112345678
@@ -91,5 +104,22 @@ pub const MessageType = struct {
     /// Extract payload from a message
     pub fn getPayload(msg: Message) u24 {
         return @truncate(msg);
+    }
+
+    /// Create a CART_EXECUTE message with entry point offset
+    /// The offset is relative to cart_xip_start (0x101C0000)
+    /// This allows 24-bit payload to address full 256KB cart region
+    pub fn cartExecute(entry_point_offset: u24) Message {
+        return withPayload(CART_EXECUTE, entry_point_offset);
+    }
+
+    /// Check if a message is a CART_EXECUTE message
+    pub fn isCartExecute(msg: Message) bool {
+        return getType(msg) == CART_EXECUTE;
+    }
+
+    /// Get entry point offset from CART_EXECUTE message
+    pub fn getEntryPointOffset(msg: Message) u24 {
+        return getPayload(msg);
     }
 };

@@ -52,8 +52,9 @@ pub fn init() void {
     const msg = std.fmt.bufPrint(&buf, "ROMFS base: 0x{x} size: {d}KB\r\n", .{ base, romfsSize() / 1024 }) catch "";
     uart.puts(msg);
 
-    if (!isFormatted()) {
-        uart.puts("Not Formatted, Formatting now.\r\n");
+    // Check if filesystem size matches expected (reformat if changed)
+    if (!isFormatted() or !isSizeCorrect()) {
+        uart.puts("Formatting filesystem...\r\n");
         formatVolume();
         uart.puts("Format complete\r\n");
     } else {
@@ -139,6 +140,23 @@ fn isFormatted() bool {
         uart.puts(msg2);
     }
     return valid;
+}
+
+/// Check if the stored filesystem size matches current expected size
+fn isSizeCorrect() bool {
+    var boot: [SECTOR_SIZE]u8 = undefined;
+    readSector(0, boot[0..]);
+
+    const stored_total = readU16(boot[0..], 19); // Total sectors (16-bit)
+    const expected_total: u16 = @intCast(volumeTotalSectors());
+
+    if (stored_total != expected_total) {
+        var buf: [96]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, "Size mismatch: stored={d} expected={d} sectors\r\n", .{ stored_total, expected_total }) catch "";
+        uart.puts(msg);
+        return false;
+    }
+    return true;
 }
 
 fn formatVolume() void {

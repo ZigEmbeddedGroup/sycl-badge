@@ -34,19 +34,19 @@ MEMORY
 
 SECTIONS
 {
-    /* Vector table must be at the VERY start of flash (offset 0) */
+    /* Vector table MUST be at the VERY start of flash (offset 0) */
     /* ARM Cortex-M: [0] = initial SP, [1] = Reset_Handler */
-    .vectors :
+    .isr_vector :
     {
-        KEEP(*(.vectors))
-        KEEP(*(.vector_table))
-        KEEP(*(microzig_flash_start))
+        KEEP(*(.isr_vector))
     } > FLASH
 
     /* Code and read-only data */
     .text :
     {
         . = ALIGN(4);
+        KEEP(*(.vectors))
+        KEEP(*(.vector_table))
         *(.text*)
         *(.rodata*)
         . = ALIGN(4);

@@ -77,6 +77,49 @@ pub fn getCartXipSize() u32 {
     return getCartXipEnd() - getCartXipStart();
 }
 
+/// Find a valid ARM Cortex-M vector table by scanning memory
+/// Some toolchains add padding before the vector table, so we scan for the pattern:
+/// - [0] = Stack pointer: Must be in RAM range (0x20000000-0x20080000) and aligned
+/// - [1] = Reset handler: Must be in cart_xip range with thumb bit set (odd address)
+/// Returns the vector table ADDRESS if found, null otherwise
+/// (Core 1 will read SP and entry point from this address)
+fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
+    // RAM range for valid stack pointer
+    const RAM_START: u32 = 0x20000000;
+    const RAM_END: u32 = 0x20080000;
+
+    // Cart XIP range for valid entry point
+    const xip_start = getCartXipStart();
+    const xip_end = getCartXipEnd();
+
+    // Scan in 4-byte increments (word aligned)
+    // Limit scan to first 64 bytes to avoid false positives
+    const scan_limit = @min(start_addr + 64, end_addr - 8);
+
+    var addr = start_addr;
+    while (addr < scan_limit) : (addr += 4) {
+        const candidate: *const [2]u32 = @ptrFromInt(addr);
+        const sp = candidate[0];
+        const entry = candidate[1];
+
+        // Check if SP is valid (in RAM range and 8-byte aligned)
+        const sp_valid = (sp >= RAM_START) and (sp <= RAM_END) and ((sp & 0x7) == 0);
+
+        // Check if entry point is valid (in cart_xip range with thumb bit set)
+        const entry_addr = entry & ~@as(u32, 1); // Remove thumb bit
+        const entry_valid = (entry_addr >= xip_start) and (entry_addr < xip_end) and ((entry & 1) == 1);
+
+        if (sp_valid and entry_valid) {
+            var buf: [128]u8 = undefined;
+            const msg = std.fmt.bufPrint(&buf, "Found vector table at 0x{x}: SP=0x{x}, Entry=0x{x}\r\n", .{ addr, sp, entry }) catch "";
+            uart.puts(msg);
+            return addr; // Return vector table address, not entry point
+        }
+    }
+
+    return null;
+}
+
 /// Get current cart state
 pub fn getState() CartState {
     return cart_state;
@@ -307,26 +350,21 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         uart.puts(msg);
     }
 
-    // Extract entry point from vector table
-    // ARM Cortex-M vector table: offset 0 = initial SP, offset 4 = Reset_Handler
-    const vector_table_addr = cart_xip_start + min_offset;
-    const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
-
-    {
-        var buf: [128]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "Vector table at 0x{x}: SP=0x{x}, Entry=0x{x}\r\n", .{ vector_table_addr, vector_table[0], vector_table[1] }) catch "";
-        uart.puts(msg);
-    }
-
-    const entry_point = vector_table[1];
+    // Find the vector table by scanning for valid SP and entry point pattern
+    // Some toolchains add padding before the vector table
+    // Returns the vector table ADDRESS (not entry point) so Core 1 can read both SP and entry
+    const vector_table_addr = findVectorTableAddr(cart_xip_start + min_offset, cart_xip_end) orelse {
+        uart.puts("Could not find valid vector table\r\n");
+        return LoadError.InvalidUF2;
+    };
 
     {
         var buf: [64]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "Entry point: 0x{x}\r\n", .{entry_point}) catch "";
+        const msg = std.fmt.bufPrint(&buf, "Vector table addr: 0x{x}\r\n", .{vector_table_addr}) catch "";
         uart.puts(msg);
     }
 
-    return entry_point;
+    return vector_table_addr;
 }
 
 /// Erase the entire cart_xip flash region

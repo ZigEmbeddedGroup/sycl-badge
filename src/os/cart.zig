@@ -112,10 +112,11 @@ fn handleMessage(msg: mailbox.Message) void {
 }
 
 /// Execute a cart loaded in cart_xip region
-/// entry_offset: Offset from cart_xip_start to the entry point
-fn executeCart(entry_offset: u24) void {
+/// vector_table_offset: Offset from cart_xip_start to the vector table
+/// (The loader scans for a valid vector table pattern and returns its address)
+fn executeCart(vector_table_offset: u24) void {
     const cart_xip_start = getCartXipStart();
-    const entry_point = cart_xip_start + entry_offset;
+    const vector_table_addr = cart_xip_start + vector_table_offset;
 
     // Signal that we're starting execution
     mailbox.send(mailbox.MessageType.CART_RUNNING);
@@ -123,10 +124,11 @@ fn executeCart(entry_offset: u24) void {
     // Mark cart as running in loader state
     loader.markRunning();
 
-    // Read initial stack pointer from vector table at cart_xip_start
+    // Read initial SP and entry point from the vector table
     // ARM Cortex-M vector table: [0] = initial SP, [1] = Reset_Handler
-    const vector_table: *const [2]u32 = @ptrFromInt(cart_xip_start);
+    const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
     const initial_sp = vector_table[0];
+    const entry_point = vector_table[1];
 
     // Jump to cart entry point
     // This is a one-way jump - the cart takes over Core 1

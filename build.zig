@@ -71,8 +71,8 @@ pub fn build(builder: *Build) void {
     }) orelse return;
     sycl_os.install(builder);
 
-    // Build test XIP cart (minimal, for testing cart loading)
-    add_minimal_cart(builder, &dep, .{
+    // Build test XIP cart (runs on Core 1 with cart_runtime)
+    add_xip_cart(builder, &dep, .{
         .name = "test-xip-cart",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/test-xip-cart/src/main.zig"),
@@ -272,111 +272,21 @@ pub fn install_cart(b: *Build, cart: *Cart) void {
 }
 
 /// XIP Cart - runs from cart_xip flash region on Core 1
-pub const XIPCart = struct {
-    fw: *MicroBuild.Firmware,
-    mb: *MicroBuild,
-
-    pub fn install(c: *const XIPCart, b: *Build) void {
-        _ = b;
-        // Install ELF and UF2 to firmware/ directory
-        c.mb.install_firmware(c.fw, .{ .format = .elf });
-        c.mb.install_firmware(c.fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
-    }
-};
-
-pub const XIPCartOptions = struct {
+/// Options for XIP cart builds (carts that run on Core 1)
+pub const XIPCartBuildOptions = struct {
     name: []const u8,
     optimize: std.builtin.OptimizeMode,
     root_source_file: Build.LazyPath,
 };
 
-/// Add an XIP cart that runs from cart_xip flash region
-pub fn add_xip_cart(
-    d: *Build.Dependency,
-    b: *Build,
-    mz_dep: *Build.Dependency,
-    options: XIPCartOptions,
-) ?*XIPCart {
-    const mb = MicroBuild.init(b, mz_dep) orelse return null;
-
-    // Use RP2350 target (Pico 2)
-    const cart_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.derive(.{
-        .board = null, // No board config for carts
-    });
-
-    const fw = mb.add_firmware(.{
-        .name = options.name,
-        .target = cart_target,
-        .optimize = options.optimize,
-        .root_source_file = options.root_source_file,
-        .linker_script = .{
-            // Use cart_xip linker script for 0x101C0000 base address
-            .file = d.builder.path("src/cart_xip.ld"),
-            .generate = .none,
-        },
-    });
-
-    const cart: *XIPCart = b.allocator.create(XIPCart) catch @panic("OOM");
-    cart.* = .{
-        .fw = fw,
-        .mb = mb,
-    };
-
-    return cart;
-}
-
-/// Options for cart builds
-pub const CartOptions = struct {
-    name: []const u8,
-    optimize: std.builtin.OptimizeMode,
-    root_source_file: Build.LazyPath,
-};
-
-/// Add a cart that uses the cart runtime (with microzig HAL access)
+/// Add an XIP cart that runs from cart_xip flash region on Core 1
 /// Carts built this way:
 /// - Use cart_runtime.zig for safe startup (no peripheral reinitialization)
-/// - Can use microzig HAL for GPIO, timers, etc.
+/// - Can use cart_hal.zig for GPIO, timers, etc. (works on all RP2350 family)
 /// - Run on Core 1 while OS runs on Core 0
-pub fn add_cart(b: *Build, dep: *Build.Dependency, mz_dep: *Build.Dependency, options: CartOptions) void {
-    const mb = MicroBuild.init(b, mz_dep) orelse return;
-
-    // Use RP2350 target
-    const cart_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.derive(.{
-        .board = null, // No board config for carts
-    });
-
-    // Create cart_runtime module that imports microzig
-    const cart_runtime_module = b.createModule(.{
-        .root_source_file = dep.builder.path("src/cart_runtime.zig"),
-        .imports = &.{
-            .{ .name = "microzig", .module = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.get_configured_microzig_module() },
-        },
-    });
-
-    // Build the cart firmware
-    const fw = mb.add_firmware(.{
-        .name = options.name,
-        .target = cart_target,
-        .optimize = options.optimize,
-        .root_source_file = options.root_source_file,
-        .linker_script = .{
-            .file = dep.builder.path("src/cart_xip.ld"),
-            .generate = .none,
-        },
-        .imports = &.{
-            .{ .name = "cart_runtime", .module = cart_runtime_module },
-        },
-    });
-
-    // Install ELF and UF2
-    mb.install_firmware(fw, .{ .format = .elf });
-    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
-}
-
-/// Add a minimal cart without microzig (for advanced use cases)
-/// This builds a cart with direct register access only
-pub fn add_minimal_cart(b: *Build, dep: *Build.Dependency, options: CartOptions) void {
-    // ARM Cortex-M33 target (RP2350)
+/// - Do NOT use microzig's startup code (which would crash Core 0)
+pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOptions) void {
+    // ARM Cortex-M33 target (RP2350 family - works on RP2350A, RP2354B, etc.)
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .thumb,
         .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
@@ -384,27 +294,50 @@ pub fn add_minimal_cart(b: *Build, dep: *Build.Dependency, options: CartOptions)
         .abi = .eabi,
     });
 
+    // Create cart_hal module (standalone HAL for RP2350 family)
+    const cart_hal_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/cart_hal.zig"),
+        .target = target,
+    });
+
+    // Create cart_runtime module that imports cart_hal
+    const cart_runtime_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/cart_runtime.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "cart_hal.zig", .module = cart_hal_module },
+        },
+    });
+
+    // Build the cart executable
     const exe = b.addExecutable(.{
         .name = options.name,
         .root_module = b.createModule(.{
             .root_source_file = options.root_source_file,
             .target = target,
             .optimize = options.optimize,
+            .imports = &.{
+                .{ .name = "cart_runtime", .module = cart_runtime_module },
+                .{ .name = "cart_hal", .module = cart_hal_module },
+            },
         }),
     });
 
-    // Use cart_xip linker script
+    // Use cart_xip linker script (places code at 0x101C0000)
     exe.setLinkerScript(dep.builder.path("src/cart_xip.ld"));
 
-    // Install ELF
-    b.installArtifact(exe);
+    // Install ELF to firmware directory
+    const install_elf = b.addInstallArtifact(exe, .{
+        .dest_dir = .{ .override = .{ .custom = "firmware" } },
+    });
+    b.getInstallStep().dependOn(&install_elf.step);
 
-    // Generate binary and UF2
+    // Generate binary
     const bin = exe.addObjCopy(.{ .format = .bin });
     const bin_install = b.addInstallBinFile(bin.getOutput(), b.fmt("firmware/{s}.bin", .{options.name}));
     b.getInstallStep().dependOn(&bin_install.step);
 
-    // Generate UF2 from binary using a custom step
+    // Generate UF2 from binary
     const uf2_step = Uf2Step.create(b, bin.getOutput(), options.name, 0x101C0000); // cart_xip base
     b.getInstallStep().dependOn(&uf2_step.step);
 }

@@ -1171,7 +1171,6 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     if (std.mem.eql(u8, subcmd, "run")) {
         // Load and execute UF2 cart in one step
         println("\r\n");
-        uart.puts("[DEBUG] Starting cart load...\r\n");
         const entry_point = loader.loadUF2Cart(name) catch |err| {
             switch (err) {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
@@ -1185,17 +1184,12 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             return;
         };
 
-        uart.puts("[DEBUG] Cart loaded, sending execute message...\r\n");
-
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
-            uart.puts("[DEBUG] Execute message sent successfully\r\n");
             printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {
-            uart.puts("[DEBUG] Execute message failed\r\n");
             println("Failed to start cart execution\r\n");
         }
-        uart.puts("[DEBUG] Returning from cart run command\r\n");
         return;
     }
 

@@ -1,4 +1,4 @@
-﻿/// SYCL Badge OS Kernel
+/// SYCL Badge OS Kernel
 /// USB CDC and UART communication with interactive console
 const std = @import("std");
 const microzig = @import("microzig");
@@ -26,10 +26,6 @@ pub fn main() !void {
     lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
     lcd.drawString(10, 40, "VIKES is the best", lcd.GREEN, lcd.BLACK, 1);
     lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
-
-    // var old: u64 = timer.micros();
-
-    uart.println("Entering main loop");
 
     // Main loop
     while (true) {

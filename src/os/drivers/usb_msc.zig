@@ -37,12 +37,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         block_offset: usize = 0,
         current_lba: u32 = 0,
         remaining_blocks: u32 = 0,
-        logged_capacity: bool = false,
-        logged_read: bool = false,
-        logged_write: bool = false,
-        logged_unknown: bool = false,
-        logged_csw_err: bool = false,
-        logged_cbw_count: u8 = 0,
         data_residue: u32 = 0,
 
         const State = enum {
@@ -112,10 +106,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                 }
             }
 
-            var ep_log_buf: [64]u8 = undefined;
-            const ep_log = std.fmt.bufPrint(&ep_log_buf, "MSC endpoints: IN=0x{x:0>2} OUT=0x{x:0>2}\r\n", .{ self.ep_in, self.ep_out }) catch "";
-            uart.puts(ep_log);
-
             self.prepare_out();
             return cfg.len - curr_cfg.len;
         }
@@ -158,11 +148,9 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     if (self.cbw_len >= self.cbw_buf.len) {
                         const signature = read_u32_le(self.cbw_buf[0..], 0);
                         if (signature != CBW_SIGNATURE) {
-                            if (self.logged_cbw_count < 32) {
-                                var buf: [64]u8 = undefined;
-                                const text = std.fmt.bufPrint(&buf, "MSC invalid CBW signature: 0x{x}\r\n", .{signature}) catch "";
-                                uart.puts(text);
-                            }
+                            var buf: [64]u8 = undefined;
+                            const text = std.fmt.bufPrint(&buf, "MSC invalid CBW signature: 0x{x}\r\n", .{signature}) catch "";
+                            uart.puts(text);
                             self.resetState();
                             self.need_arm_out = true; // Defer arming to avoid re-entrancy
                             return;
@@ -214,7 +202,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                         }
                     }
                     if (self.remaining_blocks == 0) {
-                        uart.puts("Write complete\r\n");
                         self.send_csw(0);
                     } else {
                         // More data needed, defer arming OUT endpoint
@@ -280,9 +267,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     self.prepare_read_capacity_16();
                 },
                 SCSI_SYNCHRONIZE_CACHE => {
-                    uart.puts("SYNC_CACHE: Flushing pending writes to flash\r\n");
                     storage.flushPendingWrites();
-                    uart.puts("SYNC_CACHE: Flush complete\r\n");
                     self.data_residue = 0;
                     self.send_csw(0);
                 },
@@ -304,13 +289,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     self.start_write10();
                 },
                 else => {
-                    var buf2: [96]u8 = undefined;
-                    const msg = std.fmt.bufPrint(
-                        &buf2,
-                        "MSC UNKNOWN opcode=0x{x:0>2} xfer={d}\r\n",
-                        .{ self.cbw_cmd[0], self.cbw_transfer_len },
-                    ) catch "";
-                    uart.puts(msg);
                     self.set_sense(0x05, 0x20, 0x00); // Illegal request/Invalid Command
                     self.data_residue = 0;
                     self.send_csw(1);
@@ -364,13 +342,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         fn prepare_read_format_capacities(self: *Self) void {
             const total = storage.totalSectors();
             var resp: [12]u8 = [_]u8{0} ** 12;
-            // Log once for debugging
-            if (!self.logged_capacity) {
-                self.logged_capacity = true;
-                var buf: [96]u8 = undefined;
-                const text = std.fmt.bufPrint(&buf, "MSC sectors: {d} size: {d}\r\n", .{ total, storage.SECTOR_SIZE }) catch "";
-                uart.puts(text);
-            }
             // Capacity list length = 8
             resp[3] = 8;
             // Number of blocks (total sectors)
@@ -428,13 +399,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                 return;
             }
 
-            if (!self.logged_read or self.logged_cbw_count < 32) {
-                self.logged_read = true;
-                var buf: [96]u8 = undefined;
-                const text = std.fmt.bufPrint(&buf, "MSC READ10 LBA={d} COUNT={d}\r\n", .{ self.current_lba, self.remaining_blocks }) catch "";
-                uart.puts(text);
-            }
-
             // Handle 0-block reads as successful no-op
             if (self.remaining_blocks == 0) {
                 self.data_residue = 0;
@@ -458,14 +422,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                 self.set_sense(0x05, 0x21, 0x00); // ILLEGAL_REQUEST: LBA out of range
                 self.send_csw(1);
                 return;
-            }
-
-            // Log write operation
-            if (!self.logged_write or self.logged_cbw_count < 32) {
-                self.logged_write = true;
-                var buf: [96]u8 = undefined;
-                const text = std.fmt.bufPrint(&buf, "MSC WRITE10 LBA={d} COUNT={d}\r\n", .{ self.current_lba, self.remaining_blocks }) catch "";
-                uart.puts(text);
             }
 
             // Handle 0-block writes as successful no-op

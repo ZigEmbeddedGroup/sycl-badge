@@ -45,24 +45,10 @@ var pending_dirty: bool = false;
 var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
 
 pub fn init() void {
-    uart.puts("\r\nStorage Init\r\n");
-
-    var buf: [96]u8 = undefined;
-    const base = romfsBase();
-    const msg = std.fmt.bufPrint(&buf, "ROMFS base: 0x{x} size: {d}KB\r\n", .{ base, romfsSize() / 1024 }) catch "";
-    uart.puts(msg);
-
     // Check if filesystem size matches expected (reformat if changed)
     if (!isFormatted() or !isSizeCorrect()) {
-        uart.puts("Formatting filesystem...\r\n");
         formatVolume();
-        uart.puts("Format complete\r\n");
-    } else {
-        uart.puts("Already formatted, preserving existing data\r\n");
     }
-
-    debugDump();
-    uart.puts("Storage Init Complete\r\n");
 }
 
 fn romfsBase() u32 {
@@ -113,18 +99,6 @@ fn isFormatted() bool {
     const bytes_per_sector = readU16(boot[0..], BS_BYTES_PER_SECTOR);
     const root_entries = readU16(boot[0..], 17);
     const fs_type = boot[BS_FS_TYPE .. BS_FS_TYPE + 8];
-
-    // Debug: Show what we found
-    var buf: [128]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "Check format: sig=0x{x:0>4} bps={d} root={d} fstype=", .{ signature, bytes_per_sector, root_entries }) catch "";
-    uart.puts(msg);
-    for (fs_type) |c| {
-        var cbuf: [2]u8 = undefined;
-        cbuf[0] = if (c >= 32 and c < 127) c else '.';
-        cbuf[1] = 0;
-        uart.puts(cbuf[0..1]);
-    }
-    uart.puts("\r\n");
 
     // Check all BPB fields match expected values
     if (signature != 0xAA55 or bytes_per_sector != SECTOR_SIZE or root_entries != ROOT_ENTRIES or !std.mem.eql(u8, fs_type, "FAT12   ")) {
@@ -230,58 +204,6 @@ fn formatVolume() void {
     flushPendingWrites();
 }
 
-fn debugDump() void {
-    var sector: [SECTOR_SIZE]u8 = undefined;
-    readSector(0, sector[0..]);
-    const bytes_per_sector = readU16(sector[0..], BS_BYTES_PER_SECTOR);
-    const sectors_per_cluster = sector[13];
-    const reserved = readU16(sector[0..], 14);
-    const fats = sector[16];
-    const root_entries = readU16(sector[0..], 17);
-    const total16 = readU16(sector[0..], 19);
-    const media = sector[21];
-    const fat_secs = readU16(sector[0..], 22);
-    const fs_type = sector[BS_FS_TYPE .. BS_FS_TYPE + 8];
-
-    var buf: [160]u8 = undefined;
-    uart.puts("FAT boot sector:\r\n");
-    const line = std.fmt.bufPrint(
-        &buf,
-        "  BPS={d} SPC={d} RSV={d} FATS={d} ROOT={d} TOT16={d} FATSEC={d} MEDIA=0x{x}\r\n",
-        .{ bytes_per_sector, sectors_per_cluster, reserved, fats, root_entries, total16, fat_secs, media },
-    ) catch "";
-    uart.puts(line);
-    uart.puts("  FS TYPE: ");
-    uart.puts(fs_type);
-    uart.puts("\r\n");
-
-    uart.puts("  BOOT HEX: ");
-    dumpHex(sector[0..64]);
-    uart.puts("\r\n");
-
-    // Dump FAT0 (first sector) and ROOT (first sector) for debugging.
-    readSector(1, sector[0..]);
-    uart.puts("  FAT0 HEX: ");
-    dumpHex(sector[0..64]);
-    uart.puts("\r\n");
-
-    const root_lba = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
-    readSector(root_lba, sector[0..]);
-    uart.puts("  ROOT0 HEX: ");
-    dumpHex(sector[0..64]);
-    uart.puts("\r\n");
-}
-
-fn dumpHex(bytes: []const u8) void {
-    var buf: [3]u8 = undefined;
-    for (bytes) |b| {
-        _ = std.fmt.bufPrint(&buf, "{x:0>2} ", .{b}) catch {
-            return;
-        };
-        uart.puts(buf[0..3]);
-    }
-}
-
 pub fn readSector(lba: u32, dst: []u8) void {
     if (lba >= totalSectors()) {
         @memset(dst[0..SECTOR_SIZE], 0);
@@ -316,16 +238,10 @@ pub fn writeSector(lba: u32, src: []const u8) linksection(".ram_text") void {
     const block_addr = addr & ~@as(u32, FLASH_ERASE_BLOCK - 1);
     const block_offset = addr - block_addr;
 
-    // Log every write with first 4 bytes to verify data
-    var buf: [96]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "WRITE LBA={d} data[0..4]={x:0>2}{x:0>2}{x:0>2}{x:0>2}\r\n", .{ lba, src[0], src[1], src[2], src[3] }) catch "";
-    uart.puts(msg);
-
     // For now, we can only buffer one 4KB block, so if switching blocks,
     // we must flush the old block first.
     if (!pending_valid or pending_block_addr != block_addr) {
         if (pending_valid and pending_dirty and pending_block_addr != block_addr) {
-            uart.puts("Switching blocks, flushing old\r\n");
             flushPending();
         }
         const block_ptr: [*]const u8 = @ptrFromInt(block_addr);
@@ -336,7 +252,6 @@ pub fn writeSector(lba: u32, src: []const u8) linksection(".ram_text") void {
 
     @memcpy(pending_buf[block_offset .. block_offset + SECTOR_SIZE], src[0..SECTOR_SIZE]);
     pending_dirty = true;
-    uart.puts("Marked dirty=true\r\n");
 }
 
 pub fn flushPendingWrites() linksection(".ram_text") void {

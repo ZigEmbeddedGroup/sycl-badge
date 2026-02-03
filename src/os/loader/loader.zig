@@ -110,9 +110,6 @@ fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
         const entry_valid = (entry_addr >= xip_start) and (entry_addr < xip_end) and ((entry & 1) == 1);
 
         if (sp_valid and entry_valid) {
-            var buf: [128]u8 = undefined;
-            const msg = std.fmt.bufPrint(&buf, "Found vector table at 0x{x}: SP=0x{x}, Entry=0x{x}\r\n", .{ addr, sp, entry }) catch "";
-            uart.puts(msg);
             return addr; // Return vector table address, not entry point
         }
     }
@@ -209,23 +206,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         return LoadError.ReadError;
     }
 
-    {
-        var buf: [64]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "Read {d} bytes\r\n", .{bytes_read}) catch "";
-        uart.puts(msg);
-    }
-
-    // Debug: Print first 8 bytes
-    uart.puts("UF2 header: ");
-    {
-        var hex_buf: [64]u8 = undefined;
-        const hex_msg = std.fmt.bufPrint(&hex_buf, "{x:0>2}{x:0>2}{x:0>2}{x:0>2} {x:0>2}{x:0>2}{x:0>2}{x:0>2}\r\n", .{
-            cart_buffer[0], cart_buffer[1], cart_buffer[2], cart_buffer[3],
-            cart_buffer[4], cart_buffer[5], cart_buffer[6], cart_buffer[7],
-        }) catch "";
-        uart.puts(hex_msg);
-    }
-
     // Calculate number of UF2 blocks
     const num_blocks = bytes_read / uf2.BLOCK_SIZE;
     if (num_blocks == 0) {
@@ -279,13 +259,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
                 uart.puts(msg);
                 return LoadError.AddressMismatch;
             }
-        }
-
-        // Debug: Show block info
-        {
-            var buf: [128]u8 = undefined;
-            const msg = std.fmt.bufPrint(&buf, "Block {d}: target_addr=0x{x}, payload_size={d}\r\n", .{ block_index, block.header.target_addr, block.header.payload_size }) catch "";
-            uart.puts(msg);
         }
 
         // Calculate offset within cart_xip
@@ -343,13 +316,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
 
     uart.puts("Flash programming complete\r\n");
 
-    // Debug: Show what we wrote and where
-    {
-        var buf: [128]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "min_offset: 0x{x}, max_offset: 0x{x}\r\n", .{ min_offset, max_offset }) catch "";
-        uart.puts(msg);
-    }
-
     // Find the vector table by scanning for valid SP and entry point pattern
     // Some toolchains add padding before the vector table
     // Returns the vector table ADDRESS (not entry point) so Core 1 can read both SP and entry
@@ -357,12 +323,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         uart.puts("Could not find valid vector table\r\n");
         return LoadError.InvalidUF2;
     };
-
-    {
-        var buf: [64]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "Vector table addr: 0x{x}\r\n", .{vector_table_addr}) catch "";
-        uart.puts(msg);
-    }
 
     return vector_table_addr;
 }

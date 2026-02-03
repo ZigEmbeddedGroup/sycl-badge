@@ -14,7 +14,7 @@ const init = @import("system/init.zig");
 pub const panic = @import("system/panic.zig").panic;
 
 pub fn main() !void {
-    // Initialize all drivers and kernel systems (including LCD)
+    // Initialize all drivers and kernel systems
     try init.init(.{
         .lcd_pins = lcd.createDT018BTFTPins(),
         .lcd_config = lcd.createDT018BTFTConfig(),
@@ -24,26 +24,26 @@ pub fn main() !void {
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);
     lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(10, 40, "VIKES is the best", lcd.GREEN, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "Team VIKES!", lcd.GREEN, lcd.BLACK, 1);
     lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
 
     // Main loop
     while (true) {
-        // CRITICAL: Poll USB frequently
+        // Poll USB frequently
         // Avoid spamming UART; keep USB polling tight for CDC/MSC.
         usb.poll();
 
-        // Process console input (handles echo, line buffering, commands)
+        // Process console input
         console.processInput();
     }
 }
 
-// TODO: DONE
+// DONE
 // Accumulate characters into a buffer until Enter is pressed
 // Handle backspace to delete characters
 // Process the complete line as a command
 
-// TODO: DONE
+// DONE
 // registry of commands:
 //       - list of commands
 //       - help - list of available cmds
@@ -54,7 +54,7 @@ pub fn main() !void {
 //       - gpio - gpio manipulations
 //       - reboot - reboot the system?? - not so necessary rn
 
-// TODO: DONE
+// DONE
 // build cmd parser
 // - Function to split input line into command + arguments
 // - Command lookup table/registry
@@ -65,7 +65,7 @@ pub fn main() !void {
 // Call the appropriate handler function
 // Send response back to USB
 
-// TODO: DONE
+// DONE
 // - Move USB polling into a proper input handler
 // - Call command processor when a line is complete
 // - Send command output back through USB
@@ -88,4 +88,4 @@ pub fn main() !void {
 // [x] 9. "led off" turns LED off
 // [x] 10. "uptime" shows seconds since boot
 // [x] 11. Backspace deletes characters correctly
-// [ ] 12. UART shows same output as USB (parallel debug)
+// [X] 12. UART shows same output as USB (parallel debug)

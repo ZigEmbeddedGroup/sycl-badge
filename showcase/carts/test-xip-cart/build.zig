@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .linker_script = .{
             // Use the cart_xip linker script from the main project
-            .file = b.path("../../../src/cart_xip.ld"),
+            .file = b.path("../../../src/cart/cart_xip.ld"),
             .generate = .none,
         },
     });

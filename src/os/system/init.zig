@@ -87,7 +87,7 @@ pub fn init(config: InitConfig) !void {
     uart.println("USB initialized");
 
     // 6. Wait for USB enumeration
-    timer.sleep_ms(500);
+    timer.sleep_ms(500); // TODO: reduce this as much as possible
 
     // 7. Initialize shared memory (for IPC)
     shared_mem.init();
@@ -113,7 +113,7 @@ pub fn init(config: InitConfig) !void {
         }
     }
 
-    // 11. Optional: Initialize Core 1 if chosen (this is for the user program loader)
+    // 11. Initialize Core 1 if chosen (should always be chosen in practice)
     if (config.init_core1) {
         if (config.core1_entrypoint) |entrypoint| {
             multicore.initCore1WithEntrypoint(entrypoint);

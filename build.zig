@@ -247,7 +247,7 @@ pub fn add_cart(
         .use_lld = true,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
-    cart_lib.linker_script = d.builder.path("src/cart.ld");
+    cart_lib.linker_script = d.builder.path("src/cart/cart.ld");
 
     const fw = mb.add_firmware(.{
         .name = options.name,
@@ -255,7 +255,7 @@ pub fn add_cart(
         .optimize = options.optimize,
         .root_source_file = d.builder.path("src/badge.zig"),
         .linker_script = .{
-            .file = d.builder.path("src/cart.ld"),
+            .file = d.builder.path("src/cart/cart.ld"),
         },
     });
     fw.artifact.linkLibrary(cart_lib);
@@ -303,13 +303,13 @@ pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOpti
 
     // Create cart_hal module (standalone HAL for RP2350 family)
     const cart_hal_module = b.createModule(.{
-        .root_source_file = dep.builder.path("src/cart_hal.zig"),
+        .root_source_file = dep.builder.path("src/cart/cart_hal.zig"),
         .target = target,
     });
 
     // Create cart_runtime module that imports cart_hal
     const cart_runtime_module = b.createModule(.{
-        .root_source_file = dep.builder.path("src/cart_runtime.zig"),
+        .root_source_file = dep.builder.path("src/cart/cart_runtime.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "cart_hal.zig", .module = cart_hal_module },
@@ -331,7 +331,7 @@ pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOpti
     });
 
     // Use cart_xip linker script (places code at 0x101C0000)
-    exe.setLinkerScript(dep.builder.path("src/cart_xip.ld"));
+    exe.setLinkerScript(dep.builder.path("src/cart/cart_xip.ld"));
 
     // Install ELF to firmware directory
     const install_elf = b.addInstallArtifact(exe, .{
@@ -384,9 +384,9 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
         .name = options.name,
         .target = badge_v2_target,
         .optimize = options.optimize,
-        .root_source_file = dep.builder.path("src/cart_entry.zig"),
+        .root_source_file = dep.builder.path("src/cart/cart_entry.zig"),
         .linker_script = .{
-            .file = dep.builder.path("src/cart_xip.ld"),
+            .file = dep.builder.path("src/cart/cart_xip.ld"),
             .generate = .none, // Don't generate microzig's default linker script
         },
     });

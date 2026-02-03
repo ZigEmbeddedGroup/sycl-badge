@@ -16,7 +16,7 @@ pub fn build(builder: *Build) void {
 
     _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/cart/api.zig") });
 
-    // Badge V2 (RP2350) target setup
+    // Badge V2 (RP2354B) target setup
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, builder);
 
     var dep: std.Build.Dependency = .{ .builder = builder };
@@ -27,7 +27,7 @@ pub fn build(builder: *Build) void {
     }) orelse return;
     feature_test_cart.install(builder);
 
-    // Badge V2 (RP2350) demo builds (only blinky works for now)
+    // Badge V2 (RP2354B) demo builds (only blinky works for now)
     inline for (.{
         "blinky",
         //"blinky_timer",
@@ -289,11 +289,11 @@ pub const XIPCartBuildOptions = struct {
 /// Add an XIP cart that runs from cart_xip flash region on Core 1
 /// Carts built this way:
 /// - Use cart_runtime.zig for safe startup (no peripheral reinitialization)
-/// - Can use cart_hal.zig for GPIO, timers, etc. (works on all RP2350 family)
+/// - Can use cart_hal.zig for GPIO, timers, etc. (works on all RP235X family)
 /// - Run on Core 1 while OS runs on Core 0
 /// - Do NOT use microzig's startup code (which would crash Core 0)
 pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOptions) void {
-    // ARM Cortex-M33 target (RP2350 family - works on RP2350A, RP2354B, etc.)
+    // ARM Cortex-M33 target (RP235X, same as RP2354B)
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .thumb,
         .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m33 },
@@ -301,7 +301,7 @@ pub fn add_xip_cart(b: *Build, dep: *Build.Dependency, options: XIPCartBuildOpti
         .abi = .eabi,
     });
 
-    // Create cart_hal module (standalone HAL for RP2350 family)
+    // Create cart_hal module (standalone HAL for RP235X family)
     const cart_hal_module = b.createModule(.{
         .root_source_file = dep.builder.path("src/cart/cart_hal.zig"),
         .target = target,
@@ -401,7 +401,7 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
     // Install ELF to firmware directory
     mb.install_firmware(fw, .{ .format = .elf });
 
-    // Install UF2 for RP2350
+    // Install UF2 for RP235X
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 }
 

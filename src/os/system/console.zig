@@ -1176,7 +1176,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
                 loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
                 loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
-                loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2350)\r\n"),
+                loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2354B)\r\n"),
                 loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
                 loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
                 loader.LoadError.ReadError => println("Storage read error\r\n"),

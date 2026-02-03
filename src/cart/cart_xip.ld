@@ -69,7 +69,7 @@ SECTIONS
         __exidx_end = .;
     } > FLASH
 
-    /* Initialized data - stored in flash, copied to RAM at startup */
+    /* Initialized data: stored in flash, copied to RAM at startup */
     .data :
     {
         . = ALIGN(4);

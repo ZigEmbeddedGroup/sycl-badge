@@ -122,15 +122,42 @@ pub fn isCore1Initialized() bool {
 }
 
 /// Halt Core 1 (stops execution)
+/// Uses processor reset to forcefully stop Core 1
+/// This works even if Core 1 is stuck or running a cart
 pub fn haltCore1() void {
     if (!core1_running) {
         return;
     }
 
-    // Send stop message
-    mailbox.send(mailbox.MessageType.CORE_STOP);
-    timer.sleep_ms(5);
+    // Use PPB (Private Peripheral Bus) to reset Core 1
+    // On RP2350, we can use the CPUID and reset mechanism
+
+    // First, drain the FIFO to prevent any stale messages
+    mailbox.clear();
+    fifo.drain();
+
+    // Reset Core 1 by writing to PSM FRCE_OFF then releasing
+    // This forcefully powers down Core 1
+    PSM.FRCE_OFF.modify(.{ .PROC1 = 1 });
+
+    // Brief delay for reset to take effect (no waiting on DONE which may hang)
+    var i: u32 = 0;
+    while (i < 1000) : (i += 1) {
+        microzig.cpu.nop();
+    }
+
+    // Release the force-off
+    PSM.FRCE_OFF.modify(.{ .PROC1 = 0 });
+
+    // Wait for PSM to settle
+    timer.sleep_ms(1);
+
+    // Drain FIFO again after reset
+    fifo.drain();
+    mailbox.clear();
+
     core1_running = false;
+    core1_initialized = false;
 }
 
 /// Reset Core 1 (restarts it)

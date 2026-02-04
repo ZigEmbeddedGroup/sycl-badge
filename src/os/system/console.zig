@@ -114,7 +114,6 @@ const commands = [_]Command{
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "ls", .description = "List files in SYCL cart directory", .handler = cmdLs },
     .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
@@ -1060,22 +1059,6 @@ fn lsVisitor(name: []const u8, size: u32) void {
     ls_lcd_y += 15;
 }
 
-fn cmdLs(_: *std.mem.TokenIterator(u8, .scalar)) void {
-    println("\r\n");
-    ls_file_count = 0;
-
-    lcd.fillScreen(lcd.BLACK);
-    lcd.drawString(10, 10, "Files:", lcd.WHITE, lcd.BLACK, 1);
-    ls_lcd_y = 30;
-
-    storage.listCarts(lsVisitor);
-    if (ls_file_count == 0) {
-        println("No files exist\r\n");
-        lcd.drawString(10, ls_lcd_y, "no files available", lcd.RED, lcd.BLACK, 1);
-    }
-    println("");
-}
-
 fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const name = iter.next() orelse {
         println("\r\nUsage: load <filename.uf2>\r\n");
@@ -1119,8 +1102,15 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
 
     if (std.mem.eql(u8, subcmd, "stop")) {
-        mailbox.send(mailbox.MessageType.withPayload(mailbox.MessageType.CART_STOP, 0));
+        // Use multicore to forcefully halt Core 1 (uses PSM hardware reset)
+        // This is necessary because the cart has taken over Core 1 and is no longer
+        // processing mailbox messages
+        multicore.haltCore1();
         loader.stop();
+
+        // Reset Core 1 so it's ready for the next cart
+        multicore.resetCore1();
+
         println("\r\nCart stopped\r\n");
         return;
     }
@@ -1169,6 +1159,15 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     };
 
     if (std.mem.eql(u8, subcmd, "run")) {
+        // Stop any currently running cart first
+        // This is necessary because Core 1 won't process new CART_EXECUTE messages
+        // while it's already running a cart (it jumped to the cart's code)
+        if (loader.getState() == .running or loader.getState() == .ready) {
+            multicore.haltCore1();
+            loader.stop();
+            multicore.resetCore1();
+        }
+
         // Load and execute UF2 cart in one step
         println("\r\n");
         uart.puts("[DEBUG] Starting cart load...\r\n");
@@ -1189,6 +1188,9 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
+            // Mark as running from Core 0 side as well
+            // (Core 1 also calls markRunning but this ensures state is set immediately)
+            loader.markRunning();
             uart.puts("[DEBUG] Execute message sent successfully\r\n");
             printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {

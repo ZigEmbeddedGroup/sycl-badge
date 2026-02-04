@@ -14,7 +14,7 @@ pub fn build(builder: *Build) void {
     const mz_dep = builder.dependency("microzig", .{});
     const mb = MicroBuild.init(builder, mz_dep) orelse return;
 
-    _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/cart/api.zig") });
+    _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/badge-v1/cart/api.zig") });
 
     // Badge V2 (RP2354B) target setup
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, builder);
@@ -23,7 +23,7 @@ pub fn build(builder: *Build) void {
     const feature_test_cart = add_cart(&dep, builder, .{
         .name = "feature_test",
         .optimize = optimize,
-        .root_source_file = builder.path("src/badge/feature_test.zig"),
+        .root_source_file = builder.path("src/badge-v1/badge/feature_test.zig"),
     }) orelse return;
     feature_test_cart.install(builder);
 
@@ -45,7 +45,7 @@ pub fn build(builder: *Build) void {
         const exe = mb.add_firmware(.{
             .name = std.fmt.comptimePrint("badge.v2.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
             .target = badge_v2_target,
         });
         mb.install_firmware(exe, .{ .format = .elf });
@@ -59,7 +59,7 @@ pub fn build(builder: *Build) void {
         const cart = add_cart(&dep, builder, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge/demos/{s}.zig", .{name})),
+            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
         }) orelse return;
         cart.install(builder);
     }
@@ -126,14 +126,14 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
         .preferred_binary_format = .elf,
         .board = .{
             .name = "SYCL Badge V2",
-            .root_source_file = mb.builder.path("src/board.zig"),
+            .root_source_file = mb.builder.path("src/badge-v1/board.zig"),
         },
         .linker_script = .{
-            .file = mb.builder.path("src/badge/samd51j19a_self.ld"),
+            .file = mb.builder.path("src/badge-v1/badge/samd51j19a_self.ld"),
             .generate = .none,
         },
         .hal = .{
-            .root_source_file = mb.builder.path("src/hal.zig"),
+            .root_source_file = mb.builder.path("src/badge-v1/hal.zig"),
         },
     });
 }
@@ -247,15 +247,15 @@ pub fn add_cart(
         .use_lld = true,
     });
     cart_lib.root_module.addImport("cart-api", d.module("cart-api"));
-    cart_lib.linker_script = d.builder.path("src/cart/cart.ld");
+    cart_lib.linker_script = d.builder.path("src/badge-v1/cart.ld");
 
     const fw = mb.add_firmware(.{
         .name = options.name,
         .target = sycl_badge_target,
         .optimize = options.optimize,
-        .root_source_file = d.builder.path("src/badge.zig"),
+        .root_source_file = d.builder.path("src/badge-v1/badge.zig"),
         .linker_script = .{
-            .file = d.builder.path("src/cart/cart.ld"),
+            .file = d.builder.path("src/badge-v1/cart.ld"),
         },
     });
     fw.artifact.linkLibrary(cart_lib);

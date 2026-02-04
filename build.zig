@@ -85,6 +85,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-microzig-cart/src/main.zig"),
     });
 
+    // Build test letters cart (cycles through alphabet on LCD)
+    add_microzig_cart(builder, &dep, .{
+        .name = "test-letters-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
+    });
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",

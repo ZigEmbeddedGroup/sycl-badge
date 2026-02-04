@@ -15,7 +15,7 @@ extern const __cart_xip_end__: u8;
 /// XIP base address for flash
 const XIP_BASE: u32 = 0x10000000;
 
-/// Flash erase block size (4KB for RP2350)
+/// Flash erase block size (4KB for RP2354B)
 const FLASH_ERASE_BLOCK: usize = 4096;
 const FLASH_ERASE_CMD: u8 = 0x20;
 
@@ -245,7 +245,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         // On first block, validate family and base address
         if (block_index == 0) {
             // Check family ID
-            if (block.hasFamilyId() and !block.isRP2350()) {
+            if (block.hasFamilyId() and !block.isRP235X()) {
                 uart.puts("Unsupported family ID\r\n");
                 return LoadError.UnsupportedFamily;
             }

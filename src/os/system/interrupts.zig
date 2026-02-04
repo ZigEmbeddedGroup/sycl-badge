@@ -7,7 +7,6 @@ const hal = microzig.hal;
 pub const IRQ = hal.irq.IRQ; // HAL provides IRQ enum
 
 // Handler storage for custom interrupt handlers
-// RP2350 has 52 peripheral interrupts
 // Use dynamic count based on IRQ enum if possible
 const IRQ_COUNT = if (@typeInfo(IRQ) == .Enum) @typeInfo(IRQ).Enum.fields.len else 52;
 var handlers: [IRQ_COUNT]?*const fn () void = [_]?*const fn () void{null} ** IRQ_COUNT;

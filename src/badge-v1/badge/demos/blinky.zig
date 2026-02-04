@@ -1,6 +1,6 @@
 const microzig = @import("microzig");
 
-// this file has been updated for Raspberry Pi Pico 2 (RP2350)
+// this file has been updated for SYCL Badge V2 (RP2354B)
 const gpio = microzig.hal.gpio;
 const time = microzig.hal.time;
 

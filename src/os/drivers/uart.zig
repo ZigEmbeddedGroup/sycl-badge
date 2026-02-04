@@ -1,4 +1,4 @@
-/// UART driver for RP2350
+/// UART driver for RP2354B
 /// Thin wrapper around the rp2xxx HAL uart module for having clean kernel
 const std = @import("std");
 const microzig = @import("microzig");

@@ -146,7 +146,7 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
 }
 
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Target {
-    // Use the Raspberry Pi Pico 2 board as base, then customize with our board config
+    // We use the Raspberry Pi Pico 2 board as base, then customize with our board config
     const base_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm;
 
     return base_target.derive(.{
@@ -374,7 +374,7 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
     const mz_dep = dep.builder.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    // Get the badge v2 target (RP2350)
+    // Get the badge v2 target (RP2354B)
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
 
     // Create module for user's main.zig with microzig access
@@ -457,7 +457,7 @@ const Uf2Step = struct {
         const MAGIC_START1: u32 = 0x9E5D5157;
         const MAGIC_END: u32 = 0x0AB16F30;
         const FLAG_FAMILY_PRESENT: u32 = 0x00002000;
-        const RP2350_FAMILY: u32 = 0xe48bff59; // RP2350 ARM-S
+        const RP2350_FAMILY: u32 = 0xe48bff59; // RP2354B is the same as RP2350 ARM-S
 
         const payload_size: u32 = 256;
         const block_count = @as(u32, @intCast((input_data.len + payload_size - 1) / payload_size));

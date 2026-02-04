@@ -1,7 +1,7 @@
 /// Cart HAL - Hardware Abstraction Layer for RP2350 Family
 ///
 /// Provides direct register access for carts running on Core 1.
-/// Works on all RP2350 family chips (RP2350A, RP2354B, etc.)
+/// Works on all RP2350 family chips (RP2354B, etc.)
 /// without depending on microzig's build system.
 ///
 /// Register addresses are identical across the RP2350 family.

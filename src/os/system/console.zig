@@ -14,6 +14,7 @@ const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
 const multicore = @import("multicore.zig");
+
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
 const MAX_ARGS = 8; // Maximum number of command arguments
@@ -31,7 +32,7 @@ var history: [MAX_HISTORY][MAX_LINE_LENGTH]u8 = undefined;
 var history_lengths: [MAX_HISTORY]usize = [_]usize{0} ** MAX_HISTORY;
 var history_count: usize = 0; // Total commands stored
 var history_index: usize = 0; // Current position in history (for up/down)
-var in_history_mode: bool = false; // Are we browsing history?
+var in_history_mode: bool = false; // Sets if we are browsing history
 
 // Escape Sequence State Machine
 const EscapeState = enum {
@@ -48,7 +49,7 @@ var escape_length: usize = 0;
 var completion_original_input: [MAX_LINE_LENGTH]u8 = undefined; // Original input before completion
 var completion_original_length: usize = 0; // Length of original input
 var completion_index: usize = 0; // Current completion index
-var in_completion_mode: bool = false; // Are we cycling through completions?
+var in_completion_mode: bool = false; // Sets if we are cycling through completions
 
 // Command Handler Type
 // CommandFn - function pointer type that takes a token iterator
@@ -156,12 +157,10 @@ pub fn init() void {
     history_index = 0;
     in_history_mode = false;
     escape_state = .normal;
-    println("");
     println("========================================");
-    println("  SYCL Badge OS v0.1.0");
-    println("  RP2350 Console");
+    println("SYCL Badge OS v1.0");
     println("========================================");
-    println("Type 'help' for available commands");
+    println("Type 'help' for list of available commands");
     showPrompt();
 }
 
@@ -551,9 +550,9 @@ fn commandLineCompletion() void {
         }
     }
 
-    // If we've cycled past the end, wrap around
+    // If cycled past the end, wrap around
     if (match_count == 0) {
-        // No matches at all - beep and reset
+        // No matches at all, beep and reset
         print("\x07");
         in_completion_mode = false;
         return;
@@ -962,7 +961,6 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     timer.sleep_ms(50);
 
     // Trigger system reset via SCB (System Control Block)
-    // RP2350 uses Cortex-M33, same reset mechanism as other ARM Cortex-M
     const SCB_BASE = 0xE000ED00;
     const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 
@@ -1072,7 +1070,7 @@ fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             loader.LoadError.FileNotFound => printf("File not found: {s}\r\n\r\n", .{name}),
             loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
             loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
-            loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2350)\r\n"),
+            loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2354B)\r\n"),
             loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
             loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
             loader.LoadError.ReadError => println("Storage read error\r\n"),
@@ -1188,7 +1186,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
-            // Mark as running from Core 0 side as well
+            // Mark as running from Core 0 side
             // (Core 1 also calls markRunning but this ensures state is set immediately)
             loader.markRunning();
             uart.puts("[DEBUG] Execute message sent successfully\r\n");
@@ -1217,7 +1215,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         printf("\r\n{s}\r\n  Size: {d} bytes\r\n  Cluster: {d}\r\n", .{ display_name, cart.size, cart.start_cluster });
 
-        // Check if it's a UF2 file
+        // Check if the cart is a UF2 file
         if (cart.size >= 512) {
             println("  Format: Likely UF2 (check with 'load' command)");
         }
@@ -1238,13 +1236,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 //TODO:
-// - done -- up direction key (recall last command)
-// - done -- left direction key
-// - done -- right direction key
-// - done -- down direction key (future command history navigation)
 // - left direction key + ctrl to move cursor word by word
-// - done -- right direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
-// - done -- delete key
 // - get reboot command working properly
-// - command to print text to LCD screen
+// - command to print text to LCD screen (probably not necessary other than debugging)

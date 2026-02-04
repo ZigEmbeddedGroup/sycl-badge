@@ -1,4 +1,4 @@
-//! Raspberry Pi Pico 2 Board Configuration (RP2350)
+//! SYCL Badge V2 Board Configuration (RP2354B)
 //!
 //! LCD Pin Assignments for DT018BTFT-SHB:
 //! - GP17: TFT_CS (Chip Select)
@@ -14,7 +14,7 @@ const gpio = hal.gpio;
 // Export font for use by drivers
 pub const font = @import("font.zig");
 
-// Crystal oscillator frequency (12 MHz for Pico 2)
+// Crystal oscillator frequency (12 MHz for SYCL Badge V2)
 pub const xosc_freq = 12_000_000;
 
 // ========================================

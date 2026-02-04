@@ -130,8 +130,6 @@ pub fn haltCore1() void {
     }
 
     // Use PPB (Private Peripheral Bus) to reset Core 1
-    // On RP2350, we can use the CPUID and reset mechanism
-
     // First, drain the FIFO to prevent any stale messages
     mailbox.clear();
     fifo.drain();

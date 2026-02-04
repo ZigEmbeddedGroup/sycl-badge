@@ -70,7 +70,7 @@ code and runtime (e.g. __data_start__, __bss_start__, __end__, stack limits).
 SECTIONS
 {
   /*
-  .flash_start - microzig places the vector table here.
+  .flash_start, microzig places the vector table here.
   Must be at the very start of flash (0x10000000) for ARM Cortex-M.
   microzig also places the bootmeta (IMAGE_DEF) in this section.
   */
@@ -79,7 +79,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(microzig_flash_start))
     KEEP(*(.vectors .vectors.*))
-    /* RP2350 IMAGE_DEF block - bootmeta must follow vector table */
+    /* RP2354B IMAGE_DEF block, bootmeta must follow vector table */
     . = ALIGN(4);
     __bootmeta_start__ = .;
     KEEP(*(.bootmeta))

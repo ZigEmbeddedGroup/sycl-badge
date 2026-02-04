@@ -38,54 +38,8 @@ pub fn main() !void {
     }
 }
 
-// DONE
-// Accumulate characters into a buffer until Enter is pressed
-// Handle backspace to delete characters
-// Process the complete line as a command
-
-// DONE
-// registry of commands:
-//       - list of commands
-//       - help - list of available cmds
-//       - uptime - time since boot
-//       - mem - show memory usage
-//       - ps - list of processes/tasks
-//       - led - control led
-//       - gpio - gpio manipulations
-//       - reboot - reboot the system?? - not so necessary rn
-
-// DONE
-// build cmd parser
-// - Function to split input line into command + arguments
-// - Command lookup table/registry
-// - Command handler functions
-// - Output formatting back to USB/UART
-// Parse "led on" into command="led", arg="on"
-// Look up command in a table
-// Call the appropriate handler function
-// Send response back to USB
-
-// DONE
-// - Move USB polling into a proper input handler
-// - Call command processor when a line is complete
-// - Send command output back through USB
-// - Keep the timing loop for periodic tasks
-
 // TODO: add error handling (here or in usb)
 // - Check USB init errors
 // - Handle buffer overflow in line input
 // - Validate command arguments
 // - Send error messages back to user
-
-// [x] 1. Build system compiles OS kernel to .uf2
-// [x] 2. Flash to RP2350 chip and it boots (LED blinks)
-// [x] 3. USB CDC device appears on PC
-// [x] 4. Can open serial port in PuTTY
-// [x] 5. Typing shows characters echoed back
-// [x] 6. Pressing Enter triggers command processing
-// [x] 7. "help" command shows available commands
-// [x] 8. "led on" turns LED on
-// [x] 9. "led off" turns LED off
-// [x] 10. "uptime" shows seconds since boot
-// [x] 11. Backspace deletes characters correctly
-// [X] 12. UART shows same output as USB (parallel debug)

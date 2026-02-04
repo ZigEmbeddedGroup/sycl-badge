@@ -1,4 +1,4 @@
-/// ROM driver for RP2350
+/// ROM driver for RP2354B
 /// Provides access to bootrom functions and system reset capabilities
 const std = @import("std");
 const microzig = @import("microzig");

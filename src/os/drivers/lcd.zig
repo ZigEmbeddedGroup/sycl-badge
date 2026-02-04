@@ -151,7 +151,7 @@ fn writeU16(value: u16) void {
 
 /// Initialization
 pub const Config = struct {
-    spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2350)
+    spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2354B)
     spi_baudrate: u32 = 62_500_000, // 62.5 MHz
 };
 

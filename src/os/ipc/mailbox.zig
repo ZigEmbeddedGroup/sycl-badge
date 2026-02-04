@@ -1,4 +1,4 @@
-/// Inter-core mailbox using RP2350 hardware FIFO
+/// Inter-core mailbox using RP2354B hardware FIFO
 /// Wraps MicroZig hal.multicore.fifo
 const std = @import("std");
 const microzig = @import("microzig");

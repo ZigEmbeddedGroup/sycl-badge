@@ -11,6 +11,7 @@ pub const MAGIC_START0: u32 = 0x0A324655; // "UF2\n"
 pub const MAGIC_START1: u32 = 0x9E5D5157;
 pub const MAGIC_END: u32 = 0x0AB16F30;
 
+/// RP2354B shares the same family ID as RP2350 ARM-S in MicroZig so we use it
 /// RP2350 ARM-S family ID
 pub const FAMILY_RP2350_ARM_S: u32 = 0xE48BFF59;
 /// RP2350 ARM-NS (non-secure) family ID
@@ -66,13 +67,8 @@ pub const Block = extern struct {
         return self.header.file_size_or_family;
     }
 
-    /// Check if this is for RP2350 ARM-S
-    pub fn isRP2350ArmS(self: *const Block) bool {
-        return self.hasFamilyId() and self.getFamilyId() == FAMILY_RP2350_ARM_S;
-    }
-
-    /// Check if this is for any RP2350 variant
-    pub fn isRP2350(self: *const Block) bool {
+    /// Check if this is for any RP235X variant
+    pub fn isRP235X(self: *const Block) bool {
         if (!self.hasFamilyId()) return false;
         const fam = self.getFamilyId();
         return fam == FAMILY_RP2350_ARM_S or
@@ -216,11 +212,11 @@ pub fn getInfoFromFirstBlock(data: *align(1) const [BLOCK_SIZE]u8) Error!UF2Info
     };
 }
 
-/// Validate that a UF2 is compatible with RP2350 cart execution
+/// Validate that a UF2 is compatible with RP2354B cart execution
 pub fn validateForCartExecution(block: *const Block, cart_xip_start: u32, cart_xip_end: u32) Error!void {
     // Check family ID
     if (block.hasFamilyId()) {
-        if (!block.isRP2350()) {
+        if (!block.isRP235X()) {
             return Error.UnsupportedFamily;
         }
     }

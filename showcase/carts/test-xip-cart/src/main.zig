@@ -2,7 +2,7 @@
 /// A simple test cart that demonstrates using the cart runtime
 /// This cart turns on the LED solidly to show it's running on Core 1
 ///
-/// Works on all RP2350 family boards (Pico 2, custom RP2354B boards, etc.)
+/// Works on all RP2354B family boards (Pico 2, custom SYCL-badge, etc.)
 const std = @import("std");
 const cart = @import("cart_runtime");
 
@@ -40,7 +40,7 @@ fn _start() callconv(.c) noreturn {
 // Board Configuration - Change these for your hardware
 // ============================================================================
 
-/// LED pin - GPIO 25 on Pico 2, change for custom boards
+/// LED pin - GPIO 25 on Pico 2 dev board, TODO change for SYCL Badge V2
 pub const LED_PIN: u5 = 25;
 
 // ============================================================================

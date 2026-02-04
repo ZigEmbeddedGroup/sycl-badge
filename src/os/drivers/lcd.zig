@@ -188,13 +188,13 @@ pub fn init(pin_config: Pins, config: Config) !void {
     };
     try spi_instance.apply(spi_config);
 
-    // Hardware reset sequence (matches Python code)
+    // Hardware reset sequence
     pins.rst.put(1);
     timer.sleep_ms(5);
     pins.rst.put(0);
     timer.sleep_ms(20);
     pins.rst.put(1);
-    timer.sleep_ms(150);
+    timer.sleep_ms(50);
 
     // Initialize display
     initDisplay();
@@ -203,23 +203,23 @@ pub fn init(pin_config: Pins, config: Config) !void {
 fn initDisplay() void {
     // Software reset
     writeCommand(.SWRESET);
-    timer.sleep_ms(150);
+    timer.sleep_ms(50);
 
     // Sleep out
     writeCommand(.SLPOUT);
-    timer.sleep_ms(120);
+    timer.sleep_ms(50);
 
     // Frame rate control (normal mode (ST7735S values))
     writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(10);
+    timer.sleep_ms(1);
 
     // Frame rate control (idle mode)
     writeCommandWithData(.FRMCTR2, &.{ 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(10);
+    timer.sleep_ms(1);
 
     // Frame rate control (partial mode)
     writeCommandWithData(.FRMCTR3, &.{ 0x05, 0x3C, 0x3C, 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(10);
+    timer.sleep_ms(1);
 
     // Display inversion control
     writeCommandWithData(.INVCTR, &.{0x03});
@@ -259,11 +259,11 @@ fn initDisplay() void {
 
     // Normal display mode
     writeCommand(.NORON);
-    timer.sleep_ms(10);
+    timer.sleep_ms(1);
 
     // Display on
     writeCommand(.DISPON);
-    timer.sleep_ms(120);
+    timer.sleep_ms(20);
 }
 
 /// Display Control

@@ -55,6 +55,8 @@ pub const InitConfig = struct {
 /// This function should be called once at kernel startup
 /// Returns error if USB or LCD initialization fails
 pub fn init(config: InitConfig) !void {
+    const boot_start = timer.micros();
+
     // Disable interrupts early to avoid unhandled IRQ panics during init.
     interrupts.disableInterrupts();
     // Copy RAM-resident flash helpers before any flash writes.
@@ -83,11 +85,17 @@ pub fn init(config: InitConfig) !void {
     }
 
     // 5. Initialize USB
+    const usb_start = timer.micros();
     try usb.init();
     uart.println("USB initialized");
 
     // 6. Wait for USB enumeration
-    timer.sleep_ms(500); // TODO: reduce this as much as possible
+    const usb_enum_timeout_ms: u32 = 100;
+    const start_time = timer.millis();
+    while (timer.millis() - start_time < usb_enum_timeout_ms) {
+        usb.poll();
+    }
+    const usb_time = timer.micros() - usb_start;
 
     // 7. Initialize shared memory (for IPC)
     shared_mem.init();
@@ -102,12 +110,18 @@ pub fn init(config: InitConfig) !void {
     // 10. Initialize LCD if configured
     if (config.lcd_pins) |lcd_pins| {
         if (config.lcd_config) |lcd_cfg| {
+            const lcd_start = timer.micros();
             // Initialize LCD with all pins (handles SPI and TE pin configuration)
             lcd.initWithAllPins(lcd_pins, lcd_cfg) catch |err| {
                 uart.println("LCD initialization failed");
                 return err;
             };
-            uart.println("LCD initialized");
+            const lcd_time = timer.micros() - lcd_start;
+            {
+                var buf: [64]u8 = undefined;
+                const text = std.fmt.bufPrint(&buf, "LCD initialized ({d}ms)\r\n", .{lcd_time / 1000}) catch "";
+                uart.puts(text);
+            }
         } else {
             uart.println("LCD pins provided but no config - skipping LCD init");
         }
@@ -115,13 +129,24 @@ pub fn init(config: InitConfig) !void {
 
     // 11. Initialize Core 1 if chosen (should always be chosen in practice)
     if (config.init_core1) {
+        const core1_start = timer.micros();
         if (config.core1_entrypoint) |entrypoint| {
             multicore.initCore1WithEntrypoint(entrypoint);
         } else {
             multicore.initCore1();
         }
-        uart.println("Core 1 initialized");
+        const core1_time = timer.micros() - core1_start;
+        {
+            var buf: [64]u8 = undefined;
+            const text = std.fmt.bufPrint(&buf, "Core 1 initialized ({d}ms)\r\n", .{core1_time / 1000}) catch "";
+            uart.puts(text);
+        }
     }
 
-    uart.println("System initialization complete");
+    const boot_time = timer.micros() - boot_start;
+    {
+        var buf: [96]u8 = undefined;
+        const text = std.fmt.bufPrint(&buf, "System initialization complete (total: {d}ms, USB: {d}ms)\r\n", .{ boot_time / 1000, usb_time / 1000 }) catch "";
+        uart.puts(text);
+    }
 }

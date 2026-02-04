@@ -90,7 +90,7 @@ pub fn launch_core1_with_stack(entrypoint: *const fn () void, stack: []u32) void
 /// Wait for Core 1 to signal it's ready
 /// Core 1 should send MessageType.CORE_READY when initialized
 fn waitForCore1Ready() void {
-    const timeout_us: u64 = 1_000_000; // 1 second timeout
+    const timeout_us: u64 = 100_000;
     const start = timer.micros();
 
     while (true) {
@@ -129,19 +129,14 @@ pub fn haltCore1() void {
 
     // Send stop message
     mailbox.send(mailbox.MessageType.CORE_STOP);
-
-    // Wait a bit for core to stop
-    timer.sleep_ms(10);
-
+    timer.sleep_ms(5);
     core1_running = false;
 }
 
 /// Reset Core 1 (restarts it)
 pub fn resetCore1() void {
     haltCore1();
-    timer.sleep_ms(10);
-
-    // Re-launch with cart entrypoint
+    timer.sleep_ms(5);
     launch_core1(cart.main);
     waitForCore1Ready();
     mailbox.send(mailbox.MessageType.CORE_START);

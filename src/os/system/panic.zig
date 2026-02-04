@@ -15,9 +15,9 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     led.set_function(.sio);
     led.set_direction(.out);
 
-    // Blink fast for 5 seconds to indicate panic
+    // Blink fast briefly to indicate panic
     var i: usize = 0;
-    while (i < 50) : (i += 1) {
+    while (i < 15) : (i += 1) {
         uart.println("PANIC!");
         if (message.len > 0) {
             uart.println(message);
@@ -38,6 +38,10 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
 
     // Loop forever if reset fails
     while (true) {
+        led.put(1);
+        timer.sleep_ms(50);
+        led.put(0);
+        timer.sleep_ms(50);
         microzig.cpu.wfi();
     }
 }

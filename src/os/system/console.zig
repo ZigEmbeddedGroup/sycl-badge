@@ -960,7 +960,7 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("\r\nRebooting system...\r\n");
 
     // Small delay to allow message to be sent
-    timer.sleep_ms(100);
+    timer.sleep_ms(50);
 
     // Trigger system reset via SCB (System Control Block)
     // RP2350 uses Cortex-M33, same reset mechanism as other ARM Cortex-M
@@ -991,7 +991,7 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("\r\nRebooting to BootSelect...\r\n");
 
     // Small delay to allow message to be sent
-    timer.sleep_ms(100);
+    timer.sleep_ms(50);
 
     // Use ROM function to reset to USB bootloader
     rom.reset_to_usb_boot();
@@ -1171,6 +1171,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     if (std.mem.eql(u8, subcmd, "run")) {
         // Load and execute UF2 cart in one step
         println("\r\n");
+        uart.puts("[DEBUG] Starting cart load...\r\n");
         const entry_point = loader.loadUF2Cart(name) catch |err| {
             switch (err) {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
@@ -1184,12 +1185,17 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             return;
         };
 
+        uart.puts("[DEBUG] Cart loaded, sending execute message...\r\n");
+
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
+            uart.puts("[DEBUG] Execute message sent successfully\r\n");
             printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {
+            uart.puts("[DEBUG] Execute message failed\r\n");
             println("Failed to start cart execution\r\n");
         }
+        uart.puts("[DEBUG] Returning from cart run command\r\n");
         return;
     }
 

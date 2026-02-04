@@ -1198,8 +1198,15 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             printf("\r\nCart not found: {s}\r\n\r\n", .{name});
             return;
         };
-        const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
-        const display_name = cart.short_name[0..end];
+
+        // Disp long name if avail
+        const display_name = if (cart.long_name_len > 0)
+            cart.long_name[0..cart.long_name_len]
+        else blk: {
+            const end = std.mem.indexOfScalar(u8, cart.short_name[0..], 0) orelse cart.short_name.len;
+            break :blk cart.short_name[0..end];
+        };
+
         printf("\r\n{s}\r\n  Size: {d} bytes\r\n  Cluster: {d}\r\n", .{ display_name, cart.size, cart.start_cluster });
 
         // Check if it's a UF2 file

@@ -180,6 +180,8 @@ fn handleCartLoad(payload: u24) void {
         .start_cluster = req.start_cluster,
         .size = req.size,
         .short_name = [_]u8{0} ** 12,
+        .long_name = undefined,
+        .long_name_len = 0,
     };
     if (loader.loadCart(info)) {
         mailbox.send(mailbox.MessageType.LOAD_COMPLETE);

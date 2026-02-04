@@ -24,7 +24,9 @@ const MEDIA_DESCRIPTOR: u8 = 0xF8;
 pub const CartInfo = struct {
     start_cluster: u16,
     size: u32,
-    short_name: [12]u8, // "NAME.EXT" + NUL
+    short_name: [12]u8, // "NAME.EXT" + NUL (fallback)
+    long_name: [256]u8, // Long file name buffer
+    long_name_len: usize, // Act len of long name
 };
 
 const BS_BYTES_PER_SECTOR: usize = 11;
@@ -280,17 +282,26 @@ fn flushPending() linksection(".ram_text") void {
 
 pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
     var sector_buf: [SECTOR_SIZE]u8 = undefined;
+    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
     var remaining: u16 = root_secs;
     var name_buf: [12]u8 = undefined;
+    var lfn_buf: [256]u8 = undefined;
+    var has_prev_sector = false;
 
     while (remaining > 0) : ({
         lba += 1;
         remaining -= 1;
     }) {
+        // Copy current sector to prev before reading new one
+        if (has_prev_sector) {
+            @memcpy(&prev_sector_buf, &sector_buf);
+        }
         readSector(lba, sector_buf[0..]);
+        has_prev_sector = true;
+
         var i: usize = 0;
         while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
             const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
@@ -300,9 +311,16 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
             if (attr == 0x0F) continue; // LFN
             if (attr & 0x08 != 0) continue; // volume label
             if (attr & 0x10 != 0) continue; // directory
-            const short = formatShortName(entry, &name_buf);
+
+            // Read LFN entries
+            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+            const display_name = if (lfn_len > 0)
+                lfn_buf[0..lfn_len]
+            else
+                formatShortName(entry, &name_buf);
+
             const size = readU32(entry, DIR_FILE_SIZE);
-            callback(short, size);
+            callback(display_name, size);
         }
     }
 }
@@ -311,17 +329,25 @@ pub fn findCart(name: []const u8) ?CartInfo {
     var target: [12]u8 = undefined;
     const target_len = normalizeName(name, &target);
     var sector_buf: [SECTOR_SIZE]u8 = undefined;
+    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
     var remaining: u16 = root_secs;
     var name_buf: [12]u8 = undefined;
+    var lfn_buf: [256]u8 = undefined;
+    var has_prev_sector = false;
 
     while (remaining > 0) : ({
         lba += 1;
         remaining -= 1;
     }) {
+        if (has_prev_sector) {
+            @memcpy(&prev_sector_buf, &sector_buf);
+        }
         readSector(lba, sector_buf[0..]);
+        has_prev_sector = true;
+
         var i: usize = 0;
         while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
             const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
@@ -331,13 +357,40 @@ pub fn findCart(name: []const u8) ?CartInfo {
             if (attr == 0x0F) continue;
             if (attr & 0x08 != 0) continue;
             if (attr & 0x10 != 0) continue;
-            const short = formatShortName(entry, &name_buf);
-            if (std.mem.eql(u8, short, target[0..target_len])) {
-                return .{
+
+            // Try to read LFN (may span sectors)
+            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+
+            // Check if name matches LFN (not case-sensitive)
+            var matches = false;
+            if (lfn_len > 0 and lfn_len == name.len) {
+                matches = true;
+                for (name, 0..) |c, idx| {
+                    if (std.ascii.toLower(c) != std.ascii.toLower(lfn_buf[idx])) {
+                        matches = false;
+                        break;
+                    }
+                }
+            }
+
+            // If no LFN match, try SFN
+            if (!matches) {
+                const short = formatShortName(entry, &name_buf);
+                matches = std.mem.eql(u8, short, target[0..target_len]);
+            }
+
+            if (matches) {
+                var result: CartInfo = .{
                     .start_cluster = readU16(entry, DIR_FIRST_CLUSTER),
                     .size = readU32(entry, DIR_FILE_SIZE),
                     .short_name = name_buf,
+                    .long_name = undefined,
+                    .long_name_len = lfn_len,
                 };
+                if (lfn_len > 0) {
+                    @memcpy(result.long_name[0..lfn_len], lfn_buf[0..lfn_len]);
+                }
+                return result;
             }
         }
     }
@@ -353,6 +406,7 @@ pub fn deleteCart(name: []const u8) bool {
     var lba: u32 = root_start;
     var remaining: u16 = root_secs;
     var name_buf: [12]u8 = undefined;
+    var lfn_buf: [256]u8 = undefined;
 
     while (remaining > 0) : ({
         lba += 1;
@@ -368,9 +422,50 @@ pub fn deleteCart(name: []const u8) bool {
             if (attr == 0x0F) continue;
             if (attr & 0x08 != 0) continue;
             if (attr & 0x10 != 0) continue;
-            const short = formatShortName(entry, &name_buf);
-            if (std.mem.eql(u8, short, target[0..target_len])) {
+
+            const lfn_len = readLfnEntries(sector_buf[0..], i, lfn_buf[0..]);
+
+            // Check if name matches LFN or SFN
+            var matches = false;
+            var lfn_start_idx: usize = 0;
+
+            if (lfn_len > 0 and lfn_len == name.len) {
+                matches = true;
+                for (name, 0..) |c, idx| {
+                    if (std.ascii.toLower(c) != std.ascii.toLower(lfn_buf[idx])) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    // Calc where LFN entries start
+                    var scan_idx: isize = @as(isize, @intCast(i)) - @as(isize, DIR_ENTRY_SIZE);
+                    while (scan_idx >= 0) : (scan_idx -= DIR_ENTRY_SIZE) {
+                        const idx: usize = @intCast(scan_idx);
+                        const lfn_entry = sector_buf[idx .. idx + DIR_ENTRY_SIZE];
+                        if (lfn_entry[DIR_ATTR] != 0x0F) break;
+                        lfn_start_idx = idx;
+                    }
+                }
+            }
+
+            if (!matches) {
+                const short = formatShortName(entry, &name_buf);
+                matches = std.mem.eql(u8, short, target[0..target_len]);
+            }
+
+            if (matches) {
+                // Mark SFN entry as del
                 sector_buf[i] = 0xE5;
+
+                // Mark all LFN entries as del
+                if (lfn_start_idx > 0 and lfn_start_idx < i) {
+                    var del_idx = lfn_start_idx;
+                    while (del_idx < i) : (del_idx += DIR_ENTRY_SIZE) {
+                        sector_buf[del_idx] = 0xE5;
+                    }
+                }
+
                 writeSector(lba, sector_buf[0..]);
                 clearFatChain(readU16(entry, DIR_FIRST_CLUSTER));
                 return true;
@@ -500,6 +595,284 @@ fn writeU32(buf: []u8, offset: usize, value: u32) void {
     buf[offset + 1] = @truncate(value >> 8);
     buf[offset + 2] = @truncate(value >> 16);
     buf[offset + 3] = @truncate(value >> 24);
+}
+
+/// Get Unicode chars from LFN entry (little UTF-16)
+fn getLfnChar(entry: []const u8, offset: usize) u16 {
+    return @as(u16, entry[offset]) | (@as(u16, entry[offset + 1]) << 8);
+}
+
+/// Calc checksum for SFN
+fn sfnChecksum(sfn: []const u8) u8 {
+    var sum: u8 = 0;
+    for (0..11) |i| {
+        sum = ((sum & 1) << 7) +% (sum >> 1) +% sfn[i];
+    }
+    return sum;
+}
+
+/// Read LFN entries that span across two sectors
+/// prev_sector: prev sector buffer (null if first sector)
+/// curr_sector: curr sector buffer
+/// start_idx: SFN entry idx in curr sector
+/// out: output buffer for reconstructed flname
+fn readLfnEntriesMultiSector(prev_sector: ?*const [SECTOR_SIZE]u8, curr_sector: []const u8, start_idx: usize, out: []u8) usize {
+    // SFN entry to get checksum from
+    const sfn_entry = curr_sector[start_idx .. start_idx + DIR_ENTRY_SIZE];
+    const expected_checksum = sfnChecksum(sfn_entry[DIR_NAME .. DIR_NAME + 11]);
+
+    var lfn_chars: [256]u16 = undefined;
+    var total_chars: usize = 0;
+    var found_first = false;
+
+    // Scan backwards in curr sector
+    if (start_idx > 0) {
+        var pos: isize = @as(isize, @intCast(start_idx)) - @as(isize, DIR_ENTRY_SIZE);
+        while (pos >= 0) : (pos -= DIR_ENTRY_SIZE) {
+            const idx: usize = @intCast(pos);
+            const entry = curr_sector[idx .. idx + DIR_ENTRY_SIZE];
+
+            // Stop if not an LFN entry
+            if (entry[DIR_ATTR] != 0x0F) break;
+            if (entry[0] == 0xE5) break; // Deleted
+
+            // Check checksum matches
+            if (entry[13] != expected_checksum) break;
+
+            // Extract chars from this entry (13 chars per LFN entry)
+            // Chars 1-5: bytes 1-10
+            for (0..5) |i| {
+                const c = getLfnChar(entry, 1 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+            // Chars 6-11: bytes 14-25
+            for (0..6) |i| {
+                const c = getLfnChar(entry, 14 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+            // Chars 12-13: bytes 28-31
+            for (0..2) |i| {
+                const c = getLfnChar(entry, 28 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+
+            // Check if first (last in seq) entry
+            const seq = entry[0];
+            if ((seq & 0x40) != 0) {
+                found_first = true;
+                break;
+            }
+        }
+    }
+
+    if (!found_first and prev_sector != null and total_chars > 0) {
+        var pos: isize = SECTOR_SIZE - DIR_ENTRY_SIZE;
+        while (pos >= 0) : (pos -= DIR_ENTRY_SIZE) {
+            const idx: usize = @intCast(pos);
+            const entry = prev_sector.?[idx .. idx + DIR_ENTRY_SIZE];
+
+            if (entry[DIR_ATTR] != 0x0F) break;
+            if (entry[0] == 0xE5) break;
+            if (entry[13] != expected_checksum) break;
+
+            // Extract chars
+            for (0..5) |i| {
+                const c = getLfnChar(entry, 1 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+            for (0..6) |i| {
+                const c = getLfnChar(entry, 14 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+            for (0..2) |i| {
+                const c = getLfnChar(entry, 28 + i * 2);
+                if (c != 0 and c != 0xFFFF and total_chars < lfn_chars.len) {
+                    lfn_chars[total_chars] = c;
+                    total_chars += 1;
+                } else if (c == 0) break;
+            }
+
+            if ((entry[0] & 0x40) != 0) {
+                found_first = true;
+                break;
+            }
+        }
+    }
+
+    // If found complete LFN chain, convert to ASCII
+    if (found_first and total_chars > 0) {
+        var out_idx: usize = 0;
+        for (0..total_chars) |i| {
+            const c = lfn_chars[i];
+            if (c < 0x80 and out_idx < out.len) {
+                out[out_idx] = @truncate(c);
+                out_idx += 1;
+            }
+        }
+        return out_idx;
+    }
+
+    return 0;
+}
+
+/// Extract one LFN data
+fn extractLfnEntry(entry: []const u8, chars_out: *[13]u16, expected_seq: *u8) bool {
+    const seq = entry[0] & 0x1F;
+    const is_last = (entry[0] & 0x40) != 0;
+
+    if (is_last) {
+        expected_seq.* = seq;
+    } else if (expected_seq.* == 0 or seq != expected_seq.* - 1) {
+        return false;
+    }
+    expected_seq.* = seq;
+
+    var char_idx: usize = 0;
+
+    // Chars 1-5 (bytes 1-10)
+    var off: usize = 1;
+    while (off < 11 and char_idx < 13) : ({
+        off += 2;
+        char_idx += 1;
+    }) {
+        chars_out[char_idx] = getLfnChar(entry, off);
+    }
+    // Chars 6-11 (bytes 14-25)
+    off = 14;
+    while (off < 26 and char_idx < 13) : ({
+        off += 2;
+        char_idx += 1;
+    }) {
+        chars_out[char_idx] = getLfnChar(entry, off);
+    }
+    // Chars 12-13 (bytes 28-31)
+    off = 28;
+    while (off < 32 and char_idx < 13) : ({
+        off += 2;
+        char_idx += 1;
+    }) {
+        chars_out[char_idx] = getLfnChar(entry, off);
+    }
+
+    return true;
+}
+
+/// Reconstruct flname from LFN parts (in rev order)
+fn reconstructLfnName(parts: [][13]u16, out: []u8) usize {
+    var out_idx: usize = 0;
+    var part_idx: isize = @as(isize, @intCast(parts.len)) - 1;
+
+    while (part_idx >= 0) : (part_idx -= 1) {
+        const pidx: usize = @intCast(part_idx);
+        for (parts[pidx]) |char| {
+            if (char == 0x0000 or char == 0xFFFF) break;
+            // ASCII conv
+            if (char < 0x80 and out_idx < out.len) {
+                out[out_idx] = @truncate(char);
+                out_idx += 1;
+            }
+        }
+    }
+
+    return out_idx;
+}
+
+/// Read LFN entries and recreate long flname
+/// Returns reconstructed name len, or 0 if LFN not valid
+fn readLfnEntries(sector_buf: []const u8, start_idx: usize, out: []u8) usize {
+    var lfn_parts: [20][13]u16 = undefined; // Max 20 LFN entries, 13 chars each
+    var num_parts: usize = 0;
+    var expected_seq: u8 = 0;
+
+    // Scan bwrds to find LFN entries before this dir
+    if (start_idx < DIR_ENTRY_SIZE) return 0; // Can't have LFN at start
+
+    var scan_idx: isize = @as(isize, @intCast(start_idx)) - @as(isize, DIR_ENTRY_SIZE);
+    while (scan_idx >= 0 and num_parts < 20) : (scan_idx -= DIR_ENTRY_SIZE) {
+        const idx: usize = @intCast(scan_idx);
+        const entry = sector_buf[idx .. idx + DIR_ENTRY_SIZE];
+
+        if (entry[DIR_ATTR] != 0x0F) break; // Not LFN entry
+        if (entry[0] == 0xE5) break; // Del entry
+
+        const seq = entry[0] & 0x1F;
+        const is_last = (entry[0] & 0x40) != 0;
+
+        if (is_last) {
+            expected_seq = seq;
+        } else if (expected_seq == 0 or seq != expected_seq - 1) {
+            break; // Invalid seq
+        }
+        expected_seq = seq;
+
+        // Extract 13 chars from LFN entry
+        var chars: [13]u16 = undefined;
+        var char_idx: usize = 0;
+
+        // Chars 1-5 (bytes 1-10)
+        var off: usize = 1;
+        while (off < 11 and char_idx < 13) : ({
+            off += 2;
+            char_idx += 1;
+        }) {
+            chars[char_idx] = getLfnChar(entry, off);
+        }
+        // Chars 6-11 (bytes 14-25)
+        off = 14;
+        while (off < 26 and char_idx < 13) : ({
+            off += 2;
+            char_idx += 1;
+        }) {
+            chars[char_idx] = getLfnChar(entry, off);
+        }
+        // Chars 12-13 (bytes 28-31)
+        off = 28;
+        while (off < 32 and char_idx < 13) : ({
+            off += 2;
+            char_idx += 1;
+        }) {
+            chars[char_idx] = getLfnChar(entry, off);
+        }
+
+        lfn_parts[num_parts] = chars;
+        num_parts += 1;
+
+        if (seq == 1) break; // 1st entry found
+    }
+
+    if (num_parts == 0) return 0;
+
+    // Reconstruct flname (LFN entries are in rev order)
+    var out_idx: usize = 0;
+    var part_idx: isize = @as(isize, @intCast(num_parts)) - 1;
+    while (part_idx >= 0) : (part_idx -= 1) {
+        const pidx: usize = @intCast(part_idx);
+        for (lfn_parts[pidx]) |char| {
+            if (char == 0x0000 or char == 0xFFFF) break; // Ends
+            // ASCII conv
+            if (char < 0x80 and out_idx < out.len) {
+                out[out_idx] = @truncate(char);
+                out_idx += 1;
+            }
+        }
+    }
+
+    return out_idx;
 }
 
 fn formatShortName(entry: []const u8, buf: *[12]u8) []const u8 {

@@ -28,7 +28,8 @@ pub const BKLT_PWM = gpio.num(18); // Backlight PWM
 // Note: SPI4W tied to 3V3 (High = 4-wire SPI mode)
 
 // Neopixel LEDs
-pub const led_pin = gpio.num(14);
+pub const led_pin = gpio.num(14); // regular LED
+pub const neopixel_pin = gpio.num(15); // Neopixel data pin
 
 // Alias for compatibility with existing demos
 // pub const A5_D13 = led_pin;

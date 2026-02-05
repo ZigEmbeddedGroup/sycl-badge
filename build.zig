@@ -92,6 +92,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
+    // Build neopixel puzzle cart for badge v2 (demo mode with auto-play)
+    add_microzig_cart(builder, &dep, .{
+        .name = "neopixelpuzzle-v2",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/neopixelpuzzle-v2/main.zig"),
+    });
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",

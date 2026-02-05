@@ -960,6 +960,13 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Small delay to allow message to be sent
     timer.sleep_ms(50);
 
+    // Disconnect USB to properly signal disconnection to the host
+    // This prevents the terminal from thinking the connection is still active
+    usb.disconnect();
+    
+    // Small delay to allow host to detect disconnection
+    timer.sleep_ms(10);
+
     // Trigger system reset via SCB (System Control Block)
     const SCB_BASE = 0xE000ED00;
     const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
@@ -1238,5 +1245,4 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 //TODO:
 // - left direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
-// - get reboot command working properly
 // - command to print text to LCD screen (probably not necessary other than debugging)

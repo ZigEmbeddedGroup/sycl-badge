@@ -164,6 +164,17 @@ pub fn poll() void {
     driver_msc.poll();
 }
 
+/// Disconnect the USB device from the host
+/// This disables the pull-up resistor to signal disconnection
+/// Call this before system reset to properly close the USB connection
+pub fn disconnect() void {
+    const USB = microzig.chip.peripherals.USB;
+    
+    // Disable the pull-up resistor to disconnect from host
+    // On RP235X, this is done via SIE_CTRL.PULLUP_EN
+    USB.SIE_CTRL.modify(.{ .PULLUP_EN = 0 });
+}
+
 // Buffer for formatted printing (max 2KB)
 var print_buffer: [2048]u8 = undefined;
 

@@ -19,7 +19,7 @@ pub const ystart: u16 = 0;
 pub const Pins = struct {
     cs: gpio.Pin, // Chip Select
     dc: gpio.Pin, // Data/Command
-    rst: gpio.Pin, // Reset
+    rst: ?gpio.Pin, // Reset (optional, may be tied to hardware)
     bl: ?gpio.Pin, // Backlight (this pin is tied to ground)
 };
 
@@ -169,9 +169,11 @@ pub fn init(pin_config: Pins, config: Config) !void {
     pins.dc.set_direction(.out);
     pins.dc.put(1);
 
-    pins.rst.set_function(.sio);
-    pins.rst.set_direction(.out);
-    pins.rst.put(0);
+    if (pins.rst) |rst| {
+        rst.set_function(.sio);
+        rst.set_direction(.out);
+        rst.put(0);
+    }
 
     if (pins.bl) |bl| {
         bl.set_function(.sio);
@@ -188,13 +190,18 @@ pub fn init(pin_config: Pins, config: Config) !void {
     };
     try spi_instance.apply(spi_config);
 
-    // Hardware reset sequence
-    pins.rst.put(1);
-    timer.sleep_ms(5);
-    pins.rst.put(0);
-    timer.sleep_ms(20);
-    pins.rst.put(1);
-    timer.sleep_ms(50);
+    // Hardware reset sequence (if RST pin is available)
+    if (pins.rst) |rst| {
+        rst.put(1);
+        timer.sleep_ms(5);
+        rst.put(0);
+        timer.sleep_ms(20);
+        rst.put(1);
+        timer.sleep_ms(50);
+    } else {
+        // RST is tied to hardware, just wait for it to stabilize
+        timer.sleep_ms(50);
+    }
 
     // Initialize display
     initDisplay();
@@ -471,8 +478,8 @@ pub fn createDT018BTFTPins() LCDPins {
             // LCD_D/CX: Data/Command
             .dc = board.TFT_DC,
 
-            // RST: Reset
-            .rst = board.TFT_RST,
+            // RST: Reset (tied to hardware on v2, no GPIO control)
+            .rst = null,
 
             // BKLT_PWM: Backlight (connected to VBUS/5V, no GPIO control)
             .bl = null,

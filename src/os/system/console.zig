@@ -13,6 +13,7 @@ const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
 const multicore = @import("multicore.zig");
+const badge = microzig.board;
 
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
@@ -725,7 +726,7 @@ fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-var led_pin = gpio.num(25);
+var led_pin = badge.led_pin;
 var led_initialized = false;
 
 fn cmdLed(iter: *std.mem.TokenIterator(u8, .scalar)) void {

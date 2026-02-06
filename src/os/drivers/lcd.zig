@@ -482,7 +482,7 @@ pub fn createDT018BTFTPins() LCDPins {
             .rst = null,
 
             // BKLT_PWM: Backlight (connected to VBUS/5V, no GPIO control)
-            .bl = null,
+            .bl = board.BKLT_PWM,
         },
         .spi = .{
             // LCD_SCL: Serial Clock

@@ -7,7 +7,6 @@ const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
-const pug_image = @import("../drivers/pug_image_data.zig");
 const rom = @import("../drivers/rom.zig");
 const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
@@ -157,10 +156,10 @@ pub fn init() void {
     history_index = 0;
     in_history_mode = false;
     escape_state = .normal;
-    println("========================================");
-    println("SYCL Badge OS v1.0");
-    println("========================================");
-    println("Type 'help' for list of available commands");
+    println("=============");
+    println("SYCL Badge OS");
+    println("=============");
+    println("'help' for cmds");
     showPrompt();
 }
 
@@ -963,7 +962,7 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Disconnect USB to properly signal disconnection to the host
     // This prevents the terminal from thinking the connection is still active
     usb.disconnect();
-    
+
     // Small delay to allow host to detect disconnection
     timer.sleep_ms(10);
 
@@ -1003,7 +1002,7 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|image>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
         return;
     };
 
@@ -1042,10 +1041,6 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
         lcd.fillScreen(lcd.BLACK);
-        println("Done\r\n");
-    } else if (std.mem.eql(u8, action, "image")) {
-        println("\r\nDisplaying pug image on LCD...");
-        lcd.drawImg(0, 0, lcd.width, lcd.height, &pug_image.pug_image_data);
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});

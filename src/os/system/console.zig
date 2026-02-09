@@ -910,7 +910,7 @@ fn cmdGpioToggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     var start_pin: u9 = 0;
-    var end_pin: u9 = 29;
+    var end_pin: u9 = 47;
 
     const start_str = iter.next();
     if (start_str) |s| {
@@ -918,8 +918,8 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             printf("\r\nError: Invalid start pin: {s}\r\n\r\n", .{s});
             return;
         };
-        if (start_pin > 29) {
-            println("\r\nError: Start pin must be 0-29\r\n");
+        if (start_pin > 47) {
+            println("\r\nError: Start pin must be 0-47\r\n");
             return;
         }
 
@@ -929,8 +929,8 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 printf("\r\nError: Invalid end pin: {s}\r\n\r\n", .{e});
                 return;
             };
-            if (end_pin > 29) {
-                println("\r\nError: End pin must be 0-29\r\n");
+            if (end_pin > 47) {
+                println("\r\nError: End pin must be 0-47\r\n");
                 return;
             }
             if (end_pin < start_pin) {

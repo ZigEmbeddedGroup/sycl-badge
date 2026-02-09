@@ -156,12 +156,12 @@ pub fn autoStartSingleCart() bool {
     // Count available carts
     var first_cart: storage.CartInfo = undefined;
     const cart_count = storage.countCarts(&first_cart);
-    
+
     // Only auto-start if exactly one cart is present
     if (cart_count != 1) {
         return false;
     }
-    
+
     // Get the cart name for loading
     const cart_name = if (first_cart.long_name_len > 0)
         first_cart.long_name[0..first_cart.long_name_len]
@@ -169,11 +169,11 @@ pub fn autoStartSingleCart() bool {
         const end = std.mem.indexOfScalar(u8, first_cart.short_name[0..], 0) orelse first_cart.short_name.len;
         break :blk first_cart.short_name[0..end];
     };
-    
+
     uart.puts("Auto-starting cart: ");
     uart.puts(cart_name);
     uart.puts("\r\n");
-    
+
     // Load the cart
     const entry_point = loadUF2Cart(cart_name) catch |err| {
         uart.puts("Auto-start failed: ");
@@ -188,10 +188,10 @@ pub fn autoStartSingleCart() bool {
         }
         return false;
     };
-    
+
     // Import multicore for executing the cart
     const multicore = @import("../system/multicore.zig");
-    
+
     // Execute the cart
     if (multicore.executeCart(entry_point)) {
         markRunning();

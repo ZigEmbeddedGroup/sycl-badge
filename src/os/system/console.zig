@@ -94,11 +94,37 @@ fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
+// Static storage for cart name completions
+const MAX_CART_COMPLETIONS = 16;
+const MAX_CART_NAME_LEN = 32;
+var cart_name_storage: [MAX_CART_COMPLETIONS][MAX_CART_NAME_LEN]u8 = undefined;
+var cart_name_slices: [MAX_CART_COMPLETIONS][]const u8 = undefined;
+var cart_name_count: usize = 0;
+
+fn refreshCartNames() void {
+    cart_name_count = 0;
+    storage.listCarts(struct {
+        fn visit(name: []const u8, size: u32) void {
+            _ = size;
+            if (cart_name_count >= MAX_CART_COMPLETIONS) return;
+            const copy_len = @min(name.len, MAX_CART_NAME_LEN);
+            @memcpy(cart_name_storage[cart_name_count][0..copy_len], name[0..copy_len]);
+            cart_name_slices[cart_name_count] = cart_name_storage[cart_name_count][0..copy_len];
+            cart_name_count += 1;
+        }
+    }.visit);
+}
+
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete" };
         return &options;
+    }
+    if (arg_index == 1) {
+        // Return cart names for "cart run <name>", "cart info <name>", etc.
+        refreshCartNames();
+        return cart_name_slices[0..cart_name_count];
     }
     return &[_][]const u8{};
 }

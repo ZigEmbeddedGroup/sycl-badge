@@ -366,9 +366,9 @@ pub fn countCarts(first_cart: ?*CartInfo) u32 {
             // If caller wants first cart info and we haven't found it yet
             if (first_cart != null and !found_first) {
                 const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
-                
+
                 _ = formatShortName(entry, &name_buf);
-                
+
                 first_cart.?.* = CartInfo{
                     .start_cluster = readU16(entry, DIR_FIRST_CLUSTER),
                     .size = readU32(entry, DIR_FILE_SIZE),

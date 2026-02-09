@@ -9,6 +9,7 @@ const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
+const loader = @import("loader/loader.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -26,6 +27,9 @@ pub fn main() !void {
     lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
     lcd.drawString(10, 40, "Team VIKES!", lcd.GREEN, lcd.BLACK, 1);
     lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
+
+    // Auto-start cart if only one is present in storage
+    _ = loader.autoStartSingleCart();
 
     // Main loop
     while (true) {

@@ -150,6 +150,59 @@ pub fn stop() void {
     cart_entry_point = 0;
 }
 
+/// Auto-start cart if only one is present in storage
+/// Returns true if a cart was auto-started, false otherwise
+pub fn autoStartSingleCart() bool {
+    // Count available carts
+    var first_cart: storage.CartInfo = undefined;
+    const cart_count = storage.countCarts(&first_cart);
+    
+    // Only auto-start if exactly one cart is present
+    if (cart_count != 1) {
+        return false;
+    }
+    
+    // Get the cart name for loading
+    const cart_name = if (first_cart.long_name_len > 0)
+        first_cart.long_name[0..first_cart.long_name_len]
+    else blk: {
+        const end = std.mem.indexOfScalar(u8, first_cart.short_name[0..], 0) orelse first_cart.short_name.len;
+        break :blk first_cart.short_name[0..end];
+    };
+    
+    uart.puts("Auto-starting cart: ");
+    uart.puts(cart_name);
+    uart.puts("\r\n");
+    
+    // Load the cart
+    const entry_point = loadUF2Cart(cart_name) catch |err| {
+        uart.puts("Auto-start failed: ");
+        switch (err) {
+            LoadError.FileNotFound => uart.puts("Not found\r\n"),
+            LoadError.FileTooLarge => uart.puts("Too large\r\n"),
+            LoadError.InvalidUF2 => uart.puts("Invalid UF2\r\n"),
+            LoadError.UnsupportedFamily => uart.puts("Unsupported family\r\n"),
+            LoadError.AddressMismatch => uart.puts("Address mismatch\r\n"),
+            LoadError.FlashWriteError => uart.puts("Flash error\r\n"),
+            LoadError.ReadError => uart.puts("Read error\r\n"),
+        }
+        return false;
+    };
+    
+    // Import multicore for executing the cart
+    const multicore = @import("../system/multicore.zig");
+    
+    // Execute the cart
+    if (multicore.executeCart(entry_point)) {
+        markRunning();
+        uart.puts("Cart auto-started successfully\r\n");
+        return true;
+    } else {
+        uart.puts("Failed to execute cart\r\n");
+        return false;
+    }
+}
+
 /// Load a UF2 cart from FAT12 storage and program it to cart_xip flash
 /// Returns the entry point address on success
 pub fn loadUF2Cart(name: []const u8) LoadError!u32 {

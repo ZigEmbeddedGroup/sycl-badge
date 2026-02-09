@@ -325,6 +325,67 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
     }
 }
 
+/// Count carts in storage and optionally get the first cart's info
+/// Returns: number of carts found, fills in first_cart if count == 1
+pub fn countCarts(first_cart: ?*CartInfo) u32 {
+    var sector_buf: [SECTOR_SIZE]u8 = undefined;
+    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
+    const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
+    const root_secs = rootDirSectors();
+    var lba: u32 = root_start;
+    var remaining: u16 = root_secs;
+    var name_buf: [12]u8 = undefined;
+    var lfn_buf: [256]u8 = undefined;
+    var has_prev_sector = false;
+    var count: u32 = 0;
+    var found_first = false;
+
+    while (remaining > 0) : ({
+        lba += 1;
+        remaining -= 1;
+    }) {
+        // Copy current sector to prev before reading new one
+        if (has_prev_sector) {
+            @memcpy(&prev_sector_buf, &sector_buf);
+        }
+        readSector(lba, sector_buf[0..]);
+        has_prev_sector = true;
+
+        var i: usize = 0;
+        while (i < SECTOR_SIZE) : (i += DIR_ENTRY_SIZE) {
+            const entry = sector_buf[i .. i + DIR_ENTRY_SIZE];
+            if (entry[0] == 0x00) return count;
+            if (entry[0] == 0xE5) continue;
+            const attr = entry[DIR_ATTR];
+            if (attr == 0x0F) continue; // LFN
+            if (attr & 0x08 != 0) continue; // volume label
+            if (attr & 0x10 != 0) continue; // directory
+
+            count += 1;
+
+            // If caller wants first cart info and we haven't found it yet
+            if (first_cart != null and !found_first) {
+                const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+                
+                _ = formatShortName(entry, &name_buf);
+                
+                first_cart.?.* = CartInfo{
+                    .start_cluster = readU16(entry, DIR_FIRST_CLUSTER),
+                    .size = readU32(entry, DIR_FILE_SIZE),
+                    .short_name = name_buf,
+                    .long_name = undefined,
+                    .long_name_len = lfn_len,
+                };
+                if (lfn_len > 0) {
+                    @memcpy(first_cart.?.long_name[0..lfn_len], lfn_buf[0..lfn_len]);
+                }
+                found_first = true;
+            }
+        }
+    }
+    return count;
+}
+
 pub fn findCart(name: []const u8) ?CartInfo {
     var target: [12]u8 = undefined;
     const target_len = normalizeName(name, &target);

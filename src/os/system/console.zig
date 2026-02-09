@@ -836,10 +836,13 @@ fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     };
 
-    if (pin_num > 29) {
-        println("\r\nError: Pin number must be 0-29\r\n");
+    if (pin_num > 47) {
+        println("\r\nError: Pin number must be 0-47\r\n");
         return;
     }
+
+    // Configure as input to read actual pin state
+    gpio.configureAsInput(pin_num);
 
     const pin = gpio.num(pin_num);
     const value = gpio.read(pin);
@@ -858,8 +861,8 @@ fn cmdGpioWrite(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     };
 
-    if (pin_num > 29) {
-        println("\r\nError: Pin number must be 0-29\r\n");
+    if (pin_num > 47) {
+        println("\r\nError: Pin number must be 0-47\r\n");
         return;
     }
 
@@ -894,8 +897,8 @@ fn cmdGpioToggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     };
 
-    if (pin_num > 29) {
-        println("\r\nError: Pin number must be 0-29\r\n");
+    if (pin_num > 47) {
+        println("\r\nError: Pin number must be 0-47\r\n");
         return;
     }
 
@@ -945,6 +948,9 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("\r\nGPIO Status:");
     var pin_num = start_pin;
     while (pin_num <= end_pin) : (pin_num += 1) {
+        // Configure as input to read actual pin state
+        gpio.configureAsInput(pin_num);
+
         const pin = gpio.num(pin_num);
         const value = gpio.read(pin);
         printf("  GPIO {d: >2}: {d}\r\n", .{ pin_num, value });

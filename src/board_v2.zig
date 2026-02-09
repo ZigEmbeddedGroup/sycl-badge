@@ -34,8 +34,8 @@ pub const neopixel_pin = gpio.num(15); // Neopixel data pin
 // Buttons and Joystick
 pub const joystick_up = gpio.num(37); // Connected to joystick up
 pub const joystick_down = gpio.num(24); // Connected to joystick down
-pub const joystick_left = gpio.num(35);  // Connected to joystick left
-pub const joystick_right = gpio.num(26); // Connected to joystick right
+pub const joystick_left = gpio.num(35); // Connected to joystick left
+pub const joystick_right = gpio.num(25); // Connected to joystick right
 pub const joystick_click = gpio.num(36); // Joystick press in button
 pub const button_a = gpio.num(6); // A1
 pub const button_b = gpio.num(7); // B1

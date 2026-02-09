@@ -67,14 +67,18 @@ pub fn init(config: InitConfig) !void {
     // 2. Initialize LED
     gpio.initLED();
 
-    // 3. Initialize UART for debug output (must be before any uart.println calls)
+    // 3. Initialize Buttons (joystick and face buttons)
+    gpio.initButtons();
+
+    // 4. Initialize UART for debug output (must be before any uart.println calls)
     uart.init();
     uart.println("SYCL Badge OS starting...");
     uart.println("GPIO initialized");
     uart.println("LED initialized");
+    uart.println("Buttons initialized");
     uart.println("UART initialized");
 
-    // 4. Initialize cart storage (FAT16 in romfs) before USB starts
+    // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
     storage.init();
     uart.println("Cart storage initialized");
@@ -84,12 +88,12 @@ pub fn init(config: InitConfig) !void {
         uart.puts(text);
     }
 
-    // 5. Initialize USB
+    // 6. Initialize USB
     const usb_start = timer.micros();
     try usb.init();
     uart.println("USB initialized");
 
-    // 6. Wait for USB enumeration
+    // 7. Wait for USB enumeration
     const usb_enum_timeout_ms: u32 = 100;
     const start_time = timer.millis();
     while (timer.millis() - start_time < usb_enum_timeout_ms) {
@@ -97,17 +101,17 @@ pub fn init(config: InitConfig) !void {
     }
     const usb_time = timer.micros() - usb_start;
 
-    // 7. Initialize shared memory (for IPC)
+    // 8. Initialize shared memory (for IPC)
     shared_mem.init();
     uart.println("Shared memory initialized");
 
-    // 8. Initialize console (shows welcome message and prompt)
+    // 9. Initialize console (shows welcome message and prompt)
     console.init();
 
-    // 9. Leave interrupts disabled for now (polling-based drivers)
+    // 10. Leave interrupts disabled for now (polling-based drivers)
     uart.println("Interrupts disabled");
 
-    // 10. Initialize LCD if configured
+    // 11. Initialize LCD if configured
     if (config.lcd_pins) |lcd_pins| {
         if (config.lcd_config) |lcd_cfg| {
             const lcd_start = timer.micros();
@@ -127,7 +131,7 @@ pub fn init(config: InitConfig) !void {
         }
     }
 
-    // 11. Initialize Core 1 if chosen (should always be chosen in practice)
+    // 12. Initialize Core 1 if chosen (should always be chosen in practice)
     if (config.init_core1) {
         const core1_start = timer.micros();
         if (config.core1_entrypoint) |entrypoint| {

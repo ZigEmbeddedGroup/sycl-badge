@@ -4,13 +4,14 @@ const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const gpio = hal.gpio;
+const board = microzig.board;
 const timer = @import("../drivers/timer.zig");
 const usb = @import("../drivers/usb.zig");
 const multicore = @import("../system/multicore.zig");
 const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 
-const led = gpio.num(25);
+const led = board.led_pin;
 
 // Test commands
 const TEST_FIFO: u32 = 0x7E57_F1F0;

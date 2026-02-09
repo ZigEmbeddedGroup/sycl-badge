@@ -13,13 +13,14 @@ const microzig = @import("microzig");
 
 const rp2xxx = microzig.hal;
 const gpio = rp2xxx.gpio;
+const board = microzig.board;
 
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 const interrupts = @import("system/interrupts.zig");
 
-const led = gpio.num(25);
+const led = board.led_pin;
 
 // State variables (volatile for interrupt safety)
 var current_char: u8 = 'A';

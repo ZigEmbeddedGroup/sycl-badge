@@ -99,6 +99,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/neopixelpuzzle-v2/main.zig"),
     });
 
+    // Build neopixel joystick demo cart (interactive joystick control)
+    add_microzig_cart(builder, &dep, .{
+        .name = "neopixel-joystick",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/neopixel-joystick/main.zig"),
+    });
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",

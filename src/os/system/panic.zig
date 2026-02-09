@@ -7,8 +7,9 @@ const rp2xxx = microzig.hal;
 const gpio = rp2xxx.gpio;
 const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
+const badge = microzig.board;
 
-const led = gpio.num(25);
+const led = badge.led_pin;
 
 pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     // Ensure LED is configured

@@ -72,10 +72,10 @@ pub fn build(builder: *Build) void {
     sycl_os.install(builder);
 
     // Build test XIP cart (runs on Core 1 with cart_runtime - no microzig)
-    add_xip_cart(builder, &dep, .{
-        .name = "test-xip-cart",
+    add_microzig_cart(builder, &dep, .{
+        .name = "lcd-test",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/test-xip-cart/src/main.zig"),
+        .root_source_file = builder.path("showcase/carts/lcd-test/src/main.zig"),
     });
 
     // Build test MicroZig cart (runs on Core 1 with full MicroZig HAL)

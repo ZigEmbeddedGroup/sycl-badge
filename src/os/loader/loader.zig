@@ -150,6 +150,11 @@ pub fn stop() void {
     cart_entry_point = 0;
 }
 
+/// Erase the cart XIP region (public interface for console command)
+pub fn eraseCartRegion() LoadError!void {
+    try eraseCartXipRegion();
+}
+
 /// Load a UF2 cart from FAT12 storage and program it to cart_xip flash
 /// Returns the entry point address on success
 pub fn loadUF2Cart(name: []const u8) LoadError!u32 {

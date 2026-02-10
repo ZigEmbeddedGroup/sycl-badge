@@ -116,6 +116,7 @@ const commands = [_]Command{
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
@@ -952,6 +953,50 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
+// Wipe Command - Erase cart/XIP flash and process RAM
+fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const confirm = iter.next();
+
+    if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+        println("\r\nWARNING: This will erase all cart XIP flash and process RAM!");
+        println("To proceed, type: wipe confirm\r\n");
+        return;
+    }
+
+    // Stop any running cart first
+    if (loader.getState() == .running or loader.getState() == .ready) {
+        println("\r\nStopping running cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+    }
+
+    // Erase cart XIP flash region
+    println("Erasing cart XIP flash region...");
+    loader.eraseCartRegion() catch {
+        println("ERROR: Failed to erase cart XIP region\r\n");
+        return;
+    };
+
+    // Clear process RAM (Core 1 RAM: 0x20020000 - 0x20080000, 384KB)
+    println("Clearing process RAM...");
+    const PROCESS_RAM_START: u32 = 0x20020000;
+    const PROCESS_RAM_SIZE: usize = 384 * 1024;
+    const process_ram: [*]u8 = @ptrFromInt(PROCESS_RAM_START);
+    @memset(process_ram[0..PROCESS_RAM_SIZE], 0);
+
+    printf("\r\nWipe complete!\r\n  Cart XIP: 0x{x} - 0x{x} ({d}KB)\r\n", .{
+        loader.getCartXipStart(),
+        loader.getCartXipEnd(),
+        loader.getCartXipSize() / 1024,
+    });
+    printf("  Process RAM: 0x{x} - 0x{x} ({d}KB)\r\n\r\n", .{
+        PROCESS_RAM_START,
+        PROCESS_RAM_START + PROCESS_RAM_SIZE,
+        PROCESS_RAM_SIZE / 1024,
+    });
+}
+
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
@@ -963,7 +1008,7 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Disconnect USB to properly signal disconnection to the host
     // This prevents the terminal from thinking the connection is still active
     usb.disconnect();
-    
+
     // Small delay to allow host to detect disconnection
     timer.sleep_ms(10);
 

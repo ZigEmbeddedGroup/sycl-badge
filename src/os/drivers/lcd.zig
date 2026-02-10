@@ -109,9 +109,7 @@ fn writeCommand(cmd: Command) void {
     pins.cs.put(1); // Deselect first
     pins.dc.put(0); // Command mode
     pins.cs.put(0); // Select
-    const data = [_]u8{@intFromEnum(cmd)};
-    var dummy: [1]u8 = undefined;
-    spi_instance.transceive_blocking(u8, &data, &dummy);
+    spi_instance.write_blocking(u8, &.{@intFromEnum(cmd)});
     pins.cs.put(1); // Deselect
 }
 
@@ -119,15 +117,7 @@ fn writeData(data: []const u8) void {
     pins.cs.put(1); // Deselect first
     pins.dc.put(1); // Data mode
     pins.cs.put(0); // Select
-    // Allocate dummy buffer for receive (we don't need the data)
-    var dummy = std.mem.zeroes([256]u8);
-    const chunk_size = @min(data.len, dummy.len);
-    var offset: usize = 0;
-    while (offset < data.len) {
-        const len = @min(chunk_size, data.len - offset);
-        spi_instance.transceive_blocking(u8, data[offset..][0..len], dummy[0..len]);
-        offset += len;
-    }
+    spi_instance.write_blocking(u8, data);
     pins.cs.put(1); // Deselect
 }
 
@@ -361,12 +351,10 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     pins.dc.put(1); // Data mode
     pins.cs.put(0); // Select
 
-    var dummy = std.mem.zeroes([320]u8);
-
     // Write each line
     var row: u16 = 0;
     while (row < h_actual) : (row += 1) {
-        spi_instance.transceive_blocking(u8, line[0..line_bytes], dummy[0..line_bytes]);
+        spi_instance.write_blocking(u8, line[0..line_bytes]);
     }
 
     pins.cs.put(1); // Deselect
@@ -397,21 +385,34 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
 
     const glyph = font.font[char_index];
 
-    // Draw the character bitmap
-    var row: u8 = 0;
-    while (row < 8) : (row += 1) {
-        const line = glyph[row];
-        var col: u8 = 0;
-        while (col < 8) : (col += 1) {
-            // Check if pixel is set (0 = foreground, 1 = background in this font)
-            const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
-            const pixel_color = if (bit_set) color else bg_color;
-
-            // Draw scaled pixel
-            if (size == 1) {
-                drawPixel(x + col, y + row, pixel_color);
-            } else {
-                // Draw size x size block for each font pixel
+    if (size == 1) {
+        // Optimized path: buffer entire 8x8 character and write in one shot
+        setWindow(x, y, x + 7, y + 7);
+        var buf: [8 * 8 * 2]u8 = undefined;
+        var idx: usize = 0;
+        var row: u8 = 0;
+        while (row < 8) : (row += 1) {
+            const line = glyph[row];
+            var col: u8 = 0;
+            while (col < 8) : (col += 1) {
+                const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
+                const pixel_color = if (bit_set) color else bg_color;
+                const bytes = pixel_color.toBytes();
+                buf[idx] = bytes[0];
+                buf[idx + 1] = bytes[1];
+                idx += 2;
+            }
+        }
+        writeData(&buf);
+    } else {
+        // Scaled drawing: size x size block for each font pixel
+        var row: u8 = 0;
+        while (row < 8) : (row += 1) {
+            const line = glyph[row];
+            var col: u8 = 0;
+            while (col < 8) : (col += 1) {
+                const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
+                const pixel_color = if (bit_set) color else bg_color;
                 fillRect(x + @as(u16, col) * size, y + @as(u16, row) * size, size, size, pixel_color);
             }
         }
@@ -445,11 +446,25 @@ pub fn writeFramebuffer(framebuffer: []const Color16) void {
 
     setWindow(0, 0, width - 1, height - 1);
 
-    // Write entire framebuffer pixel by pixel
-    for (framebuffer) |pixel| {
-        const data = pixel.toBytes();
-        writeData(&data);
+    // Convert and write one row at a time to avoid per-pixel CS toggling
+    var line_buf: [width * 2]u8 = undefined;
+
+    pins.dc.put(1); // Data mode
+    pins.cs.put(0); // Select — hold CS low for entire frame
+
+    var row: u16 = 0;
+    while (row < height) : (row += 1) {
+        const row_start = @as(usize, row) * width;
+        var col: u16 = 0;
+        while (col < width) : (col += 1) {
+            const bytes = framebuffer[row_start + col].toBytes();
+            line_buf[col * 2] = bytes[0];
+            line_buf[col * 2 + 1] = bytes[1];
+        }
+        spi_instance.write_blocking(u8, &line_buf);
     }
+
+    pins.cs.put(1); // Deselect
 }
 
 /// Test Functions

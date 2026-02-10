@@ -22,6 +22,53 @@ extern const __ram_text_load__: u8;
 extern var __ram_text_start__: u8;
 extern var __ram_text_end__: u8;
 
+// Linker symbols for RAM clearing
+extern const __bss_end__: u8;
+extern const __kernel_ram_end__: u8;
+extern const __process_ram_start__: u8;
+extern const __process_ram_end__: u8;
+extern const __scratch_x_region_start__: u8;
+extern const __scratch_x_region_end__: u8;
+extern const __scratch_y_region_start__: u8;
+extern const __scratch_y_region_end__: u8;
+
+fn clearRange(start: usize, end: usize) void {
+    if (end > start) {
+        const dest: [*]u8 = @ptrFromInt(start);
+        @memset(dest[0..(end - start)], 0);
+    }
+}
+
+fn readMsp() usize {
+    var sp: usize = 0;
+    asm volatile ("mrs %[out], msp"
+        : [out] "=r" (sp),
+    );
+    return sp;
+}
+
+fn clearOnBoot() void {
+    // Clear kernel RAM after .bss (heap/shared_mem/unused).
+    clearRange(@intFromPtr(&__bss_end__), @intFromPtr(&__kernel_ram_end__));
+
+    // Clear all process RAM before Core 1 starts.
+    clearRange(@intFromPtr(&__process_ram_start__), @intFromPtr(&__process_ram_end__));
+
+    // Clear scratch X entirely (IRQ stack is not in use with interrupts disabled).
+    clearRange(@intFromPtr(&__scratch_x_region_start__), @intFromPtr(&__scratch_x_region_end__));
+
+    // Clear scratch Y below the current MSP to avoid clobbering the active stack.
+    const scratch_y_start = @intFromPtr(&__scratch_y_region_start__);
+    const scratch_y_end = @intFromPtr(&__scratch_y_region_end__);
+    const sp = readMsp();
+    const clear_end = if (sp < scratch_y_end) sp else scratch_y_end;
+    if (clear_end > scratch_y_start) {
+        clearRange(scratch_y_start, clear_end);
+    }
+
+    microzig.cpu.dmb();
+}
+
 fn copyRamTextSection() void {
     const text_flash_start = @intFromPtr(&__ram_text_load__);
     const text_ram_start = @intFromPtr(&__ram_text_start__);
@@ -59,6 +106,8 @@ pub fn init(config: InitConfig) !void {
 
     // Disable interrupts early to avoid unhandled IRQ panics during init.
     interrupts.disableInterrupts();
+    // Scrub RAM regions that are not guaranteed to reset on warm boots.
+    clearOnBoot();
     // Copy RAM-resident flash helpers before any flash writes.
     copyRamTextSection();
     // 1. Initialize GPIO subsystem

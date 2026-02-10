@@ -93,8 +93,8 @@ fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
     const xip_end = getCartXipEnd();
 
     // Scan in 4-byte increments (word aligned)
-    // Limit scan to first 64 bytes to avoid false positives
-    const scan_limit = @min(start_addr + 64, end_addr - 8);
+    // Limit scan to first 1KB to allow for toolchain padding before vectors
+    const scan_limit = @min(start_addr + 1024, end_addr - 8);
 
     var addr = start_addr;
     while (addr < scan_limit) : (addr += 4) {
@@ -206,6 +206,14 @@ pub fn autoStartSingleCart() bool {
 /// Load a UF2 cart from FAT12 storage and program it to cart_xip flash
 /// Returns the entry point address on success
 pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
+    // If a cart is already running, stop Core 1 before erasing cart_xip.
+    if (cart_state == .running) {
+        const multicore = @import("../system/multicore.zig");
+        uart.puts("Stopping running cart...\r\n");
+        multicore.haltCore1();
+        multicore.resetCore1();
+    }
+
     cart_state = .loading;
     errdefer cart_state = .error_state;
 
@@ -223,7 +231,7 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
 
     // Validate size (UF2 blocks are 512 bytes each, cart_xip is 256KB)
     // Max useful data per block is 256 bytes, so max UF2 file size is roughly 2x cart_xip size
-    const max_uf2_size = getCartXipSize() * 2;
+    const max_uf2_size = @min(getCartXipSize() * 2, @as(u32, @intCast(cart_buffer.len)));
     if (cart_info.size > max_uf2_size) {
         uart.puts("UF2 too large\r\n");
         return LoadError.FileTooLarge;
@@ -257,6 +265,10 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     if (bytes_read == 0 or bytes_read != cart_info.size) {
         uart.puts("Failed to read UF2 file\r\n");
         return LoadError.ReadError;
+    }
+    if (bytes_read % uf2.BLOCK_SIZE != 0) {
+        uart.puts("UF2 size is not a multiple of 512\r\n");
+        return LoadError.InvalidUF2;
     }
 
     // Calculate number of UF2 blocks
@@ -303,6 +315,12 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
                 return LoadError.UnsupportedFamily;
             }
 
+            // Check block count matches file length
+            if (block.header.num_blocks != num_blocks) {
+                uart.puts("UF2 block count mismatch\r\n");
+                return LoadError.InvalidUF2;
+            }
+
             // Check base address is within cart_xip
             if (block.header.target_addr < cart_xip_start or
                 block.header.target_addr >= cart_xip_end)
@@ -317,6 +335,18 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         // Calculate offset within cart_xip
         const target_offset = block.header.target_addr - cart_xip_start;
         const payload = block.getPayload();
+        if (payload.len == 0) {
+            uart.puts("UF2 block with empty payload\r\n");
+            return LoadError.InvalidUF2;
+        }
+
+        // Validate each block address range
+        if (block.header.target_addr < cart_xip_start or
+            block.header.target_addr + @as(u32, @intCast(payload.len)) > cart_xip_end)
+        {
+            uart.puts("UF2 block outside cart_xip\r\n");
+            return LoadError.AddressMismatch;
+        }
 
         // Track extent
         if (target_offset < min_offset) min_offset = target_offset;
@@ -372,6 +402,15 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     // Find the vector table by scanning for valid SP and entry point pattern
     // Some toolchains add padding before the vector table
     // Returns the vector table ADDRESS (not entry point) so Core 1 can read both SP and entry
+    if (!parser.isComplete()) {
+        uart.puts("UF2 incomplete\r\n");
+        return LoadError.InvalidUF2;
+    }
+    parser.validateAddressRange(cart_xip_start, cart_xip_end) catch {
+        uart.puts("UF2 address range invalid\r\n");
+        return LoadError.AddressMismatch;
+    };
+
     const vector_table_addr = findVectorTableAddr(cart_xip_start + min_offset, cart_xip_end) orelse {
         uart.puts("Could not find valid vector table\r\n");
         return LoadError.InvalidUF2;

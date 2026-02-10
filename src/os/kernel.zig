@@ -29,12 +29,11 @@ pub fn main() !void {
     lcd.drawString(10, 60, "Ready!", lcd.CYAN, lcd.BLACK, 1);
 
     // Auto-start cart if only one is present in storage
-    _ = loader.autoStartSingleCart();
+    // _ = loader.autoStartSingleCart();
 
     // Main loop
     while (true) {
-        // Poll USB frequently
-        // Avoid spamming UART; keep USB polling tight for CDC/MSC.
+        // Poll USB frequently for console
         usb.poll();
 
         // Process console input

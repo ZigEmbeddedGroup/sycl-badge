@@ -17,10 +17,10 @@ pub const RegionId = u8;
 const MAX_REGIONS = 16;
 
 /// Shared memory pool base address
-/// Located at 0x2001C000 (64KB before end of kernel RAM)
+/// Located at 0x20010000 (64KB before end of kernel RAM)
 /// This leaves 64KB for kernel use and provides 64KB for shared memory
 /// Both cores can access this region since they share the same physical SRAM
-pub const SHARED_MEM_BASE_ADDR: u32 = 0x2001C000;
+pub const SHARED_MEM_BASE_ADDR: u32 = 0x20010000;
 pub const SHARED_MEM_POOL_SIZE: usize = 64 * 1024; // 64KB
 
 /// Shared memory region descriptor
@@ -34,11 +34,14 @@ const Region = struct {
 /// Shared memory registry structure - placed at the start of shared memory
 /// This ensures both cores can access the registry
 const Registry = struct {
+    magic: u32,
     regions: [MAX_REGIONS]Region,
     next_region_id: RegionId,
     pool_offset: usize,
     lock: Spinlock,
 };
+
+const REGISTRY_MAGIC: u32 = 0x53484D52; // "SHMR"
 
 /// Shared memory pool - located at fixed address accessible to both cores
 /// Registry is at the start, followed by the actual memory pool
@@ -61,16 +64,13 @@ fn getPoolPtr() *[POOL_SIZE]u8 {
 pub fn init() void {
     const registry = getRegistryPtr();
 
-    // Check if already initialized (next_region_id != 0 means initialized)
-    // Do this check WITHOUT locking first, since the lock isn't initialized yet
-    if (registry.next_region_id == 0) {
-        // Initialize the spinlock FIRST before using it
-        registry.lock = hal.multicore.Spinlock.init(0); // Use hardware spinlock 0
+    // Always initialize the lock before any checks.
+    registry.lock = hal.multicore.Spinlock.init(0); // Use hardware spinlock 0
 
-        // Now we can safely lock
-        registry.lock.lock();
-        defer registry.lock.unlock();
+    registry.lock.lock();
+    defer registry.lock.unlock();
 
+    if (registry.magic != REGISTRY_MAGIC) {
         // Initialize registry
         for (&registry.regions) |*region| {
             region.* = .{
@@ -82,6 +82,7 @@ pub fn init() void {
         }
         registry.next_region_id = 1;
         registry.pool_offset = 0;
+        registry.magic = REGISTRY_MAGIC;
 
         // Clear the pool
         const pool = getPoolPtr();

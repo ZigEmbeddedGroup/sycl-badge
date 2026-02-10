@@ -18,7 +18,7 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
 
     // Blink fast briefly to indicate panic
     var i: usize = 0;
-    while (i < 15) : (i += 1) {
+    while (i < 30) : (i += 1) {
         uart.println("PANIC!");
         if (message.len > 0) {
             uart.println(message);

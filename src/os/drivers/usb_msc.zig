@@ -611,4 +611,3 @@ fn write_u32_le(buf: []u8, value: u32) void {
     buf[2] = @truncate(value >> 16);
     buf[3] = @truncate(value >> 24);
 }
-

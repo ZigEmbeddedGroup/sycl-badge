@@ -218,7 +218,8 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
     @memcpy(&loaded_cart_name, &cart_info.short_name);
     loaded_cart_size = cart_info.size;
     cart_entry_point = entry_point;
-    cart_state = .ready;return entry_point;
+    cart_state = .ready;
+    return entry_point;
 }
 
 /// Internal function to load UF2 from storage and program to flash
@@ -262,7 +263,8 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         const block_data = cart_buffer[block_offset..][0..uf2.BLOCK_SIZE];
 
         // Parse the block
-        const block = parser.parseBlock(block_data) catch {return LoadError.InvalidUF2;
+        const block = parser.parseBlock(block_data) catch {
+            return LoadError.InvalidUF2;
         };
 
         // On first block, validate family and base address
@@ -280,7 +282,8 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
             // Check base address is within cart_xip
             if (block.header.target_addr < cart_xip_start or
                 block.header.target_addr >= cart_xip_end)
-            {return LoadError.AddressMismatch;
+            {
+                return LoadError.AddressMismatch;
             }
         }
 
@@ -404,5 +407,3 @@ pub fn loadCart(info: storage.CartInfo) bool {
 pub fn tick() void {
     // XIP carts run directly from flash, no tick needed
 }
-
-

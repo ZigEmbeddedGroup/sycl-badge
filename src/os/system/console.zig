@@ -87,7 +87,7 @@ fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
 fn rebootCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "bootsel" };
+        const options = [_][]const u8{"bootsel"};
         return &options;
     }
     return &[_][]const u8{};

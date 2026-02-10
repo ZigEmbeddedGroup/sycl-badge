@@ -114,7 +114,6 @@ pub fn main() !void {
     ;
     _ = usb.send(welcome);
 
-
     // NOTE: For a real interrupt-driven implementation, you would:
     // 1. Register the interrupt handlers
     // 2. Enable the appropriate IRQs

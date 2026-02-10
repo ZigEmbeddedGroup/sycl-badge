@@ -202,6 +202,8 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                         }
                     }
                     if (self.remaining_blocks == 0) {
+                        // Ensure writes are committed so carts survive power cycles.
+                        storage.flushPendingWrites();
                         self.send_csw(0);
                     } else {
                         // More data needed, defer arming OUT endpoint

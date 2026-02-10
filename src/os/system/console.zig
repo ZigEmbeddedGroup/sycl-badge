@@ -118,7 +118,7 @@ fn refreshCartNames() void {
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipe" };
         return &options;
     }
     if (arg_index == 1) {
@@ -140,7 +140,7 @@ const commands = [_]Command{
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/status/info/delete/wipe)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
@@ -1119,7 +1119,7 @@ fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|status|info|delete> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipe> [name]\r\n");
         return;
     };
 
@@ -1168,6 +1168,23 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             loader.getCartXipSize() / 1024,
         });
         println("");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipe")) {
+        const confirm = iter.next() orelse {
+            println("\r\nThis will erase all cart storage.\r\nUsage: cart wipe YES\r\n");
+            return;
+        };
+
+        if (!std.ascii.eqlIgnoreCase(confirm, "YES")) {
+            println("\r\nAborted. Type: cart wipe YES\r\n");
+            return;
+        }
+
+        println("\r\nWiping cart storage...\r\n");
+        storage.wipeAll();
+        println("Cart storage wiped\r\n");
         return;
     }
 

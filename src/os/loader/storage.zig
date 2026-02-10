@@ -53,6 +53,28 @@ pub fn init() void {
     }
 }
 
+pub fn wipeAll() void {
+    flushPendingWrites();
+
+    const base = romfsBase();
+    const size = romfsSize();
+    const erase_len = (size + (FLASH_ERASE_BLOCK - 1)) & ~@as(usize, FLASH_ERASE_BLOCK - 1);
+    const flash_offset = base - XIP_BASE;
+
+    interrupts.disableInterrupts();
+    defer interrupts.enableInterrupts();
+
+    rom.flash_exit_xip();
+    rom.flash_range_erase(flash_offset, erase_len, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);
+    rom.flash_flush_cache();
+    rom.flash_enter_cmd_xip();
+
+    pending_valid = false;
+    pending_dirty = false;
+
+    formatVolume();
+}
+
 fn romfsBase() u32 {
     return @intFromPtr(&__romfs_region_start__);
 }

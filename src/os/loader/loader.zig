@@ -5,7 +5,6 @@ const microzig = @import("microzig");
 const storage = @import("storage.zig");
 const uf2 = @import("uf2.zig");
 const rom = @import("../drivers/rom.zig");
-const uart = @import("../drivers/uart.zig");
 const interrupts = @import("../system/interrupts.zig");
 
 /// Linker symbols for cart_xip region
@@ -170,22 +169,8 @@ pub fn autoStartSingleCart() bool {
         break :blk first_cart.short_name[0..end];
     };
 
-    uart.puts("Auto-starting cart: ");
-    uart.puts(cart_name);
-    uart.puts("\r\n");
-
     // Load the cart
-    const entry_point = loadUF2Cart(cart_name) catch |err| {
-        uart.puts("Auto-start failed: ");
-        switch (err) {
-            LoadError.FileNotFound => uart.puts("Not found\r\n"),
-            LoadError.FileTooLarge => uart.puts("Too large\r\n"),
-            LoadError.InvalidUF2 => uart.puts("Invalid UF2\r\n"),
-            LoadError.UnsupportedFamily => uart.puts("Unsupported family\r\n"),
-            LoadError.AddressMismatch => uart.puts("Address mismatch\r\n"),
-            LoadError.FlashWriteError => uart.puts("Flash error\r\n"),
-            LoadError.ReadError => uart.puts("Read error\r\n"),
-        }
+    const entry_point = loadUF2Cart(cart_name) catch {
         return false;
     };
 
@@ -195,10 +180,8 @@ pub fn autoStartSingleCart() bool {
     // Execute the cart
     if (multicore.executeCart(entry_point)) {
         markRunning();
-        uart.puts("Cart auto-started successfully\r\n");
         return true;
     } else {
-        uart.puts("Failed to execute cart\r\n");
         return false;
     }
 }
@@ -209,7 +192,6 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
     // If a cart is already running, stop Core 1 before erasing cart_xip.
     if (cart_state == .running) {
         const multicore = @import("../system/multicore.zig");
-        uart.puts("Stopping running cart...\r\n");
         multicore.haltCore1();
         multicore.resetCore1();
     }
@@ -219,21 +201,13 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
 
     // Find the cart in FAT12 storage
     const cart_info = storage.findCart(name) orelse {
-        uart.puts("Cart not found: ");
-        uart.puts(name);
-        uart.puts("\r\n");
         return LoadError.FileNotFound;
     };
-
-    uart.puts("Loading UF2: ");
-    uart.puts(name);
-    uart.puts("\r\n");
 
     // Validate size (UF2 blocks are 512 bytes each, cart_xip is 256KB)
     // Max useful data per block is 256 bytes, so max UF2 file size is roughly 2x cart_xip size
     const max_uf2_size = @min(getCartXipSize() * 2, @as(u32, @intCast(cart_buffer.len)));
     if (cart_info.size > max_uf2_size) {
-        uart.puts("UF2 too large\r\n");
         return LoadError.FileTooLarge;
     }
 
@@ -244,13 +218,7 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
     @memcpy(&loaded_cart_name, &cart_info.short_name);
     loaded_cart_size = cart_info.size;
     cart_entry_point = entry_point;
-    cart_state = .ready;
-
-    var buf: [64]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "Cart loaded, entry: 0x{x}\r\n", .{entry_point}) catch "";
-    uart.puts(msg);
-
-    return entry_point;
+    cart_state = .ready;return entry_point;
 }
 
 /// Internal function to load UF2 from storage and program to flash
@@ -260,14 +228,11 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     const cart_xip_size = getCartXipSize();
 
     // Read the entire UF2 file into the cart buffer first
-    uart.puts("Reading UF2 file...\r\n");
     const bytes_read = storage.readCart(cart_info, &cart_buffer);
     if (bytes_read == 0 or bytes_read != cart_info.size) {
-        uart.puts("Failed to read UF2 file\r\n");
         return LoadError.ReadError;
     }
     if (bytes_read % uf2.BLOCK_SIZE != 0) {
-        uart.puts("UF2 size is not a multiple of 512\r\n");
         return LoadError.InvalidUF2;
     }
 
@@ -278,10 +243,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     }
 
     // Erase the cart_xip region
-    uart.puts("Erasing cart_xip region...\r\n");
     try eraseCartXipRegion();
-    uart.puts("Erase complete\r\n");
-
     var parser = uf2.Parser{};
     var block_index: u32 = 0;
 
@@ -300,35 +262,25 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         const block_data = cart_buffer[block_offset..][0..uf2.BLOCK_SIZE];
 
         // Parse the block
-        const block = parser.parseBlock(block_data) catch {
-            var buf: [64]u8 = undefined;
-            const msg = std.fmt.bufPrint(&buf, "UF2 parse error at block {d}\r\n", .{block_index}) catch "";
-            uart.puts(msg);
-            return LoadError.InvalidUF2;
+        const block = parser.parseBlock(block_data) catch {return LoadError.InvalidUF2;
         };
 
         // On first block, validate family and base address
         if (block_index == 0) {
             // Check family ID
             if (block.hasFamilyId() and !block.isRP235X()) {
-                uart.puts("Unsupported family ID\r\n");
                 return LoadError.UnsupportedFamily;
             }
 
             // Check block count matches file length
             if (block.header.num_blocks != num_blocks) {
-                uart.puts("UF2 block count mismatch\r\n");
                 return LoadError.InvalidUF2;
             }
 
             // Check base address is within cart_xip
             if (block.header.target_addr < cart_xip_start or
                 block.header.target_addr >= cart_xip_end)
-            {
-                var buf: [96]u8 = undefined;
-                const msg = std.fmt.bufPrint(&buf, "Address 0x{x} outside cart_xip (0x{x}-0x{x})\r\n", .{ block.header.target_addr, cart_xip_start, cart_xip_end }) catch "";
-                uart.puts(msg);
-                return LoadError.AddressMismatch;
+            {return LoadError.AddressMismatch;
             }
         }
 
@@ -336,7 +288,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         const target_offset = block.header.target_addr - cart_xip_start;
         const payload = block.getPayload();
         if (payload.len == 0) {
-            uart.puts("UF2 block with empty payload\r\n");
             return LoadError.InvalidUF2;
         }
 
@@ -344,7 +295,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         if (block.header.target_addr < cart_xip_start or
             block.header.target_addr + @as(u32, @intCast(payload.len)) > cart_xip_end)
         {
-            uart.puts("UF2 block outside cart_xip\r\n");
             return LoadError.AddressMismatch;
         }
 
@@ -397,22 +347,17 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         try flushWriteBuffer(current_erase_block, cart_xip_start);
     }
 
-    uart.puts("Flash programming complete\r\n");
-
     // Find the vector table by scanning for valid SP and entry point pattern
     // Some toolchains add padding before the vector table
     // Returns the vector table ADDRESS (not entry point) so Core 1 can read both SP and entry
     if (!parser.isComplete()) {
-        uart.puts("UF2 incomplete\r\n");
         return LoadError.InvalidUF2;
     }
     parser.validateAddressRange(cart_xip_start, cart_xip_end) catch {
-        uart.puts("UF2 address range invalid\r\n");
         return LoadError.AddressMismatch;
     };
 
     const vector_table_addr = findVectorTableAddr(cart_xip_start + min_offset, cart_xip_end) orelse {
-        uart.puts("Could not find valid vector table\r\n");
         return LoadError.InvalidUF2;
     };
 
@@ -459,3 +404,5 @@ pub fn loadCart(info: storage.CartInfo) bool {
 pub fn tick() void {
     // XIP carts run directly from flash, no tick needed
 }
+
+

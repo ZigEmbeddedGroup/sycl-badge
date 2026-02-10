@@ -1,7 +1,6 @@
 /// FAT12-based cart storage in the romfs flash region
 const std = @import("std");
 const rom = @import("../drivers/rom.zig");
-const uart = @import("../drivers/uart.zig");
 const interrupts = @import("../system/interrupts.zig");
 
 extern const __romfs_start__: u8;
@@ -126,17 +125,11 @@ fn isFormatted() bool {
 
     // Check all BPB fields match expected values
     if (signature != 0xAA55 or bytes_per_sector != SECTOR_SIZE or root_entries != ROOT_ENTRIES or !std.mem.eql(u8, fs_type, "FAT12   ")) {
-        uart.puts("Format check FAILED (boot sector invalid)\r\n");
         return false;
     }
     var fat0: [SECTOR_SIZE]u8 = undefined;
     readSector(1, fat0[0..]);
     const valid = fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0xFF;
-    if (!valid) {
-        var buf2: [64]u8 = undefined;
-        const msg2 = std.fmt.bufPrint(&buf2, "Format check FAILED (FAT: {x:0>2} {x:0>2} {x:0>2} {x:0>2})\r\n", .{ fat0[0], fat0[1], fat0[2], fat0[3] }) catch "";
-        uart.puts(msg2);
-    }
     return valid;
 }
 
@@ -148,13 +141,7 @@ fn isSizeCorrect() bool {
     const stored_total = readU16(boot[0..], 19); // Total sectors (16-bit)
     const expected_total: u16 = @intCast(volumeTotalSectors());
 
-    if (stored_total != expected_total) {
-        var buf: [96]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "Size mismatch: stored={d} expected={d} sectors\r\n", .{ stored_total, expected_total }) catch "";
-        uart.puts(msg);
-        return false;
-    }
-    return true;
+    return stored_total == expected_total;
 }
 
 fn formatVolume() void {
@@ -247,14 +234,10 @@ pub fn readSector(lba: u32, dst: []u8) void {
 
 pub fn writeSector(lba: u32, src: []const u8) linksection(".ram_text") void {
     if (lba >= totalSectors()) {
-        uart.puts("ERROR: writeSector LBA out of range\r\n");
         return;
     }
 
     if (src.len != SECTOR_SIZE) {
-        var buf: [64]u8 = undefined;
-        const msg = std.fmt.bufPrint(&buf, "ERROR: writeSector wrong size: {d}\r\n", .{src.len}) catch "";
-        uart.puts(msg);
         return;
     }
 

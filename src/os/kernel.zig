@@ -1,10 +1,9 @@
 /// SYCL Badge OS Kernel
-/// USB CDC and UART communication with interactive console
+/// USB CDC communication with interactive console
 const std = @import("std");
 const microzig = @import("microzig");
 
 const usb = @import("drivers/usb.zig");
-const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
 const console = @import("system/console.zig");

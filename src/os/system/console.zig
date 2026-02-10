@@ -3,7 +3,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const usb = @import("../drivers/usb.zig");
-const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
@@ -141,19 +140,18 @@ const commands = [_]Command{
     .{ .name = "reboot", .description = "Restart the system (use 'reboot bootsel' for BootSelect)", .handler = cmdReboot, .completion_provider = rebootCompletions },
 };
 
-// Unified Console Output (sends to both USB and UART)
+// Unified Console Output (sends to USB CDC)
 var print_buffer: [512]u8 = undefined;
 
-/// Print formatted string to console (USB + UART)
+/// Print formatted string to console (USB)
 pub fn printf(comptime fmt: []const u8, args: anytype) void {
     const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return;
     print(text);
 }
 
-/// Print string to console (USB + UART)
+/// Print string to console (USB)
 pub fn print(text: []const u8) void {
     _ = usb.send(text);
-    uart.puts(text);
 }
 
 /// Print string with newline
@@ -1139,7 +1137,6 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Load and execute UF2 cart in one step
         println("\r\n");
-        uart.puts("[DEBUG] Starting cart load...\r\n");
         const entry_point = loader.loadUF2Cart(name) catch |err| {
             switch (err) {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
@@ -1153,20 +1150,15 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             return;
         };
 
-        uart.puts("[DEBUG] Cart loaded, sending execute message...\r\n");
-
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
             // Mark as running from Core 0 side
             // (Core 1 also calls markRunning but this ensures state is set immediately)
             loader.markRunning();
-            uart.puts("[DEBUG] Execute message sent successfully\r\n");
             printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {
-            uart.puts("[DEBUG] Execute message failed\r\n");
             println("Failed to start cart execution\r\n");
         }
-        uart.puts("[DEBUG] Returning from cart run command\r\n");
         return;
     }
 

@@ -5,7 +5,6 @@ const microzig = @import("microzig");
 
 // Driver imports
 const gpio = @import("../drivers/gpio.zig");
-const uart = @import("../drivers/uart.zig");
 const usb = @import("../drivers/usb.zig");
 const timer = @import("../drivers/timer.zig");
 const lcd = @import("../drivers/lcd.zig");
@@ -119,30 +118,15 @@ pub fn init(config: InitConfig) !void {
     // 3. Initialize Buttons (joystick and face buttons)
     gpio.initButtons();
 
-    // 4. Initialize UART for debug output (must be before any uart.println calls)
-    uart.init();
-    uart.println("SYCL Badge OS starting...");
-    uart.println("GPIO initialized");
-    uart.println("LED initialized");
-    uart.println("Buttons initialized");
-    uart.println("UART initialized");
-
-    // 5. Initialize cart storage (FAT16 in romfs) before USB starts
+    // 4. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
     storage.init();
-    uart.println("Cart storage initialized");
-    {
-        var buf: [96]u8 = undefined;
-        const text = std.fmt.bufPrint(&buf, "ROMFS sectors: {d}\r\n", .{storage.totalSectors()}) catch "";
-        uart.puts(text);
-    }
 
-    // 6. Initialize USB
+    // 5. Initialize USB
     const usb_start = timer.micros();
     try usb.init();
-    uart.println("USB initialized");
 
-    // 7. Wait for USB enumeration
+    // 6. Wait for USB enumeration
     const usb_enum_timeout_ms: u32 = 100;
     const start_time = timer.millis();
     while (timer.millis() - start_time < usb_enum_timeout_ms) {
@@ -150,56 +134,33 @@ pub fn init(config: InitConfig) !void {
     }
     const usb_time = timer.micros() - usb_start;
 
-    // 8. Initialize shared memory (for IPC)
+    // 7. Initialize shared memory (for IPC)
     shared_mem.init();
-    uart.println("Shared memory initialized");
 
-    // 9. Initialize console (shows welcome message and prompt)
+    // 8. Initialize console (shows welcome message and prompt)
     console.init();
 
-    // 10. Leave interrupts disabled for now (polling-based drivers)
-    uart.println("Interrupts disabled");
+    // 9. Leave interrupts disabled for now (polling-based drivers)
 
-    // 11. Initialize LCD if configured
+    // 10. Initialize LCD if configured
     if (config.lcd_pins) |lcd_pins| {
         if (config.lcd_config) |lcd_cfg| {
-            const lcd_start = timer.micros();
             // Initialize LCD with all pins (handles SPI and TE pin configuration)
             lcd.initWithAllPins(lcd_pins, lcd_cfg) catch |err| {
-                uart.println("LCD initialization failed");
                 return err;
             };
-            const lcd_time = timer.micros() - lcd_start;
-            {
-                var buf: [64]u8 = undefined;
-                const text = std.fmt.bufPrint(&buf, "LCD initialized ({d}ms)\r\n", .{lcd_time / 1000}) catch "";
-                uart.puts(text);
-            }
-        } else {
-            uart.println("LCD pins provided but no config - skipping LCD init");
         }
     }
 
-    // 12. Initialize Core 1 if chosen (should always be chosen in practice)
+    // 11. Initialize Core 1 if chosen (should always be chosen in practice)
     if (config.init_core1) {
-        const core1_start = timer.micros();
         if (config.core1_entrypoint) |entrypoint| {
             multicore.initCore1WithEntrypoint(entrypoint);
         } else {
             multicore.initCore1();
         }
-        const core1_time = timer.micros() - core1_start;
-        {
-            var buf: [64]u8 = undefined;
-            const text = std.fmt.bufPrint(&buf, "Core 1 initialized ({d}ms)\r\n", .{core1_time / 1000}) catch "";
-            uart.puts(text);
-        }
     }
 
-    const boot_time = timer.micros() - boot_start;
-    {
-        var buf: [96]u8 = undefined;
-        const text = std.fmt.bufPrint(&buf, "System initialization complete (total: {d}ms, USB: {d}ms)\r\n", .{ boot_time / 1000, usb_time / 1000 }) catch "";
-        uart.puts(text);
-    }
+    _ = boot_start;
+    _ = usb_time;
 }

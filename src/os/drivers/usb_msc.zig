@@ -2,7 +2,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const storage = @import("../loader/storage.zig");
-const uart = @import("uart.zig");
 
 const usb = microzig.hal.usb;
 const types = usb.types;
@@ -148,9 +147,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     if (self.cbw_len >= self.cbw_buf.len) {
                         const signature = read_u32_le(self.cbw_buf[0..], 0);
                         if (signature != CBW_SIGNATURE) {
-                            var buf: [64]u8 = undefined;
-                            const text = std.fmt.bufPrint(&buf, "MSC invalid CBW signature: 0x{x}\r\n", .{signature}) catch "";
-                            uart.puts(text);
                             self.resetState();
                             self.need_arm_out = true; // Defer arming to avoid re-entrancy
                             return;
@@ -615,3 +611,4 @@ fn write_u32_le(buf: []u8, value: u32) void {
     buf[2] = @truncate(value >> 16);
     buf[3] = @truncate(value >> 24);
 }
+

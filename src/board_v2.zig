@@ -13,9 +13,20 @@ pub const xosc_freq = 12_000_000;
 // Pin Assignments
 // ========================================
 
-// UART Pins (UART0)
-pub const UART0_TX = gpio.num(0);
-pub const UART0_RX = gpio.num(1);
+// ========================================
+// TC2030-CTX-NL Debug Connector (6-pin Tag-Connect)
+// ========================================
+// This connector provides SWD debugging via external debugger (J-Link, Black Magic Probe, etc.):
+//   Pin 1: VCC (target voltage reference)
+//   Pin 2: SWDIO (Serial Wire Debug I/O)
+//   Pin 3: nRESET (Reset)
+//   Pin 4: SWCLK (Serial Wire Debug Clock)
+//   Pin 5: GND
+//   Pin 6: SWO/TDO (Serial Wire Output for printf-style debugging via debugger)
+//
+// Note: SWDIO, SWCLK, and SWO are dedicated ARM Cortex debug signals on the RP2354B.
+// No firmware driver needed - debugging is handled by external hardware debugger.
+// For printf-style debug output, use SWO with your debugger software (e.g., RTT or SWO viewer).
 
 // LCD Display Pins (DT018BTFT-SHB on SPI0)
 pub const TFT_CS = gpio.num(19); // SPI0 CSn

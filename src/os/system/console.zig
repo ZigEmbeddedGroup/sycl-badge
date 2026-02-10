@@ -85,15 +85,6 @@ fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
-fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
-    _ = partial;
-    if (arg_index == 0) {
-        const options = [_][]const u8{ "on", "off", "toggle" };
-        return &options;
-    }
-    return &[_][]const u8{};
-}
-
 // Static storage for cart name completions
 const MAX_CART_COMPLETIONS = 16;
 const MAX_CART_NAME_LEN = 32;
@@ -132,16 +123,12 @@ fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
 // Command Registry
 const commands = [_]Command{
     .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
-    .{ .name = "led", .description = "Control LED (on/off/toggle)", .handler = cmdLed, .completion_provider = ledCompletions },
     .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
-    .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
-    .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/status/info/delete/wipe)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
     .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
@@ -752,35 +739,6 @@ fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-var led_pin = badge.led_pin;
-var led_initialized = false;
-
-fn cmdLed(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    if (!led_initialized) {
-        led_pin.set_function(.sio);
-        led_pin.set_direction(.out);
-        led_initialized = true;
-    }
-
-    const arg = iter.next();
-    if (arg) |a| {
-        if (std.mem.eql(u8, a, "on")) {
-            led_pin.put(1);
-            println("\r\nLED turned ON\r\n");
-        } else if (std.mem.eql(u8, a, "off")) {
-            led_pin.put(0);
-            println("\r\nLED turned OFF\r\n");
-        } else if (std.mem.eql(u8, a, "toggle")) {
-            led_pin.toggle();
-            println("\r\nLED toggled\r\n");
-        } else {
-            println("\r\nUsage: led [on|off|toggle]\r\n");
-        }
-    } else {
-        println("\r\nUsage: led [on|off|toggle]\r\n");
-    }
-}
-
 fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     const uptime_us = timer.micros();
@@ -790,15 +748,6 @@ fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const seconds = uptime_sec % 60;
 
     printf("\r\nUptime: {d}h {d}m {d}s\r\n\r\n", .{ hours, minutes, seconds });
-}
-
-fn cmdEcho(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    print("\r\n");
-    while (iter.next()) |arg| {
-        print(arg);
-        print(" ");
-    }
-    println("\r\n");
 }
 
 fn cmdClear(iter: *std.mem.TokenIterator(u8, .scalar)) void {
@@ -822,11 +771,6 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         printf("  {d}: {s}\r\n", .{ i + 1, history[idx][0..len] });
     }
     println("");
-}
-fn cmdPs(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
-    println("\r\nProcess listing not implemented yet.\r\n");
-    return;
 }
 
 // GPIO Command Handler
@@ -1081,42 +1025,6 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
 }
 
-// Static counter for ls command (needed because callbacks can't capture locals)
-var ls_file_count: usize = 0;
-var ls_lcd_y: u16 = 0;
-
-fn lsVisitor(name: []const u8, size: u32) void {
-    ls_file_count += 1;
-    printf("  {s}  ({d} bytes)\r\n", .{ name, size });
-    lcd.drawString(10, ls_lcd_y, name, lcd.GREEN, lcd.BLACK, 1);
-    ls_lcd_y += 15;
-}
-
-fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    const name = iter.next() orelse {
-        println("\r\nUsage: load <filename.uf2>\r\n");
-        return;
-    };
-
-    // Load the UF2 cart
-    println("\r\n");
-    const entry_point = loader.loadUF2Cart(name) catch |err| {
-        switch (err) {
-            loader.LoadError.FileNotFound => printf("File not found: {s}\r\n\r\n", .{name}),
-            loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
-            loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
-            loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2354B)\r\n"),
-            loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
-            loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
-            loader.LoadError.ReadError => println("Storage read error\r\n"),
-        }
-        return;
-    };
-
-    printf("Cart loaded at entry point 0x{x}\r\n", .{entry_point});
-    println("Use 'run' to execute, or 'cart run <name>' for one-step load+run\r\n");
-}
-
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
         println("\r\nUsage: cart <list|run|stop|status|info|delete|wipe> [name]\r\n");
@@ -1291,3 +1199,4 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // - left direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
 // - command to print text to LCD screen (probably not necessary other than debugging)
+// - fix extra newline character when using up arrow

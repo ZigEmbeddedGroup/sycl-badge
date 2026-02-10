@@ -7591,6 +7591,164 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "TPS61041DBVR:TPS61041DBVR"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "U"
+				(at -12.7 11.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Value" "TPS61041DBVR"
+				(at -12.7 -14.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Footprint" "TPS61041DBVR:SOT95P280X145-5N"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "TPS61041DBVR_0_0"
+				(rectangle
+					(start -12.7 -10.16)
+					(end 12.7 10.16)
+					(stroke
+						(width 0.41)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin input line
+					(at -17.78 7.62 0)
+					(length 5.08)
+					(name "EN"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -17.78 5.08 0)
+					(length 5.08)
+					(name "FB"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -17.78 2.54 0)
+					(length 5.08)
+					(name "VIN"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin output line
+					(at 17.78 7.62 180)
+					(length 5.08)
+					(name "SW"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 17.78 -5.08 180)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Transistor_FET:Q_NMOS_DGS"
 			(pin_names
 				(offset 0)
@@ -11007,7 +11165,7 @@
 	)
 	(text "tearing effect \n"
 		(exclude_from_sim no)
-		(at 223.266 56.388 0)
+		(at 217.424 54.356 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -11122,6 +11280,26 @@
 			(justify left bottom)
 		)
 		(uuid "6c642c8f-4038-4e2b-8784-945116a7b93e")
+	)
+	(text "I fear the QSPI_CS needs to be double checked with the data sheet. \nI wonder if this should connect to QSPI_SS"
+		(exclude_from_sim no)
+		(at 370.078 52.578 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "6efdc6bd-32c7-420e-bf09-ee4220efc493")
+	)
+	(text "NEED BOOST CIRCUITRY to 6V"
+		(exclude_from_sim no)
+		(at 236.22 61.468 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "7c5e14d1-fed2-4748-9f81-790636569bcc")
 	)
 	(text "RIGHT\n"
 		(exclude_from_sim no)
@@ -11483,12 +11661,6 @@
 		(uuid "6177ba0f-f362-40ab-acec-05913fb64b63")
 	)
 	(junction
-		(at 270.51 205.74)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "62999c4a-5ea2-47d6-8fdc-a17a92dab5b8")
-	)
-	(junction
 		(at 255.27 144.78)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -11615,12 +11787,6 @@
 		(uuid "c9fe7e46-dbb8-4513-93b3-cc2fe9070d4a")
 	)
 	(junction
-		(at 203.2 34.29)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "ccd643f9-54b9-42c9-b00a-9bc74f078f3b")
-	)
-	(junction
 		(at 107.315 218.44)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -11737,10 +11903,6 @@
 		(uuid "2fb8d9e1-2d8b-4ac8-bda2-6c3f76fd3019")
 	)
 	(no_connect
-		(at 322.58 232.41)
-		(uuid "3a449726-a8fb-41bf-85ce-98e81a7464eb")
-	)
-	(no_connect
 		(at 306.07 232.41)
 		(uuid "3cd58789-2174-40a4-b882-758c75e4fc24")
 	)
@@ -11785,6 +11947,10 @@
 		(uuid "6a888e65-b340-4ada-b49d-bff8f2dd313d")
 	)
 	(no_connect
+		(at 341.63 232.41)
+		(uuid "7192edaf-d066-45fc-8805-cba5dd4e192d")
+	)
+	(no_connect
 		(at 30.48 271.78)
 		(uuid "806fcec6-a7f1-4b45-87a1-3edb90802ba5")
 	)
@@ -11801,10 +11967,6 @@
 		(uuid "abec278b-2782-4024-99fb-a404cee1d188")
 	)
 	(no_connect
-		(at 325.12 232.41)
-		(uuid "bab90843-a0bd-4a37-917e-41082ec4747a")
-	)
-	(no_connect
 		(at 311.15 232.41)
 		(uuid "cd05d048-87f6-4770-b9cf-b459a29cd9be")
 	)
@@ -11815,6 +11977,10 @@
 	(no_connect
 		(at 364.49 200.66)
 		(uuid "d4f0385d-f187-45a6-99b1-9f00e76f2010")
+	)
+	(no_connect
+		(at 339.09 232.41)
+		(uuid "dc2f05aa-be1e-4ad1-9e3e-7589719cb235")
 	)
 	(no_connect
 		(at 92.71 133.35)
@@ -12482,16 +12648,6 @@
 	)
 	(wire
 		(pts
-			(xy 327.66 232.41) (xy 327.66 245.11)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2548aeb7-be97-445d-b05d-cd9ebecab0bd")
-	)
-	(wire
-		(pts
 			(xy 80.01 264.16) (xy 80.01 262.89)
 		)
 		(stroke
@@ -12762,13 +12918,13 @@
 	)
 	(wire
 		(pts
-			(xy 339.09 245.11) (xy 339.09 232.41)
+			(xy 325.12 232.41) (xy 325.12 245.11)
 		)
 		(stroke
 			(width 0.1524)
 			(type solid)
 		)
-		(uuid "3717b07f-2f80-4b23-b4e8-514f1030856f")
+		(uuid "36bc3cb1-fca6-4018-ae81-aaa89a5d38fe")
 	)
 	(wire
 		(pts
@@ -13102,7 +13258,7 @@
 	)
 	(wire
 		(pts
-			(xy 187.96 59.69) (xy 203.2 59.69)
+			(xy 187.96 59.69) (xy 227.33 59.69)
 		)
 		(stroke
 			(width 0)
@@ -13219,6 +13375,16 @@
 			(type default)
 		)
 		(uuid "5275bc60-35f9-46e5-94cd-5c360fbf9840")
+	)
+	(wire
+		(pts
+			(xy 336.55 245.11) (xy 336.55 232.41)
+		)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(uuid "52e69f57-bb5a-48f1-91a0-6e8daafc2c5f")
 	)
 	(wire
 		(pts
@@ -13462,6 +13628,16 @@
 	)
 	(wire
 		(pts
+			(xy 322.58 232.41) (xy 322.58 245.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "64da67e0-2c3a-4084-81fc-a5fc58fba59b")
+	)
+	(wire
+		(pts
 			(xy 341.63 135.89) (xy 341.63 134.62)
 		)
 		(stroke
@@ -13639,6 +13815,16 @@
 			(type default)
 		)
 		(uuid "6c9811db-cf38-433c-b760-32beee190681")
+	)
+	(wire
+		(pts
+			(xy 222.25 205.74) (xy 270.51 205.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6ca1f8d2-91e6-4527-9833-4676cdfae8ff")
 	)
 	(wire
 		(pts
@@ -13849,16 +14035,6 @@
 			(type default)
 		)
 		(uuid "77872761-374e-48e3-92d4-809fae2e8858")
-	)
-	(wire
-		(pts
-			(xy 330.2 245.11) (xy 330.2 232.41)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "77f95f6d-0b9d-4be1-98c8-9f7066c765bb")
 	)
 	(wire
 		(pts
@@ -14159,6 +14335,16 @@
 			(type solid)
 		)
 		(uuid "8a61b652-a3e0-4814-8db8-dc680f67ef98")
+	)
+	(wire
+		(pts
+			(xy 330.2 245.11) (xy 330.2 232.41)
+		)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(uuid "8a848d6f-d458-4f4f-a992-be9e8dc17b98")
 	)
 	(wire
 		(pts
@@ -14592,16 +14778,6 @@
 	)
 	(wire
 		(pts
-			(xy 222.25 205.74) (xy 270.51 205.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a93091c0-3c33-4b2c-9999-d455cec0c8f3")
-	)
-	(wire
-		(pts
 			(xy 106.68 110.49) (xy 106.68 111.76)
 		)
 		(stroke
@@ -15002,6 +15178,16 @@
 	)
 	(wire
 		(pts
+			(xy 327.66 245.11) (xy 327.66 232.41)
+		)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(uuid "c48b3f32-fb7e-4a4a-8a2d-d889482a8a13")
+	)
+	(wire
+		(pts
 			(xy 397.51 43.18) (xy 397.51 40.64)
 		)
 		(stroke
@@ -15039,16 +15225,6 @@
 			(type default)
 		)
 		(uuid "c8d8833e-ce61-4220-be1e-0ca12a20e408")
-	)
-	(wire
-		(pts
-			(xy 336.55 245.11) (xy 336.55 232.41)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "c93d87b4-f444-4af2-95a1-4cc71452d83f")
 	)
 	(wire
 		(pts
@@ -15272,6 +15448,16 @@
 	)
 	(wire
 		(pts
+			(xy 222.25 227.33) (xy 222.25 219.71)
+		)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(uuid "d9591871-06fd-4d35-bc2e-54df9c4f05d9")
+	)
+	(wire
+		(pts
 			(xy 298.45 232.41) (xy 298.45 245.11)
 		)
 		(stroke
@@ -15349,16 +15535,6 @@
 			(type solid)
 		)
 		(uuid "dbd7b864-6c6e-4380-afa6-bfdac6444ba4")
-	)
-	(wire
-		(pts
-			(xy 341.63 245.11) (xy 341.63 232.41)
-		)
-		(stroke
-			(width 0.1524)
-			(type solid)
-		)
-		(uuid "dc71ce53-57dc-433b-821a-3ea489c94986")
 	)
 	(wire
 		(pts
@@ -15482,16 +15658,6 @@
 	)
 	(wire
 		(pts
-			(xy 273.05 205.74) (xy 270.51 205.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e535732d-d215-47d1-836d-0c2692e2f01c")
-	)
-	(wire
-		(pts
 			(xy 187.96 31.75) (xy 203.2 31.75)
 		)
 		(stroke
@@ -15499,16 +15665,6 @@
 			(type default)
 		)
 		(uuid "e54629a4-000d-4039-8407-9871a16e7b07")
-	)
-	(wire
-		(pts
-			(xy 203.2 34.29) (xy 203.2 59.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e57084aa-de96-4baf-a601-8a9d3a102570")
 	)
 	(wire
 		(pts
@@ -15679,6 +15835,16 @@
 			(type default)
 		)
 		(uuid "f11dde32-2de9-49f3-9c25-13818ae4fd9c")
+	)
+	(wire
+		(pts
+			(xy 222.25 205.74) (xy 222.25 209.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f5c0c048-674c-4768-abe2-b7e8cbc4d09f")
 	)
 	(wire
 		(pts
@@ -15890,6 +16056,16 @@
 		)
 		(uuid "093a39ea-baaf-4403-8f92-3dcedaf21807")
 	)
+	(label "LCD_SCL"
+		(at 327.66 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "0a46aef7-b3c7-4ebb-8dda-e484bcda69a7")
+	)
 	(label "QSPI_SCK"
 		(at 257.81 193.04 0)
 		(effects
@@ -15929,6 +16105,16 @@
 			(justify left bottom)
 		)
 		(uuid "17171203-216e-4e87-8ece-f917fca64d7a")
+	)
+	(label "BKLT_PWM"
+		(at 322.58 245.11 90)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1916f21e-bc02-4fea-8993-af8087294d37")
 	)
 	(label "D-"
 		(at 46.99 146.05 180)
@@ -16010,6 +16196,16 @@
 		)
 		(uuid "33660e92-abfd-4002-be98-30d63f07a0d9")
 	)
+	(label "~{LCD_CS}"
+		(at 325.12 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "3575d8b1-3000-4cc1-8018-83b1e97e15ed")
+	)
 	(label "QSPI_CS"
 		(at 175.26 97.79 0)
 		(effects
@@ -16039,16 +16235,6 @@
 			(justify right bottom)
 		)
 		(uuid "43033d1f-c78c-406f-8470-f88d0d1cdda6")
-	)
-	(label "LCD_SDIO"
-		(at 336.55 245.11 90)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "45201b37-ae76-4871-976d-993317fc3812")
 	)
 	(label "A0"
 		(at 300.99 245.11 90)
@@ -16139,16 +16325,6 @@
 			(justify right bottom)
 		)
 		(uuid "51a77704-5b51-4387-b59c-d2a68c461afb")
-	)
-	(label "BKLT_PWM"
-		(at 327.66 245.11 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "54ae92b4-7e60-4621-91dd-530d68a3fd9a")
 	)
 	(label "SWDIO"
 		(at 377.19 205.74 180)
@@ -16269,16 +16445,6 @@
 			(justify left bottom)
 		)
 		(uuid "6c06648a-428c-4bbb-9da4-5999910ec6ba")
-	)
-	(label "~{LCD_CS}"
-		(at 330.2 245.11 90)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "6e09f3b9-4492-4c9c-bdf8-42ed888fef24")
 	)
 	(label "LCD_SDIO"
 		(at 214.63 41.91 180)
@@ -16449,16 +16615,6 @@
 			(justify left bottom)
 		)
 		(uuid "9c8bb78d-c52e-4dea-8085-e39c65926b53")
-	)
-	(label "LCD_D{slash}CX"
-		(at 339.09 245.11 90)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "9d287b0d-23c9-41c5-8f8c-1068574285e0")
 	)
 	(label "~{RESET}"
 		(at 398.78 161.29 90)
@@ -16720,6 +16876,26 @@
 		)
 		(uuid "ea83834d-624f-40da-89d0-2e075f08375d")
 	)
+	(label "LCD_SDIO"
+		(at 330.2 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "eb1f6278-cfcf-42d2-8e81-c1d1a5eee523")
+	)
+	(label "LCD_D{slash}CX"
+		(at 336.55 245.11 90)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify left bottom)
+		)
+		(uuid "f833bc9e-6202-4fa6-ba2a-e4ca8c7cf204")
+	)
 	(label "TE"
 		(at 214.63 57.15 180)
 		(effects
@@ -16739,16 +16915,6 @@
 			(justify left bottom)
 		)
 		(uuid "fa3c9424-e7de-42c8-b79d-656a19038f56")
-	)
-	(label "LCD_SCL"
-		(at 341.63 245.11 90)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "fbd7434d-4d75-4277-8e0a-8bf50a849bf3")
 	)
 	(label "BUTTON0"
 		(at 79.375 207.01 90)
@@ -16889,6 +17055,185 @@
 			(project ""
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "TP1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Switch:SW_SPST")
+		(at 222.25 214.63 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "035f4159-0d8d-475d-b41f-2677d9732b71")
+		(property "Reference" "SW3"
+			(at 224.79 213.36 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "SW_SPST"
+			(at 224.79 215.9 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A"
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Part Number" "CKN12221-1-ND"
+			(at 222.25 214.63 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "C&K"
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part Number" "PTS526 SK15 SMTR2 LFS"
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "SMD"
+			(at 222.25 214.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2689521"
+			(at 222.25 214.63 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "1422787b-b7ed-42d9-9f8b-2d911f7e0dce")
+		)
+		(pin "2"
+			(uuid "35020b7e-727a-4fa8-9b98-bedb7eef419c")
+		)
+		(instances
+			(project "SYCL Badge 2024"
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "SW3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 222.25 227.33 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "037c654b-7251-4dbc-8e44-214838d381f8")
+		(property "Reference" "#PWR075"
+			(at 222.25 233.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 222.25 231.775 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 222.25 227.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 222.25 227.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 222.25 227.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e8710ee1-aca2-4f2c-b88d-81730c04e128")
+		)
+		(instances
+			(project "SYCL Badge 2024"
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "#PWR075")
 					(unit 1)
 				)
 			)
@@ -19097,6 +19442,84 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "#P+05")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "TPS61041DBVR:TPS61041DBVR")
+		(at -25.4 171.45 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1e0a1770-8b5f-4259-b5e1-8fa298bd9d4d")
+		(property "Reference" "U9"
+			(at -25.4 156.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "TPS61041DBVR"
+			(at -25.4 158.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TPS61041DBVR:SOT95P280X145-5N"
+			(at -25.4 171.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at -25.4 171.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at -25.4 171.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "026de23e-3830-49f5-ac08-75f847b5a5ed")
+		)
+		(pin "4"
+			(uuid "10a990a7-6a50-42e2-8cd4-3fe9e2728672")
+		)
+		(pin "3"
+			(uuid "34d168ee-a081-44ac-9496-ab3ae6b848f1")
+		)
+		(pin "1"
+			(uuid "dfc41962-eaa7-414c-b1f5-6fea52961e72")
+		)
+		(pin "5"
+			(uuid "e8565d2f-3847-45e8-ae63-0e4b683596e9")
+		)
+		(instances
+			(project ""
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "U9")
 					(unit 1)
 				)
 			)
@@ -27733,6 +28156,72 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "C25")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_name "+3V3_4")
+		(lib_id "power:+3V3")
+		(at 227.33 59.69 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "a15f1947-7966-4bfe-a747-b490b7b97ef5")
+		(property "Reference" "#PWR076"
+			(at 227.33 63.5 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+6"
+			(at 226.822 55.88 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 227.33 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 227.33 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3V3\""
+			(at 227.33 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "130d95e4-3fbc-43d5-9a30-2115814cc65c")
+		)
+		(instances
+			(project "SYCL Badge 2024"
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "#PWR076")
 					(unit 1)
 				)
 			)

@@ -38,7 +38,8 @@ const NeopixelColor = extern struct {
 const Neopixels = struct {
     /// Write colors to all neopixels
     pub fn write(leds: *const [NUM_LEDS]NeopixelColor) void {
-        var buf: [NUM_LEDS * 3]u8 = undefined;
+        // Initialize buffer to zero to prevent garbage data
+        var buf: [NUM_LEDS * 3]u8 = [_]u8{0} ** (NUM_LEDS * 3);
 
         for (leds, 0..) |color, i| {
             buf[i * 3 + 0] = color.g;
@@ -63,9 +64,9 @@ const Neopixels = struct {
         const SIO_GPIO_OUT_SET: *volatile u32 = @ptrFromInt(0xD0000018);
         const SIO_GPIO_OUT_CLR: *volatile u32 = @ptrFromInt(0xD0000020);
 
-        // Send reset pulse (>50us low)
+        // Send reset pulse (>50us required, using 100us for safety)
         SIO_GPIO_OUT_CLR.* = pin_mask;
-        time.sleep_us(80);
+        time.sleep_us(100);
 
         // Send each byte
         for (buf) |byte| {
@@ -101,6 +102,10 @@ const Neopixels = struct {
                 }
             }
         }
+
+        // Ensure pin ends LOW and send final reset pulse to latch data
+        SIO_GPIO_OUT_CLR.* = pin_mask;
+        time.sleep_us(100);
     }
 };
 
@@ -156,10 +161,11 @@ var last_buttons = ButtonState{};
 // ============================================================================
 
 pub fn main() void {
-    // Initialize neopixel pin as output
+    // Initialize neopixel pin as output and ensure it starts LOW
     const neopixel_pin = gpio.num(NEOPIXEL_PIN);
     neopixel_pin.set_function(.sio);
     neopixel_pin.set_direction(.out);
+    neopixel_pin.put(0); // Ensure pin starts LOW
 
     // Initialize joystick pins as inputs with pull-downs
     board.joystick_up.set_function(.sio);

@@ -85,6 +85,15 @@ fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
+fn rebootCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{ "bootsel" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
 // Static storage for cart name completions
 const MAX_CART_COMPLETIONS = 16;
 const MAX_CART_NAME_LEN = 32;
@@ -129,8 +138,7 @@ const commands = [_]Command{
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/status/info/delete/wipe)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
-    .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
+    .{ .name = "reboot", .description = "Restart the system (use 'reboot bootsel' for BootSelect)", .handler = cmdReboot, .completion_provider = rebootCompletions },
 };
 
 // Unified Console Output (sends to both USB and UART)
@@ -640,7 +648,7 @@ fn commandLineCompletion() void {
 fn clearCurrentLine() void {
     // Clear entire line and move cursor to start
     print("\r\x1b[K");
-    showPrompt();
+    print(PROMPT);
     line_length = 0;
     cursor_pos = 0;
 }
@@ -686,7 +694,7 @@ fn loadHistory(idx: usize) void {
 
     // Clear current line
     print("\r\x1b[K");
-    showPrompt();
+    print(PROMPT);
 
     // Load from history
     @memcpy(line_buffer[0..len], history[hist_idx][0..len]);
@@ -930,52 +938,55 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
-    println("\r\nRebooting system...\r\n");
+    const arg = iter.next();
+    if (arg) |a| {
+        if (std.mem.eql(u8, a, "bootsel")) {
+            println("\r\nRebooting to BootSelect...\r\n");
 
-    // Small delay to allow message to be sent
-    timer.sleep_ms(50);
+            // Small delay to allow message to be sent
+            timer.sleep_ms(50);
 
-    // Disconnect USB to properly signal disconnection to the host
-    // This prevents the terminal from thinking the connection is still active
-    usb.disconnect();
+            // Use ROM function to reset to USB bootloader
+            rom.reset_to_usb_boot();
+        } else {
+            printf("\r\nUnknown reboot option: {s}\r\nUsage: reboot [bootsel]\r\n\r\n", .{a});
+        }
+    } else {
+        println("\r\nRebooting system...\r\n");
 
-    // Small delay to allow host to detect disconnection
-    timer.sleep_ms(10);
+        // Small delay to allow message to be sent
+        timer.sleep_ms(50);
 
-    // Trigger system reset via SCB (System Control Block)
-    const SCB_BASE = 0xE000ED00;
-    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+        // Disconnect USB to properly signal disconnection to the host
+        // This prevents the terminal from thinking the connection is still active
+        usb.disconnect();
 
-    // Write SYSRESETREQ bit with VECTKEY
-    // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
-    // Need to preserve other bits in AIRCR, so read-modify-write
-    microzig.cpu.dsb();
-    microzig.cpu.isb();
+        // Small delay to allow host to detect disconnection
+        timer.sleep_ms(10);
 
-    // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-    AIRCR.* = 0x05FA0004;
+        // Trigger system reset via SCB (System Control Block)
+        const SCB_BASE = 0xE000ED00;
+        const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 
-    microzig.cpu.dsb();
-    microzig.cpu.isb();
+        // Write SYSRESETREQ bit with VECTKEY
+        // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+        // Need to preserve other bits in AIRCR, so read-modify-write
+        microzig.cpu.dsb();
+        microzig.cpu.isb();
 
-    // Wait for reset to occur (should happen immediately)
-    while (true) {
-        microzig.cpu.wfi();
+        // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+        AIRCR.* = 0x05FA0004;
+
+        microzig.cpu.dsb();
+        microzig.cpu.isb();
+
+        // Wait for reset to occur (should happen immediately)
+        while (true) {
+            microzig.cpu.wfi();
+        }
     }
 }
 
-// Reboot to BootSelect Command
-fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
-    println("\r\nRebooting to BootSelect...\r\n");
-
-    // Small delay to allow message to be sent
-    timer.sleep_ms(50);
-
-    // Use ROM function to reset to USB bootloader
-    rom.reset_to_usb_boot();
-}
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {

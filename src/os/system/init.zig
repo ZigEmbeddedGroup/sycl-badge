@@ -150,7 +150,7 @@ pub fn init(config: InitConfig) !void {
 
     // Boot-time cart_xip check — report vector table presence
     if (loader.getCartXipVector()) |v| {
-        console.printf("Cart XIP vector found: addr=0x{x}, sp=0x{x}, entry=0x{x}\r\n", .{v.addr, v.sp, v.entry});
+        console.printf("Cart XIP vector found: addr=0x{x}, sp=0x{x}, entry=0x{x}\r\n", .{ v.addr, v.sp, v.entry });
     } else {
         console.println("Cart XIP: no valid vector found\r\n");
     }

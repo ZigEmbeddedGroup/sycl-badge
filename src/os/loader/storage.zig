@@ -220,7 +220,7 @@ fn formatVolume() void {
     // Mark formatted and record debug message
     formatted_this_boot = true;
     var _buf: [128]u8 = undefined;
-    const _romfs_slice = std.fmt.bufPrint(_buf[0..], "ROMFS formatted: base=0x{x}, size={d} bytes\r\n", .{romfsBase(), romfsSize()}) catch "";
+    const _romfs_slice = std.fmt.bufPrint(_buf[0..], "ROMFS formatted: base=0x{x}, size={d} bytes\r\n", .{ romfsBase(), romfsSize() }) catch "";
     if (_romfs_slice.len != 0) debug_log.record(_romfs_slice);
 }
 
@@ -297,7 +297,7 @@ fn flushPending() linksection(".ram_text") void {
     const flash_offset = pending_block_addr - XIP_BASE;
     // Log pending flush info for debugging
     var _msg: [128]u8 = undefined;
-    const _flush_slice = std.fmt.bufPrint(_msg[0..], "flushPending: flash_offset=0x{x}, size={d}\r\n", .{flash_offset, FLASH_ERASE_BLOCK}) catch "";
+    const _flush_slice = std.fmt.bufPrint(_msg[0..], "flushPending: flash_offset=0x{x}, size={d}\r\n", .{ flash_offset, FLASH_ERASE_BLOCK }) catch "";
     if (_flush_slice.len != 0) debug_log.record(_flush_slice);
 
     interrupts.disableInterrupts();

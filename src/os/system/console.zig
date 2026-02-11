@@ -1093,7 +1093,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // ROMFS / storage info
         printf("  ROMFS base: 0x{x} size: {d}KB\r\n", .{ storage.romfsBaseAddr(), storage.romfsSizeBytes() / 1024 });
-        printf("  ROMFS formatted this boot: {s}\r\n", .{ if (storage.getFormattedThisBoot()) "yes" else "no" });
+        printf("  ROMFS formatted this boot: {s}\r\n", .{if (storage.getFormattedThisBoot()) "yes" else "no"});
 
         println("");
         return;

@@ -2,6 +2,7 @@
 const std = @import("std");
 const rom = @import("../drivers/rom.zig");
 const interrupts = @import("../system/interrupts.zig");
+const debug_log = @import("../debug_log.zig");
 
 extern const __romfs_start__: u8;
 extern const __romfs_end__: u8;
@@ -44,6 +45,8 @@ var pending_block_addr: u32 = 0;
 var pending_valid: bool = false;
 var pending_dirty: bool = false;
 var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
+
+pub var formatted_this_boot: bool = false;
 
 pub fn init() void {
     // Check if filesystem size matches expected (reformat if changed)
@@ -213,6 +216,12 @@ fn formatVolume() void {
     label_sector[DIR_ATTR] = 0x08; // Volume label
     writeSector(root_lba, label_sector[0..]);
     flushPendingWrites();
+
+    // Mark formatted and record debug message
+    formatted_this_boot = true;
+    var _buf: [128]u8 = undefined;
+    const _romfs_slice = std.fmt.bufPrint(_buf[0..], "ROMFS formatted: base=0x{x}, size={d} bytes\r\n", .{romfsBase(), romfsSize()}) catch "";
+    if (_romfs_slice.len != 0) debug_log.record(_romfs_slice);
 }
 
 pub fn readSector(lba: u32, dst: []u8) void {
@@ -265,6 +274,18 @@ pub fn flushPendingWrites() linksection(".ram_text") void {
     flushPending();
 }
 
+pub fn getFormattedThisBoot() bool {
+    return formatted_this_boot;
+}
+
+pub fn romfsBaseAddr() u32 {
+    return romfsBase();
+}
+
+pub fn romfsSizeBytes() usize {
+    return romfsSize();
+}
+
 fn flushPending() linksection(".ram_text") void {
     if (!pending_valid) {
         return; // Silent (no pending data)
@@ -274,6 +295,11 @@ fn flushPending() linksection(".ram_text") void {
     }
 
     const flash_offset = pending_block_addr - XIP_BASE;
+    // Log pending flush info for debugging
+    var _msg: [128]u8 = undefined;
+    const _flush_slice = std.fmt.bufPrint(_msg[0..], "flushPending: flash_offset=0x{x}, size={d}\r\n", .{flash_offset, FLASH_ERASE_BLOCK}) catch "";
+    if (_flush_slice.len != 0) debug_log.record(_flush_slice);
+
     interrupts.disableInterrupts();
     defer interrupts.enableInterrupts();
 

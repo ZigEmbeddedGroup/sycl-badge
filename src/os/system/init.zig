@@ -8,6 +8,9 @@ const gpio = @import("../drivers/gpio.zig");
 const usb = @import("../drivers/usb.zig");
 const timer = @import("../drivers/timer.zig");
 const lcd = @import("../drivers/lcd.zig");
+const rom = @import("../drivers/rom.zig");
+const loader = @import("../loader/loader.zig");
+const debug_log = @import("../debug_log.zig");
 
 // System imports
 const console = @import("console.zig");
@@ -120,6 +123,8 @@ pub fn init(config: InitConfig) !void {
 
     // 4. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
+    // Ensure internal flash is connected before any ROM access (improves persistence across power cycles)
+    rom.connect_internal_flash();
     storage.init();
 
     // 5. Initialize USB
@@ -139,6 +144,16 @@ pub fn init(config: InitConfig) !void {
 
     // 8. Initialize console (shows welcome message and prompt)
     console.init();
+
+    // Dump any early boot logs recorded before console was available
+    debug_log.forEachEntry(console.__console_print_log);
+
+    // Boot-time cart_xip check — report vector table presence
+    if (loader.getCartXipVector()) |v| {
+        console.printf("Cart XIP vector found: addr=0x{x}, sp=0x{x}, entry=0x{x}\r\n", .{v.addr, v.sp, v.entry});
+    } else {
+        console.println("Cart XIP: no valid vector found\r\n");
+    }
 
     // 9. Leave interrupts disabled for now (polling-based drivers)
 

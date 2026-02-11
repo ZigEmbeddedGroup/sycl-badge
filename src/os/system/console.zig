@@ -11,6 +11,7 @@ const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
+const debug_log = @import("../debug_log.zig");
 const multicore = @import("multicore.zig");
 const badge = microzig.board;
 
@@ -158,6 +159,11 @@ pub fn print(text: []const u8) void {
 pub fn println(text: []const u8) void {
     print(text);
     print("\r\n");
+}
+
+/// Helper to print a debug_log entry with newline
+pub fn __console_print_log(msg: []const u8) void {
+    printf("  {s}\r\n", .{msg});
 }
 
 /// Show the prompt
@@ -817,7 +823,7 @@ fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     }
 
-    // Configure as input to read actual pin state
+    // Configure as input to read actual pin state (otherwise it doesn't get the correct value)
     gpio.configureAsInput(pin_num);
 
     const pin = gpio.num(pin_num);
@@ -1084,6 +1090,11 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             loader.getCartXipEnd(),
             loader.getCartXipSize() / 1024,
         });
+
+        // ROMFS / storage info
+        printf("  ROMFS base: 0x{x} size: {d}KB\r\n", .{ storage.romfsBaseAddr(), storage.romfsSizeBytes() / 1024 });
+        printf("  ROMFS formatted this boot: {s}\r\n", .{ if (storage.getFormattedThisBoot()) "yes" else "no" });
+
         println("");
         return;
     }
@@ -1137,6 +1148,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Load and execute UF2 cart in one step
         println("\r\n");
+
         const entry_point = loader.loadUF2Cart(name) catch |err| {
             switch (err) {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
@@ -1147,8 +1159,14 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
                 loader.LoadError.ReadError => println("Storage read error\r\n"),
             }
+
+            // Dump debug logs to console for diagnostic info
+            debug_log.forEachEntry(__console_print_log);
             return;
         };
+
+        // Dump loader/storage logs (verification/erase info)
+        debug_log.forEachEntry(__console_print_log);
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
@@ -1192,6 +1210,13 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         } else {
             printf("\r\nCart not found: {s}\r\n\r\n", .{name});
         }
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "diag")) {
+        println("\r\nCart diagnostic log:\r\n");
+        debug_log.forEachEntry(__console_print_log);
+        println("");
         return;
     }
 

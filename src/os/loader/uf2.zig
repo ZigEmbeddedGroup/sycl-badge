@@ -179,58 +179,10 @@ pub const Parser = struct {
     }
 };
 
-/// Information about a parsed UF2 file
-pub const UF2Info = struct {
-    /// Total number of blocks
-    num_blocks: u32,
-    /// Family ID
-    family_id: u32,
-    /// Base address (lowest target address)
-    base_addr: u32,
-    /// Total binary size in bytes
-    binary_size: u32,
-    /// Entry point address (typically base_addr + 4 for vector table Reset_Handler)
-    entry_point: u32,
-};
+// Removed unused helper types and convenience functions to reduce the public API surface.
+// Use the Parser methods (reset, parseBlock, validateAddressRange, getBinarySize, isComplete)
+// to inspect UF2 metadata and perform validation during load operations.
 
-/// Extract UF2 info from the first block
-pub fn getInfoFromFirstBlock(data: *align(1) const [BLOCK_SIZE]u8) Error!UF2Info {
-    const block: *const Block = @ptrCast(@alignCast(data));
-
-    if (!block.isValid()) {
-        return Error.InvalidMagic;
-    }
-
-    const family_id = if (block.hasFamilyId()) block.getFamilyId() else 0;
-
-    return .{
-        .num_blocks = block.header.num_blocks,
-        .family_id = family_id,
-        .base_addr = block.header.target_addr,
-        .binary_size = 0, // Unknown until all blocks are parsed
-        .entry_point = 0, // Will be extracted from vector table after loading
-    };
-}
-
-/// Validate that a UF2 is compatible with RP2354B cart execution
-pub fn validateForCartExecution(block: *const Block, cart_xip_start: u32, cart_xip_end: u32) Error!void {
-    // Check family ID
-    if (block.hasFamilyId()) {
-        if (!block.isRP235X()) {
-            return Error.UnsupportedFamily;
-        }
-    }
-
-    // Check address range (first block gives us base address)
-    if (block.header.target_addr < cart_xip_start or block.header.target_addr >= cart_xip_end) {
-        return Error.AddressOutOfRange;
-    }
-}
-
-/// Calculate the offset within the cart_xip region for a given target address
-pub fn calculateOffset(target_addr: u32, cart_xip_start: u32) u32 {
-    return target_addr - cart_xip_start;
-}
 
 // Comptime validation
 comptime {

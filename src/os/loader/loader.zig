@@ -6,6 +6,7 @@ const storage = @import("storage.zig");
 const uf2 = @import("uf2.zig");
 const rom = @import("../drivers/rom.zig");
 const interrupts = @import("../system/interrupts.zig");
+const debug_log = @import("../debug_log.zig");
 
 /// Linker symbols for cart_xip region
 extern const __cart_xip_start__: u8;
@@ -76,6 +77,20 @@ pub fn getCartXipSize() u32 {
     return getCartXipEnd() - getCartXipStart();
 }
 
+pub const CartVector = struct {
+    addr: u32,
+    sp: u32,
+    entry: u32,
+};
+
+pub fn getCartXipVector() ?CartVector {
+    const cart_xip_start = getCartXipStart();
+    const cart_xip_end = getCartXipEnd();
+    const vt = findVectorTableAddr(cart_xip_start, cart_xip_end) orelse return null;
+    const vector_table: *const [2]u32 = @ptrFromInt(vt);
+    return CartVector{ .addr = vt, .sp = vector_table[0], .entry = vector_table[1] };
+} 
+
 /// Find a valid ARM Cortex-M vector table by scanning memory
 /// Some toolchains add padding before the vector table, so we scan for the pattern:
 /// - [0] = Stack pointer: Must be in RAM range (0x20000000-0x20080000) and aligned
@@ -92,8 +107,8 @@ fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
     const xip_end = getCartXipEnd();
 
     // Scan in 4-byte increments (word aligned)
-    // Limit scan to first 1KB to allow for toolchain padding before vectors
-    const scan_limit = @min(start_addr + 1024, end_addr - 8);
+    // Limit scan to first 4KB to allow for toolchain padding before vectors
+    const scan_limit = @min(start_addr + 4096, end_addr - 8);
 
     var addr = start_addr;
     while (addr < scan_limit) : (addr += 4) {
@@ -243,6 +258,11 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         return LoadError.InvalidUF2;
     }
 
+    // Debug: record file/blocks info
+    var _uf2_msg: [128]u8 = undefined;
+    const _uf2_slice = std.fmt.bufPrint(_uf2_msg[0..], "UF2 read: {d} bytes, blocks={d}\r\n", .{bytes_read, num_blocks}) catch "";
+    if (_uf2_slice.len != 0) debug_log.record(_uf2_slice);
+
     // Erase the cart_xip region
     try eraseCartXipRegion();
     var parser = uf2.Parser{};
@@ -361,8 +381,29 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     };
 
     const vector_table_addr = findVectorTableAddr(cart_xip_start + min_offset, cart_xip_end) orelse {
-        return LoadError.InvalidUF2;
+        debug_log.record("findVectorTableAddr: vector not found after programming");
+        return LoadError.FlashWriteError;
     };
+
+    // Read back and verify vector table after programming
+    const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
+    const sp = vector_table[0];
+    const entry = vector_table[1];
+
+    const RAM_START: u32 = 0x20000000;
+    const RAM_END: u32 = 0x20080000;
+    const entry_addr = entry & ~@as(u32, 1);
+
+    if (!(sp >= RAM_START and sp <= RAM_END and ((sp & 0x7) == 0) and (entry_addr >= cart_xip_start and entry_addr < cart_xip_end and ((entry & 1) == 1)))) {
+        var _verify_msg: [128]u8 = undefined;
+        const _verify_failed_slice = std.fmt.bufPrint(_verify_msg[0..], "Post-program verification FAILED: sp=0x{x} entry=0x{x}\r\n", .{sp, entry}) catch "";
+        if (_verify_failed_slice.len != 0) debug_log.record(_verify_failed_slice);
+        return LoadError.FlashWriteError;
+    } else {
+        var _verify_ok_msg: [128]u8 = undefined;
+        const _verify_ok_slice = std.fmt.bufPrint(_verify_ok_msg[0..], "Post-program verification OK: vt=0x{x} sp=0x{x} entry=0x{x}\r\n", .{vector_table_addr, sp, entry}) catch "";
+        if (_verify_ok_slice.len != 0) debug_log.record(_verify_ok_slice);
+    }
 
     return vector_table_addr;
 }
@@ -373,6 +414,11 @@ fn eraseCartXipRegion() LoadError!void {
     const cart_xip_size = getCartXipSize();
     const flash_offset = cart_xip_start - XIP_BASE;
 
+    // Record erase attempt for debugging
+    var _erase_msg: [128]u8 = undefined;
+    const _erase_slice = std.fmt.bufPrint(_erase_msg[0..], "eraseCartXipRegion: flash_offset=0x{x}, size={d}\r\n", .{flash_offset, cart_xip_size}) catch "";
+    if (_erase_slice.len != 0) debug_log.record(_erase_slice);
+
     interrupts.disableInterrupts();
     defer interrupts.enableInterrupts();
 
@@ -380,12 +426,17 @@ fn eraseCartXipRegion() LoadError!void {
     rom.flash_range_erase(flash_offset, cart_xip_size, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);
     rom.flash_flush_cache();
     rom.flash_enter_cmd_xip();
-}
+} 
 
 /// Flush write buffer to flash
 fn flushWriteBuffer(erase_block_num: u32, cart_xip_start: u32) LoadError!void {
     const flash_addr = cart_xip_start + (erase_block_num * FLASH_ERASE_BLOCK);
     const flash_offset = flash_addr - XIP_BASE;
+
+    // Debug: record write attempt
+    var _fw_msg: [128]u8 = undefined;
+    const _fw_slice = std.fmt.bufPrint(_fw_msg[0..], "flushWriteBuffer: erase_block={d}, flash_offset=0x{x}\r\n", .{erase_block_num, flash_offset}) catch "";
+    if (_fw_slice.len != 0) debug_log.record(_fw_slice);
 
     interrupts.disableInterrupts();
     defer interrupts.enableInterrupts();
@@ -394,7 +445,7 @@ fn flushWriteBuffer(erase_block_num: u32, cart_xip_start: u32) LoadError!void {
     rom.flash_range_program(flash_offset, &flash_write_buffer);
     rom.flash_flush_cache();
     rom.flash_enter_cmd_xip();
-}
+} 
 
 /// Legacy cart loading (for backwards compatibility with old cart format)
 pub fn loadCart(info: storage.CartInfo) bool {

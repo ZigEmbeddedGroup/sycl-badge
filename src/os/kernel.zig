@@ -111,7 +111,7 @@ fn refreshCartDisplay() void {
 
     // If no carts were displayed, show a message
     if (cart_y_pos == 50) {
-        lcd.drawString(10, 50, "(no carts)", lcd.YELLOW, lcd.BLACK, 1);
+        lcd.drawString(10, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
     }
 }
 

@@ -20,8 +20,8 @@ pub const panic = @import("system/panic.zig").panic;
 // Simple button poller (similar to badge-v1)
 const ButtonPoller = struct {
     pub const Buttons = packed struct(u2) {
-        up: u1,    // GPIO 10
-        down: u1,  // GPIO 11
+        up: u1, // GPIO 10
+        down: u1, // GPIO 11
     };
 
     pub fn init() ButtonPoller {
@@ -86,7 +86,7 @@ pub fn main() !void {
 
         // Poll buttons (non-toggle behavior like badge-v1)
         const buttons = button_poller.read();
-        
+
         // Detect button_up press (GPIO 10) - only trigger on press, not release
         if (buttons.up == 1 and !button_up_was_pressed) {
             // Button just pressed - cycle color

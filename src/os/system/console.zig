@@ -138,11 +138,9 @@ const commands = [_]Command{
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
-    .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
 
 // Unified Console Output (sends to USB CDC)
@@ -1015,12 +1013,11 @@ fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         multicore.resetCore1();
     }
 
-    // Erase cart XIP flash region
-    println("Erasing cart XIP flash region...");
-    loader.eraseCartRegion() catch {
-        println("ERROR: Failed to erase cart XIP region\r\n");
-        return;
-    };
+    // Clear cart XIP flash region
+    println("Clearing cart XIP flash region...");
+    const xip_start: [*]u8 = @ptrFromInt(loader.getCartXipStart());
+    const xip_size = loader.getCartXipSize();
+    @memset(xip_start[0..xip_size], 0);
 
     // Clear process RAM (Core 1 RAM: 0x20020000 - 0x20080000, 384KB)
     println("Clearing process RAM...");
@@ -1198,7 +1195,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         }
 
         println("\r\nWiping cart storage...\r\n");
-        storage.wipeAll();
+        storage.wipeStorage();
         println("Cart storage wiped\r\n");
         return;
     }

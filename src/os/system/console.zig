@@ -1076,7 +1076,6 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         while (true) {
             microzig.cpu.wfi();
         }
-    }
 }
 
 // LCD Test Command

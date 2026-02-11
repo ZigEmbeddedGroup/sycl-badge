@@ -2,11 +2,13 @@
 /// USB CDC and UART communication with interactive console
 const std = @import("std");
 const microzig = @import("microzig");
+const board = microzig.board;
 
 const usb = @import("drivers/usb.zig");
 const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
+const gpio = @import("drivers/gpio.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const storage = @import("loader/storage.zig");
@@ -14,6 +16,27 @@ const loader = @import("loader/loader.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
+
+// Simple button poller (similar to badge-v1)
+const ButtonPoller = struct {
+    pub const Buttons = packed struct(u2) {
+        up: u1,    // GPIO 10
+        down: u1,  // GPIO 11
+    };
+
+    pub fn init() ButtonPoller {
+        gpio.initButtons();
+        return ButtonPoller{};
+    }
+
+    pub fn read(self: ButtonPoller) Buttons {
+        _ = self;
+        return .{
+            .up = if (gpio.isButtonPressed(board.button_up)) 1 else 0,
+            .down = if (gpio.isButtonPressed(board.button_down)) 1 else 0,
+        };
+    }
+};
 
 // Y position for cart list display
 var cart_y_pos: u16 = 50;
@@ -27,6 +50,11 @@ var display_active: bool = true; // Track if we're showing the cart display
 const CART_CHECK_INTERVAL: u64 = 500_000;
 var last_cart_check: u64 = 0;
 
+// Button state tracking
+var button_up_was_pressed: bool = false;
+var color_index: u8 = 0;
+const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA, lcd.WHITE, lcd.BLACK };
+
 pub fn main() !void {
     // Initialize all drivers and kernel systems
     try init.init(.{
@@ -34,6 +62,9 @@ pub fn main() !void {
         .lcd_config = lcd.createDT018BTFTConfig(),
         .init_core1 = true,
     });
+
+    // Initialize button poller
+    const button_poller = ButtonPoller.init();
 
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);
@@ -52,6 +83,25 @@ pub fn main() !void {
 
         // Process console input
         console.processInput();
+
+        // Poll buttons (non-toggle behavior like badge-v1)
+        const buttons = button_poller.read();
+        
+        // Detect button_up press (GPIO 10) - only trigger on press, not release
+        if (buttons.up == 1 and !button_up_was_pressed) {
+            // Button just pressed - cycle color
+            lcd.fillScreen(colors[color_index]);
+            color_index = (color_index + 1) % @as(u8, colors.len);
+            button_up_was_pressed = true;
+        } else if (buttons.up == 0 and button_up_was_pressed) {
+            // Button released - restore default display
+            lcd.fillScreen(lcd.BLACK);
+            lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+            lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+            refreshCartDisplay();
+            last_cart_hash = computeCartHash();
+            button_up_was_pressed = false;
+        }
 
         // Check if cart is running - stop display updates
         const cart_running = loader.getState() == .running;

@@ -36,6 +36,7 @@ pub const TFT_DC = gpio.num(21); // Data/Command (GPIO)
 
 // Onboard LED (GPIO 25)
 pub const led_pin = gpio.num(25);
-
+pub const button_up = gpio.num(10);
+pub const button_down = gpio.num(11);
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;

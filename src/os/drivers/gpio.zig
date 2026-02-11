@@ -82,72 +82,55 @@ pub const Pins = struct {
 };
 // Button pin definitions - single source of truth
 
+// Button pin definitions - single source of truth
 const button_pins = [_]Pin{ board.button_down, board.button_up };
 
 /// Button pin numbers extracted from board definitions at compile time
 const button_pin_numbers = blk: {
     var numbers: [button_pins.len]u8 = undefined;
-
     for (button_pins, 0..) |p, i| {
         numbers[i] = @intFromEnum(p);
     }
-
     break :blk numbers;
 };
-
-// Button initialization
-
-pub fn initButtons() void {
-
-    // Configure all button and joystick pins as inputs with pull-downs
-
-    // Buttons are active-high (connect to VCC when pressed)
-
-    for (button_pins) |pin| {
-        pin.set_function(.sio);
-
-        pin.set_direction(.in);
-
-        pin.set_pull(.down); // Pull-down: not pressed = 0, pressed = 1
-
-    }
-}
 
 /// Check if a pin number corresponds to a button/joystick pin
 fn isButtonPin(pin: Pin) bool {
     const pin_num = @intFromEnum(pin);
-
     for (button_pin_numbers) |bp_num| {
         if (pin_num == bp_num) return true;
     }
-
     return false;
 }
 
-/// Configure a pin as an input (useful for reading GPIO state)
-/// If the pin is a button, also enables pull-down
+/// Configure a pin as an input
+/// Automatically applies pull-down for buttons
 pub fn configureAsInput(pin_num: u9) void {
     const pin = num(pin_num);
-
     pin.set_function(.sio);
-
     pin.set_direction(.in);
 
-    // Enable pull-down for button pins (not pressed = 0, pressed = 1)
-
     if (isButtonPin(pin)) {
-        pin.set_pull(.down);
+        pin.set_pull(.down); // Pull-down for active-high buttons
     }
 }
 
-// Button reading convenience functions (returns true when pressed)
+/// Initialize all buttons
+/// Simply loops through button pins and configures them as input
+pub fn initButtons() void {
+    for (button_pins) |pin| {
+        configureAsInput(@intFromEnum(pin));
+        // Small delay to allow pull-down resistor to stabilize the pin state
+        // This prevents reading floating values on RP2354B
+        microzig.hal.time.sleep_us(10);
+    }
+}
 
+/// Button reading convenience functions
 pub fn isButtonPressed(pin: Pin) bool {
-    return read(pin) == 1; // Active-high with pull-down: pressed = 1
-
+    return read(pin) == 1; // Active-high: pressed = 1
 }
 
 pub fn isButtonReleased(pin: Pin) bool {
-    return read(pin) == 0; // Active-high with pull-down: released = 0
-
+    return read(pin) == 0; // Released = 0
 }

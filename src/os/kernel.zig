@@ -77,6 +77,9 @@ pub fn main() !void {
 
     // Initialize button poller
     const button_poller = ButtonPoller.init();
+    const initial = button_poller.read();
+    button_up_was_pressed = (initial.up == 1);
+    button_down_was_pressed = (initial.down == 1);
 
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);

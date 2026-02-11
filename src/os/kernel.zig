@@ -13,6 +13,7 @@ const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const storage = @import("loader/storage.zig");
 const loader = @import("loader/loader.zig");
+const multicore = @import("system/multicore.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -52,8 +53,19 @@ var last_cart_check: u64 = 0;
 
 // Button state tracking
 var button_up_was_pressed: bool = false;
-var color_index: u8 = 0;
-const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA, lcd.WHITE, lcd.BLACK };
+var button_down_was_pressed: bool = false;
+
+// Cursor tracking for cart selection
+var cursor_index: usize = 0; // Which cart is currently selected
+var cart_count: usize = 0; // Total number of carts
+var draw_index: usize = 0; // Current cart being drawn
+
+// Cart name storage for running selected cart
+const MAX_CARTS: usize = 16;
+const MAX_CART_NAME_LEN: usize = 64;
+var cart_names: [MAX_CARTS][MAX_CART_NAME_LEN]u8 = undefined;
+var cart_name_lengths: [MAX_CARTS]usize = undefined;
+var collect_index: usize = 0;
 
 pub fn main() !void {
     // Initialize all drivers and kernel systems
@@ -87,20 +99,27 @@ pub fn main() !void {
         // Poll buttons (non-toggle behavior like badge-v1)
         const buttons = button_poller.read();
 
-        // Detect button_up press (GPIO 10) - only trigger on press, not release
+        // Detect button_up press (GPIO 10) - move cursor down through cart list
         if (buttons.up == 1 and !button_up_was_pressed) {
-            // Button just pressed - cycle color
-            lcd.fillScreen(colors[color_index]);
-            color_index = (color_index + 1) % @as(u8, colors.len);
             button_up_was_pressed = true;
+            // Move cursor to next cart (wrap around to top)
+            if (cart_count > 0) {
+                cursor_index = (cursor_index + 1) % cart_count;
+                refreshCartDisplay();
+            }
         } else if (buttons.up == 0 and button_up_was_pressed) {
-            // Button released - restore default display
-            lcd.fillScreen(lcd.BLACK);
-            lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-            lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
-            refreshCartDisplay();
-            last_cart_hash = computeCartHash();
             button_up_was_pressed = false;
+        }
+
+        // Detect button_down press (GPIO 11) - run selected cart
+        if (buttons.down == 1 and !button_down_was_pressed) {
+            button_down_was_pressed = true;
+            // Run the selected cart
+            if (cart_count > 0 and cursor_index < cart_count) {
+                runSelectedCart();
+            }
+        } else if (buttons.down == 0 and button_down_was_pressed) {
+            button_down_was_pressed = false;
         }
 
         // Check if cart is running - stop display updates
@@ -157,11 +176,89 @@ fn refreshCartDisplay() void {
 
     // Reset Y position and display carts
     cart_y_pos = 50;
+    draw_index = 0;
+    cart_count = 0;
+    storage.listCarts(countCart);
+
+    // Reset cursor if cart list changed
+    if (cursor_index >= cart_count) {
+        cursor_index = 0;
+    }
+
+    // Collect cart names
+    draw_index = 0;
+    collect_index = 0;
+    storage.listCarts(collectCartName);
+
+    // Display carts
+    draw_index = 0;
     storage.listCarts(displayCart);
 
     // If no carts were displayed, show a message
-    if (cart_y_pos == 50) {
+    if (cart_count == 0) {
         lcd.drawString(10, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
+    }
+}
+
+/// Callback to count carts
+fn countCart(name: []const u8, size: u32) void {
+    _ = name;
+    _ = size;
+    cart_count += 1;
+}
+
+/// Callback to collect cart names
+fn collectCartName(name: []const u8, size: u32) void {
+    _ = size;
+    if (collect_index >= MAX_CARTS) return;
+
+    const copy_len = @min(name.len, MAX_CART_NAME_LEN - 1);
+    @memcpy(cart_names[collect_index][0..copy_len], name[0..copy_len]);
+    cart_name_lengths[collect_index] = copy_len;
+    collect_index += 1;
+}
+
+/// Run the currently selected cart
+fn runSelectedCart() void {
+    if (cursor_index >= cart_count) return;
+
+    const name = cart_names[cursor_index][0..cart_name_lengths[cursor_index]];
+
+    // Stop any running cart first
+    if (loader.isRunning()) {
+        multicore.resetCore1();
+        timer.sleep_ms(100);
+    }
+
+    // Load the cart
+    const entry_point = loader.loadUF2Cart(name) catch |err| {
+        // Show error on LCD
+        lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
+        const error_msg = switch (err) {
+            loader.LoadError.FileNotFound => "Cart not found",
+            loader.LoadError.FileTooLarge => "UF2 too large",
+            loader.LoadError.InvalidUF2 => "Invalid UF2",
+            loader.LoadError.UnsupportedFamily => "Wrong chip",
+            loader.LoadError.AddressMismatch => "Wrong address",
+            loader.LoadError.FlashWriteError => "Flash error",
+            loader.LoadError.ReadError => "Read error",
+        };
+        lcd.drawString(10, 50, error_msg, lcd.RED, lcd.BLACK, 1);
+        timer.sleep_ms(2000);
+        refreshCartDisplay();
+        return;
+    };
+
+    // Execute the cart
+    if (multicore.executeCart(entry_point)) {
+        // Cart execution started successfully
+        display_active = false;
+    } else {
+        // Execution failed
+        lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
+        lcd.drawString(10, 50, "Failed to run", lcd.RED, lcd.BLACK, 1);
+        timer.sleep_ms(2000);
+        refreshCartDisplay();
     }
 }
 
@@ -170,13 +267,16 @@ fn displayCart(name: []const u8, size: u32) void {
     // Convert size from bytes to kB
     const size_kb = (size + 512) / 1024; // Round to nearest kB
 
-    // Format the display string
+    // Format the display string with cursor indicator
     var buf: [64]u8 = undefined;
-    const text = std.fmt.bufPrint(&buf, "{s} {d}kB", .{ name, size_kb }) catch return;
+    const cursor = if (draw_index == cursor_index) ">" else " ";
+    const text = std.fmt.bufPrint(&buf, "{s}{s} {d}kB", .{ cursor, name, size_kb }) catch return;
 
     // Draw on LCD if within screen bounds (height is 128)
     if (cart_y_pos < 120) {
         lcd.drawString(10, cart_y_pos, text, lcd.WHITE, lcd.BLACK, 1);
         cart_y_pos += 10;
     }
+
+    draw_index += 1;
 }

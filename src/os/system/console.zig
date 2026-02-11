@@ -118,7 +118,7 @@ fn refreshCartNames() void {
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipe" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall" };
         return &options;
     }
     if (arg_index == 1) {
@@ -137,8 +137,12 @@ const commands = [_]Command{
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/status/info/delete/wipe)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "reboot", .description = "Restart the system (use 'reboot bootsel' for BootSelect)", .handler = cmdReboot, .completion_provider = rebootCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
+    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
+    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
+    .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
 
 // Unified Console Output (sends to USB CDC)
@@ -940,23 +944,107 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
+// Storage Statistics Command - Show filesystem details
+fn cmdStorage(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+
+    println("\r\n=== Storage Filesystem Statistics ===\r\n");
+
+    const stats = storage.getStats();
+
+    // Overall filesystem info
+    printf("Total Storage:     {d} KB ({d} bytes)\r\n", .{ stats.total_size_bytes / 1024, stats.total_size_bytes });
+    printf("FAT12 Filesystem:  {d} sectors x 512 bytes\r\n\r\n", .{storage.totalSectors()});
+
+    // Filesystem layout
+    println("--- Filesystem Layout ---");
+    printf("FAT Tables:        {d} KB  (2 copies)\r\n", .{stats.fat_size_bytes / 1024});
+    printf("Root Directory:    {d} KB  ({d} entries max)\r\n", .{ stats.root_size_bytes / 1024, stats.root_total_entries });
+    printf("Data Region:       {d} KB  ({d} clusters)\r\n\r\n", .{ stats.data_size_bytes / 1024, stats.total_clusters });
+
+    // Cluster usage
+    println("--- Cluster Usage ---");
+    printf("Total Clusters:    {d}\r\n", .{stats.total_clusters});
+    printf("Used Clusters:     {d}\r\n", .{stats.used_clusters});
+    printf("Free Clusters:     {d}\r\n", .{stats.free_clusters});
+
+    const used_pct = if (stats.total_clusters > 0)
+        (@as(u32, stats.used_clusters) * 100) / stats.total_clusters
+    else
+        0;
+    printf("Usage:             {d}%\r\n\r\n", .{used_pct});
+
+    // Space usage
+    println("--- Space Usage ---");
+    const used_kb = (@as(u32, stats.used_clusters) * 512) / 1024;
+    const free_kb = stats.free_space_bytes / 1024;
+    printf("Used Space:        {d} KB\r\n", .{used_kb});
+    printf("Free Space:        {d} KB\r\n\r\n", .{free_kb});
+
+    // Root directory usage
+    println("--- Root Directory ---");
+    printf("Total Entries:     {d}\r\n", .{stats.root_total_entries});
+    printf("Used Entries:      {d}\r\n", .{stats.root_used_entries});
+    printf("  Active Files:    {d}\r\n", .{stats.file_count});
+    printf("  Deleted (0xE5):  {d}\r\n", .{stats.root_deleted_entries});
+    printf("Free Entries:      {d}\r\n", .{stats.root_free_entries});
+
+    if (stats.root_free_entries < 5) {
+        println("\r\nWARNING: Root directory nearly full!");
+        println("Use 'cart wipeall confirm' to reclaim space.\r\n");
+    } else {
+        println("");
+    }
+}
+
+// Wipe Command - Erase cart/XIP flash and process RAM
+fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const confirm = iter.next();
+
+    if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+        println("\r\nWARNING: This will erase all cart XIP flash and process RAM!");
+        println("To proceed, type: wipe confirm\r\n");
+        return;
+    }
+
+    // Stop any running cart first
+    if (loader.getState() == .running or loader.getState() == .ready) {
+        println("\r\nStopping running cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+    }
+
+    // Erase cart XIP flash region
+    println("Erasing cart XIP flash region...");
+    loader.eraseCartRegion() catch {
+        println("ERROR: Failed to erase cart XIP region\r\n");
+        return;
+    };
+
+    // Clear process RAM (Core 1 RAM: 0x20020000 - 0x20080000, 384KB)
+    println("Clearing process RAM...");
+    const PROCESS_RAM_START: u32 = 0x20020000;
+    const PROCESS_RAM_SIZE: usize = 384 * 1024;
+    const process_ram: [*]u8 = @ptrFromInt(PROCESS_RAM_START);
+    @memset(process_ram[0..PROCESS_RAM_SIZE], 0);
+
+    printf("\r\nWipe complete!\r\n  Cart XIP: 0x{x} - 0x{x} ({d}KB)\r\n", .{
+        loader.getCartXipStart(),
+        loader.getCartXipEnd(),
+        loader.getCartXipSize() / 1024,
+    });
+    printf("  Process RAM: 0x{x} - 0x{x} ({d}KB)\r\n\r\n", .{
+        PROCESS_RAM_START,
+        PROCESS_RAM_START + PROCESS_RAM_SIZE,
+        PROCESS_RAM_SIZE / 1024,
+    });
+}
+
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    const arg = iter.next();
-    if (arg) |a| {
-        if (std.mem.eql(u8, a, "bootsel")) {
-            println("\r\nRebooting to BootSelect...\r\n");
-
-            // Small delay to allow message to be sent
-            timer.sleep_ms(50);
-
-            // Use ROM function to reset to USB bootloader
-            rom.reset_to_usb_boot();
-        } else {
-            printf("\r\nUnknown reboot option: {s}\r\nUsage: reboot [bootsel]\r\n\r\n", .{a});
-        }
-    } else {
-        println("\r\nRebooting system...\r\n");
+    _ = iter;
+    println("\r\nRebooting system...\r\n");
 
         // Small delay to allow message to be sent
         timer.sleep_ms(50);
@@ -1042,7 +1130,7 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipe> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall> [name]\r\n");
         return;
     };
 
@@ -1128,6 +1216,31 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         } else {
             println("\r\nFailed to execute cart\r\n");
         }
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipeall")) {
+        const confirm = iter.next();
+
+        if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+            println("\r\nWARNING: This will COMPLETELY WIPE the storage filesystem!");
+            println("ALL carts will be permanently deleted!");
+            println("This reformats the FAT12 filesystem and clears all deleted entries.");
+            println("\r\nTo proceed, type: cart wipeall confirm\r\n");
+            return;
+        }
+
+        // Stop any running cart first
+        if (loader.getState() == .running or loader.getState() == .ready) {
+            println("\r\nStopping running cart...");
+            multicore.haltCore1();
+            loader.stop();
+            multicore.resetCore1();
+        }
+
+        println("Wiping storage filesystem...");
+        storage.wipeStorage();
+        println("\r\nStorage filesystem wiped! All carts deleted.\r\n");
         return;
     }
 

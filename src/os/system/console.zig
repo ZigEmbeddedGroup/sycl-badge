@@ -164,7 +164,7 @@ pub fn println(text: []const u8) void {
 }
 
 /// Helper to print a debug_log entry with newline
-pub fn __console_print_log(msg: []const u8) void {
+pub fn consolePrintLog(msg: []const u8) void {
     printf("  {s}\r\n", .{msg});
 }
 
@@ -1270,12 +1270,12 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             }
 
             // Dump debug logs to console for diagnostic info
-            debug_log.forEachEntry(__console_print_log);
+            debug_log.forEachEntry(consolePrintLog);
             return;
         };
 
         // Dump loader/storage logs (verification/erase info)
-        debug_log.forEachEntry(__console_print_log);
+        debug_log.forEachEntry(consolePrintLog);
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
@@ -1324,7 +1324,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     if (std.mem.eql(u8, subcmd, "diag")) {
         println("\r\nCart diagnostic log:\r\n");
-        debug_log.forEachEntry(__console_print_log);
+        debug_log.forEachEntry(consolePrintLog);
         println("");
         return;
     }

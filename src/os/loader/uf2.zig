@@ -179,11 +179,6 @@ pub const Parser = struct {
     }
 };
 
-// Removed unused helper types and convenience functions to reduce the public API surface.
-// Use the Parser methods (reset, parseBlock, validateAddressRange, getBinarySize, isComplete)
-// to inspect UF2 metadata and perform validation during load operations.
-
-
 // Comptime validation
 comptime {
     // Ensure Block is exactly 512 bytes

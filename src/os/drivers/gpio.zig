@@ -83,7 +83,7 @@ pub const Pins = struct {
 // Button pin definitions - single source of truth
 
 // Button pin definitions - single source of truth
-const button_pins = [_]Pin{ board.button_down, board.button_up };
+const button_pins = [_]Pin{ board.button_down, board.button_up, board.button_stop };
 
 /// Button pin numbers extracted from board definitions at compile time
 const button_pin_numbers = blk: {

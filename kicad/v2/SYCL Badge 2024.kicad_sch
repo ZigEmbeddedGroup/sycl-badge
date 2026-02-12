@@ -12291,16 +12291,6 @@
 	)
 	(wire
 		(pts
-			(xy 16.51 35.56) (xy 34.29 35.56)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0955ad59-d259-4380-9387-39ed6a74fef2")
-	)
-	(wire
-		(pts
 			(xy 341.63 144.78) (xy 341.63 143.51)
 		)
 		(stroke
@@ -14731,6 +14721,16 @@
 	)
 	(wire
 		(pts
+			(xy 33.02 35.56) (xy 34.29 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9482fc6a-0d3f-4944-b90e-67e1d2eb64e6")
+	)
+	(wire
+		(pts
 			(xy 114.3 120.65) (xy 116.84 120.65)
 		)
 		(stroke
@@ -15811,6 +15811,16 @@
 	)
 	(wire
 		(pts
+			(xy 15.24 35.56) (xy 25.4 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d992f46e-26f7-485f-99fb-86a8153a392d")
+	)
+	(wire
+		(pts
 			(xy 307.34 152.4) (xy 309.88 152.4)
 		)
 		(stroke
@@ -16440,7 +16450,7 @@
 		(uuid "1bde1337-f5a2-46c9-8456-2e5776d9844d")
 	)
 	(label "D8_NEOPIX"
-		(at 16.51 35.56 0)
+		(at 15.24 35.56 0)
 		(effects
 			(font
 				(size 1.2446 1.2446)
@@ -32636,6 +32646,117 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 29.21 35.56 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "ca284c85-c571-4de0-aa9f-cdaf4f7f129f")
+		(property "Reference" "R31"
+			(at 29.464 38.1 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "500"
+			(at 29.21 35.56 90)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
+			(at 29.21 37.338 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Part Number" ""
+			(at 29.21 35.56 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part Number" "RT0603BRC07500RL"
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "0603"
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C860931"
+			(at 29.21 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "dc3f4ed2-00d3-4d8e-83a3-9db9172d5d4e")
+		)
+		(pin "2"
+			(uuid "9edda85f-2b02-4778-ae4a-fd142a15bce5")
+		)
+		(instances
+			(project "SYCL Badge 2024"
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "R31")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "LED:SK6812MINI")
 		(at 66.04 35.56 0)
 		(unit 1)
@@ -33462,7 +33583,7 @@
 				)
 			)
 		)
-		(property "Value" "SWPA5020S2R2NT"
+		(property "Value" "SWPA5020S100MT"
 			(at 487.68 82.55 0)
 			(effects
 				(font
@@ -33480,7 +33601,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "SWPA5020S2R2NT"
+		(property "Datasheet" ""
 			(at 480.06 87.63 0)
 			(effects
 				(font
@@ -33491,6 +33612,15 @@
 			)
 		)
 		(property "Description" ""
+			(at 480.06 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C52281"
 			(at 480.06 87.63 0)
 			(effects
 				(font
@@ -33572,6 +33702,117 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "H4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:D_Schottky")
+		(at 504.19 87.63 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d6dbd2c5-e877-40be-84cb-891cac50b6e6")
+		(property "Reference" "D8"
+			(at 504.19 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "MBR0540"
+			(at 504.19 85.09 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Diode_SMD:D_SOD-123"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Part Number" "NRVB0540T3GOSCT-ND"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Onsemi"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part Number" "NRVB0540T3G"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "0603"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C896817"
+			(at 504.19 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "7e523b2f-d00e-4230-8009-e49536308e80")
+		)
+		(pin "2"
+			(uuid "d9280173-6a66-4067-83e5-81e276d5c8b2")
+		)
+		(instances
+			(project "SYCL Badge 2024"
+				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
+					(reference "D8")
 					(unit 1)
 				)
 			)
@@ -35905,73 +36146,6 @@
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
 					(reference "#PWR09")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:D_Schottky")
-		(at 504.19 87.63 180)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "f3150316-3630-4dfb-b516-bf13dbc97526")
-		(property "Reference" "D8"
-			(at 504.5075 81.28 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "D_Schottky"
-			(at 504.5075 83.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 504.19 87.63 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 504.19 87.63 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Schottky diode"
-			(at 504.19 87.63 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "4133fd67-cf64-4725-ab36-adfbf46b394c")
-		)
-		(pin "1"
-			(uuid "e12879e1-448b-42a6-8b0d-618b5c9f9f2e")
-		)
-		(instances
-			(project ""
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D8")
 					(unit 1)
 				)
 			)

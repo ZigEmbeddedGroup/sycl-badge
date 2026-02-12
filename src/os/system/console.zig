@@ -1043,36 +1043,36 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting system...\r\n");
 
-        // Small delay to allow message to be sent
-        timer.sleep_ms(50);
+    // Small delay to allow message to be sent
+    timer.sleep_ms(50);
 
-        // Disconnect USB to properly signal disconnection to the host
-        // This prevents the terminal from thinking the connection is still active
-        usb.disconnect();
+    // Disconnect USB to properly signal disconnection to the host
+    // This prevents the terminal from thinking the connection is still active
+    usb.disconnect();
 
-        // Small delay to allow host to detect disconnection
-        timer.sleep_ms(10);
+    // Small delay to allow host to detect disconnection
+    timer.sleep_ms(10);
 
-        // Trigger system reset via SCB (System Control Block)
-        const SCB_BASE = 0xE000ED00;
-        const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+    // Trigger system reset via SCB (System Control Block)
+    const SCB_BASE = 0xE000ED00;
+    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 
-        // Write SYSRESETREQ bit with VECTKEY
-        // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
-        // Need to preserve other bits in AIRCR, so read-modify-write
-        microzig.cpu.dsb();
-        microzig.cpu.isb();
+    // Write SYSRESETREQ bit with VECTKEY
+    // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+    // Need to preserve other bits in AIRCR, so read-modify-write
+    microzig.cpu.dsb();
+    microzig.cpu.isb();
 
-        // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-        AIRCR.* = 0x05FA0004;
+    // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+    AIRCR.* = 0x05FA0004;
 
-        microzig.cpu.dsb();
-        microzig.cpu.isb();
+    microzig.cpu.dsb();
+    microzig.cpu.isb();
 
-        // Wait for reset to occur (should happen immediately)
-        while (true) {
-            microzig.cpu.wfi();
-        }
+    // Wait for reset to occur (should happen immediately)
+    while (true) {
+        microzig.cpu.wfi();
+    }
 }
 
 // LCD Test Command

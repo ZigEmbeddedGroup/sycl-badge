@@ -20,9 +20,10 @@ pub const panic = @import("system/panic.zig").panic;
 
 // Simple button poller (similar to badge-v1)
 const ButtonPoller = struct {
-    pub const Buttons = packed struct(u2) {
+    pub const Buttons = packed struct(u3) {
         up: u1, // GPIO 10
         down: u1, // GPIO 11
+        stop: u1, // GPIO 15
     };
 
     pub fn init() ButtonPoller {
@@ -35,6 +36,7 @@ const ButtonPoller = struct {
         return .{
             .up = if (gpio.isButtonPressed(board.button_up)) 1 else 0,
             .down = if (gpio.isButtonPressed(board.button_down)) 1 else 0,
+            .stop = if (gpio.isButtonPressed(board.button_stop)) 1 else 0,
         };
     }
 };
@@ -54,6 +56,7 @@ var last_cart_check: u64 = 0;
 // Button state tracking
 var button_up_was_pressed: bool = false;
 var button_down_was_pressed: bool = false;
+var button_stop_was_pressed: bool = false;
 
 // Cursor tracking for cart selection
 var cursor_index: usize = 0; // Which cart is currently selected
@@ -77,6 +80,10 @@ pub fn main() !void {
 
     // Initialize button poller
     const button_poller = ButtonPoller.init();
+    const initial = button_poller.read();
+    button_up_was_pressed = (initial.up == 1);
+    button_down_was_pressed = (initial.down == 1);
+    button_stop_was_pressed = (initial.stop == 1);
 
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);
@@ -96,45 +103,78 @@ pub fn main() !void {
         // Process console input
         console.processInput();
 
-        // Poll buttons (non-toggle behavior like badge-v1)
+        // Check if cart is running - controls both button handling and display updates
+        // Check for both .ready and .running states (cart is active from load until stop)
+        const cart_state = loader.getState();
+        const cart_running = (cart_state == .running) or (cart_state == .ready);
+
+        // Poll buttons
         const buttons = button_poller.read();
 
-        // Detect button_up press (GPIO 10) - move cursor down through cart list
-        if (buttons.up == 1 and !button_up_was_pressed) {
-            button_up_was_pressed = true;
-            // Move cursor to next cart (wrap around to top)
-            if (cart_count > 0) {
-                cursor_index = (cursor_index + 1) % cart_count;
+        // Stop button (GPIO 15) works at any time - stops running cart
+        if (buttons.stop == 1 and !button_stop_was_pressed) {
+            button_stop_was_pressed = true;
+            if (cart_running) {
+                // Stop the cart (halt Core 1, reset state, restart Core 1)
+                multicore.haltCore1();
+                loader.stop();
+                multicore.resetCore1();
+
+                // Restore display - reinit LCD registers first to fix color mode
+                display_active = true;
+                lcd.reinitDisplay();
+                lcd.fillScreen(lcd.BLACK);
+                lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+                lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
                 refreshCartDisplay();
+                last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
             }
-        } else if (buttons.up == 0 and button_up_was_pressed) {
-            button_up_was_pressed = false;
+        } else if (buttons.stop == 0 and button_stop_was_pressed) {
+            button_stop_was_pressed = false;
         }
 
-        // Detect button_down press (GPIO 11) - run selected cart
-        if (buttons.down == 1 and !button_down_was_pressed) {
-            button_down_was_pressed = true;
-            // Run the selected cart
-            if (cart_count > 0 and cursor_index < cart_count) {
-                runSelectedCart();
+        // Only process navigation buttons when cart is NOT running
+        if (!cart_running) {
+            // Detect button_up press (GPIO 10) - move cursor down through cart list
+            if (buttons.up == 1 and !button_up_was_pressed) {
+                button_up_was_pressed = true;
+                // Move cursor to next cart (wrap around to top)
+                if (cart_count > 0) {
+                    cursor_index = (cursor_index + 1) % cart_count;
+                    refreshCartDisplay();
+                }
+            } else if (buttons.up == 0 and button_up_was_pressed) {
+                button_up_was_pressed = false;
             }
-        } else if (buttons.down == 0 and button_down_was_pressed) {
+
+            // Detect button_down press (GPIO 11) - run selected cart
+            if (buttons.down == 1 and !button_down_was_pressed) {
+                button_down_was_pressed = true;
+                // Run the selected cart
+                if (cart_count > 0 and cursor_index < cart_count) {
+                    runSelectedCart();
+                }
+            } else if (buttons.down == 0 and button_down_was_pressed) {
+                button_down_was_pressed = false;
+            }
+        } else {
+            // Reset navigation button states when cart is running to avoid stuck states
+            button_up_was_pressed = false;
             button_down_was_pressed = false;
         }
-
-        // Check if cart is running - stop display updates
-        const cart_running = loader.getState() == .running;
 
         if (cart_running and display_active) {
             // Cart just started running - stop updating display
             display_active = false;
         } else if (!cart_running and !display_active) {
-            // Cart stopped - restore display
+            // Cart stopped naturally (not via stop button) - restore display
             display_active = true;
+            lcd.reinitDisplay();
             lcd.fillScreen(lcd.BLACK);
             lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
             lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
-            last_cart_hash = 0; // Force refresh
+            refreshCartDisplay();
+            last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
 
         // Periodically check if cart list changed (only when display is active)
@@ -249,10 +289,19 @@ fn runSelectedCart() void {
         return;
     };
 
+    // Prepare LCD for cart: ensure normal mode (not inverted) and clear screen
+    lcd.prepareForCart(); // Reset LCD to standard state
+    lcd.fillScreen(lcd.BLACK); // Clear to black
+    timer.sleep_ms(10); // Small delay to ensure LCD command completes
+
     // Execute the cart
     if (multicore.executeCart(entry_point)) {
         // Cart execution started successfully
+        // Mark as running immediately to prevent race conditions
+        loader.markRunning();
         display_active = false;
+        // Small delay to let Core 1 start and take control of hardware
+        timer.sleep_ms(5);
     } else {
         // Execution failed
         lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);

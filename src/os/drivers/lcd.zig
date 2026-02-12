@@ -289,11 +289,54 @@ fn initDisplay() void {
     timer.sleep_ms(20);
 }
 
+/// Re-initialize display registers (call after cart stops to restore LCD settings)
+/// This performs a quick reinit without full hardware reset for faster recovery
+pub fn reinitDisplay() void {
+    // Reconfigure critical GPIO pins (cart may have changed them)
+    pins.cs.set_function(.sio);
+    pins.cs.set_direction(.out);
+    pins.cs.put(1); // Deselect
+
+    pins.dc.set_function(.sio);
+    pins.dc.set_direction(.out);
+
+    // Reset SPI peripheral (cart may have changed SPI settings)
+    const spi_config = spi.Config{
+        .clock_config = hal.clock_config,
+    };
+    spi_instance.apply(spi_config) catch {};
+
+    // Quick software reset (no hardware reset pin toggle)
+    writeCommand(.SWRESET);
+    timer.sleep_ms(10); // Reduced from 50ms
+
+    // Wake up display
+    writeCommand(.SLPOUT);
+    timer.sleep_ms(10); // Reduced from 50ms
+
+    // Restore critical registers only
+    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
+    writeCommandWithData(.COLMOD, &.{0x05}); // 16-bit RGB565
+    writeCommand(.NORON); // Normal display mode
+    writeCommand(.DISPON); // Display on
+    timer.sleep_ms(5); // Short delay for display to stabilize
+}
+
 /// Display Control
 pub fn setBacklight(on: bool) void {
     if (pins.bl) |bl| {
         bl.put(if (on) 1 else 0);
     }
+}
+
+/// Prepare LCD for cart execution
+/// Ensures clean state with proper color mode
+pub fn prepareForCart() void {
+    // Ensure LCD is in normal, non-inverted mode with correct orientation
+    writeCommand(.NORON); // Normal display mode (not partial)
+    writeCommand(.INVOFF); // Turn off color inversion
+    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
+    writeCommandWithData(.COLMOD, &.{0x05}); // 16-bit RGB565
 }
 
 pub fn displayOn(on: bool) void {

@@ -17975,7 +17975,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 322.58 99.06 180)
+		(at 322.58 99.06 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -17983,7 +17983,7 @@
 		(dnp no)
 		(uuid "0d717d5a-1f13-4dbe-ac10-014896cf46dc")
 		(property "Reference" "R7"
-			(at 325.12 99.06 90)
+			(at 320.04 99.06 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17999,7 +17999,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
-			(at 324.358 99.06 90)
+			(at 320.802 99.06 90)
 			(effects
 				(font
 					(size 1.27 1.27)

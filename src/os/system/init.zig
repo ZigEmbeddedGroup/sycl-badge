@@ -145,16 +145,6 @@ pub fn init(config: InitConfig) !void {
     // 8. Initialize console (shows welcome message and prompt)
     console.init();
 
-    // Dump any early boot logs recorded before console was available
-    debug_log.forEachEntry(console.__console_print_log);
-
-    // Boot-time cart_xip check — report vector table presence
-    if (loader.getCartXipVector()) |v| {
-        console.printf("Cart XIP vector found: addr=0x{x}, sp=0x{x}, entry=0x{x}\r\n", .{ v.addr, v.sp, v.entry });
-    } else {
-        console.println("Cart XIP: no valid vector found\r\n");
-    }
-
     // 9. Leave interrupts disabled for now (polling-based drivers)
 
     // 10. Initialize LCD if configured

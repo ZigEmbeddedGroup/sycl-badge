@@ -11862,6 +11862,12 @@
 		(uuid "d5cdc56a-653a-4b50-816f-8264ba96d744")
 	)
 	(junction
+		(at 247.65 205.74)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d6f44b85-b911-409c-bd56-e51244b0e0d8")
+	)
+	(junction
 		(at 519.43 87.63)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -12621,6 +12627,16 @@
 	)
 	(wire
 		(pts
+			(xy 247.65 205.74) (xy 247.65 210.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1bbcb50f-52d1-49e8-957a-6cf6e4a1054f")
+	)
+	(wire
+		(pts
 			(xy 203.2 67.31) (xy 203.2 62.23)
 		)
 		(stroke
@@ -13151,7 +13167,7 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 205.74) (xy 270.51 205.74)
+			(xy 243.84 205.74) (xy 247.65 205.74)
 		)
 		(stroke
 			(width 0)
@@ -13781,7 +13797,7 @@
 	)
 	(wire
 		(pts
-			(xy 392.43 186.69) (xy 392.43 179.07)
+			(xy 247.65 223.52) (xy 247.65 220.98)
 		)
 		(stroke
 			(width 0.1524)
@@ -15401,6 +15417,16 @@
 	)
 	(wire
 		(pts
+			(xy 247.65 205.74) (xy 270.51 205.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c0e15aa6-002a-4c35-be51-5b75be1d2333")
+	)
+	(wire
+		(pts
 			(xy 72.39 151.13) (xy 72.39 152.4)
 		)
 		(stroke
@@ -16261,16 +16287,6 @@
 	)
 	(wire
 		(pts
-			(xy 392.43 161.29) (xy 392.43 168.783)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fd5b1359-c836-4489-b94d-6fb58240463e")
-	)
-	(wire
-		(pts
 			(xy 402.59 83.82) (xy 402.59 91.44)
 		)
 		(stroke
@@ -16559,16 +16575,6 @@
 		)
 		(uuid "43033d1f-c78c-406f-8470-f88d0d1cdda6")
 	)
-	(label "QSPI_SS"
-		(at 246.38 205.74 0)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "44d0db30-a55c-4535-8d30-51a385febad3")
-	)
 	(label "A0"
 		(at 300.99 245.11 90)
 		(effects
@@ -16698,16 +16704,6 @@
 			(justify left bottom)
 		)
 		(uuid "631561b4-687c-4794-af12-c4d390ef736b")
-	)
-	(label "QSPI_SS"
-		(at 392.43 161.29 90)
-		(effects
-			(font
-				(size 1.2446 1.2446)
-			)
-			(justify left bottom)
-		)
-		(uuid "642fcc33-2aa0-4946-8812-5684569113d6")
 	)
 	(label "QSPI_DATA[3]"
 		(at 449.58 166.37 0)
@@ -17209,6 +17205,16 @@
 		)
 		(uuid "ebc69d66-c712-4f2c-88c0-2b7a98f7d067")
 	)
+	(label "QSPI_SS"
+		(at 256.54 205.74 180)
+		(effects
+			(font
+				(size 1.2446 1.2446)
+			)
+			(justify right bottom)
+		)
+		(uuid "f42f0043-0d8c-4c83-9c0c-f44a8200f263")
+	)
 	(label "LCD_D{slash}CX"
 		(at 336.55 245.11 90)
 		(effects
@@ -17385,7 +17391,7 @@
 	)
 	(symbol
 		(lib_id "Switch:SW_SPST")
-		(at 392.43 173.99 90)
+		(at 247.65 215.9 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -17393,7 +17399,7 @@
 		(dnp no)
 		(uuid "035f4159-0d8d-475d-b41f-2677d9732b71")
 		(property "Reference" "SW3"
-			(at 381 172.466 90)
+			(at 236.22 214.376 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17402,7 +17408,7 @@
 			)
 		)
 		(property "Value" "SW_SPST"
-			(at 381 175.006 90)
+			(at 236.22 216.916 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17411,7 +17417,7 @@
 			)
 		)
 		(property "Footprint" "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A"
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17420,7 +17426,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17429,7 +17435,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17437,7 +17443,7 @@
 			)
 		)
 		(property "Part Number" "CKN12221-1-ND"
-			(at 392.43 173.99 90)
+			(at 247.65 215.9 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17446,7 +17452,7 @@
 			)
 		)
 		(property "Manufacturer" "C&K"
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17455,7 +17461,7 @@
 			)
 		)
 		(property "Manufacturer Part Number" "PTS526 SK15 SMTR2 LFS"
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17464,7 +17470,7 @@
 			)
 		)
 		(property "Package" "SMD"
-			(at 392.43 173.99 0)
+			(at 247.65 215.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17473,7 +17479,7 @@
 			)
 		)
 		(property "LCSC" "C2689521"
-			(at 392.43 173.99 90)
+			(at 247.65 215.9 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -34903,7 +34909,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 392.43 186.69 0)
+		(at 247.65 223.52 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -34912,7 +34918,7 @@
 		(fields_autoplaced yes)
 		(uuid "e6f5819e-321e-4ed4-918e-4af6ec05508a")
 		(property "Reference" "#PWR083"
-			(at 392.43 193.04 0)
+			(at 247.65 229.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -34921,7 +34927,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 392.43 191.135 0)
+			(at 247.65 227.965 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -34929,7 +34935,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 392.43 186.69 0)
+			(at 247.65 223.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -34938,7 +34944,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 392.43 186.69 0)
+			(at 247.65 223.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -34947,7 +34953,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 392.43 186.69 0)
+			(at 247.65 223.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)

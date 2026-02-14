@@ -1,6 +1,6 @@
-# SYCL 2024 Badge Simulator
+# SYCL Badge V2 Simulator
 
-Simulate your badge on the interwebz.
+Simulate your V2 badge on the interwebz.
 
 ## Controls
 
@@ -23,7 +23,7 @@ Simulate your badge on the interwebz.
 - [x] A/B buttons
 - [x] A navstick with up/down/left/right. Unsure up/left will both be activated on diagonal
 - [x] Navstick is pressable too
-- [x] 2MB flash separate from the microcontroller's flash
+- [x] 4MB flash (V2 badge: 2MB internal RP2354B + 2MB external flash)
 
 ## Additional Features
 

@@ -37,10 +37,13 @@ export class Runtime {
         }
 
         this.compositor = new WebGLCompositor(gl);
-        
+
         this.apu = new APU();
 
-        this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
+        // Allocate full external flash storage (4MB for V2 badge)
+        // V2 badge has 2MB internal flash (RP2354B) + 2MB external flash
+        // Carts access the external flash via read_flash/write_flash_page
+        this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE * constants.FLASH_PAGE_COUNT);
 
         this.memory = new WebAssembly.Memory({initial: 64, maximum: 64});
         this.data = new DataView(this.memory.buffer);
@@ -60,7 +63,7 @@ export class Runtime {
     setControls (controls: number) {
         this.data.setUint16(constants.ADDR_CONTROLS, controls, true);
     }
-    
+
     setLightLevel (value: number) {
         this.data.setUint16(constants.ADDR_LIGHT_LEVEL, value, true);
     }
@@ -185,7 +188,11 @@ export class Runtime {
     }
 
     write_flash_page (page: number, srcPtr: number) {
-        // TODO: Make dangerous write crash!!
+        // Validate page number is within bounds
+        if (page < 0 || page >= constants.FLASH_PAGE_COUNT) {
+            console.error(`Flash write out of bounds: page ${page} (max ${constants.FLASH_PAGE_COUNT - 1})`);
+            return;
+        }
 
         const src = new Uint8Array(this.memory.buffer, srcPtr, constants.FLASH_PAGE_SIZE);
         const dst = new Uint8Array(this.flashBuffer, page * constants.FLASH_PAGE_SIZE, constants.FLASH_PAGE_SIZE);
@@ -255,7 +262,7 @@ export class Runtime {
         const messageY = 52;
 
         this.framebuffer.fillScreen(blue);
-        
+
         this.framebuffer.drawHLine(grey, headerX, headerY-1, headerWidth);
         this.framebuffer.drawText(blue, grey, toCharArr(headerTitle), headerX, headerY);
         this.framebuffer.drawText(grey, blue, toCharArr(text), messageX, messageY);

@@ -21,7 +21,7 @@ The badge is based on the PyBadge and is equipped with:
 
 ## Setup
 
-Install Zig 0.12.0. You can find [the binaries on the Zig website](https://ziglang.org/download/#release-0.12.0), or obtain them via a version manager such as [`zigup`](https://github.com/marler8997/zigup).
+Install Zig 0.15.1. You can find [the binaries on the Zig website](https://ziglang.org/download/), or obtain them via a version manager such as [`zigup`](https://github.com/marler8997/zigup).
 
 Clone this repository and enter this directory:
 

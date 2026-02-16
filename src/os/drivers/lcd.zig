@@ -6,6 +6,7 @@ const hal = microzig.hal;
 const gpio = hal.gpio;
 const spi = hal.spi;
 const timer = @import("timer.zig");
+const dma = @import("dma.zig");
 const board = microzig.board;
 const font = board.font;
 
@@ -75,6 +76,13 @@ pub const MAGENTA: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x1F };
 /// Driver State
 var pins: Pins = undefined;
 var spi_instance: spi.SPI = undefined;
+var spi_instance_num: u1 = 0;
+var spi_baudrate: u32 = 62_500_000; // Fixed baudrate for LCD (max for RP2350 SPI is 62.5 MHz)
+
+/// Framebuffer for DMA transfers (160x128 pixels, RGB565 = 2 bytes per pixel)
+var framebuffer: [width * height * 2]u8 align(4) = undefined;
+var dma_enabled: bool = false;
+var dma_active: bool = false;
 
 /// ST7735/ST7789 Commands
 const Command = enum(u8) {
@@ -153,6 +161,7 @@ fn writeU16(value: u16) void {
 pub const Config = struct {
     spi_instance_num: u1 = 0, // Which SPI peripheral to use (0 or 1 for RP2354B)
     spi_baudrate: u32 = 62_500_000, // 62.5 MHz
+    use_dma: bool = true, // Enable DMA flag
 };
 
 /// Low-level initialization (control pins only)
@@ -179,14 +188,28 @@ pub fn init(pin_config: Pins, config: Config) !void {
         bl.put(1); // Turn on backlight
     }
 
+    // Store SPI instance num and baudrate for DMA config
+    spi_instance_num = config.spi_instance_num;
+    spi_baudrate = config.spi_baudrate;
+    
     // Initialize SPI peripheral
     spi_instance = spi.instance.num(config.spi_instance_num);
 
     // Reset and configure SPI peripheral
+    // Must pass baud_rate, otherwise HAL defaults to 1 MHz
     const spi_config = spi.Config{
         .clock_config = hal.clock_config,
+        .baud_rate = 62_500_000, // 62.5 MHz
     };
     try spi_instance.apply(spi_config);
+    
+    // Enable DMA if requested
+    dma_enabled = config.use_dma;
+    if (dma_enabled) {
+        dma.init();
+        // Clear framebuffer to black
+        @memset(&framebuffer, 0);
+    }
 
     // Hardware reset sequence
     pins.rst.put(1);
@@ -264,6 +287,9 @@ fn initDisplay() void {
     // Display on
     writeCommand(.DISPON);
     timer.sleep_ms(20);
+    
+    // DMA inits on first present() call
+    dma_active = false;
 }
 
 /// Re-initialize display registers (call after cart stops to restore LCD settings)
@@ -280,6 +306,7 @@ pub fn reinitDisplay() void {
     // Reset SPI peripheral (cart may have changed SPI settings)
     const spi_config = spi.Config{
         .clock_config = hal.clock_config,
+        .baud_rate = 62_500_000,
     };
     spi_instance.apply(spi_config) catch {};
 
@@ -352,6 +379,17 @@ fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
     writeData(&row_data);
 
     writeCommand(.RAMWR);
+}
+
+/// Set win for DMA streaming, keep CS low and DC high after RAMWR
+fn setWindowForDMA(x0: u16, y0: u16, x1: u16, y1: u16) void {
+    // setWindow to send CASET, RASET, RAMWR (ends with CS high)
+    // Blocking SPI calls handle synch internally
+    setWindow(x0, y0, x1, y1);
+    
+    // Set DC to data mode and CS low
+    pins.dc.put(1); // Data mode
+    pins.cs.put(0); // Select and keep selected for DMA streaming
 }
 
 pub fn drawPixel(x: u16, y: u16, color: Color16) void {
@@ -474,17 +512,28 @@ pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u8) void {
 }
 
 /// Write RGB565 framebuffer to display
-pub fn writeFramebuffer(framebuffer: []const Color16) void {
-    if (framebuffer.len != width * height) {
+/// Copies to internal buffer and triggers DMA transfer
+pub fn writeFramebuffer(source_fb: []const Color16) void {
+    if (source_fb.len != width * height) {
         return; // Invalid framebuffer size
     }
 
-    setWindow(0, 0, width - 1, height - 1);
-
-    // Write entire framebuffer pixel by pixel
-    for (framebuffer) |pixel| {
-        const data = pixel.toBytes();
-        writeData(&data);
+    if (dma_enabled) {
+        // Convert Color16 to bytes and copy to DMA framebuffer
+        for (source_fb, 0..) |pixel, i| {
+            const bytes = pixel.toBytes();
+            framebuffer[i * 2] = bytes[0];
+            framebuffer[i * 2 + 1] = bytes[1];
+        }
+        // Trigger DMA transfer
+        present();
+    } else {
+        // Fallback: write pixel by pixel (it's slow)
+        setWindow(0, 0, width - 1, height - 1);
+        for (source_fb) |pixel| {
+            const data = pixel.toBytes();
+            writeData(&data);
+        }
     }
 }
 
@@ -537,6 +586,7 @@ pub fn createDT018BTFTConfig() Config {
     return .{
         .spi_instance_num = 0, // SPI instance number
         .spi_baudrate = 62_500_000, // 62.5 MHz (maximum)
+        .use_dma = true,
     };
 }
 
@@ -580,4 +630,137 @@ pub fn drawImg(x: u16, y: u16, w: u16, h: u16, img_data: []const u8) void {
     _ = w;
     _ = h;
     writeBuffer(0, 0, width, height, img_data);
+}
+
+// DMA Functions
+
+/// Get pointer to internal framebuffer for dir access
+/// Fastest way to draw - write dir to framebuffer then call present()
+pub fn getFramebuffer() *[width * height * 2]u8 {
+    return &framebuffer;
+}
+
+/// Trigger DMA transfer of framebuffer to LCD
+/// Call after drawing to framebuffer to update screen
+pub fn present() void {
+    if (!dma_enabled) return;
+    
+    if (!dma_active) {
+        // Set up LCD for DMA streaming and init DMA
+        setWindowForDMA(0, 0, width - 1, height - 1);
+        dma.initLCD(spi_instance_num, &framebuffer);
+        dma_active = true;
+    } else {
+        // Wait for prev transfer to complete
+        vsync();
+    }
+    
+    // Start/restart DMA transfer (CS stays low, DC stays high)
+    dma.startLCD();
+}
+
+pub fn vsync() void {
+    if (!dma_enabled or !dma_active) return;
+    
+    // Wait for DMA to finish transferring data
+    dma.waitLCD();
+}
+
+/// Stop DMA transfers
+pub fn stopDMA() void {
+    if (!dma_active) return;
+    
+    // Stop DMA and wait
+    dma.stopLCD();
+    
+    dma_active = false;
+    
+    // Deselect LCD
+    pins.cs.put(1);
+}
+
+/// Check if DMA transfer in progress
+pub fn isBusy() bool {
+    if (!dma_enabled or !dma_active) return false;
+    return dma.isLCDbusy();
+}
+
+/// Fast fill screen with single color
+pub fn clearScreen(color: Color16) void {
+    if (dma_enabled) {
+        const bytes = color.toBytes();
+        // Fill framebuffer with color
+        var i: usize = 0;
+        while (i < framebuffer.len) : (i += 2) {
+            framebuffer[i] = bytes[0];
+            framebuffer[i + 1] = bytes[1];
+        }
+        present();
+        vsync();
+    } else {
+        fillScreen(color);
+    }
+}
+
+/// Fast pixel write to framebuffer (no bounds checking for speed)
+/// Only use when x, y are within bounds
+pub inline fn setPixelUnsafe(x: u16, y: u16, color: Color16) void {
+    const offset = (y * width + x) * 2;
+    const bytes = color.toBytes();
+    framebuffer[offset] = bytes[0];
+    framebuffer[offset + 1] = bytes[1];
+}
+
+/// Safe pixel write to framebuffer with bounds checking
+pub fn setPixel(x: u16, y: u16, color: Color16) void {
+    if (x >= width or y >= height) return;
+    setPixelUnsafe(x, y, color);
+}
+
+/// Horizontal line
+pub fn setHLine(x: u16, y: u16, w: u16, color: Color16) void {
+    if (y >= height or x >= width) return;
+    const actual_w = @min(w, width - x);
+    const bytes = color.toBytes();
+    const start_offset = (y * width + x) * 2;
+    
+    var i: usize = 0;
+    while (i < actual_w) : (i += 1) {
+        const offset = start_offset + i * 2;
+        framebuffer[offset] = bytes[0];
+        framebuffer[offset + 1] = bytes[1];
+    }
+}
+
+/// Vertical line
+pub fn setVLine(x: u16, y: u16, h: u16, color: Color16) void {
+    if (x >= width or y >= height) return;
+    const actual_h = @min(h, height - y);
+    const bytes = color.toBytes();
+    
+    var row: usize = 0;
+    while (row < actual_h) : (row += 1) {
+        const offset = ((y + row) * width + x) * 2;
+        framebuffer[offset] = bytes[0];
+        framebuffer[offset + 1] = bytes[1];
+    }
+}
+
+pub fn setRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
+    if (x >= width or y >= height) return;
+    
+    const actual_w = @min(w, width - x);
+    const actual_h = @min(h, height - y);
+    const bytes = color.toBytes();
+    
+    var row: usize = 0;
+    while (row < actual_h) : (row += 1) {
+        const row_offset = ((y + row) * width + x) * 2;
+        var col: usize = 0;
+        while (col < actual_w) : (col += 1) {
+            const offset = row_offset + col * 2;
+            framebuffer[offset] = bytes[0];
+            framebuffer[offset + 1] = bytes[1];
+        }
+    }
 }

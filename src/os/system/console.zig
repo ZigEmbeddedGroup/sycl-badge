@@ -70,7 +70,7 @@ pub const Command = struct {
 fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image" };
+        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image", "fps" };
         return &options;
     }
     return &[_][]const u8{};
@@ -113,7 +113,7 @@ const commands = [_]Command{
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
-    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
@@ -1102,7 +1102,7 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|image>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|image|fps>\r\n");
         return;
     };
 
@@ -1112,44 +1112,77 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "red")) {
         println("\r\nFilling LCD with RED...");
-        lcd.fillScreen(lcd.RED);
+        lcd.clearScreen(lcd.RED);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "green")) {
         println("\r\nFilling LCD with GREEN...");
-        lcd.fillScreen(lcd.GREEN);
+        lcd.clearScreen(lcd.GREEN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "blue")) {
         println("\r\nFilling LCD with BLUE...");
-        lcd.fillScreen(lcd.BLUE);
+        lcd.clearScreen(lcd.BLUE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "yellow")) {
         println("\r\nFilling LCD with YELLOW...");
-        lcd.fillScreen(lcd.YELLOW);
+        lcd.clearScreen(lcd.YELLOW);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "cyan")) {
         println("\r\nFilling LCD with CYAN...");
-        lcd.fillScreen(lcd.CYAN);
+        lcd.clearScreen(lcd.CYAN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "magenta")) {
         println("\r\nFilling LCD with MAGENTA...");
-        lcd.fillScreen(lcd.MAGENTA);
+        lcd.clearScreen(lcd.MAGENTA);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "white")) {
         println("\r\nFilling LCD with WHITE...");
-        lcd.fillScreen(lcd.WHITE);
+        lcd.clearScreen(lcd.WHITE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
-        lcd.fillScreen(lcd.BLACK);
+        lcd.clearScreen(lcd.BLACK);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "image")) {
         println("\r\nDisplaying pug image on LCD...");
         lcd.drawImg(0, 0, lcd.width, lcd.height, &pug_image.pug_image_data);
         println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "fps")) {
+        println("\r\nRunning FPS benchmark...");
+        lcdFpsBenchmark();
+        println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
-        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black\r\n");
+        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black, fps\r\n");
     }
+}
+
+// LCD FPS Benchmark
+fn lcdFpsBenchmark() void {
+    const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA };
+
+    println("\r\nMeasuring DMA-based screen fill perf...");
+    println("Filling screen 100 times with diff colors...");
+
+    const start_time = timer.get_time_since_boot();
+
+    var i: usize = 0;
+    while (i < 100) : (i += 1) {
+        const color = colors[i % colors.len];
+        lcd.clearScreen(color);
+        lcd.vsync();
+    }
+
+    const end_time = timer.get_time_since_boot();
+    const elapsed_us = end_time.to_us() - start_time.to_us();
+    const elapsed_ms = elapsed_us / 1000;
+    const avg_frame_time_ms = elapsed_ms / 100;
+    const fps = if (avg_frame_time_ms > 0) 1000 / avg_frame_time_ms else 0;
+
+    printf("\r\nResults:\r\n", .{});
+    printf("  Total time: {d}ms\r\n", .{elapsed_ms});
+    printf("  Average frame time: {d}ms\r\n", .{avg_frame_time_ms});
+    printf("  Estimated FPS: {d}\r\n", .{fps});
+    println("");
 }
 
 // Static counter for ls command (needed because callbacks can't capture locals)

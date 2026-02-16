@@ -139,6 +139,29 @@ fn writeData(data: []const u8) void {
     pins.cs.put(1); // Deselect
 }
 
+// Helper: start a data transfer without toggling CS/DC for each chunk
+fn startData() void {
+    pins.dc.put(1);
+    pins.cs.put(0);
+}
+
+// Helper: end a data transfer (deselect)
+fn endData() void {
+    pins.cs.put(1);
+}
+
+// Helper: write data while assuming CS already low and DC set to data mode
+fn writeDataNoCS(data: []const u8) void {
+    var dummy = std.mem.zeroes([256]u8);
+    const chunk_size = @min(data.len, dummy.len);
+    var offset: usize = 0;
+    while (offset < data.len) {
+        const len = @min(chunk_size, data.len - offset);
+        spi_instance.transceive_blocking(u8, data[offset..][0..len], dummy[0..len]);
+        offset += len;
+    }
+}
+
 fn writeCommandWithData(cmd: Command, data: []const u8) void {
     writeCommand(cmd);
     if (data.len > 0) {
@@ -472,20 +495,40 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
     const glyph = font.font[char_index];
 
     // Draw the character bitmap
-    var row: u8 = 0;
-    while (row < 8) : (row += 1) {
-        const line = glyph[row];
-        var col: u8 = 0;
-        while (col < 8) : (col += 1) {
-            // Check if pixel is set (0 = foreground, 1 = background in this font)
-            const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
-            const pixel_color = if (bit_set) color else bg_color;
-
-            // Draw scaled pixel
-            if (size == 1) {
-                drawPixel(x + col, y + row, pixel_color);
-            } else {
-                // Draw size x size block for each font pixel
+    if (size == 1) {
+        // Single-size characters: write each row as a contiguous 8-pixel transfer
+        var row_idx: u8 = 0;
+        while (row_idx < 8) : (row_idx += 1) {
+            const line = glyph[row_idx];
+            var buf: [16]u8 = undefined; // 8 pixels * 2 bytes
+            var cidx: usize = 0;
+            var col: u8 = 0;
+            while (col < 8) : (col += 1) {
+                // Check if pixel is set (0 = foreground, 1 = background in this font)
+                const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
+                const pixel_color = if (bit_set) color else bg_color;
+                const bytes = pixel_color.toBytes();
+                buf[cidx] = bytes[0];
+                buf[cidx + 1] = bytes[1];
+                cidx += 2;
+            }
+            // Set window for this row and stream it as one transfer
+            setWindow(x, y + @as(u16, row_idx), x + 7, y + @as(u16, row_idx));
+            startData();
+            writeDataNoCS(buf[0..16]);
+            endData();
+        }
+    } else {
+        // Draw the scaled character bitmap
+        var row: u8 = 0;
+        while (row < 8) : (row += 1) {
+            const line = glyph[row];
+            var col: u8 = 0;
+            while (col < 8) : (col += 1) {
+                // Check if pixel is set (0 = foreground, 1 = background in this font)
+                const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
+                const pixel_color = if (bit_set) color else bg_color;
+                // Draw scaled pixel block
                 fillRect(x + @as(u16, col) * size, y + @as(u16, row) * size, size, size, pixel_color);
             }
         }

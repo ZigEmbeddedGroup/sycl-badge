@@ -114,6 +114,7 @@ pub fn main() !void {
         // Stop button (GPIO 15) works at any time - stops running cart
         if (buttons.stop == 1 and !button_stop_was_pressed) {
             button_stop_was_pressed = true;
+            console.printf("[BTN] STOP pressed (cart_running={})\r\n", .{cart_running});
             if (cart_running) {
                 // Stop the cart (halt Core 1, reset state, restart Core 1)
                 multicore.haltCore1();
@@ -138,6 +139,7 @@ pub fn main() !void {
             // Detect button_up press (GPIO 10) - move cursor down through cart list
             if (buttons.up == 1 and !button_up_was_pressed) {
                 button_up_was_pressed = true;
+                console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 // Move cursor to next cart (wrap around to top)
                 if (cart_count > 0) {
                     cursor_index = (cursor_index + 1) % cart_count;
@@ -150,9 +152,12 @@ pub fn main() !void {
             // Detect button_down press (GPIO 11) - run selected cart
             if (buttons.down == 1 and !button_down_was_pressed) {
                 button_down_was_pressed = true;
+                console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 // Run the selected cart
                 if (cart_count > 0 and cursor_index < cart_count) {
                     runSelectedCart();
+                } else {
+                    console.printf("[BTN] DOWN: no cart to run (cart_count={d})\r\n", .{cart_count});
                 }
             } else if (buttons.down == 0 and button_down_was_pressed) {
                 button_down_was_pressed = false;
@@ -263,14 +268,19 @@ fn runSelectedCart() void {
     if (cursor_index >= cart_count) return;
 
     const name = cart_names[cursor_index][0..cart_name_lengths[cursor_index]];
+    console.printf("[BTN] runSelectedCart: loading '{s}'\r\n", .{name});
 
     // Stop any running cart first
     if (loader.isRunning()) {
+        console.println("[BTN] stopping running cart before reload");
+        multicore.haltCore1();
+        loader.stop();
         multicore.resetCore1();
         timer.sleep_ms(100);
     }
 
     // Load the cart
+    console.println("[BTN] calling loadUF2Cart...");
     const entry_point = loader.loadUF2Cart(name) catch |err| {
         // Show error on LCD
         lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
@@ -290,20 +300,29 @@ fn runSelectedCart() void {
     };
 
     // Prepare LCD for cart: ensure normal mode (not inverted) and clear screen
-    lcd.prepareForCart(); // Reset LCD to standard state
-    lcd.fillScreen(lcd.BLACK); // Clear to black
-    timer.sleep_ms(10); // Small delay to ensure LCD command completes
+    console.printf("[BTN] cart loaded, entry_point=0x{x}\r\n", .{entry_point});
+    // NOTE: do NOT touch the LCD here - prepareForCart/fillScreen before executeCart
+    // interferes with the cart's own LCD init (forces MADCTL, may leave DMA running).
+    // The console 'cart run' command works precisely because it skips these LCD calls.
 
     // Execute the cart
+    console.println("[BTN] calling executeCart...");
     if (multicore.executeCart(entry_point)) {
         // Cart execution started successfully
         // Mark as running immediately to prevent race conditions
         loader.markRunning();
-        display_active = false;
+        // NOTE: do NOT set display_active = false here. cart_running is still false
+        // in this loop iteration (it was captured before runSelectedCart was called),
+        // so setting display_active = false here causes the !cart_running && !display_active
+        // branch to fire immediately, redrawing the menu on top of the cart.
+        // The main loop's (cart_running && display_active) check handles this correctly
+        // on the next iteration once cart_running reflects the new state.
+        console.println("[BTN] executeCart succeeded, cart running");
         // Small delay to let Core 1 start and take control of hardware
         timer.sleep_ms(5);
     } else {
         // Execution failed
+        console.println("[BTN] executeCart FAILED");
         lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
         lcd.drawString(10, 50, "Failed to run", lcd.RED, lcd.BLACK, 1);
         timer.sleep_ms(2000);

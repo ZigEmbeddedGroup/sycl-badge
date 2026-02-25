@@ -116,6 +116,7 @@ const commands = [_]Command{
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
+    .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
@@ -1098,6 +1099,50 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     // Use ROM function to reset to USB bootloader
     rom.reset_to_usb_boot();
+}
+
+// Menu Command - Return to cart selection screen
+var menu_y_pos: u16 = 0;
+
+fn menuCartVisitor(name: []const u8, size: u32) void {
+    _ = size;
+    if (menu_y_pos < 220) { // Don't draw past screen bottom
+        lcd.drawString(20, menu_y_pos, name, lcd.GREEN, lcd.BLACK, 1);
+        menu_y_pos += 12;
+    }
+}
+
+fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+
+    // Stop any running cart first
+    const cart_state = loader.getState();
+    if (cart_state == .running or cart_state == .ready) {
+        println("\r\nStopping cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+
+        // Give the system a moment to settle
+        timer.sleep_ms(50);
+    }
+
+    // Restore the default cart selection screen
+    println("Restoring menu...\r\n");
+
+    // Reinitialize LCD display (fixes color mode if cart changed it)
+    lcd.reinitDisplay();
+
+    // Clear screen and draw header
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+
+    // List available carts
+    menu_y_pos = 60;
+    storage.listCarts(menuCartVisitor);
+
+    println("Menu restored. Use buttons to navigate and select carts.\r\n");
 }
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {

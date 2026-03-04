@@ -92,6 +92,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
+    // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
+    add_os_cart(builder, &dep, .{
+        .name = "os-cart-space-shooter",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/space-shooter/src/main.zig"),
+    });
+
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{
         .name = "font_export_exe",
@@ -409,6 +416,59 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
     mb.install_firmware(fw, .{ .format = .elf });
 
     // Install UF2 for RP235X
+    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+}
+
+/// OS Cart - runs on the new RP2354B OS (Core 1), using the new cart API.
+/// Cart source must export `fn start()` and `fn update()`.
+pub const OsCartOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+    root_source_file: Build.LazyPath,
+};
+
+pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
+    const mz_dep = dep.builder.dependency("microzig", .{});
+    const mb = MicroBuild.init(b, mz_dep) orelse return;
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
+
+    // The cart-api module for OS
+    const cart_api_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
+    });
+
+    // The user's cart source (must export start() and update())
+    const user_cart_module = b.createModule(.{
+        .root_source_file = options.root_source_file,
+        .imports = &.{
+            .{ .name = "cart-api", .module = cart_api_module },
+        },
+    });
+
+    // Firmware root is OS cart entry wrapper
+    const fw = mb.add_firmware(.{
+        .name = options.name,
+        .target = badge_v2_target,
+        .optimize = options.optimize,
+        .root_source_file = dep.builder.path("src/os/cart/cart_entry.zig"),
+        .linker_script = .{
+            .file = dep.builder.path("src/cart/cart_xip.ld"),
+            .generate = .none,
+        },
+    });
+
+    // Inject cart and api modules into the entry wrapper
+    fw.app_mod.addImport("user_cart", user_cart_module);
+    fw.app_mod.addImport("cart-api", cart_api_module);
+    user_cart_module.addImport("microzig", fw.core_mod);
+
+    // Share the board module with cart-api so that font.zig belongs to exactly
+    // one module (board). Without this, both board_v2.zig and api.zig would
+    // directly import font.zig, which Zig prohibits.
+    const board_mod = fw.core_mod.import_table.get("board").?;
+    cart_api_module.addImport("board", board_mod);
+
+    mb.install_firmware(fw, .{ .format = .elf });
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 }
 

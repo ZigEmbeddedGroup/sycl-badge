@@ -14,16 +14,28 @@ const init = @import("system/init.zig");
 const storage = @import("loader/storage.zig");
 const loader = @import("loader/loader.zig");
 const multicore = @import("system/multicore.zig");
+const mailbox = @import("ipc/mailbox.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
 
 // Simple button poller (similar to badge-v1)
 const ButtonPoller = struct {
-    pub const Buttons = packed struct(u3) {
+    /// All physical buttons on the badge.
+    /// Bits 0-8 mirror the cart API Controls layout so they can be forwarded directly.
+    pub const Buttons = packed struct(u10) {
+        // -- cart Controls bits 0-8 (same order as api.zig Controls) --
+        start: u1, // GPIO 6
+        select: u1, // GPIO 7
+        a: u1, // GPIO 2
+        b: u1, // GPIO 3
+        click: u1, // GPIO 8
         up: u1, // GPIO 10
         down: u1, // GPIO 11
-        stop: u1, // GPIO 15
+        left: u1, // GPIO 4
+        right: u1, // GPIO 5
+        // -- OS-only --
+        stop: u1, // GPIO 15  (kills running cart, not forwarded to cart)
     };
 
     pub fn init() ButtonPoller {
@@ -34,8 +46,16 @@ const ButtonPoller = struct {
     pub fn read(self: ButtonPoller) Buttons {
         _ = self;
         return .{
+            // TODO: uncomment when physical buttons are placed on the board
+            .start = 0, // gpio.isButtonPressed(board.button_start)
+            .select = 0, // gpio.isButtonPressed(board.button_select)
+            .a = 0, // gpio.isButtonPressed(board.button_a)
+            .b = 0, // gpio.isButtonPressed(board.button_b)
+            .click = 0, // gpio.isButtonPressed(board.button_click)
             .up = if (gpio.isButtonPressed(board.button_up)) 1 else 0,
             .down = if (gpio.isButtonPressed(board.button_down)) 1 else 0,
+            .left = 0, // gpio.isButtonPressed(board.button_left)
+            .right = 0, // gpio.isButtonPressed(board.button_right)
             .stop = if (gpio.isButtonPressed(board.button_stop)) 1 else 0,
         };
     }
@@ -166,6 +186,32 @@ pub fn main() !void {
             // Reset navigation button states when cart is running to avoid stuck states
             button_up_was_pressed = false;
             button_down_was_pressed = false;
+
+            // Mailbox framebuffer sync.
+            // New-API carts send FRAMEBUFFER_READY when they finish a frame.
+            // Old carts (badge-v1 API) drive the LCD directly and never send
+            // this message, so Core 0 stays off the SPI bus.
+            if (mailbox.tryReceive()) |msg| {
+                if (msg == mailbox.MessageType.FRAMEBUFFER_READY) {
+                    // Write button state into the IPC block for the cart to read.
+                    // Buttons bits 0-8 match the cart Controls layout exactly.
+                    const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
+                    const btn = button_poller.read();
+                    const btn_bits: u10 = @bitCast(btn);
+                    ipc_controls.* = @as(u16, @as(u9, @truncate(btn_bits))); // 9 cart bits
+
+                    // Flush the shared-RAM framebuffer (40960 bytes at 0x20020020)
+                    // to the LCD over SPI, using column-major MADCTL.
+                    const fb_ptr: [*]const u8 = @ptrFromInt(0x20020020);
+                    lcd.writeCartBuffer(fb_ptr[0 .. 160 * 128 * 2]);
+
+                    // Tell Core 1 it can start the next frame.
+                    mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                }
+                // Other messages (e.g. CART_FINISHED) are handled by the
+                // loader state machine and will be picked up on the next
+                // iteration by cart_running becoming false.
+            }
         }
 
         if (cart_running and display_active) {

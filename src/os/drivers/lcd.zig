@@ -214,7 +214,7 @@ pub fn init(pin_config: Pins, config: Config) !void {
     // Store SPI instance num and baudrate for DMA config
     spi_instance_num = config.spi_instance_num;
     spi_baudrate = config.spi_baudrate;
-    
+
     // Initialize SPI peripheral
     spi_instance = spi.instance.num(config.spi_instance_num);
 
@@ -225,7 +225,7 @@ pub fn init(pin_config: Pins, config: Config) !void {
         .baud_rate = 62_500_000, // 62.5 MHz
     };
     try spi_instance.apply(spi_config);
-    
+
     // Enable DMA if requested
     dma_enabled = config.use_dma;
     if (dma_enabled) {
@@ -310,7 +310,7 @@ fn initDisplay() void {
     // Display on
     writeCommand(.DISPON);
     timer.sleep_ms(20);
-    
+
     // DMA inits on first present() call
     dma_active = false;
 }
@@ -409,7 +409,7 @@ fn setWindowForDMA(x0: u16, y0: u16, x1: u16, y1: u16) void {
     // setWindow to send CASET, RASET, RAMWR (ends with CS high)
     // Blocking SPI calls handle synch internally
     setWindow(x0, y0, x1, y1);
-    
+
     // Set DC to data mode and CS low
     pins.dc.put(1); // Data mode
     pins.cs.put(0); // Select and keep selected for DMA streaming
@@ -554,6 +554,31 @@ pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u8) void {
     writeData(buffer);
 }
 
+/// Write a column-major framebuffer (the cart API layout) to the full display.
+///
+/// Temporarily switches to MADCTL=0x40 (MV=0, MX=1) so the
+/// native column axis (128 = screen-Y) is the fast scan direction, matching
+/// the framebuffer memory order.
+pub fn writeCartBuffer(buffer: []const u8) void {
+    // MV=0: fast axis = native columns (128 = screen Y).
+    // MX=1: columns scan 127→0 so Y=0 maps to native col 127 (screen top).
+    // MY=0: rows scan 0→159 so X=0 maps to native row 0 (screen left).
+    writeCommandWithData(.MADCTL, &.{0x40});
+
+    // With MV=0: CASET = native columns (0-127), RASET = native rows (0-159).
+    // Send CASET/RASET directly to avoid confusion with setWindow's x/y naming.
+    writeCommand(.CASET);
+    writeData(&[_]u8{ 0x00, 0x00 + xstart, 0x00, 127 + xstart });
+    writeCommand(.RASET);
+    writeData(&[_]u8{ 0x00, 0x00 + ystart, 0x00, 159 + ystart });
+    writeCommand(.RAMWR);
+
+    writeData(buffer);
+
+    // Restore landscape MADCTL for direct-draw UI operations.
+    writeCommandWithData(.MADCTL, &.{0xA0});
+}
+
 /// Write RGB565 framebuffer to display
 /// Copies to internal buffer and triggers DMA transfer
 pub fn writeFramebuffer(source_fb: []const Color16) void {
@@ -687,7 +712,7 @@ pub fn getFramebuffer() *[width * height * 2]u8 {
 /// Call after drawing to framebuffer to update screen
 pub fn present() void {
     if (!dma_enabled) return;
-    
+
     if (!dma_active) {
         // Set up LCD for DMA streaming and init DMA
         setWindowForDMA(0, 0, width - 1, height - 1);
@@ -697,14 +722,14 @@ pub fn present() void {
         // Wait for prev transfer to complete
         vsync();
     }
-    
+
     // Start/restart DMA transfer (CS stays low, DC stays high)
     dma.startLCD();
 }
 
 pub fn vsync() void {
     if (!dma_enabled or !dma_active) return;
-    
+
     // Wait for DMA to finish transferring data
     dma.waitLCD();
 }
@@ -712,12 +737,12 @@ pub fn vsync() void {
 /// Stop DMA transfers
 pub fn stopDMA() void {
     if (!dma_active) return;
-    
+
     // Stop DMA and wait
     dma.stopLCD();
-    
+
     dma_active = false;
-    
+
     // Deselect LCD
     pins.cs.put(1);
 }
@@ -766,7 +791,7 @@ pub fn setHLine(x: u16, y: u16, w: u16, color: Color16) void {
     const actual_w = @min(w, width - x);
     const bytes = color.toBytes();
     const start_offset = (y * width + x) * 2;
-    
+
     var i: usize = 0;
     while (i < actual_w) : (i += 1) {
         const offset = start_offset + i * 2;
@@ -780,7 +805,7 @@ pub fn setVLine(x: u16, y: u16, h: u16, color: Color16) void {
     if (x >= width or y >= height) return;
     const actual_h = @min(h, height - y);
     const bytes = color.toBytes();
-    
+
     var row: usize = 0;
     while (row < actual_h) : (row += 1) {
         const offset = ((y + row) * width + x) * 2;
@@ -791,11 +816,11 @@ pub fn setVLine(x: u16, y: u16, h: u16, color: Color16) void {
 
 pub fn setRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     if (x >= width or y >= height) return;
-    
+
     const actual_w = @min(w, width - x);
     const actual_h = @min(h, height - y);
     const bytes = color.toBytes();
-    
+
     var row: usize = 0;
     while (row < actual_h) : (row += 1) {
         const row_offset = ((y + row) * width + x) * 2;

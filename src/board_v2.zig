@@ -55,3 +55,7 @@ pub const button_select = gpio.num(38); // SELECT1
 
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;
+
+// Buzzer / Speaker (CMT-7525-80-SMT-TR)
+pub const buzzer_enable = gpio.num(8); // SPKR_EN  - speaker enable (active-high)
+pub const buzzer_pwm = gpio.num(9); // SPKR_A0  - PWM audio output (PWM slice 4, channel B)

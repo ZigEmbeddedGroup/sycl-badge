@@ -200,6 +200,10 @@ pub fn autoStartSingleCart() bool {
         return false;
     }
 }
+// Erase the cart XIP region (public interface for console command)
+pub fn eraseCartRegion() LoadError!void {
+    try eraseCartXipRegion();
+}
 
 /// Load a UF2 cart from FAT12 storage and program it to cart_xip flash
 /// Returns the entry point address on success

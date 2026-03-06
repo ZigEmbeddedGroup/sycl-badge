@@ -70,7 +70,7 @@ pub const Command = struct {
 fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image" };
+        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image", "fps" };
         return &options;
     }
     return &[_][]const u8{};
@@ -118,7 +118,7 @@ fn refreshCartNames() void {
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall", "wipeall" };
         return &options;
     }
     if (arg_index == 1) {
@@ -136,8 +136,11 @@ const commands = [_]Command{
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
-    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
+    .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
@@ -1013,11 +1016,12 @@ fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         multicore.resetCore1();
     }
 
-    // Clear cart XIP flash region
-    println("Clearing cart XIP flash region...");
-    const xip_start: [*]u8 = @ptrFromInt(loader.getCartXipStart());
-    const xip_size = loader.getCartXipSize();
-    @memset(xip_start[0..xip_size], 0);
+    // Erase cart XIP flash region
+    println("Erasing cart XIP flash region...");
+    loader.eraseCartRegion() catch {
+        println("ERROR: Failed to erase cart XIP region\r\n");
+        return;
+    };
 
     // Clear process RAM (Core 1 RAM: 0x20020000 - 0x20080000, 384KB)
     println("Clearing process RAM...");
@@ -1052,6 +1056,12 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Small delay to allow host to detect disconnection
         timer.sleep_ms(10);
+    // Disconnect USB to properly signal disconnection to the host
+    // This prevents the terminal from thinking the connection is still active
+    usb.disconnect();
+
+    // Small delay to allow host to detect disconnection
+    timer.sleep_ms(10);
 
         // Trigger system reset via SCB (System Control Block)
         const SCB_BASE = 0xE000ED00;
@@ -1075,10 +1085,65 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         }
 }
 
+// Reboot to BootSelect Command
+fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+    println("\r\nRebooting to BootSelect...\r\n");
+
+    // Small delay to allow message to be sent
+    timer.sleep_ms(50);
+
+    // Use ROM function to reset to USB bootloader
+    rom.reset_to_usb_boot();
+}
+
+// Menu Command - Return to cart selection screen
+var menu_y_pos: u16 = 0;
+
+fn menuCartVisitor(name: []const u8, size: u32) void {
+    _ = size;
+    if (menu_y_pos < 220) { // Don't draw past screen bottom
+        lcd.drawString(20, menu_y_pos, name, lcd.GREEN, lcd.BLACK, 1);
+        menu_y_pos += 12;
+    }
+}
+
+fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+
+    // Stop any running cart first
+    const cart_state = loader.getState();
+    if (cart_state == .running or cart_state == .ready) {
+        println("\r\nStopping cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+
+        // Give the system a moment to settle
+        timer.sleep_ms(50);
+    }
+
+    // Restore the default cart selection screen
+    println("Restoring menu...\r\n");
+
+    // Reinitialize LCD display (fixes color mode if cart changed it)
+    lcd.reinitDisplay();
+
+    // Clear screen and draw header
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+
+    // List available carts
+    menu_y_pos = 60;
+    storage.listCarts(menuCartVisitor);
+
+    println("Menu restored. Use buttons to navigate and select carts.\r\n");
+}
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|fps>\r\n");
         return;
     };
 
@@ -1088,45 +1153,114 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "red")) {
         println("\r\nFilling LCD with RED...");
-        lcd.fillScreen(lcd.RED);
+        lcd.clearScreen(lcd.RED);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "green")) {
         println("\r\nFilling LCD with GREEN...");
-        lcd.fillScreen(lcd.GREEN);
+        lcd.clearScreen(lcd.GREEN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "blue")) {
         println("\r\nFilling LCD with BLUE...");
-        lcd.fillScreen(lcd.BLUE);
+        lcd.clearScreen(lcd.BLUE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "yellow")) {
         println("\r\nFilling LCD with YELLOW...");
-        lcd.fillScreen(lcd.YELLOW);
+        lcd.clearScreen(lcd.YELLOW);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "cyan")) {
         println("\r\nFilling LCD with CYAN...");
-        lcd.fillScreen(lcd.CYAN);
+        lcd.clearScreen(lcd.CYAN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "magenta")) {
         println("\r\nFilling LCD with MAGENTA...");
-        lcd.fillScreen(lcd.MAGENTA);
+        lcd.clearScreen(lcd.MAGENTA);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "white")) {
         println("\r\nFilling LCD with WHITE...");
-        lcd.fillScreen(lcd.WHITE);
+        lcd.clearScreen(lcd.WHITE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
-        lcd.fillScreen(lcd.BLACK);
+        lcd.clearScreen(lcd.BLACK);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "fps")) {
+        println("\r\nRunning FPS benchmark...");
+        lcdFpsBenchmark();
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
-        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black\r\n");
+        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black, fps\r\n");
     }
+}
+
+// LCD FPS Benchmark
+fn lcdFpsBenchmark() void {
+    const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA };
+
+    println("\r\nMeasuring DMA-based screen fill perf...");
+    println("Filling screen 100 times with diff colors...");
+
+    const start_time = timer.get_time_since_boot();
+
+    var i: usize = 0;
+    while (i < 100) : (i += 1) {
+        const color = colors[i % colors.len];
+        lcd.clearScreen(color);
+        lcd.vsync();
+    }
+
+    const end_time = timer.get_time_since_boot();
+    const elapsed_us = end_time.to_us() - start_time.to_us();
+    const elapsed_ms = elapsed_us / 1000;
+    const avg_frame_time_ms = elapsed_ms / 100;
+    const fps = if (avg_frame_time_ms > 0) 1000 / avg_frame_time_ms else 0;
+
+    printf("\r\nResults:\r\n", .{});
+    printf("  Total time: {d}ms\r\n", .{elapsed_ms});
+    printf("  Average frame time: {d}ms\r\n", .{avg_frame_time_ms});
+    printf("  Estimated FPS: {d}\r\n", .{fps});
+    println("");
+}
+
+// Static counter for ls command (needed because callbacks can't capture locals)
+var ls_file_count: usize = 0;
+var ls_lcd_y: u16 = 0;
+
+fn lsVisitor(name: []const u8, size: u32) void {
+    ls_file_count += 1;
+    printf("  {s}  ({d} bytes)\r\n", .{ name, size });
+    lcd.drawString(10, ls_lcd_y, name, lcd.GREEN, lcd.BLACK, 1);
+    ls_lcd_y += 15;
+}
+
+fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const name = iter.next() orelse {
+        println("\r\nUsage: load <filename.uf2>\r\n");
+        return;
+    };
+
+    // Load the UF2 cart
+    println("\r\n");
+    const entry_point = loader.loadUF2Cart(name) catch |err| {
+        switch (err) {
+            loader.LoadError.FileNotFound => printf("File not found: {s}\r\n\r\n", .{name}),
+            loader.LoadError.FileTooLarge => println("UF2 file too large (max 256KB binary)\r\n"),
+            loader.LoadError.InvalidUF2 => println("Invalid UF2 format\r\n"),
+            loader.LoadError.UnsupportedFamily => println("Unsupported chip family (need RP2354B)\r\n"),
+            loader.LoadError.AddressMismatch => println("UF2 not linked for cart_xip region (0x101C0000)\r\n"),
+            loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
+            loader.LoadError.ReadError => println("Storage read error\r\n"),
+        }
+        return;
+    };
+
+    printf("Cart loaded at entry point 0x{x}\r\n", .{entry_point});
+    println("Use 'run' to execute, or 'cart run <name>' for one-step load+run\r\n");
 }
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall|wipeall> [name]\r\n");
         return;
     };
 
@@ -1212,6 +1346,31 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         } else {
             println("\r\nFailed to execute cart\r\n");
         }
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipeall")) {
+        const confirm = iter.next();
+
+        if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+            println("\r\nWARNING: This will COMPLETELY WIPE the storage filesystem!");
+            println("ALL carts will be permanently deleted!");
+            println("This reformats the FAT12 filesystem and clears all deleted entries.");
+            println("\r\nTo proceed, type: cart wipeall confirm\r\n");
+            return;
+        }
+
+        // Stop any running cart first
+        if (loader.getState() == .running or loader.getState() == .ready) {
+            println("\r\nStopping running cart...");
+            multicore.haltCore1();
+            loader.stop();
+            multicore.resetCore1();
+        }
+
+        println("Wiping storage filesystem...");
+        storage.wipeStorage();
+        println("\r\nStorage filesystem wiped! All carts deleted.\r\n");
         return;
     }
 

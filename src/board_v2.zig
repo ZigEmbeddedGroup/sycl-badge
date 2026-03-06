@@ -54,6 +54,24 @@ pub const button_b = gpio.num(7); // B1
 pub const button_start = gpio.num(5); // START1
 pub const button_select = gpio.num(38); // SELECT1
 
+// Navigation / directional buttons
+pub const button_up = gpio.num(10);
+pub const button_down = gpio.num(11);
+// TODO: assign real GPIOs (I put them down as placeholders)
+// pub const button_left = gpio.num(4);
+// pub const button_right = gpio.num(5);
+
+// Action buttons (I put them down as placeholders)
+// TODO: assign real GPIOs 
+// pub const button_a = gpio.num(2);
+// pub const button_b = gpio.num(3);
+// pub const button_start = gpio.num(6);
+// pub const button_select = gpio.num(7);
+// pub const button_click = gpio.num(8);
+
+// OS-level button (stop running cart)
+pub const button_stop = gpio.num(15);
+
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;
 

@@ -87,6 +87,14 @@ pub const MessageType = struct {
     pub const CART_LOAD: u8 = 0x11;
     pub const CART_STOP: u8 = 0x12;
 
+    // Framebuffer sync messages (new-API carts)
+    // Core 1 sends FRAMEBUFFER_READY after finishing a frame.
+    // Core 0 flushes the shared-RAM framebuffer to the LCD, then
+    // replies with FRAMEBUFFER_DONE so Core 1 knows it can start
+    // writing the next frame without tearing.
+    pub const FRAMEBUFFER_READY: Message = 0x25000001;
+    pub const FRAMEBUFFER_DONE: Message = 0x25000002;
+
     // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x30000000;
 

@@ -966,7 +966,7 @@ fn readLfnEntriesMultiSector(prev_sector: ?*const [SECTOR_SIZE]u8, curr_sector: 
         }
     }
 
-    if (!found_first and prev_sector != null and total_chars > 0) {
+    if (!found_first and prev_sector != null and (start_idx == 0 or total_chars > 0)) {
         var pos: isize = SECTOR_SIZE - DIR_ENTRY_SIZE;
         while (pos >= 0) : (pos -= DIR_ENTRY_SIZE) {
             const idx: usize = @intCast(pos);

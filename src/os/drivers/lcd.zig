@@ -36,7 +36,7 @@ pub const LCDPins = struct {
     /// SPI pins (LCD_SCL and LCD_SDIO)
     spi: SPIPins,
     /// TE (Tearing Effect) pin (optional and we aren't using for now)
-    te: ?gpio.Pin = null,
+    te: ?gpio.Pin,
 };
 
 // Color formats
@@ -507,7 +507,7 @@ pub fn createDT018BTFTPins() LCDPins {
             .sdo = board.TFT_MOSI,
         },
         // TE: Tearing Effect (optional, leave it disconnected for now)
-        .te = null,
+        .te = board.LCD_TE,
     };
 }
 

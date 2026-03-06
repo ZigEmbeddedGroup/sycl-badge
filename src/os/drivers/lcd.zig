@@ -227,12 +227,16 @@ pub fn init(pin_config: Pins, config: Config) !void {
     }
 
     // Hardware reset sequence
-    pins.rst.put(1);
-    timer.sleep_ms(5);
-    pins.rst.put(0);
-    timer.sleep_ms(20);
-    pins.rst.put(1);
-    timer.sleep_ms(50);
+    if (pins.rst) |rst| {
+        rst.put(1);
+        timer.sleep_ms(5);
+        rst.put(0);
+        timer.sleep_ms(20);
+        rst.put(1);
+        timer.sleep_ms(50);
+    } else {
+        timer.sleep_ms(50);
+    }
 
     // Initialize display
     initDisplay();

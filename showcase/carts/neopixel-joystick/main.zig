@@ -4,7 +4,7 @@
 /// - Left/Right: Move the lit LED
 /// - Up/Down: Change the LED color
 ///
-/// Hardware: 5 WS2812B neopixels on GPIO 15
+/// Hardware: 5 WS2812B neopixels on GPIO defined by board.neopixel_pin
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
@@ -16,14 +16,9 @@ const board = microzig.board;
 // Pin Configuration
 // ============================================================================
 
-const NEOPIXEL_PIN = 15; // GPIO 15 for neopixel data
+/// Derived at compile time from the board definition, so board pin changes propagate here automatically.
+const NEOPIXEL_PIN: u5 = @intCast(@intFromEnum(board.neopixel_pin));
 const NUM_LEDS = 5;
-
-// Joystick pins (from board_v2.zig)
-const JOYSTICK_UP = 37;
-const JOYSTICK_DOWN = 24;
-const JOYSTICK_LEFT = 35;
-const JOYSTICK_RIGHT = 25;
 
 // ============================================================================
 // Neopixel Driver for WS2812B
@@ -53,20 +48,28 @@ const Neopixels = struct {
     /// Low-level WS2812B protocol implementation
     /// Timing: T0H=300ns, T0L=900ns, T1H=600ns, T1L=600ns
     /// RP2350 at 150MHz = 6.67ns per cycle
-    fn write_buf(buf: []const u8) void {
-        // Disable interrupts for timing-critical section
-        asm volatile ("cpsid i");
-        defer asm volatile ("cpsie i");
-
+    ///
+    /// NOTE: linksection(".data") places this function in the .data section so
+    /// MicroZig copies it to RAM at boot.  This is critical: the bit-bang
+    /// timing loop is so short (~300-900 ns per pulse) that an XIP flash cache
+    /// miss caused by Core 0's kernel activity would corrupt the WS2812B
+    /// bit stream and produce garbage colors.
+    fn write_buf(buf: []const u8) linksection(".data") void {
         const pin_mask: u32 = @as(u32, 1) << NEOPIXEL_PIN;
 
         // Use SIO registers directly for timing-critical operations
         const SIO_GPIO_OUT_SET: *volatile u32 = @ptrFromInt(0xD0000018);
         const SIO_GPIO_OUT_CLR: *volatile u32 = @ptrFromInt(0xD0000020);
 
-        // Send reset pulse (>50us required, using 100us for safety)
+        // Send reset pulse (>50us required, using 100us for safety).
+        // Interrupts are still enabled here; timing does not matter for the reset.
         SIO_GPIO_OUT_CLR.* = pin_mask;
         time.sleep_us(100);
+
+        // Disable interrupts only for the timing-critical bit transmission.
+        // Core 1 has no interrupt handlers so this is safe, but keeping the
+        // disabled window as short as possible is good practice.
+        asm volatile ("cpsid i");
 
         // Send each byte
         for (buf) |byte| {
@@ -102,6 +105,9 @@ const Neopixels = struct {
                 }
             }
         }
+
+        // Re-enable interrupts now that timing-critical transmission is done.
+        asm volatile ("cpsie i");
 
         // Ensure pin ends LOW and send final reset pulse to latch data
         SIO_GPIO_OUT_CLR.* = pin_mask;
@@ -162,10 +168,9 @@ var last_buttons = ButtonState{};
 
 pub fn main() void {
     // Initialize neopixel pin as output and ensure it starts LOW
-    const neopixel_pin = gpio.num(NEOPIXEL_PIN);
-    neopixel_pin.set_function(.sio);
-    neopixel_pin.set_direction(.out);
-    neopixel_pin.put(0); // Ensure pin starts LOW
+    board.neopixel_pin.set_function(.sio);
+    board.neopixel_pin.set_direction(.out);
+    board.neopixel_pin.put(0); // Ensure pin starts LOW
 
     // Initialize joystick pins as inputs with pull-downs
     board.joystick_up.set_function(.sio);

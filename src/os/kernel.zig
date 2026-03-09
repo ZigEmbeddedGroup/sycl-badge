@@ -140,7 +140,7 @@ pub fn main() !void {
         // Poll buttons
         const buttons = button_poller.read();
 
-        // Start button (GPIO 15) works at any time - stops running cart
+        // Start button works at any time - stops running cart
         if (buttons.start == 1 and !button_start_was_pressed) {
             button_start_was_pressed = true;
             console.printf("[BTN] START (STOP) pressed (cart_running={})\r\n", .{cart_running});

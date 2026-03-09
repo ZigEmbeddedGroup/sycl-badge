@@ -556,14 +556,14 @@ pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u8) void {
 
 /// Write a column-major framebuffer (the cart API layout) to the full display.
 ///
-/// Temporarily switches to MADCTL=0x40 (MV=0, MX=1) so the
+/// Temporarily switches to MADCTL=0x80 (MV=0, MY=1) so the
 /// native column axis (128 = screen-Y) is the fast scan direction, matching
 /// the framebuffer memory order.
 pub fn writeCartBuffer(buffer: []const u8) void {
     // MV=0: fast axis = native columns (128 = screen Y).
-    // MX=1: columns scan 127→0 so Y=0 maps to native col 127 (screen top).
-    // MY=0: rows scan 0→159 so X=0 maps to native row 0 (screen left).
-    writeCommandWithData(.MADCTL, &.{0x40});
+    // MY=1: rows scan 159→0 so X=0 maps to native row 159 (screen left after 180°).
+    // MX=0: columns scan 0→127 so Y=0 maps to native col 0 (screen top after 180°).
+    writeCommandWithData(.MADCTL, &.{0x80});
 
     // With MV=0: CASET = native columns (0-127), RASET = native rows (0-159).
     // Send CASET/RASET directly to avoid confusion with setWindow's x/y naming.

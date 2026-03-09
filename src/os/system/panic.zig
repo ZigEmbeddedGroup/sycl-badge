@@ -7,6 +7,7 @@ const rp2xxx = microzig.hal;
 const gpio = rp2xxx.gpio;
 const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
+const console = @import("console.zig");
 
 const led = gpio.num(25);
 
@@ -18,6 +19,7 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     // Blink fast briefly to indicate panic
     var i: usize = 0;
     while (i < 15) : (i += 1) {
+        console.println("[PANIC] PANIC!");
         uart.println("PANIC!");
         if (message.len > 0) {
             uart.println(message);
@@ -29,6 +31,7 @@ pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noretu
     }
 
     // Try to reboot
+    console.println("[PANIC] Trying to reboot...");
     const SCB_BASE = 0xE000ED00;
     const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 

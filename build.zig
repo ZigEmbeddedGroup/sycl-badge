@@ -101,9 +101,34 @@ pub fn build(builder: *Build) void {
 
     // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
     add_os_cart(builder, &dep, .{
-        .name = "os-cart-space-shooter",
+        .name = "space-shooter",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/space-shooter/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "blobs",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/blobs/src/blobs.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "plasma",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/plasma/src/plasma.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "metalgear-timer",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "neopixelpuzzle",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/neopixelpuzzle/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "raytracer",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/raytracer/src/main.zig"),
     });
 
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");

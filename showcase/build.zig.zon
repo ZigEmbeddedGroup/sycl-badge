@@ -13,9 +13,8 @@
         .raytracer = .{ .path = "carts/raytracer" },
         .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
         .@"space-shooter" = .{ .path = "carts/space-shooter" },
-        // TODO: enable these when zigimg gets a 0.15.1 update
-        //.dvd = .{ .path = "carts/dvd" },
-        //.zeroman = .{ .path = "carts/zeroman" },
+        .dvd = .{ .path = "carts/dvd" },
+        .zeroman = .{ .path = "carts/zeroman" },
     },
     .paths = .{
         "README.md",

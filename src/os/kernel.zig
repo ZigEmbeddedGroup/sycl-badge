@@ -22,8 +22,8 @@ pub const panic = @import("system/panic.zig").panic;
 const ButtonPoller = struct {
     /// All physical buttons on the badge.
     /// Bits 0-8 mirror the cart API Controls layout so they can be forwarded directly.
-    pub const Buttons = packed struct(u10) {
-        // -- cart Controls bits 0-8 (same order as api.zig Controls) --
+    pub const Buttons = packed struct(u9) {
+        // -- cart Controls --
         start: u1, // GPIO 6
         select: u1, // GPIO 7
         a: u1, // GPIO 2
@@ -33,8 +33,6 @@ const ButtonPoller = struct {
         down: u1, // GPIO 11
         left: u1, // GPIO 4
         right: u1, // GPIO 5
-        // -- OS-only --
-        stop: u1, // GPIO 15  (kills running cart, not forwarded to cart)
     };
 
     pub fn init() ButtonPoller {
@@ -45,17 +43,15 @@ const ButtonPoller = struct {
     pub fn read(self: ButtonPoller) Buttons {
         _ = self;
         return .{
-            // TODO: uncomment when physical buttons are placed on the board
-            .start = 0, // gpio.isButtonPressed(board.button_start)
-            .select = 0, // gpio.isButtonPressed(board.button_select)
-            .a = 0, // gpio.isButtonPressed(board.button_a)
-            .b = 0, // gpio.isButtonPressed(board.button_b)
-            .click = 0, // gpio.isButtonPressed(board.button_click)
-            .up = if (gpio.isButtonPressed(board.button_up)) 1 else 0,
-            .down = if (gpio.isButtonPressed(board.button_down)) 1 else 0,
-            .left = 0, // gpio.isButtonPressed(board.button_left)
-            .right = 0, // gpio.isButtonPressed(board.button_right)
-            .stop = if (gpio.isButtonPressed(board.button_stop)) 1 else 0,
+            .start = if (gpio.isButtonPressed(board.button_start)) 1 else 0,
+            .select = if (gpio.isButtonPressed(board.button_select)) 1 else 0,
+            .a = if (gpio.isButtonPressed(board.button_a)) 1 else 0,
+            .b = if (gpio.isButtonPressed(board.button_b)) 1 else 0,
+            .click = if (gpio.isButtonPressed(board.joystick_click)) 1 else 0, // joystick press-in button
+            .up = if (gpio.isButtonPressed(board.joystick_up)) 1 else 0,
+            .down = if (gpio.isButtonPressed(board.joystick_down)) 1 else 0,
+            .left = if (gpio.isButtonPressed(board.joystick_left)) 1 else 0,
+            .right = if (gpio.isButtonPressed(board.joystick_right)) 1 else 0,
         };
     }
 };
@@ -73,9 +69,15 @@ const CART_CHECK_INTERVAL: u64 = 500_000;
 var last_cart_check: u64 = 0;
 
 // Button state tracking
-var button_up_was_pressed: bool = false;
-var button_down_was_pressed: bool = false;
-var button_stop_was_pressed: bool = false;
+var joystick_up_was_pressed: bool = false;
+var joystick_down_was_pressed: bool = false;
+var joystick_left_was_pressed: bool = false;
+var joystick_right_was_pressed: bool = false;
+var joystick_click_was_pressed: bool = false;
+var button_a_was_pressed: bool = false;
+var button_b_was_pressed: bool = false;
+var button_select_was_pressed: bool = false;
+var button_start_was_pressed: bool = false;
 
 // Cursor tracking for cart selection
 var cursor_index: usize = 0; // Which cart is currently selected
@@ -100,14 +102,20 @@ pub fn main() !void {
     // Initialize button poller
     const button_poller = ButtonPoller.init();
     const initial = button_poller.read();
-    button_up_was_pressed = (initial.up == 1);
-    button_down_was_pressed = (initial.down == 1);
-    button_stop_was_pressed = (initial.stop == 1);
+    joystick_up_was_pressed = (initial.up == 1);
+    joystick_down_was_pressed = (initial.down == 1);
+    joystick_left_was_pressed = (initial.left == 1);
+    joystick_right_was_pressed = (initial.right == 1);
+    joystick_click_was_pressed = (initial.click == 1);
+    button_a_was_pressed = (initial.a == 1);
+    button_b_was_pressed = (initial.b == 1);
+    button_select_was_pressed = (initial.select == 1);
+    button_start_was_pressed = (initial.start == 1); // start button stops cart and sends back to main menu
 
     // Display startup message on LCD
     lcd.fillScreen(lcd.BLACK);
-    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+    lcd.drawString(0, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(0, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
 
     // Initial cart display
     refreshCartDisplay();
@@ -132,10 +140,10 @@ pub fn main() !void {
         // Poll buttons
         const buttons = button_poller.read();
 
-        // Stop button (GPIO 15) works at any time - stops running cart
-        if (buttons.stop == 1 and !button_stop_was_pressed) {
-            button_stop_was_pressed = true;
-            console.printf("[BTN] STOP pressed (cart_running={})\r\n", .{cart_running});
+        // Start button (GPIO 15) works at any time - stops running cart
+        if (buttons.start == 1 and !button_start_was_pressed) {
+            button_start_was_pressed = true;
+            console.printf("[BTN] START (STOP) pressed (cart_running={})\r\n", .{cart_running});
             if (cart_running) {
                 // Stop the cart (halt Core 1, reset state, restart Core 1)
                 multicore.haltCore1();
@@ -146,33 +154,33 @@ pub fn main() !void {
                 display_active = true;
                 lcd.reinitDisplay();
                 lcd.fillScreen(lcd.BLACK);
-                lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-                lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+                lcd.drawString(0, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+                lcd.drawString(0, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
                 refreshCartDisplay();
                 last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
             }
-        } else if (buttons.stop == 0 and button_stop_was_pressed) {
-            button_stop_was_pressed = false;
+        } else if (buttons.start == 0 and button_start_was_pressed) {
+            button_start_was_pressed = false;
         }
 
         // Only process navigation buttons when cart is NOT running
         if (!cart_running) {
             // Detect button_up press (GPIO 10) - move cursor down through cart list
-            if (buttons.up == 1 and !button_up_was_pressed) {
-                button_up_was_pressed = true;
+            if (buttons.up == 1 and !joystick_up_was_pressed) {
+                joystick_up_was_pressed = true;
                 console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 // Move cursor to next cart (wrap around to top)
                 if (cart_count > 0) {
                     cursor_index = (cursor_index + 1) % cart_count;
                     refreshCartDisplay();
                 }
-            } else if (buttons.up == 0 and button_up_was_pressed) {
-                button_up_was_pressed = false;
+            } else if (buttons.up == 0 and joystick_up_was_pressed) {
+                joystick_up_was_pressed = false;
             }
 
             // Detect button_down press (GPIO 11) - run selected cart
-            if (buttons.down == 1 and !button_down_was_pressed) {
-                button_down_was_pressed = true;
+            if (buttons.down == 1 and !joystick_down_was_pressed) {
+                joystick_down_was_pressed = true;
                 console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 // Run the selected cart
                 if (cart_count > 0 and cursor_index < cart_count) {
@@ -180,13 +188,13 @@ pub fn main() !void {
                 } else {
                     console.printf("[BTN] DOWN: no cart to run (cart_count={d})\r\n", .{cart_count});
                 }
-            } else if (buttons.down == 0 and button_down_was_pressed) {
-                button_down_was_pressed = false;
+            } else if (buttons.down == 0 and joystick_down_was_pressed) {
+                joystick_down_was_pressed = false;
             }
         } else {
             // Reset navigation button states when cart is running to avoid stuck states
-            button_up_was_pressed = false;
-            button_down_was_pressed = false;
+            joystick_up_was_pressed = false;
+            joystick_down_was_pressed = false;
 
             // Mailbox framebuffer sync.
             // New-API carts send FRAMEBUFFER_READY when they finish a frame.
@@ -198,8 +206,8 @@ pub fn main() !void {
                     // Buttons bits 0-8 match the cart Controls layout exactly.
                     const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
                     const btn = button_poller.read();
-                    const btn_bits: u10 = @bitCast(btn);
-                    ipc_controls.* = @as(u16, @as(u9, @truncate(btn_bits))); // 9 cart bits
+                    const btn_bits: u9 = @bitCast(btn);
+                    ipc_controls.* = @as(u16, btn_bits); // 9 cart bits
 
                     // Flush the shared-RAM framebuffer (40960 bytes at 0x20020020)
                     // to the LCD over SPI, using column-major MADCTL.

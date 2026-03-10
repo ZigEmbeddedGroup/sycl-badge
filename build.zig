@@ -464,7 +464,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
     const mb = MicroBuild.init(b, mz_dep) orelse return;
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
 
-    // The cart-api module for OS
+    // The cart-api module for OS (ARM build)
     const cart_api_module = b.createModule(.{
         .root_source_file = dep.builder.path("src/os/cart/api.zig"),
     });
@@ -502,6 +502,39 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
 
     mb.install_firmware(fw, .{ .format = .elf });
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+
+    // WASM build for the web simulator.
+    // api.zig detects is_wasm at comptime and switches to WASM extern imports,
+    // so no board/microzig dependency is needed here.
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+
+    const wasm_cart_api_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
+    });
+
+    const wasm = b.addExecutable(.{
+        .name = options.name,
+        .root_module = b.createModule(.{
+            .root_source_file = options.root_source_file,
+            .target = wasm_target,
+            .optimize = .ReleaseSmall,
+            .strip = true,
+            .imports = &.{
+                .{ .name = "cart-api", .module = wasm_cart_api_module },
+            },
+        }),
+    });
+    wasm.entry = .disabled;
+    wasm.import_memory = true;
+    wasm.initial_memory = 64 * 65536;
+    wasm.max_memory = 64 * 65536;
+    wasm.stack_size = 14752;
+    wasm.global_base = 160 * 128 * 2 + 0x1e;
+    wasm.rdynamic = true;
+    b.installArtifact(wasm);
 }
 
 /// UF2 generation step

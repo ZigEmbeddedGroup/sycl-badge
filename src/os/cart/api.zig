@@ -422,11 +422,6 @@ pub const TextOptions = struct {
     background_color: ?DisplayColor = null,
 };
 
-// Font bitmap: [char - ' '][row] where each byte is 8 pixels, 0-bit = foreground.
-// Access via the board module to avoid the Zig rule that a file can only belong
-// to one module (board_v2.zig also imports font.zig for the LCD driver).
-const font_data = @import("board").font.font;
-
 /// Draws text using the built-in system font.
 pub inline fn text(options: TextOptions) void {
     if (is_wasm) {
@@ -441,6 +436,10 @@ pub inline fn text(options: TextOptions) void {
             options.y,
         );
     } else {
+        // Font bitmap: [char - ' '][row] where each byte is 8 pixels, 0-bit = foreground.
+        // Accessed here (not at file scope) so that @import("board") is only resolved
+        // for native builds — WASM builds take the branch above and never reach this.
+        const font_data = @import("board").font.font;
         const text_pixel: ?Pixel = if (options.text_color) |c| Pixel.fromColor(c) else null;
         const bg_pixel: ?Pixel = if (options.background_color) |c| Pixel.fromColor(c) else null;
 

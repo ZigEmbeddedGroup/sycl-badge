@@ -4,9 +4,8 @@ const std = @import("std");
 const root = @import("root");
 // cart imports
 const carts = .{
-    // TODO: Enable these when zigimg comes out with a 0.15.1 update
-    //.{ "zeroman", @import("zeroman") },
-    //.{ "dvd", @import("dvd") },
+    .{ "zeroman", @import("zeroman") },
+    .{ "dvd", @import("dvd") },
     .{ "blobs", @import("blobs") },
     .{ "plasma", @import("plasma") },
     .{ "metalgear-timer", @import("metalgear-timer") },

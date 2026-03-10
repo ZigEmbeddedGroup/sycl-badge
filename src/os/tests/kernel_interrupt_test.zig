@@ -1,6 +1,9 @@
 /// SYCL Badge OS - Interrupt Test Kernel
 /// Tests interrupt handling with USB CDC character switching
 ///
+/// Debug Output: Use SWD debugger with breakpoints or SWO via TC2030-CTX-NL connector
+/// USB Interface: USB CDC for character input/output
+///
 /// Usage in PuTTY or any serial terminal:
 /// - Connect to the USB CDC port
 /// - You'll see 'A' printed continuously
@@ -16,7 +19,6 @@ const gpio = rp2xxx.gpio;
 const board = microzig.board;
 
 const usb = @import("drivers/usb.zig");
-const uart = @import("drivers/uart.zig");
 const timer = @import("drivers/timer.zig");
 const interrupts = @import("system/interrupts.zig");
 
@@ -89,15 +91,8 @@ pub fn main() !void {
     led.set_direction(.out);
     led.put(1);
 
-    // Initialize UART for debug output
-    uart.init();
-    uart.println("=================================");
-    uart.println("SYCL Badge OS - Interrupt Test");
-    uart.println("=================================");
-
     // Initialize USB
     try usb.init();
-    uart.println("USB initialized");
 
     // Small delay for USB enumeration
     timer.sleep_ms(1000);
@@ -118,7 +113,6 @@ pub fn main() !void {
         \\
     ;
     _ = usb.send(welcome);
-    uart.println("Welcome message sent");
 
     // NOTE: For a real interrupt-driven implementation, you would:
     // 1. Register the interrupt handlers
@@ -130,9 +124,6 @@ pub fn main() !void {
     // This test will use a hybrid approach:
     // - Polling for USB events (required by HAL)
     // - Simulated "interrupt-like" behavior by checking for data frequently
-
-    uart.println("Entering main loop (polling mode)");
-    uart.println("Open PuTTY/terminal on USB CDC port");
 
     var old_time: u64 = timer.micros();
     var blink_time: u64 = timer.micros();
@@ -162,11 +153,6 @@ pub fn main() !void {
                 var notify_buf: [64]u8 = undefined;
                 const notify = std.fmt.bufPrint(&notify_buf, "\r\n>>> Switched to '{c}' <<<\r\n", .{current_char}) catch "";
                 _ = usb.send(notify);
-
-                // Also log to UART
-                uart.puts("Character switched to: ");
-                const char_str = [_]u8{current_char};
-                uart.println(&char_str);
             }
         }
 

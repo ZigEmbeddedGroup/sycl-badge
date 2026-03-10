@@ -186,6 +186,31 @@ SECTIONS
   } > kernel_ram
 
   /*
+  .heap - optional heap region placed after bss.
+  __end__ / end are common linker symbols used by C libs to find the heap start.
+  KEEP(*(.heap*)) allows explicit heap sub-sections to be preserved.
+  */
+  .heap (NOLOAD):
+  {
+    __end__ = .;
+    end = __end__;
+    KEEP(*(.heap*))
+  } > kernel_ram
+
+  /*
+  .shared_mem - reserved shared memory region at the top of kernel RAM.
+  This keeps IPC shared memory out of the kernel heap/.bss.
+  */
+  .shared_mem (NOLOAD) :
+  {
+    . = ALIGN(4);
+    __shared_mem_start__ = ORIGIN(kernel_ram) + LENGTH(kernel_ram) - 64K;
+    . = __shared_mem_start__;
+    . = . + 64K;
+    __shared_mem_end__ = .;
+  } > kernel_ram
+
+  /*
   .process_ram - user process data (Core 1 runtime buffers)
   Placed in the dedicated process RAM region.
   */
@@ -198,20 +223,8 @@ SECTIONS
     __process_ram_end__ = .;
   } > process_ram
 
-  /*
-  .heap - optional heap region placed after bss.
-  __end__ / end are common linker symbols used by C libs to find the heap start.
-  KEEP(*(.heap*)) allows explicit heap sub-sections to be preserved.
-  */
-  .heap (NOLOAD):
-  {
-    __end__ = .;
-    end = __end__;
-    KEEP(*(.heap*))
-  } > kernel_ram
-
-  /* compile-time symbol describing the maximum heap limit (end of kernel_ram) */
-  __heap_limit__ = ORIGIN(kernel_ram) + LENGTH(kernel_ram);
+  /* compile-time symbol describing the maximum heap limit (start of shared_mem) */
+  __heap_limit__ = __shared_mem_start__;
 
   /*
   scratch_x / scratch_y are the fast scratch RAM banks 4KB each (SRAM4/SRAM5).
@@ -273,6 +286,8 @@ SECTIONS
   ASSERT(__data_start_flash__ <= 0x10080000, "ERROR: Kernel code exceeds 512KB flash allocation")
   ASSERT(__data_end__ <= __kernel_ram_end__, "ERROR: .data section too large for kernel_ram")
   ASSERT(__bss_end__ <= __kernel_ram_end__, "ERROR: .bss section overflows kernel_ram")
+  ASSERT(__bss_end__ <= __shared_mem_start__, "ERROR: .bss section overlaps shared_mem")
+  ASSERT(__shared_mem_end__ <= __kernel_ram_end__, "ERROR: shared_mem outside kernel_ram")
   ASSERT((__stack_top__ & 0x7) == 0, "ERROR: Stack pointer not 8-byte aligned")
   ASSERT((__irq_stack_top__ & 0x7) == 0, "ERROR: IRQ stack pointer not 8-byte aligned")
   ASSERT(__stack_limit__ != __irq_stack_limit__, "ERROR: Main and IRQ stacks overlap")

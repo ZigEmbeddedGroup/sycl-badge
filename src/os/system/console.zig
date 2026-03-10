@@ -3,7 +3,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const usb = @import("../drivers/usb.zig");
-const uart = @import("../drivers/uart.zig");
 const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
@@ -12,7 +11,9 @@ const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
+const debug_log = @import("../debug_log.zig");
 const multicore = @import("multicore.zig");
+const fps_overlay = @import("fps_overlay.zig");
 const badge = microzig.board;
 
 // Console Configuration
@@ -70,7 +71,7 @@ pub const Command = struct {
 fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image" };
+        const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image", "fps" };
         return &options;
     }
     return &[_][]const u8{};
@@ -85,10 +86,44 @@ fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
-fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn rebootCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "on", "off", "toggle" };
+        const options = [_][]const u8{"bootsel"};
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
+// Static storage for cart name completions
+const MAX_CART_COMPLETIONS = 16;
+const MAX_CART_NAME_LEN = 32;
+var cart_name_storage: [MAX_CART_COMPLETIONS][MAX_CART_NAME_LEN]u8 = undefined;
+var cart_name_slices: [MAX_CART_COMPLETIONS][]const u8 = undefined;
+var cart_name_count: usize = 0;
+
+fn refreshCartNames() void {
+    cart_name_count = 0;
+    storage.listCarts(struct {
+        fn visit(name: []const u8, size: u32) void {
+            _ = size;
+            if (cart_name_count >= MAX_CART_COMPLETIONS) return;
+            const copy_len = @min(name.len, MAX_CART_NAME_LEN);
+            @memcpy(cart_name_storage[cart_name_count][0..copy_len], name[0..copy_len]);
+            cart_name_slices[cart_name_count] = cart_name_storage[cart_name_count][0..copy_len];
+            cart_name_count += 1;
+        }
+    }.visit);
+}
+
+fn overlayCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{"fps"};
+        return &options;
+    }
+    if (arg_index == 1) {
+        const options = [_][]const u8{ "on", "off" };
         return &options;
     }
     return &[_][]const u8{};
@@ -97,8 +132,13 @@ fn ledCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall", "wipeall" };
         return &options;
+    }
+    if (arg_index == 1) {
+        // Return cart names for "cart run <name>", "cart info <name>", etc.
+        refreshCartNames();
+        return cart_name_slices[0..cart_name_count];
     }
     return &[_][]const u8{};
 }
@@ -106,39 +146,44 @@ fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
 // Command Registry
 const commands = [_]Command{
     .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
-    .{ .name = "led", .description = "Control LED (on/off/toggle)", .handler = cmdLed, .completion_provider = ledCompletions },
     .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
-    .{ .name = "echo", .description = "Echo arguments back", .handler = cmdEcho },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
-    .{ .name = "ps", .description = "List running processes (not implemented)", .handler = cmdPs },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
-    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/pattern)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "load", .description = "Load and run a cart by name", .handler = cmdLoad },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlayCompletions },
+    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
+    .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
+    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
-    .{ .name = "rebootBootSel", .description = "Reboot to BootSelect", .handler = cmdRebootBootSel }, // End marker
 };
 
-// Unified Console Output (sends to both USB and UART)
+// Unified Console Output (sends to USB CDC)
 var print_buffer: [512]u8 = undefined;
 
-/// Print formatted string to console (USB + UART)
+/// Print formatted string to console (USB)
 pub fn printf(comptime fmt: []const u8, args: anytype) void {
     const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return;
     print(text);
 }
 
-/// Print string to console (USB + UART)
+/// Print string to console (USB)
 pub fn print(text: []const u8) void {
     _ = usb.send(text);
-    uart.puts(text);
 }
 
 /// Print string with newline
 pub fn println(text: []const u8) void {
     print(text);
     print("\r\n");
+}
+
+/// Helper to print a debug_log entry with newline
+pub fn consolePrintLog(msg: []const u8) void {
+    printf("  {s}\r\n", .{msg});
 }
 
 /// Show the prompt
@@ -627,7 +672,7 @@ fn commandLineCompletion() void {
 fn clearCurrentLine() void {
     // Clear entire line and move cursor to start
     print("\r\x1b[K");
-    showPrompt();
+    print(PROMPT);
     line_length = 0;
     cursor_pos = 0;
 }
@@ -673,7 +718,7 @@ fn loadHistory(idx: usize) void {
 
     // Clear current line
     print("\r\x1b[K");
-    showPrompt();
+    print(PROMPT);
 
     // Load from history
     @memcpy(line_buffer[0..len], history[hist_idx][0..len]);
@@ -726,35 +771,6 @@ fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-var led_pin = badge.led_pin;
-var led_initialized = false;
-
-fn cmdLed(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    if (!led_initialized) {
-        led_pin.set_function(.sio);
-        led_pin.set_direction(.out);
-        led_initialized = true;
-    }
-
-    const arg = iter.next();
-    if (arg) |a| {
-        if (std.mem.eql(u8, a, "on")) {
-            led_pin.put(1);
-            println("\r\nLED turned ON\r\n");
-        } else if (std.mem.eql(u8, a, "off")) {
-            led_pin.put(0);
-            println("\r\nLED turned OFF\r\n");
-        } else if (std.mem.eql(u8, a, "toggle")) {
-            led_pin.toggle();
-            println("\r\nLED toggled\r\n");
-        } else {
-            println("\r\nUsage: led [on|off|toggle]\r\n");
-        }
-    } else {
-        println("\r\nUsage: led [on|off|toggle]\r\n");
-    }
-}
-
 fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     const uptime_us = timer.micros();
@@ -764,15 +780,6 @@ fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const seconds = uptime_sec % 60;
 
     printf("\r\nUptime: {d}h {d}m {d}s\r\n\r\n", .{ hours, minutes, seconds });
-}
-
-fn cmdEcho(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    print("\r\n");
-    while (iter.next()) |arg| {
-        print(arg);
-        print(" ");
-    }
-    println("\r\n");
 }
 
 fn cmdClear(iter: *std.mem.TokenIterator(u8, .scalar)) void {
@@ -796,11 +803,6 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         printf("  {d}: {s}\r\n", .{ i + 1, history[idx][0..len] });
     }
     println("");
-}
-fn cmdPs(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
-    println("\r\nProcess listing not implemented yet.\r\n");
-    return;
 }
 
 // GPIO Command Handler
@@ -841,7 +843,7 @@ fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     }
 
-    // Configure as input to read actual pin state
+    // Configure as input to read actual pin state (otherwise it doesn't get the correct value)
     gpio.configureAsInput(pin_num);
 
     const pin = gpio.num(pin_num);
@@ -958,14 +960,117 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
+// Storage Statistics Command - Show filesystem details
+fn cmdStorage(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+
+    println("\r\n=== Storage Filesystem Statistics ===\r\n");
+
+    const stats = storage.getStats();
+
+    // Overall filesystem info
+    printf("Total Storage:     {d} KB ({d} bytes)\r\n", .{ stats.total_size_bytes / 1024, stats.total_size_bytes });
+    printf("FAT12 Filesystem:  {d} sectors x 512 bytes\r\n\r\n", .{storage.totalSectors()});
+
+    // Filesystem layout
+    println("--- Filesystem Layout ---");
+    printf("FAT Tables:        {d} KB  (2 copies)\r\n", .{stats.fat_size_bytes / 1024});
+    printf("Root Directory:    {d} KB  ({d} entries max)\r\n", .{ stats.root_size_bytes / 1024, stats.root_total_entries });
+    printf("Data Region:       {d} KB  ({d} clusters)\r\n\r\n", .{ stats.data_size_bytes / 1024, stats.total_clusters });
+
+    // Cluster usage
+    println("--- Cluster Usage ---");
+    printf("Total Clusters:    {d}\r\n", .{stats.total_clusters});
+    printf("Used Clusters:     {d}\r\n", .{stats.used_clusters});
+    printf("Free Clusters:     {d}\r\n", .{stats.free_clusters});
+
+    const used_pct = if (stats.total_clusters > 0)
+        (@as(u32, stats.used_clusters) * 100) / stats.total_clusters
+    else
+        0;
+    printf("Usage:             {d}%\r\n\r\n", .{used_pct});
+
+    // Space usage
+    println("--- Space Usage ---");
+    const used_kb = (@as(u32, stats.used_clusters) * 512) / 1024;
+    const free_kb = stats.free_space_bytes / 1024;
+    printf("Used Space:        {d} KB\r\n", .{used_kb});
+    printf("Free Space:        {d} KB\r\n\r\n", .{free_kb});
+
+    // Root directory usage
+    println("--- Root Directory ---");
+    printf("Total Entries:     {d}\r\n", .{stats.root_total_entries});
+    printf("Used Entries:      {d}\r\n", .{stats.root_used_entries});
+    printf("  Active Files:    {d}\r\n", .{stats.file_count});
+    printf("  Deleted (0xE5):  {d}\r\n", .{stats.root_deleted_entries});
+    printf("Free Entries:      {d}\r\n", .{stats.root_free_entries});
+
+    if (stats.root_free_entries < 5) {
+        println("\r\nWARNING: Root directory nearly full!");
+        println("Use 'cart wipeall confirm' to reclaim space.\r\n");
+    } else {
+        println("");
+    }
+}
+
+// Wipe Command - Erase cart/XIP flash and process RAM
+fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const confirm = iter.next();
+
+    if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+        println("\r\nWARNING: This will erase all cart XIP flash and process RAM!");
+        println("To proceed, type: wipe confirm\r\n");
+        return;
+    }
+
+    // Stop any running cart first
+    if (loader.getState() == .running or loader.getState() == .ready) {
+        println("\r\nStopping running cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+    }
+
+    // Erase cart XIP flash region
+    println("Erasing cart XIP flash region...");
+    loader.eraseCartRegion() catch {
+        println("ERROR: Failed to erase cart XIP region\r\n");
+        return;
+    };
+
+    // Clear process RAM (Core 1 RAM: 0x20020000 - 0x20080000, 384KB)
+    println("Clearing process RAM...");
+    const PROCESS_RAM_START: u32 = 0x20020000;
+    const PROCESS_RAM_SIZE: usize = 384 * 1024;
+    const process_ram: [*]u8 = @ptrFromInt(PROCESS_RAM_START);
+    @memset(process_ram[0..PROCESS_RAM_SIZE], 0);
+
+    printf("\r\nWipe complete!\r\n  Cart XIP: 0x{x} - 0x{x} ({d}KB)\r\n", .{
+        loader.getCartXipStart(),
+        loader.getCartXipEnd(),
+        loader.getCartXipSize() / 1024,
+    });
+    printf("  Process RAM: 0x{x} - 0x{x} ({d}KB)\r\n\r\n", .{
+        PROCESS_RAM_START,
+        PROCESS_RAM_START + PROCESS_RAM_SIZE,
+        PROCESS_RAM_SIZE / 1024,
+    });
+}
+
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting system...\r\n");
 
-    // Small delay to allow message to be sent
-    timer.sleep_ms(50);
+        // Small delay to allow message to be sent
+        timer.sleep_ms(50);
 
+        // Disconnect USB to properly signal disconnection to the host
+        // This prevents the terminal from thinking the connection is still active
+        usb.disconnect();
+
+        // Small delay to allow host to detect disconnection
+        timer.sleep_ms(10);
     // Disconnect USB to properly signal disconnection to the host
     // This prevents the terminal from thinking the connection is still active
     usb.disconnect();
@@ -973,26 +1078,26 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Small delay to allow host to detect disconnection
     timer.sleep_ms(10);
 
-    // Trigger system reset via SCB (System Control Block)
-    const SCB_BASE = 0xE000ED00;
-    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+        // Trigger system reset via SCB (System Control Block)
+        const SCB_BASE = 0xE000ED00;
+        const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 
-    // Write SYSRESETREQ bit with VECTKEY
-    // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
-    // Need to preserve other bits in AIRCR, so read-modify-write
-    microzig.cpu.dsb();
-    microzig.cpu.isb();
+        // Write SYSRESETREQ bit with VECTKEY
+        // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+        // Need to preserve other bits in AIRCR, so read-modify-write
+        microzig.cpu.dsb();
+        microzig.cpu.isb();
 
-    // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-    AIRCR.* = 0x05FA0004;
+        // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+        AIRCR.* = 0x05FA0004;
 
-    microzig.cpu.dsb();
-    microzig.cpu.isb();
+        microzig.cpu.dsb();
+        microzig.cpu.isb();
 
-    // Wait for reset to occur (should happen immediately)
-    while (true) {
-        microzig.cpu.wfi();
-    }
+        // Wait for reset to occur (should happen immediately)
+        while (true) {
+            microzig.cpu.wfi();
+        }
 }
 
 // Reboot to BootSelect Command
@@ -1006,10 +1111,54 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Use ROM function to reset to USB bootloader
     rom.reset_to_usb_boot();
 }
+
+// Menu Command - Return to cart selection screen
+var menu_y_pos: u16 = 0;
+
+fn menuCartVisitor(name: []const u8, size: u32) void {
+    _ = size;
+    if (menu_y_pos < 220) { // Don't draw past screen bottom
+        lcd.drawString(20, menu_y_pos, name, lcd.GREEN, lcd.BLACK, 1);
+        menu_y_pos += 12;
+    }
+}
+
+fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    _ = iter;
+
+    // Stop any running cart first
+    const cart_state = loader.getState();
+    if (cart_state == .running or cart_state == .ready) {
+        println("\r\nStopping cart...");
+        multicore.haltCore1();
+        loader.stop();
+        multicore.resetCore1();
+
+        // Give the system a moment to settle
+        timer.sleep_ms(50);
+    }
+
+    // Restore the default cart selection screen
+    println("Restoring menu...\r\n");
+
+    // Reinitialize LCD display (fixes color mode if cart changed it)
+    lcd.reinitDisplay();
+
+    // Clear screen and draw header
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+
+    // List available carts
+    menu_y_pos = 60;
+    storage.listCarts(menuCartVisitor);
+
+    println("Menu restored. Use buttons to navigate and select carts.\r\n");
+}
 // LCD Test Command
 fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
-        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black>\r\n");
+        println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|fps>\r\n");
         return;
     };
 
@@ -1019,45 +1168,112 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "red")) {
         println("\r\nFilling LCD with RED...");
-        lcd.fillScreen(lcd.RED);
+        lcd.clearScreen(lcd.RED);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "green")) {
         println("\r\nFilling LCD with GREEN...");
-        lcd.fillScreen(lcd.GREEN);
+        lcd.clearScreen(lcd.GREEN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "blue")) {
         println("\r\nFilling LCD with BLUE...");
-        lcd.fillScreen(lcd.BLUE);
+        lcd.clearScreen(lcd.BLUE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "yellow")) {
         println("\r\nFilling LCD with YELLOW...");
-        lcd.fillScreen(lcd.YELLOW);
+        lcd.clearScreen(lcd.YELLOW);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "cyan")) {
         println("\r\nFilling LCD with CYAN...");
-        lcd.fillScreen(lcd.CYAN);
+        lcd.clearScreen(lcd.CYAN);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "magenta")) {
         println("\r\nFilling LCD with MAGENTA...");
-        lcd.fillScreen(lcd.MAGENTA);
+        lcd.clearScreen(lcd.MAGENTA);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "white")) {
         println("\r\nFilling LCD with WHITE...");
-        lcd.fillScreen(lcd.WHITE);
+        lcd.clearScreen(lcd.WHITE);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
-        lcd.fillScreen(lcd.BLACK);
+        lcd.clearScreen(lcd.BLACK);
+        println("Done\r\n");
+    } else if (std.mem.eql(u8, action, "fps")) {
+        println("\r\nRunning FPS benchmark...");
+        lcdFpsBenchmark();
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
-        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black\r\n");
+        println("Available: test, red, green, blue, yellow, cyan, magenta, white, black, fps\r\n");
     }
+}
+
+// LCD FPS Benchmark
+fn lcdFpsBenchmark() void {
+    const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA };
+
+    println("\r\nMeasuring DMA-based screen fill perf...");
+    println("Filling screen 100 times with diff colors...");
+
+    const start_time = timer.get_time_since_boot();
+
+    var i: usize = 0;
+    while (i < 100) : (i += 1) {
+        const color = colors[i % colors.len];
+        lcd.clearScreen(color);
+        lcd.vsync();
+    }
+
+    const end_time = timer.get_time_since_boot();
+    const elapsed_us = end_time.to_us() - start_time.to_us();
+    const elapsed_ms = elapsed_us / 1000;
+    const avg_frame_time_ms = elapsed_ms / 100;
+    const fps = if (avg_frame_time_ms > 0) 1000 / avg_frame_time_ms else 0;
+
+    printf("\r\nResults:\r\n", .{});
+    printf("  Total time: {d}ms\r\n", .{elapsed_ms});
+    printf("  Average frame time: {d}ms\r\n", .{avg_frame_time_ms});
+    printf("  Estimated FPS: {d}\r\n", .{fps});
+    println("");
 }
 
 // Static counter for ls command (needed because callbacks can't capture locals)
 var ls_file_count: usize = 0;
 var ls_lcd_y: u16 = 0;
+
+// Overlay Command Handler
+fn cmdOverlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const feature = iter.next() orelse {
+        println("\r\nUsage: overlay fps [on|off]\r\n");
+        return;
+    };
+
+    if (std.mem.eql(u8, feature, "fps")) {
+        const state_arg = iter.next();
+        if (state_arg) |state| {
+            if (std.mem.eql(u8, state, "on")) {
+                fps_overlay.setEnabled(true);
+                println("\r\nFPS overlay enabled\r\n");
+            } else if (std.mem.eql(u8, state, "off")) {
+                fps_overlay.setEnabled(false);
+                println("\r\nFPS overlay disabled\r\n");
+            } else {
+                printf("\r\nUnknown state '{s}'. Use 'on' or 'off'.\r\n", .{state});
+            }
+        } else {
+            // No argument — toggle
+            const new_state = !fps_overlay.isEnabled();
+            fps_overlay.setEnabled(new_state);
+            if (new_state) {
+                println("\r\nFPS overlay enabled\r\n");
+            } else {
+                println("\r\nFPS overlay disabled\r\n");
+            }
+        }
+    } else {
+        printf("\r\nUnknown overlay feature '{s}'. Available: fps\r\n", .{feature});
+    }
+}
 
 fn lsVisitor(name: []const u8, size: u32) void {
     ls_file_count += 1;
@@ -1093,7 +1309,7 @@ fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|status|info|delete> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall|wipeall> [name]\r\n");
         return;
     };
 
@@ -1141,7 +1357,29 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
             loader.getCartXipEnd(),
             loader.getCartXipSize() / 1024,
         });
+
+        // ROMFS / storage info
+        printf("  ROMFS base: 0x{x} size: {d}KB\r\n", .{ storage.romfsBaseAddr(), storage.romfsSizeBytes() / 1024 });
+        printf("  ROMFS formatted this boot: {s}\r\n", .{if (storage.getFormattedThisBoot()) "yes" else "no"});
+
         println("");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipe")) {
+        const confirm = iter.next() orelse {
+            println("\r\nThis will erase all cart storage.\r\nUsage: cart wipe YES\r\n");
+            return;
+        };
+
+        if (!std.ascii.eqlIgnoreCase(confirm, "YES")) {
+            println("\r\nAborted. Type: cart wipe YES\r\n");
+            return;
+        }
+
+        println("\r\nWiping cart storage...\r\n");
+        storage.wipeStorage();
+        println("Cart storage wiped\r\n");
         return;
     }
 
@@ -1157,6 +1395,56 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         } else {
             println("\r\nFailed to execute cart\r\n");
         }
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipeall")) {
+        const confirm = iter.next();
+
+        if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+            println("\r\nWARNING: This will COMPLETELY WIPE the storage filesystem!");
+            println("ALL carts will be permanently deleted!");
+            println("This reformats the FAT12 filesystem and clears all deleted entries.");
+            println("\r\nTo proceed, type: cart wipeall confirm\r\n");
+            return;
+        }
+
+        // Stop any running cart first
+        if (loader.getState() == .running or loader.getState() == .ready) {
+            println("\r\nStopping running cart...");
+            multicore.haltCore1();
+            loader.stop();
+            multicore.resetCore1();
+        }
+
+        println("Wiping storage filesystem...");
+        storage.wipeStorage();
+        println("\r\nStorage filesystem wiped! All carts deleted.\r\n");
+        return;
+    }
+
+    if (std.mem.eql(u8, subcmd, "wipeall")) {
+        const confirm = iter.next();
+
+        if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
+            println("\r\nWARNING: This will COMPLETELY WIPE the storage filesystem!");
+            println("ALL carts will be permanently deleted!");
+            println("This reformats the FAT12 filesystem and clears all deleted entries.");
+            println("\r\nTo proceed, type: cart wipeall confirm\r\n");
+            return;
+        }
+
+        // Stop any running cart first
+        if (loader.getState() == .running or loader.getState() == .ready) {
+            println("\r\nStopping running cart...");
+            multicore.haltCore1();
+            loader.stop();
+            multicore.resetCore1();
+        }
+
+        println("Wiping storage filesystem...");
+        storage.wipeStorage();
+        println("\r\nStorage filesystem wiped! All carts deleted.\r\n");
         return;
     }
 
@@ -1177,7 +1465,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
         // Load and execute UF2 cart in one step
         println("\r\n");
-        uart.puts("[DEBUG] Starting cart load...\r\n");
+
         const entry_point = loader.loadUF2Cart(name) catch |err| {
             switch (err) {
                 loader.LoadError.FileNotFound => printf("Cart not found: {s}\r\n\r\n", .{name}),
@@ -1188,23 +1476,24 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 loader.LoadError.FlashWriteError => println("Flash write error\r\n"),
                 loader.LoadError.ReadError => println("Storage read error\r\n"),
             }
+
+            // Dump debug logs to console for diagnostic info
+            debug_log.forEachEntry(consolePrintLog);
             return;
         };
 
-        uart.puts("[DEBUG] Cart loaded, sending execute message...\r\n");
+        // Dump loader/storage logs (verification/erase info)
+        debug_log.forEachEntry(consolePrintLog);
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
             // Mark as running from Core 0 side
             // (Core 1 also calls markRunning but this ensures state is set immediately)
             loader.markRunning();
-            uart.puts("[DEBUG] Execute message sent successfully\r\n");
             printf("Cart running at 0x{x}\r\n\r\n", .{entry_point});
         } else {
-            uart.puts("[DEBUG] Execute message failed\r\n");
             println("Failed to start cart execution\r\n");
         }
-        uart.puts("[DEBUG] Returning from cart run command\r\n");
         return;
     }
 
@@ -1241,6 +1530,13 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         return;
     }
 
+    if (std.mem.eql(u8, subcmd, "diag")) {
+        println("\r\nCart diagnostic log:\r\n");
+        debug_log.forEachEntry(consolePrintLog);
+        println("");
+        return;
+    }
+
     println("\r\nUnknown cart subcommand\r\n");
 }
 
@@ -1248,3 +1544,4 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // - left direction key + ctrl to move cursor word by word
 // - ctrl + shift + left/right to select text
 // - command to print text to LCD screen (probably not necessary other than debugging)
+// - fix extra newline character when using up arrow

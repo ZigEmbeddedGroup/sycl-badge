@@ -2,7 +2,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const storage = @import("../loader/storage.zig");
-const uart = @import("uart.zig");
 
 const usb = microzig.hal.usb;
 const types = usb.types;
@@ -148,9 +147,6 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                     if (self.cbw_len >= self.cbw_buf.len) {
                         const signature = read_u32_le(self.cbw_buf[0..], 0);
                         if (signature != CBW_SIGNATURE) {
-                            var buf: [64]u8 = undefined;
-                            const text = std.fmt.bufPrint(&buf, "MSC invalid CBW signature: 0x{x}\r\n", .{signature}) catch "";
-                            uart.puts(text);
                             self.resetState();
                             self.need_arm_out = true; // Defer arming to avoid re-entrancy
                             return;
@@ -202,6 +198,8 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
                         }
                     }
                     if (self.remaining_blocks == 0) {
+                        // Ensure writes are committed so carts survive power cycles.
+                        storage.flushPendingWrites();
                         self.send_csw(0);
                     } else {
                         // More data needed, defer arming OUT endpoint

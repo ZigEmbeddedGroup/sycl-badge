@@ -1,5 +1,14 @@
 /// UART driver for RP2354B
 /// Thin wrapper around the rp2xxx HAL uart module for having clean kernel
+///
+/// Note: UART0 TX/RX are routed to the TC2030-CTX-NL 6-pin debug connector.
+/// This connector provides both SWD (Serial Wire Debug) and UART functionality:
+///   - Pin 1: VCC (target voltage reference)
+///   - Pin 2: SWDIO (Serial Wire Debug I/O)
+///   - Pin 3: GND
+///   - Pin 4: SWCLK (Serial Wire Debug Clock)
+///   - Pin 5: UART0 TX (GPIO0)
+///   - Pin 6: UART0 RX (GPIO1)
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;

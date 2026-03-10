@@ -10,6 +10,7 @@ const lcd = @import("drivers/lcd.zig");
 const gpio = @import("drivers/gpio.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
+const fps_overlay = @import("system/fps_overlay.zig");
 const storage = @import("loader/storage.zig");
 const loader = @import("loader/loader.zig");
 const multicore = @import("system/multicore.zig");
@@ -191,10 +192,21 @@ pub fn main() !void {
             } else if (buttons.down == 0 and joystick_down_was_pressed) {
                 joystick_down_was_pressed = false;
             }
+
+            // Detect joystick_click press - toggle FPS overlay
+            if (buttons.click == 1 and !joystick_click_was_pressed) {
+                joystick_click_was_pressed = true;
+                const new_state = !fps_overlay.isEnabled();
+                fps_overlay.setEnabled(new_state);
+                console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
+            } else if (buttons.click == 0 and joystick_click_was_pressed) {
+                joystick_click_was_pressed = false;
+            }
         } else {
             // Reset navigation button states when cart is running to avoid stuck states
             joystick_up_was_pressed = false;
             joystick_down_was_pressed = false;
+            joystick_click_was_pressed = false;
 
             // Mailbox framebuffer sync.
             // New-API carts send FRAMEBUFFER_READY when they finish a frame.
@@ -211,8 +223,10 @@ pub fn main() !void {
 
                     // Flush the shared-RAM framebuffer (40960 bytes at 0x20020020)
                     // to the LCD over SPI, using column-major MADCTL.
+                    _ = fps_overlay.tick();
                     const fb_ptr: [*]const u8 = @ptrFromInt(0x20020020);
                     lcd.writeCartBuffer(fb_ptr[0 .. 160 * 128 * 2]);
+                    fps_overlay.render();
 
                     // Tell Core 1 it can start the next frame.
                     mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);

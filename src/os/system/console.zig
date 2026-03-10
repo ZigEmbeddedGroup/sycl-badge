@@ -13,6 +13,7 @@ const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
 const debug_log = @import("../debug_log.zig");
 const multicore = @import("multicore.zig");
+const fps_overlay = @import("fps_overlay.zig");
 const badge = microzig.board;
 
 // Console Configuration
@@ -115,6 +116,19 @@ fn refreshCartNames() void {
     }.visit);
 }
 
+fn overlayCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+    _ = partial;
+    if (arg_index == 0) {
+        const options = [_][]const u8{"fps"};
+        return &options;
+    }
+    if (arg_index == 1) {
+        const options = [_][]const u8{ "on", "off" };
+        return &options;
+    }
+    return &[_][]const u8{};
+}
+
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
@@ -138,6 +152,7 @@ const commands = [_]Command{
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
     .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlayCompletions },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
@@ -1225,6 +1240,40 @@ fn lcdFpsBenchmark() void {
 // Static counter for ls command (needed because callbacks can't capture locals)
 var ls_file_count: usize = 0;
 var ls_lcd_y: u16 = 0;
+
+// Overlay Command Handler
+fn cmdOverlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+    const feature = iter.next() orelse {
+        println("\r\nUsage: overlay fps [on|off]\r\n");
+        return;
+    };
+
+    if (std.mem.eql(u8, feature, "fps")) {
+        const state_arg = iter.next();
+        if (state_arg) |state| {
+            if (std.mem.eql(u8, state, "on")) {
+                fps_overlay.setEnabled(true);
+                println("\r\nFPS overlay enabled\r\n");
+            } else if (std.mem.eql(u8, state, "off")) {
+                fps_overlay.setEnabled(false);
+                println("\r\nFPS overlay disabled\r\n");
+            } else {
+                printf("\r\nUnknown state '{s}'. Use 'on' or 'off'.\r\n", .{state});
+            }
+        } else {
+            // No argument — toggle
+            const new_state = !fps_overlay.isEnabled();
+            fps_overlay.setEnabled(new_state);
+            if (new_state) {
+                println("\r\nFPS overlay enabled\r\n");
+            } else {
+                println("\r\nFPS overlay disabled\r\n");
+            }
+        }
+    } else {
+        printf("\r\nUnknown overlay feature '{s}'. Available: fps\r\n", .{feature});
+    }
+}
 
 fn lsVisitor(name: []const u8, size: u32) void {
     ls_file_count += 1;

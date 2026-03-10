@@ -138,15 +138,16 @@ export class Runtime {
         };
 
         await this.bluescreenOnError(async () => {
-            const module = await WebAssembly.instantiate(wasmBuffer, { env });
-            this.wasm = module.instance;
+            const result = await WebAssembly.instantiate(wasmBuffer as BufferSource, { env }) as WebAssembly.WebAssemblyInstantiatedSource;
+            const instance = result.instance;
+            this.wasm = instance;
 
             // Call the WASI _start/_initialize function (different from WASM-4's start callback!)
-            if (typeof this.wasm.exports["_start"] === 'function') {
-                this.wasm.exports._start();
+            if (typeof instance.exports["_start"] === 'function') {
+                (instance.exports._start as Function)();
             }
-            if (typeof this.wasm.exports["_initialize"] === 'function') {
-                this.wasm.exports._initialize();
+            if (typeof instance.exports["_initialize"] === 'function') {
+                (instance.exports._initialize as Function)();
             }
         });
     }
@@ -179,12 +180,15 @@ export class Runtime {
     }
 
     read_flash (offset: number, dstPtr: number, length: number): number {
-        const src = new Uint8Array(this.flashBuffer, offset, length);
-        const dst = new Uint8Array(this.memory.buffer, dstPtr, length);
+        const available = Math.max(0, this.flashBuffer.byteLength - offset);
+        const readLen = Math.min(length, available);
+        if (readLen <= 0) return 0;
 
+        const src = new Uint8Array(this.flashBuffer, offset, readLen);
+        const dst = new Uint8Array(this.memory.buffer, dstPtr, readLen);
         dst.set(src);
 
-        return src.length;
+        return readLen;
     }
 
     write_flash_page (page: number, srcPtr: number) {

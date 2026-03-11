@@ -90,15 +90,14 @@ const button_pin_numbers = blk: {
     break :blk numbers;
 };
 
-
 // Button initialization
 pub fn initButtons() void {
-    // Configure all button and joystick pins as inputs with pull-downs
-    // Buttons are active-high (connect to VCC when pressed)
+    // Configure all button and joystick pins as inputs with pull-ups
+    // Buttons are active-low (connect to GND when pressed)
     for (button_pins) |pin| {
         pin.set_function(.sio);
         pin.set_direction(.in);
-        pin.set_pull(.down); // Pull-down: not pressed = 0, pressed = 1
+        pin.set_pull(.up); // Pull-up: not pressed = 1 (high), pressed = 0 (low)
     }
 }
 
@@ -111,7 +110,6 @@ fn isButtonPin(pin: Pin) bool {
     return false;
 }
 
-
 /// Configure a pin as an input (useful for reading GPIO state)
 /// If the pin is a button, also enables pull-down
 pub fn configureAsInput(pin_num: u9) void {
@@ -119,19 +117,19 @@ pub fn configureAsInput(pin_num: u9) void {
     pin.set_function(.sio);
     pin.set_direction(.in);
 
-    // Enable pull-down for button pins (not pressed = 0, pressed = 1)
+    // Enable pull-up for button pins (not pressed = 1, pressed = 0)
     if (isButtonPin(pin)) {
-        pin.set_pull(.down);
+        pin.set_pull(.up);
     }
 }
 
 // Button reading convenience functions (returns true when pressed)
 pub fn isButtonPressed(pin: Pin) bool {
-    return read(pin) == 1; // Active-high with pull-down: pressed = 1
+    return read(pin) == 0; // Active-high with pull-up: pressed = 0
 }
 
 pub fn isButtonReleased(pin: Pin) bool {
-    return read(pin) == 0; // Active-high with pull-down: released = 0
+    return read(pin) == 1; // Active-high with pull-up: released = 1
 }
 
 // ============================================================================

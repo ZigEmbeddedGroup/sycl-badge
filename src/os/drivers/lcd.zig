@@ -1,5 +1,5 @@
 /// LCD Driver for RP2354B SYCL Badge OS
-/// 160x128 LCD (90° counter-clockwise rotation for the badge)
+/// 160x128 LCD (90° clockwise rotation for the badge)
 const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
@@ -277,8 +277,8 @@ fn initDisplay() void {
     writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
 
     // Memory access control with 90° clockwise rotation
-    // MV (0x20) = Row/Column exchange, MY (0x80) = Row address order
-    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
+    // MV (0x20) = Row/Column exchange, MX (0x40) = Column address order
+    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CW rotation, RGB
 
     // Color mode (16-bit RGB565)
     writeCommandWithData(.COLMOD, &.{0x05});
@@ -338,7 +338,7 @@ pub fn reinitDisplay() void {
     timer.sleep_ms(10); // Reduced from 50ms
 
     // Restore critical registers only
-    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
+    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CW rotation, RGB
     writeCommandWithData(.COLMOD, &.{0x05}); // 16-bit RGB565
     writeCommand(.NORON); // Normal display mode
     writeCommand(.DISPON); // Display on
@@ -358,7 +358,7 @@ pub fn prepareForCart() void {
     // Ensure LCD is in normal, non-inverted mode with correct orientation
     writeCommand(.NORON); // Normal display mode (not partial)
     writeCommand(.INVOFF); // Turn off color inversion
-    writeCommandWithData(.MADCTL, &.{0xA0}); // 90° CW rotation, RGB
+    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CW rotation, RGB
     writeCommandWithData(.COLMOD, &.{0x05}); // 16-bit RGB565
 }
 
@@ -550,14 +550,16 @@ pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u8) void {
 
 /// Write a column-major framebuffer (the cart API layout) to the full display.
 ///
-/// Temporarily switches to MADCTL=0x80 (MV=0, MY=1) so the
+/// Temporarily switches to MADCTL=0x40 (MV=0, MX=1, MY=0) so the
 /// native column axis (128 = screen-Y) is the fast scan direction, matching
-/// the framebuffer memory order.
+/// the framebuffer memory order, and the image orientation matches the
+/// right-side-up landscape MADCTL=0x60 used for normal UI rendering.
 pub fn writeCartBuffer(buffer: []const u8) void {
-    // MV=0: fast axis = native columns (128 = screen Y).
-    // MY=1: rows scan 159→0 so X=0 maps to native row 159 (screen left after 180°).
-    // MX=0: columns scan 0→127 so Y=0 maps to native col 0 (screen top after 180°).
-    writeCommandWithData(.MADCTL, &.{0x80});
+    // MV=0: no row/column exchange; CASET = native cols (0-127), RASET = native rows (0-159).
+    // MX=1: columns scan 127→0 so cart_y=0 maps to native col 127 (screen top, since
+    //        landscape MADCTL=0x60 maps native_col=127-screen_y).
+    // MY=0: rows scan 0→159 so cart_x=0 maps to native row 0 (screen left).
+    writeCommandWithData(.MADCTL, &.{0x40});
 
     // With MV=0: CASET = native columns (0-127), RASET = native rows (0-159).
     // Send CASET/RASET directly to avoid confusion with setWindow's x/y naming.
@@ -570,7 +572,7 @@ pub fn writeCartBuffer(buffer: []const u8) void {
     writeData(buffer);
 
     // Restore landscape MADCTL for direct-draw UI operations.
-    writeCommandWithData(.MADCTL, &.{0xA0});
+    writeCommandWithData(.MADCTL, &.{0x60});
 }
 
 /// Write RGB565 framebuffer to display

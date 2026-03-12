@@ -121,7 +121,10 @@ pub fn init(config: InitConfig) !void {
     // 3. Initialize Buttons (joystick and face buttons)
     gpio.initButtons();
 
-    // 4. Initialize cart storage (FAT16 in romfs) before USB starts
+    // 4. Initialize buzzer (GPIO 8/9 for CMT-7525-80 magnetic buzzer)
+    gpio.buzzer.init();
+
+    // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
     // Ensure internal flash is connected before any ROM access (improves persistence across power cycles)
     rom.connect_internal_flash();
@@ -145,7 +148,10 @@ pub fn init(config: InitConfig) !void {
     // 8. Initialize console (shows welcome message and prompt)
     console.init();
 
-    // 9. Leave interrupts disabled for now (polling-based drivers)
+    // 9. Enable interrupts now that all drivers are initialized.
+    // Flash operations disable interrupts locally around the XIP-off window and restore
+    // the previous state on exit, so they are safe to call with interrupts enabled.
+    interrupts.enableInterrupts();
 
     // 10. Initialize LCD if configured
     if (config.lcd_pins) |lcd_pins| {

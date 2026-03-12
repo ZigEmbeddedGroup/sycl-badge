@@ -41,10 +41,14 @@ pub fn disableInterrupts() void {
     microzig.cpu.interrupt.disable_interrupts();
 }
 
+pub fn areEnabled() bool {
+    return microzig.cpu.interrupt.globally_enabled();
+}
+
 /// Critical section helper - executes function with interrupts disabled
 /// Automatically restores interrupt state after execution
 pub fn withInterruptsDisabled(comptime func: anytype) @TypeOf(func()) {
-    const was_enabled = microzig.cpu.interrupt.are_enabled();
+    const was_enabled = microzig.cpu.interrupt.globally_enabled();
     disableInterrupts();
     defer if (was_enabled) enableInterrupts();
     return func();

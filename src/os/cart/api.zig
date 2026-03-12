@@ -108,7 +108,8 @@ const is_wasm = switch (builtin.target.cpu.arch) {
 // (0x20000000) where the OS keeps its own data structures.
 const base = if (is_wasm) 0 else 0x20020000;
 
-pub const controls: *Controls = @ptrFromInt(base + 0x04);
+/// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
+pub const controls: *volatile const Controls = @ptrFromInt(base + 0x04);
 pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
@@ -546,15 +547,32 @@ pub const ToneOptions = struct {
     flags: Flags,
 };
 
-/// Plays a sound tone.
-/// NOTE: Audio driver not yet implemented; this is a no-op stub.
+/// Plays a sound tone via the hardware buzzer.
+/// On native: sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer.
+/// Duration is in 60ths of a second (same as badge-v1 convention).
 pub inline fn tone(options: ToneOptions) void {
     if (is_wasm) {
         struct {
             extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
         }.tone(options.frequency, options.duration, options.volume, options.flags);
     } else {
-        // no-op stub: audio driver not yet implemented
+        const CART_TONE: u32 = 0x27000000;
+        const CART_TONE_FREQ: u32 = 0x200250A0;
+        const CART_TONE_DURATION: u32 = 0x200250A4;
+        const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
+        const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
+        const FIFO_RDY: u32 = 1 << 1;
+
+        if (options.frequency == 0) return;
+
+        const freq_ptr: *volatile u32 = @ptrFromInt(CART_TONE_FREQ);
+        const dur_ptr: *volatile u32 = @ptrFromInt(CART_TONE_DURATION);
+        freq_ptr.* = options.frequency;
+        dur_ptr.* = options.duration;
+
+        while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
+        SIO_FIFO_WR.* = CART_TONE;
+        asm volatile ("sev");
     }
 }
 
@@ -617,15 +635,32 @@ pub inline fn rand() u32 {
 }
 
 /// Prints a message to the debug console.
-/// NOTE: UART is owned by the kernel; trace is a no-op from the cart side.
-/// Use a JTAG/SWD debugger or a shared ring buffer (future work) for cart logging.
+/// On native: copies string to shared buffer and sends CART_TRACE via FIFO;
+/// kernel prints to UART. Used by Blobs and other carts for panic/debug output.
 pub inline fn trace(x: []const u8) void {
     if (is_wasm) {
         struct {
             extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
         }.trace(x.ptr, x.len);
     } else {
-        // no-op stub: UART is owned by kernel, no cart trace output
+        const TRACE_BUF: u32 = 0x20025020;
+        const TRACE_BUF_SIZE: usize = 128;
+        const CART_TRACE: u8 = 0x26;
+        const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
+        const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
+        const FIFO_RDY: u32 = 1 << 1;
+
+        const len: u24 = @intCast(@min(x.len, TRACE_BUF_SIZE - 1));
+        const buf: [*]volatile u8 = @ptrFromInt(TRACE_BUF);
+        for (x[0..len], 0..) |c, i| buf[i] = c;
+        buf[len] = 0;
+
+        const msg: u32 = (@as(u32, CART_TRACE) << 24) | len;
+        while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
+            asm volatile ("nop");
+        }
+        SIO_FIFO_WR.* = msg;
+        asm volatile ("sev");
     }
 }
 

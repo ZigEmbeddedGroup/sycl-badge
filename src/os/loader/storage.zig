@@ -72,8 +72,9 @@ pub fn wipeStorage() void {
     const erase_len = (size + (FLASH_ERASE_BLOCK - 1)) & ~@as(usize, FLASH_ERASE_BLOCK - 1);
     const flash_offset = base - XIP_BASE;
 
+    const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();
-    defer interrupts.enableInterrupts();
+    defer if (irq_was_enabled) interrupts.enableInterrupts();
 
     rom.flash_exit_xip();
     rom.flash_range_erase(flash_offset, erase_len, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);
@@ -399,8 +400,9 @@ fn flushPending() linksection(".ram_text") void {
     const _flush_slice = std.fmt.bufPrint(_msg[0..], "flushPending: flash_offset=0x{x}, size={d}\r\n", .{ flash_offset, FLASH_ERASE_BLOCK }) catch "";
     if (_flush_slice.len != 0) debug_log.record(_flush_slice);
 
+    const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();
-    defer interrupts.enableInterrupts();
+    defer if (irq_was_enabled) interrupts.enableInterrupts();
 
     rom.flash_exit_xip();
     rom.flash_range_erase(flash_offset, FLASH_ERASE_BLOCK, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);

@@ -13,10 +13,17 @@ const console = @import("console.zig");
 const led = badge.led_pin;
 
 pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
-    _ = message; // Debug via SWD debugger
     // Ensure LED is configured
     led.set_function(.sio);
     led.set_direction(.out);
+
+    // Print panic message for debugging (limit length to avoid buffer overrun)
+    const max_len = @min(message.len, 120);
+    if (max_len > 0) {
+        console.printf("[PANIC] {s}\r\n", .{message[0..max_len]});
+    } else {
+        console.println("[PANIC] (no message)");
+    }
 
     // Blink fast briefly to indicate panic
     var i: usize = 0;

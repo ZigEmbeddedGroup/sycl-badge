@@ -423,8 +423,9 @@ fn eraseCartXipRegion() LoadError!void {
     const _erase_slice = std.fmt.bufPrint(_erase_msg[0..], "eraseCartXipRegion: flash_offset=0x{x}, size={d}\r\n", .{ flash_offset, cart_xip_size }) catch "";
     if (_erase_slice.len != 0) debug_log.record(_erase_slice);
 
+    const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();
-    defer interrupts.enableInterrupts();
+    defer if (irq_was_enabled) interrupts.enableInterrupts();
 
     rom.flash_exit_xip();
     rom.flash_range_erase(flash_offset, cart_xip_size, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);
@@ -442,8 +443,9 @@ fn flushWriteBuffer(erase_block_num: u32, cart_xip_start: u32) LoadError!void {
     const _fw_slice = std.fmt.bufPrint(_fw_msg[0..], "flushWriteBuffer: erase_block={d}, flash_offset=0x{x}\r\n", .{ erase_block_num, flash_offset }) catch "";
     if (_fw_slice.len != 0) debug_log.record(_fw_slice);
 
+    const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();
-    defer interrupts.enableInterrupts();
+    defer if (irq_was_enabled) interrupts.enableInterrupts();
 
     rom.flash_exit_xip();
     rom.flash_range_program(flash_offset, &flash_write_buffer);

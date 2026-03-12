@@ -618,6 +618,7 @@ fn draw_intro_text() void {
 var stateTick: u16 = 0;
 var pixelTick: u8 = 0;
 var quietMode: bool = false;
+var select_held_frames: u8 = 0; // Debounce: require SELECT held to reset from game
 
 export fn update() void {
     if (stateTick > 1000) stateTick = 100;
@@ -637,7 +638,8 @@ export fn update() void {
         tick_stars();
         draw_stars();
         draw_intro_text();
-        if (stateTick > 50 and cart.controls.start) {
+        // Accept START after ~10 frames (~166ms) instead of 50 - avoids feeling unresponsive
+        if (stateTick > 10 and cart.controls.start) {
             gameState = .game;
             stateTick = 0;
         }
@@ -662,7 +664,7 @@ export fn update() void {
                 .text_color = rgb565(red),
             });
         }
-        if (stateTick > 50 and cart.controls.start) {
+        if (stateTick > 10 and cart.controls.start) {
             reset_game();
             gameState = .intro;
             stateTick = 0;
@@ -675,10 +677,18 @@ export fn update() void {
             }
         }
     } else {
-        if (stateTick > 50 and cart.controls.select) {
+        // SELECT+DOWN = intentional reset (avoids accidental resets from SELECT noise).
+        // SELECT alone no longer resets - was causing rapid resets to intro screen.
+        if (stateTick > 60 and cart.controls.select and cart.controls.down) {
+            select_held_frames +%= 1;
+        } else {
+            select_held_frames = 0;
+        }
+        if (select_held_frames >= 20) {
             reset_game();
             gameState = .intro;
             stateTick = 0;
+            select_held_frames = 0;
         }
         tick_game();
         if (player.health == 0) {

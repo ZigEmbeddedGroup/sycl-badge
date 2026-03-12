@@ -44,9 +44,11 @@ const ButtonPoller = struct {
 
     pub fn read(self: ButtonPoller) Buttons {
         _ = self;
+        const start_pressed = gpio.isButtonPressed(board.button_start);
+        const select_pressed = gpio.isButtonPressed(board.button_select);
         return .{
-            .start = if (gpio.isButtonPressed(board.button_start)) 1 else 0,
-            .select = if (gpio.isButtonPressed(board.button_select)) 1 else 0,
+            .start = if (start_pressed) 1 else 0,
+            .select = if (select_pressed) 1 else 0,
             .a = if (gpio.isButtonPressed(board.button_a)) 1 else 0,
             .b = if (gpio.isButtonPressed(board.button_b)) 1 else 0,
             .click = if (gpio.isButtonPressed(board.joystick_click)) 1 else 0, // joystick press-in button
@@ -70,9 +72,12 @@ var display_active: bool = true; // Track if we're showing the cart display
 const CART_CHECK_INTERVAL: u64 = 500_000;
 var last_cart_check: u64 = 0;
 
-// Stop combo: require both START+SELECT held for 250ms before triggering
-const STOP_COMBO_HOLD_US: u64 = 250_000;
+// Stop combo: require both START+SELECT held for 500ms before triggering
+const STOP_COMBO_HOLD_US: u64 = 500_000;
 var stop_combo_held_since: u64 = 0; // 0 = not currently held
+
+// Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
+var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
 // Button state tracking
 var joystick_up_was_pressed: bool = false;
@@ -129,6 +134,12 @@ pub fn main() !void {
     while (true) {
         // Poll USB frequently for console
         usb.poll();
+
+        // Stop buzzer when tone duration expires (non-blocking CART_TONE playback)
+        if (tone_stop_at_us != 0 and timer.micros() >= tone_stop_at_us) {
+            gpio.buzzer.stop();
+            tone_stop_at_us = 0;
+        }
 
         // Process console input
         console.processInput();
@@ -253,32 +264,39 @@ pub fn main() !void {
             joystick_down_was_pressed = false;
             button_a_was_pressed = false;
 
-            // Mailbox framebuffer sync.
+            // Keep ipc_controls updated every iteration so carts always read fresh
+            // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
+            const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
+            ipc_controls.* = @as(u16, @as(u9, @bitCast(button_poller.read())));
+
+            // Mailbox: process all pending messages (trace, framebuffer sync).
             // New-API carts send FRAMEBUFFER_READY when they finish a frame.
-            // Old carts (badge-v1 API) drive the LCD directly and never send
-            // this message, so Core 0 stays off the SPI bus.
-            if (mailbox.tryReceive()) |msg| {
-                if (msg == mailbox.MessageType.FRAMEBUFFER_READY) {
+            // CART_TRACE: cart debug/panic output via cart.trace().
+            while (mailbox.tryReceive()) |msg| {
+                if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
+                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.MessageType.CART_TRACE_BUF_SIZE - 1);
+                    const buf: [*]const u8 = @ptrFromInt(mailbox.MessageType.CART_TRACE_BUF);
+                    console.printf("[CART] {s}\r\n", .{buf[0..len]});
+                } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
+                    const freq: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_FREQ))).*;
+                    const duration_60ths: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_DURATION))).*;
+                    const duration_ms: u32 = (duration_60ths * 1000) / 60;
+                    gpio.buzzer.tone(freq);
+                    tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
+                } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY) {
                     // Write button state into the IPC block for the cart to read.
-                    // Buttons bits 0-8 match the cart Controls layout exactly.
-                    const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
                     const btn = button_poller.read();
-                    const btn_bits: u9 = @bitCast(btn);
-                    ipc_controls.* = @as(u16, btn_bits); // 9 cart bits
+                    ipc_controls.* = @as(u16, @as(u9, @bitCast(btn))); // u9 zero-extends to u16
 
                     // Flush the shared-RAM framebuffer (40960 bytes at 0x20020020)
-                    // to the LCD over SPI, using column-major MADCTL.
                     _ = fps_overlay.tick();
                     const fb_ptr: [*]const u8 = @ptrFromInt(0x20020020);
                     lcd.writeCartBuffer(fb_ptr[0 .. 160 * 128 * 2]);
                     fps_overlay.render();
 
-                    // Tell Core 1 it can start the next frame.
                     mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
                 }
-                // Other messages (e.g. CART_FINISHED) are handled by the
-                // loader state machine and will be picked up on the next
-                // iteration by cart_running becoming false.
+                // Other messages (e.g. CART_FINISHED) handled by loader state machine.
             }
         }
 
@@ -436,12 +454,13 @@ fn runSelectedCart() void {
     // ipc_controls before the new cart's first update().
     while (mailbox.tryReceive()) |_| {}
 
-    // Clear stale button state from the previous cart run.
-    // cart_entry.zig calls update() before the first present() returns, so
-    // without this the first frame reads whatever buttons were held when the
-    // previous cart was stopped (e.g. start=1 from the START+SELECT combo).
+    // Write current button state before cart's first frame.
+    // Carts read at start of update(); this ensures frame 0 sees real buttons
+    // rather than all-zero (which broke metalgear-timer and spaceshooter).
     const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
-    ipc_controls.* = 0;
+    var poller = ButtonPoller.init();
+    const btn = poller.read();
+    ipc_controls.* = @as(u16, @as(u9, @bitCast(btn)));
 
     // Execute the cart
     console.println("[BTN] calling executeCart...");

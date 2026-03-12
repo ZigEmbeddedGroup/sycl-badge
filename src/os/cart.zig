@@ -4,6 +4,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const multicore = @import("system/multicore.zig");
+const interrupts = @import("system/interrupts.zig");
 const mailbox = @import("ipc/mailbox.zig");
 const loader = @import("loader/loader.zig");
 const storage = @import("loader/storage.zig");
@@ -23,6 +24,10 @@ fn getCartXipStart() u32 {
 /// Core 1 main entry point
 /// Initializes IPC, waits for Core 0 to signal start, then enters main loop
 pub fn main() noreturn {
+    // Disable interrupts on Core 1 to prevent unhandled IRQs (e.g. DMA, USB)
+    // from reaching the default panic handler when running cart code.
+    interrupts.disableInterrupts();
+
     // Initialize Core 1's environment
     multicore.initCore1Environment();
 

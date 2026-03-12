@@ -23,18 +23,18 @@ pub const panic = @import("system/panic.zig").panic;
 // Simple button poller (similar to badge-v1)
 const ButtonPoller = struct {
     /// All physical buttons on the badge.
-    /// Bits 0-8 mirror the cart API Controls layout so they can be forwarded directly.
+    /// Bits 0-8 mirror the cart API Controls layout (start, select, a, b, click, up, down, left, right)
+    /// so they can be forwarded directly to ipc_controls. Order must match src/os/cart/api.zig Controls.
     pub const Buttons = packed struct(u9) {
-        // -- cart Controls --
-        start: u1, // GPIO 6
-        select: u1, // GPIO 7
-        a: u1, // GPIO 2
-        b: u1, // GPIO 3
-        click: u1, // GPIO 8
-        up: u1, // GPIO 10
-        down: u1, // GPIO 11
-        left: u1, // GPIO 4
-        right: u1, // GPIO 5
+        start: u1, // GPIO 5 (board.button_start)
+        select: u1, // GPIO 38 (board.button_select)
+        a: u1, // GPIO 6 (board.button_a)
+        b: u1, // GPIO 7 (board.button_b)
+        click: u1, // GPIO 36 (board.joystick_click)
+        up: u1, // GPIO 37
+        down: u1, // GPIO 24
+        left: u1, // GPIO 35
+        right: u1, // GPIO 25
     };
 
     pub fn init() ButtonPoller {
@@ -59,7 +59,7 @@ const ButtonPoller = struct {
 };
 
 // Y position for cart list display
-var cart_y_pos: u16 = 50;
+var cart_y_pos: u16 = 2;
 
 // Cart display state
 var last_cart_hash: u32 = 0;
@@ -69,6 +69,10 @@ var display_active: bool = true; // Track if we're showing the cart display
 // Cart display check interval (in microseconds) - check every 500ms
 const CART_CHECK_INTERVAL: u64 = 500_000;
 var last_cart_check: u64 = 0;
+
+// Stop combo: require both START+SELECT held for 250ms before triggering
+const STOP_COMBO_HOLD_US: u64 = 250_000;
+var stop_combo_held_since: u64 = 0; // 0 = not currently held
 
 // Button state tracking
 var joystick_up_was_pressed: bool = false;
@@ -114,11 +118,6 @@ pub fn main() !void {
     button_select_was_pressed = (initial.select == 1);
     button_start_was_pressed = (initial.start == 1); // start button stops cart and sends back to main menu
 
-    // Display startup message on LCD
-    lcd.fillScreen(lcd.BLACK);
-    lcd.drawString(0, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(0, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
-
     // Initial cart display
     refreshCartDisplay();
     last_cart_hash = computeCartHash();
@@ -142,31 +141,61 @@ pub fn main() !void {
         // Poll buttons
         const buttons = button_poller.read();
 
-        // Start button works at any time - stops running cart
-        if (buttons.start == 1 and !button_start_was_pressed) {
-            button_start_was_pressed = true;
-            console.printf("[BTN] START (STOP) pressed (cart_running={})\r\n", .{cart_running});
-            if (cart_running) {
-                // Halt Core 1 first so the cart cannot interfere with cleanup.
-                multicore.haltCore1();
-
-                // Reset all hardware the cart may have left active:
-                // buzzer, PWM slices, PIO state machines, neopixel/LED outputs,
-                // and button pin configuration.
-                gpio.resetCartHardware();
-
-                // Abort any DMA transfers the cart may have started on channels 1-15.
-                dma.abortCartChannels();
-
-                loader.stop();
-                multicore.resetCore1();
-
-                // Update cart_running immediately so the rest of this loop iteration
-                // does NOT enter the mailbox/IPC path (which would send stale messages
-                // to the freshly-restarted cart.main on Core 1)
-                cart_running = false;
+        // Start + Select combo stops running cart (prevents accidental exit in carts
+        // that use the Start button for their own purposes).
+        // Require both held for 250ms to avoid accidental trigger when pressing START alone.
+        const stop_combo = (buttons.start == 1 and buttons.select == 1);
+        if (stop_combo) {
+            if (stop_combo_held_since == 0) {
+                stop_combo_held_since = timer.micros();
             }
-        } else if (buttons.start == 0 and button_start_was_pressed) {
+            const held_us = timer.micros() -% stop_combo_held_since;
+            if (held_us >= STOP_COMBO_HOLD_US and !button_start_was_pressed) {
+                button_start_was_pressed = true;
+                console.printf("[BTN] START+SELECT (STOP) pressed (cart_running={})\r\n", .{cart_running});
+                if (cart_running) {
+                    console.println("[STOP] 1: halting Core 1");
+                    multicore.haltCore1();
+                    console.println("[STOP] 2: stopDMA");
+                    lcd.stopDMA();
+                    console.println("[STOP] 3a: resetCartBuzzer");
+                    gpio.resetCartBuzzer();
+                    console.println("[STOP] 3b: resetCartPWM");
+                    gpio.resetCartPWM();
+                    console.println("[STOP] 3c: resetCartPIO");
+                    gpio.resetCartPIO();
+                    console.println("[STOP] 3d: resetCartNeopixels");
+                    gpio.resetCartNeopixels();
+                    console.println("[STOP] 3e: resetCartLED");
+                    gpio.resetCartLED();
+                    console.println("[STOP] 3f: initButtons");
+                    gpio.initButtons();
+                    console.println("[STOP] 4: abortCartChannels");
+                    dma.abortCartChannels();
+                    console.println("[STOP] 5: loader.stop");
+                    loader.stop();
+                    console.println("[STOP] 6: resetCore1");
+                    multicore.resetCore1();
+                    // Mark cart as stopped and restore state before reinit
+                    cart_running = false;
+                    display_active = true;
+                    button_a_was_pressed = (buttons.a == 1);
+                    joystick_up_was_pressed = (buttons.up == 1);
+                    joystick_down_was_pressed = (buttons.down == 1);
+                    button_start_was_pressed = (buttons.start == 1 and buttons.select == 1);
+                    console.println("[STOP] 7: reinitDisplay");
+                    lcd.reinitDisplay();
+                    console.println("[STOP] 8: refreshCartDisplay");
+                    refreshCartDisplay();
+                    last_cart_hash = computeCartHash();
+                    console.println("[STOP] 9: done");
+                }
+            }
+        } else if (buttons.start == 0 and buttons.select == 0) {
+            // Only reset combo state when BOTH buttons are released.
+            // Resetting when either is still held would allow a quick
+            // tap of the other button to bypass the 250ms hold requirement.
+            stop_combo_held_since = 0;
             button_start_was_pressed = false;
         }
 
@@ -258,15 +287,21 @@ pub fn main() !void {
             display_active = false;
         } else if (!cart_running and !display_active) {
             // Cart stopped naturally (not via stop button) - reset hardware and restore display.
+            console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
+            lcd.stopDMA();
             // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
             gpio.resetCartHardware();
             // Abort any DMA transfers the cart may have left running.
             dma.abortCartChannels();
             display_active = true;
+            // Re-sync all button states so any buttons still held when the cart
+            // exited are consumed and won't immediately re-trigger menu actions.
+            const cur = button_poller.read();
+            button_a_was_pressed = (cur.a == 1);
+            joystick_up_was_pressed = (cur.up == 1);
+            joystick_down_was_pressed = (cur.down == 1);
+            button_start_was_pressed = (cur.start == 1 and cur.select == 1);
             lcd.reinitDisplay();
-            lcd.fillScreen(lcd.BLACK);
-            lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-            lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
             refreshCartDisplay();
             last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
@@ -305,30 +340,27 @@ fn hashCart(name: []const u8, size: u32) void {
 
 /// Refresh the cart list display on LCD
 fn refreshCartDisplay() void {
-    // Clear the cart list area (y: 50 to 120)
-    lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
+    lcd.fillScreen(lcd.BLACK);
 
-    // Reset Y position and display carts
-    cart_y_pos = 50;
+    // Header
+    lcd.drawString(0, 2, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+    cart_y_pos = 14; // below header (8px char + 4px gap)
+
     draw_index = 0;
     cart_count = 0;
     storage.listCarts(countCart);
 
-    // Reset cursor if cart list changed
     if (cursor_index >= cart_count) {
         cursor_index = 0;
     }
 
-    // Collect cart names
     draw_index = 0;
     collect_index = 0;
     storage.listCarts(collectCartName);
 
-    // Display carts
     draw_index = 0;
     storage.listCarts(displayCart);
 
-    // If no carts were displayed, show a message
     if (cart_count == 0) {
         lcd.drawString(0, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
     }
@@ -368,6 +400,12 @@ fn runSelectedCart() void {
         timer.sleep_ms(100);
     }
 
+    // Show loading screen while the UF2 is read from storage and flashed.
+    lcd.fillScreen(lcd.BLACK);
+    lcd.drawString(0, 20, "Loading Cart", lcd.CYAN, lcd.BLACK, 1);
+    lcd.drawString(0, 40, name[0..@min(name.len, 18)], lcd.WHITE, lcd.BLACK, 1);
+    lcd.drawString(0, 60, "Please wait...", lcd.YELLOW, lcd.BLACK, 1);
+
     // Load the cart
     console.println("[BTN] calling loadUF2Cart...");
     const entry_point = loader.loadUF2Cart(name) catch |err| {
@@ -393,6 +431,17 @@ fn runSelectedCart() void {
     // NOTE: do NOT touch the LCD here - prepareForCart/fillScreen before executeCart
     // interferes with the cart's own LCD init (forces MADCTL, may leave DMA running).
     // The console 'cart run' command works precisely because it skips these LCD calls.
+
+    // Drain any stale messages from previous cart so they don't overwrite
+    // ipc_controls before the new cart's first update().
+    while (mailbox.tryReceive()) |_| {}
+
+    // Clear stale button state from the previous cart run.
+    // cart_entry.zig calls update() before the first present() returns, so
+    // without this the first frame reads whatever buttons were held when the
+    // previous cart was stopped (e.g. start=1 from the START+SELECT combo).
+    const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
+    ipc_controls.* = 0;
 
     // Execute the cart
     console.println("[BTN] calling executeCart...");
@@ -421,17 +470,23 @@ fn runSelectedCart() void {
 
 /// Callback to display a cart entry on the LCD
 fn displayCart(name: []const u8, size: u32) void {
-    // Convert size from bytes to kB
-    const size_kb = (size + 512) / 1024; // Round to nearest kB
+    _ = size;
 
-    // Format the display string with cursor indicator
+    // Strip .uf2 / .UF2 extension for cleaner display
+    const display_name = if (name.len >= 4 and
+        (std.mem.eql(u8, name[name.len - 4 ..], ".uf2") or
+        std.mem.eql(u8, name[name.len - 4 ..], ".UF2")))
+        name[0 .. name.len - 4]
+    else
+        name;
+
     var buf: [64]u8 = undefined;
     const cursor = if (draw_index == cursor_index) ">" else " ";
-    const text = std.fmt.bufPrint(&buf, "{s}{s} {d}kB", .{ cursor, name, size_kb }) catch return;
+    const text = std.fmt.bufPrint(&buf, "{s}{s}", .{ cursor, display_name }) catch return;
 
-    // Draw on LCD if within screen bounds (height is 128)
-    if (cart_y_pos < 120) {
-        lcd.drawString(0, cart_y_pos, text, lcd.WHITE, lcd.BLACK, 1);
+    if (cart_y_pos < 128) {
+        const color = if (draw_index == cursor_index) lcd.YELLOW else lcd.WHITE;
+        lcd.drawString(0, cart_y_pos, text, color, lcd.BLACK, 1);
         cart_y_pos += 10;
     }
 

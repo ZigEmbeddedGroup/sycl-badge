@@ -81,25 +81,18 @@ pub const Pixel = extern struct {
     }
 };
 
+/// Button layout must match kernel.zig ButtonPoller.Buttons exactly:
+/// start, select, a, b, click, up, down, left, right (bits 0-8).
+/// Kernel writes u9 to ipc_controls (0x20020004) each frame when cart sends FRAMEBUFFER_READY.
 pub const Controls = packed struct(u9) {
-    /// START button
     start: bool,
-    /// SELECT button
     select: bool,
-    /// A button
     a: bool,
-    /// B button
     b: bool,
-
-    /// Tactile click
     click: bool,
-    /// Tactile up
     up: bool,
-    /// Tactile down
     down: bool,
-    /// Tactile left
     left: bool,
-    /// Tactile right
     right: bool,
 };
 

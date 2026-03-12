@@ -8,6 +8,7 @@ const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
 const gpio = @import("drivers/gpio.zig");
+const dma = @import("drivers/dma.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const fps_overlay = @import("system/fps_overlay.zig");
@@ -136,7 +137,7 @@ pub fn main() !void {
         // Check if cart is running - controls both button handling and display updates
         // Check for both .ready and .running states (cart is active from load until stop)
         const cart_state = loader.getState();
-        const cart_running = (cart_state == .running) or (cart_state == .ready);
+        var cart_running = (cart_state == .running) or (cart_state == .ready);
 
         // Poll buttons
         const buttons = button_poller.read();
@@ -146,67 +147,82 @@ pub fn main() !void {
             button_start_was_pressed = true;
             console.printf("[BTN] START (STOP) pressed (cart_running={})\r\n", .{cart_running});
             if (cart_running) {
-                // Stop the cart (halt Core 1, reset state, restart Core 1)
+                // Halt Core 1 first so the cart cannot interfere with cleanup.
                 multicore.haltCore1();
+
+                // Reset all hardware the cart may have left active:
+                // buzzer, PWM slices, PIO state machines, neopixel/LED outputs,
+                // and button pin configuration.
+                gpio.resetCartHardware();
+
+                // Abort any DMA transfers the cart may have started on channels 1-15.
+                dma.abortCartChannels();
+
                 loader.stop();
                 multicore.resetCore1();
 
-                // Restore display - reinit LCD registers first to fix color mode
-                display_active = true;
-                lcd.reinitDisplay();
-                lcd.fillScreen(lcd.BLACK);
-                lcd.drawString(0, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-                lcd.drawString(0, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
-                refreshCartDisplay();
-                last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
+                // Update cart_running immediately so the rest of this loop iteration
+                // does NOT enter the mailbox/IPC path (which would send stale messages
+                // to the freshly-restarted cart.main on Core 1)
+                cart_running = false;
             }
         } else if (buttons.start == 0 and button_start_was_pressed) {
             button_start_was_pressed = false;
         }
 
+        // Joystick click toggles FPS overlay at any time (cart running or not)
+        if (buttons.click == 1 and !joystick_click_was_pressed) {
+            joystick_click_was_pressed = true;
+            const new_state = !fps_overlay.isEnabled();
+            fps_overlay.setEnabled(new_state);
+            console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
+        } else if (buttons.click == 0 and joystick_click_was_pressed) {
+            joystick_click_was_pressed = false;
+        }
+
         // Only process navigation buttons when cart is NOT running
         if (!cart_running) {
-            // Detect button_up press (GPIO 10) - move cursor down through cart list
+            // Joystick up - move cursor up through cart list
             if (buttons.up == 1 and !joystick_up_was_pressed) {
                 joystick_up_was_pressed = true;
                 console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
-                // Move cursor to next cart (wrap around to top)
                 if (cart_count > 0) {
-                    cursor_index = (cursor_index + 1) % cart_count;
+                    cursor_index = if (cursor_index == 0) cart_count - 1 else cursor_index - 1;
                     refreshCartDisplay();
                 }
             } else if (buttons.up == 0 and joystick_up_was_pressed) {
                 joystick_up_was_pressed = false;
             }
 
-            // Detect button_down press (GPIO 11) - run selected cart
+            // Joystick down - move cursor down through cart list
             if (buttons.down == 1 and !joystick_down_was_pressed) {
                 joystick_down_was_pressed = true;
                 console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
-                // Run the selected cart
-                if (cart_count > 0 and cursor_index < cart_count) {
-                    runSelectedCart();
-                } else {
-                    console.printf("[BTN] DOWN: no cart to run (cart_count={d})\r\n", .{cart_count});
+                if (cart_count > 0) {
+                    cursor_index = (cursor_index + 1) % cart_count;
+                    refreshCartDisplay();
                 }
             } else if (buttons.down == 0 and joystick_down_was_pressed) {
                 joystick_down_was_pressed = false;
             }
 
-            // Detect joystick_click press - toggle FPS overlay
-            if (buttons.click == 1 and !joystick_click_was_pressed) {
-                joystick_click_was_pressed = true;
-                const new_state = !fps_overlay.isEnabled();
-                fps_overlay.setEnabled(new_state);
-                console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
-            } else if (buttons.click == 0 and joystick_click_was_pressed) {
-                joystick_click_was_pressed = false;
+            // Button A - run the selected cart
+            if (buttons.a == 1 and !button_a_was_pressed) {
+                button_a_was_pressed = true;
+                console.printf("[BTN] A pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
+                if (cart_count > 0 and cursor_index < cart_count) {
+                    runSelectedCart();
+                } else {
+                    console.printf("[BTN] A: no cart to run (cart_count={d})\r\n", .{cart_count});
+                }
+            } else if (buttons.a == 0 and button_a_was_pressed) {
+                button_a_was_pressed = false;
             }
         } else {
             // Reset navigation button states when cart is running to avoid stuck states
             joystick_up_was_pressed = false;
             joystick_down_was_pressed = false;
-            joystick_click_was_pressed = false;
+            button_a_was_pressed = false;
 
             // Mailbox framebuffer sync.
             // New-API carts send FRAMEBUFFER_READY when they finish a frame.
@@ -241,7 +257,11 @@ pub fn main() !void {
             // Cart just started running - stop updating display
             display_active = false;
         } else if (!cart_running and !display_active) {
-            // Cart stopped naturally (not via stop button) - restore display
+            // Cart stopped naturally (not via stop button) - reset hardware and restore display.
+            // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
+            gpio.resetCartHardware();
+            // Abort any DMA transfers the cart may have left running.
+            dma.abortCartChannels();
             display_active = true;
             lcd.reinitDisplay();
             lcd.fillScreen(lcd.BLACK);
@@ -310,7 +330,7 @@ fn refreshCartDisplay() void {
 
     // If no carts were displayed, show a message
     if (cart_count == 0) {
-        lcd.drawString(10, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
+        lcd.drawString(0, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
     }
 }
 
@@ -393,7 +413,7 @@ fn runSelectedCart() void {
         // Execution failed
         console.println("[BTN] executeCart FAILED");
         lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
-        lcd.drawString(10, 50, "Failed to run", lcd.RED, lcd.BLACK, 1);
+        lcd.drawString(0, 50, "Failed to run", lcd.RED, lcd.BLACK, 1);
         timer.sleep_ms(2000);
         refreshCartDisplay();
     }
@@ -411,7 +431,7 @@ fn displayCart(name: []const u8, size: u32) void {
 
     // Draw on LCD if within screen bounds (height is 128)
     if (cart_y_pos < 120) {
-        lcd.drawString(10, cart_y_pos, text, lcd.WHITE, lcd.BLACK, 1);
+        lcd.drawString(0, cart_y_pos, text, lcd.WHITE, lcd.BLACK, 1);
         cart_y_pos += 10;
     }
 

@@ -223,3 +223,119 @@ pub const buzzer = struct {
         }
     }
 };
+
+/// Bit-bang a WS2812B all-black (zero) frame onto the neopixel data line.
+///
+/// Transmits 5 pixels × 3 bytes × 8 bits = 120 consecutive "0" code-words
+/// using the WS2812B NRZ protocol, then holds the line low for ≥60 µs so
+/// the strip latches and all LEDs turn off.
+///
+/// Protocol timing (WS2812B, ±150 ns tolerance):
+///   T0H (zero-code high): ~400 ns → 45 NOPs at 125 MHz ≈ 360 ns
+///   T0L (zero-code low):  ~850 ns → 105 NOPs + loop overhead ≈ 860 ns
+///   Reset/latch:          >50 µs  → timer-based 80 µs pre-pulse + 60 µs post
+///
+/// The caller must have already reconfigured the neopixel pin as an SIO
+/// output.  The line is left low (latched/off) after this function returns.
+fn clearNeopixels() void {
+    // SIO single-cycle GPIO registers (addresses from RP2350 TRM / cart_hal.zig).
+    const GPIO_OUT_SET: *volatile u32 = @ptrFromInt(0xD0000018);
+    const GPIO_OUT_CLR: *volatile u32 = @ptrFromInt(0xD0000020);
+    // TIMER0_TIMERAWL: free-running 32-bit µs counter (1 MHz, always-on).
+    const TIMER_RAWL: *volatile u32 = @ptrFromInt(0x400B0028);
+
+    const neopixel_gpio: u5 = @intCast(@intFromEnum(board.neopixel_pin));
+    const PIN: u32 = @as(u32, 1) << neopixel_gpio;
+
+    // Pre-transmission reset: hold data line low for ≥80 µs so any prior
+    // in-progress WS2812 frame is abandoned and the strip is ready to latch.
+    GPIO_OUT_CLR.* = PIN;
+    const t0 = TIMER_RAWL.*;
+    while (TIMER_RAWL.* -% t0 < 80) {}
+
+    // Transmit 120 zero bits (= 5 fully-black pixels).
+    var i: u32 = 0;
+    while (i < 120) : (i += 1) {
+        // --- T0H: ~400 ns high ---
+        GPIO_OUT_SET.* = PIN;
+        asm volatile (
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop
+        ); // 45 NOPs ≈ 360 ns
+
+        // --- T0L: ~850 ns low ---
+        GPIO_OUT_CLR.* = PIN;
+        asm volatile (
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop; nop; nop; nop; nop; nop
+            \\ nop; nop; nop; nop; nop
+        ); // 105 NOPs ≈ 840 ns (loop overhead ≈ +24 ns → total ≈ 864 ns)
+    }
+
+    // Post-transmission latch: hold low ≥60 µs to commit the all-off frame.
+    GPIO_OUT_CLR.* = PIN;
+    const t1 = TIMER_RAWL.*;
+    while (TIMER_RAWL.* -% t1 < 60) {}
+}
+
+/// Reset all hardware to a safe state after a cart stops.
+///
+/// This must be called (on Core 0) after Core 1 has been halted so that any
+/// peripherals the cart left in an active state are silenced/disabled before
+/// the OS resumes normal operation.  Specifically it:
+///   • Silences the buzzer (disables the PWM tone and de-asserts SPKR_EN).
+///   • Disables every PWM slice (carts may drive LEDs or servos via PWM).
+///   • Disables all PIO state-machine groups (carts use PIO for neopixels,
+///     custom protocols, etc.).
+///   • Transmits an all-black WS2812B frame to clear all 5 neopixels.
+///   • Drives the debug LED low.
+///   • Reconfigures all button/joystick pins as pull-up inputs so they are
+///     readable by the kernel again.
+pub fn resetCartHardware() void {
+    // 1. Stop buzzer – de-asserts SPKR_EN and disables the PWM slice.
+    buzzer.stop();
+
+    // 2. Disable all 12 PWM slices (RP2350).
+    //    The LCD backlight (GPIO 16) is wired as a plain SIO output, not PWM,
+    //    so disabling every slice is safe.
+    var i: u32 = 0;
+    while (i < 12) : (i += 1) {
+        const sl: hal.pwm.Slice = @enumFromInt(i);
+        sl.disable();
+    }
+
+    // 3. Disable all PIO state machines across PIO0, PIO1, PIO2.
+    //    The SM_ENABLE field occupies bits [3:0] of each PIO CTRL register.
+    //    The OS itself does not use PIO, so clearing these bits is safe.
+    const PIO0_CTRL: *volatile u32 = @ptrFromInt(0x50200000);
+    const PIO1_CTRL: *volatile u32 = @ptrFromInt(0x50300000);
+    const PIO2_CTRL: *volatile u32 = @ptrFromInt(0x50400000);
+    PIO0_CTRL.* = PIO0_CTRL.* & ~@as(u32, 0xF);
+    PIO1_CTRL.* = PIO1_CTRL.* & ~@as(u32, 0xF);
+    PIO2_CTRL.* = PIO2_CTRL.* & ~@as(u32, 0xF);
+
+    // 4. Clear all 5 neopixels by bit-banging an all-black WS2812B frame.
+    //    Reconfigure the pin first (cart may have left it in PIO/PWM mode).
+    board.neopixel_pin.set_function(.sio);
+    board.neopixel_pin.set_direction(.out);
+    clearNeopixels(); // transmits 5×24 zero bits + latch; leaves line low
+
+    // 5. Drive the debug LED off.
+    board.led_pin.set_function(.sio);
+    board.led_pin.set_direction(.out);
+    board.led_pin.put(0);
+
+    // 6. Restore button / joystick pins for kernel use.
+    initButtons();
+}

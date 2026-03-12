@@ -1,5 +1,4 @@
 /// DMA Driver for RP2350 family
-
 const std = @import("std");
 const microzig = @import("microzig");
 const chip = microzig.chip;
@@ -19,8 +18,7 @@ var lcd_framebuffer_len: u28 = 0;
 var lcd_spi_dr_addr: u32 = 0;
 
 /// Init DMA ctrl (already init by boot ROM)
-pub fn init() void {
-}
+pub fn init() void {}
 
 /// Config DMA ch0 for LCD SPI transfer
 pub fn initLCD(
@@ -117,6 +115,29 @@ pub fn isLCDbusy() bool {
 /// Wait for DMA transfer to complete
 pub fn waitLCD() void {
     while (DMA.CH0_CTRL_TRIG.read().BUSY != 0) {}
+}
+
+/// Abort any DMA channels a cart may have started (channels 1–15).
+///
+/// Channel 0 is reserved for the OS LCD driver and is never touched here.
+/// This should be called on Core 0 after Core 1 has been halted so that
+/// stray cart DMA transfers cannot corrupt memory or peripherals.
+pub fn abortCartChannels() void {
+    // RP2350 DMA_CHAN_ABORT register: write a 1 to each bit to request abort
+    // for the corresponding channel.  The register reads back the pending
+    // abort requests; polling it until it clears confirms completion.
+    // DMA base = 0x50000000, CHAN_ABORT offset = 0x444.
+    const DMA_CHAN_ABORT: *volatile u32 = @ptrFromInt(0x50000444);
+
+    // Request abort for channels 1-15 (bit mask 0xFFFE: all bits except bit 0).
+    const cart_channel_mask: u32 = 0x0000_FFFE;
+    DMA_CHAN_ABORT.* = cart_channel_mask;
+
+    // Wait until all requested aborts have been serviced (register clears).
+    var timeout: u32 = 10_000;
+    while ((DMA_CHAN_ABORT.* & cart_channel_mask) != 0 and timeout > 0) : (timeout -= 1) {
+        microzig.cpu.nop();
+    }
 }
 
 /// Reconfig DMA with new framebuffer pointer and len

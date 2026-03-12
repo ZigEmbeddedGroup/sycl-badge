@@ -132,7 +132,7 @@ fn overlayCompletions(arg_index: usize, partial: []const u8) []const []const u8 
 fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
-        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall", "wipeall" };
+        const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall" };
         return &options;
     }
     if (arg_index == 1) {
@@ -151,13 +151,11 @@ const commands = [_]Command{
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
     .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
     .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlayCompletions },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
-    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
-    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
 };
 
@@ -1062,15 +1060,9 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting system...\r\n");
 
-        // Small delay to allow message to be sent
-        timer.sleep_ms(50);
+    // Small delay to allow message to be sent
+    timer.sleep_ms(50);
 
-        // Disconnect USB to properly signal disconnection to the host
-        // This prevents the terminal from thinking the connection is still active
-        usb.disconnect();
-
-        // Small delay to allow host to detect disconnection
-        timer.sleep_ms(10);
     // Disconnect USB to properly signal disconnection to the host
     // This prevents the terminal from thinking the connection is still active
     usb.disconnect();
@@ -1078,26 +1070,25 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Small delay to allow host to detect disconnection
     timer.sleep_ms(10);
 
-        // Trigger system reset via SCB (System Control Block)
-        const SCB_BASE = 0xE000ED00;
-        const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
+    // Trigger system reset via SCB (System Control Block)
+    const SCB_BASE = 0xE000ED00;
+    const AIRCR = @as(*volatile u32, @ptrFromInt(SCB_BASE + 0x0C));
 
-        // Write SYSRESETREQ bit with VECTKEY
-        // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
-        // Need to preserve other bits in AIRCR, so read-modify-write
-        microzig.cpu.dsb();
-        microzig.cpu.isb();
+    // Write SYSRESETREQ bit with VECTKEY
+    // VECTKEY = 0x5FA, SYSRESETREQ = bit 2
+    microzig.cpu.dsb();
+    microzig.cpu.isb();
 
-        // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
-        AIRCR.* = 0x05FA0004;
+    // Write: VECTKEY (0x5FA) in upper 16 bits, SYSRESETREQ (bit 2) set
+    AIRCR.* = 0x05FA0004;
 
-        microzig.cpu.dsb();
-        microzig.cpu.isb();
+    microzig.cpu.dsb();
+    microzig.cpu.isb();
 
-        // Wait for reset to occur (should happen immediately)
-        while (true) {
-            microzig.cpu.wfi();
-        }
+    // Wait for reset to occur (should happen immediately)
+    while (true) {
+        microzig.cpu.wfi();
+    }
 }
 
 // Reboot to BootSelect Command
@@ -1309,7 +1300,7 @@ fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
-        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall|wipeall> [name]\r\n");
+        println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall> [name]\r\n");
         return;
     };
 
@@ -1395,31 +1386,6 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         } else {
             println("\r\nFailed to execute cart\r\n");
         }
-        return;
-    }
-
-    if (std.mem.eql(u8, subcmd, "wipeall")) {
-        const confirm = iter.next();
-
-        if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
-            println("\r\nWARNING: This will COMPLETELY WIPE the storage filesystem!");
-            println("ALL carts will be permanently deleted!");
-            println("This reformats the FAT12 filesystem and clears all deleted entries.");
-            println("\r\nTo proceed, type: cart wipeall confirm\r\n");
-            return;
-        }
-
-        // Stop any running cart first
-        if (loader.getState() == .running or loader.getState() == .ready) {
-            println("\r\nStopping running cart...");
-            multicore.haltCore1();
-            loader.stop();
-            multicore.resetCore1();
-        }
-
-        println("Wiping storage filesystem...");
-        storage.wipeStorage();
-        println("\r\nStorage filesystem wiped! All carts deleted.\r\n");
         return;
     }
 

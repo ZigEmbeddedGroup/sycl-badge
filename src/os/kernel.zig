@@ -79,6 +79,13 @@ var stop_combo_held_since: u64 = 0; // 0 = not currently held
 // Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
 var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
+// Button diagnostic logging: print raw button state every BTN_DIAG_US microseconds
+// while a cart is running.  Uses timer.micros() so it fires at a wall-clock rate
+// regardless of main-loop iteration speed.
+const BTN_DIAG_US: u64 = 2_000_000; // 2 seconds
+var btn_diag_last_us: u64 = 0;
+var btn_diag_cart_was_running: bool = false; // tracks first-run edge
+
 // Button state tracking
 var joystick_up_was_pressed: bool = false;
 var joystick_down_was_pressed: bool = false;
@@ -190,6 +197,7 @@ pub fn main() !void {
                     // Mark cart as stopped and restore state before reinit
                     cart_running = false;
                     display_active = true;
+                    btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
                     button_a_was_pressed = (buttons.a == 1);
                     joystick_up_was_pressed = (buttons.up == 1);
                     joystick_down_was_pressed = (buttons.down == 1);
@@ -267,7 +275,32 @@ pub fn main() !void {
             // Keep ipc_controls updated every iteration so carts always read fresh
             // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
             const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
-            ipc_controls.* = @as(u16, @as(u9, @bitCast(button_poller.read())));
+            const live_btn = button_poller.read();
+            ipc_controls.* = @as(u16, @as(u9, @bitCast(live_btn)));
+
+            // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
+            // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
+            const now_us = timer.micros();
+            if (!btn_diag_cart_was_running) {
+                btn_diag_cart_was_running = true;
+                btn_diag_last_us = now_us;
+                console.println("[BTN-DIAG] cart started - will log button state every 2s");
+            }
+            if (now_us -% btn_diag_last_us >= BTN_DIAG_US) {
+                btn_diag_last_us = now_us;
+                const start_gpio = gpio.read(board.button_start); // 0=pressed(active-low), 1=released
+                const sel_gpio   = gpio.read(board.button_select);
+                const a_gpio     = gpio.read(board.button_a);
+                const b_gpio     = gpio.read(board.button_b);
+                const up_gpio    = gpio.read(board.joystick_up);
+                const dn_gpio    = gpio.read(board.joystick_down);
+                const raw_u9: u9 = @bitCast(live_btn);
+                console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={d} SEL={d} A={d} B={d} UP={d} DN={d} | processed: start={} sel={} a={} b={} up={} dn={}\r\n", .{
+                    raw_u9,
+                    start_gpio, sel_gpio, a_gpio, b_gpio, up_gpio, dn_gpio,
+                    live_btn.start, live_btn.select, live_btn.a, live_btn.b, live_btn.up, live_btn.down,
+                });
+            }
 
             // Mailbox: process all pending messages (trace, framebuffer sync).
             // New-API carts send FRAMEBUFFER_READY when they finish a frame.
@@ -305,6 +338,7 @@ pub fn main() !void {
             display_active = false;
         } else if (!cart_running and !display_active) {
             // Cart stopped naturally (not via stop button) - reset hardware and restore display.
+            btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
             console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
             lcd.stopDMA();
             // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.

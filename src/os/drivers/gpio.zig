@@ -90,12 +90,12 @@ const button_pin_numbers = blk: {
 
 // Button initialization
 pub fn initButtons() void {
-    // Configure all button and joystick pins as inputs with pull-ups
-    // Buttons are active-low (connect to GND when pressed)
+    // Configure all button and joystick pins as inputs with pull-downs.
+    // Buttons are active-high: not pressed = 0 (low), pressed = 1 (high).
     for (button_pins) |pin| {
         pin.set_function(.sio);
         pin.set_direction(.in);
-        pin.set_pull(.up); // Pull-up: not pressed = 1 (high), pressed = 0 (low)
+        pin.set_pull(.down); // Pull-down: not pressed = 0 (low), pressed = 1 (high)
     }
 }
 
@@ -115,19 +115,19 @@ pub fn configureAsInput(pin_num: u9) void {
     pin.set_function(.sio);
     pin.set_direction(.in);
 
-    // Enable pull-up for button pins (not pressed = 1, pressed = 0)
+    // Enable pull-down for button pins (active-high: not pressed = 0, pressed = 1)
     if (isButtonPin(pin)) {
-        pin.set_pull(.up);
+        pin.set_pull(.down);
     }
 }
 
 // Button reading convenience functions (returns true when pressed)
 pub fn isButtonPressed(pin: Pin) bool {
-    return read(pin) == 0; // Active-high with pull-up: pressed = 0
+    return read(pin) == 1; // Active-high: pressed = 1 (high)
 }
 
 pub fn isButtonReleased(pin: Pin) bool {
-    return read(pin) == 1; // Active-high with pull-up: released = 1
+    return read(pin) == 0; // Active-high: released = 0 (low)
 }
 
 // ============================================================================

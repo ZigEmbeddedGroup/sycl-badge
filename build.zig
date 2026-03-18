@@ -72,10 +72,10 @@ pub fn build(builder: *Build) void {
     sycl_os.install(builder);
 
     // Build test XIP cart (runs on Core 1 with cart_runtime - no microzig)
-    add_xip_cart(builder, &dep, .{
-        .name = "test-xip-cart",
+    add_microzig_cart(builder, &dep, .{
+        .name = "lcd-test",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/test-xip-cart/src/main.zig"),
+        .root_source_file = builder.path("showcase/carts/lcd-test/src/main.zig"),
     });
 
     // Build test MicroZig cart (runs on Core 1 with full MicroZig HAL)
@@ -92,18 +92,43 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
-    // Build neopixel puzzle cart for badge v2 (demo mode with auto-play)
-    add_microzig_cart(builder, &dep, .{
-        .name = "neopixelpuzzle-v2",
-        .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/neopixelpuzzle-v2/main.zig"),
-    });
-
-    // Build neopixel joystick demo cart (interactive joystick control)
+    // Build neopixel-joystick demo cart
     add_microzig_cart(builder, &dep, .{
         .name = "neopixel-joystick",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/neopixel-joystick/main.zig"),
+    });
+
+    // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
+    add_os_cart(builder, &dep, .{
+        .name = "space-shooter",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/space-shooter/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "blobs",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/blobs/src/blobs.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "plasma",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/plasma/src/plasma.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "metalgear-timer",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "neopixelpuzzle",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/neopixelpuzzle/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "raytracer",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/raytracer/src/main.zig"),
     });
 
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -424,6 +449,92 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
 
     // Install UF2 for RP235X
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+}
+
+/// OS Cart - runs on the new RP2354B OS (Core 1), using the new cart API.
+/// Cart source must export `fn start()` and `fn update()`.
+pub const OsCartOptions = struct {
+    name: []const u8,
+    optimize: std.builtin.OptimizeMode,
+    root_source_file: Build.LazyPath,
+};
+
+pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
+    const mz_dep = dep.builder.dependency("microzig", .{});
+    const mb = MicroBuild.init(b, mz_dep) orelse return;
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
+
+    // The cart-api module for OS (ARM build)
+    const cart_api_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
+    });
+
+    // The user's cart source (must export start() and update())
+    const user_cart_module = b.createModule(.{
+        .root_source_file = options.root_source_file,
+        .imports = &.{
+            .{ .name = "cart-api", .module = cart_api_module },
+        },
+    });
+
+    // Firmware root is OS cart entry wrapper
+    const fw = mb.add_firmware(.{
+        .name = options.name,
+        .target = badge_v2_target,
+        .optimize = options.optimize,
+        .root_source_file = dep.builder.path("src/os/cart/cart_entry.zig"),
+        .linker_script = .{
+            .file = dep.builder.path("src/cart/cart_xip.ld"),
+            .generate = .none,
+        },
+    });
+
+    // Inject cart and api modules into the entry wrapper
+    fw.app_mod.addImport("user_cart", user_cart_module);
+    fw.app_mod.addImport("cart-api", cart_api_module);
+    user_cart_module.addImport("microzig", fw.core_mod);
+
+    // Share the board module with cart-api so that font.zig belongs to exactly
+    // one module (board). Without this, both board_v2.zig and api.zig would
+    // directly import font.zig, which Zig prohibits.
+    const board_mod = fw.core_mod.import_table.get("board").?;
+    cart_api_module.addImport("board", board_mod);
+
+    mb.install_firmware(fw, .{ .format = .elf });
+    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+
+    // WASM build for the web simulator.
+    // api.zig detects is_wasm at comptime and switches to WASM extern imports,
+    // so no board/microzig dependency is needed here.
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+
+    const wasm_cart_api_module = b.createModule(.{
+        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
+    });
+
+    const wasm = b.addExecutable(.{
+        .name = options.name,
+        .root_module = b.createModule(.{
+            .root_source_file = options.root_source_file,
+            .target = wasm_target,
+            .optimize = .ReleaseSmall,
+            .strip = true,
+            .imports = &.{
+                .{ .name = "cart-api", .module = wasm_cart_api_module },
+            },
+        }),
+    });
+    wasm.entry = .disabled;
+    wasm.import_memory = true;
+    wasm.initial_memory = 64 * 65536;
+    wasm.max_memory = 64 * 65536;
+    wasm.stack_size = 14752;
+    wasm.global_base = 160 * 128 * 2 + 0x1e;
+    wasm.rdynamic = true;
+    b.installArtifact(wasm);
 }
 
 /// UF2 generation step

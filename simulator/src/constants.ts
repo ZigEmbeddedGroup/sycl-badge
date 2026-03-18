@@ -2,7 +2,7 @@ export const WIDTH = 160;
 export const HEIGHT = 128;
 
 export const FLASH_PAGE_SIZE = 256;
-export const FLASH_PAGE_COUNT = 8000;
+export const FLASH_PAGE_COUNT = 16000; // 4MB total (RP2354B 2MB internal + 2MB external flash)
 
 export const CRASH_TITLE = "SYCL BADGE SIM";
 

@@ -39,14 +39,16 @@ pub fn main() !void {
         try convert(in_file, &writer.interface);
     }
 
-    try writer.flush();
+    try writer.interface.flush();
 }
 
 fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
     const N = 8 / args.bits;
 
-    var image = try Image.fromFilePath(allocator, args.path);
-    defer image.deinit();
+    const read_buffer = try allocator.alloc(u8, 4 * 1024 * 1024);
+    defer allocator.free(read_buffer);
+    var image = try Image.fromFilePath(allocator, args.path, read_buffer);
+    defer image.deinit(allocator);
 
     var colors = ArrayListManaged(Color).init(allocator);
     defer colors.deinit();

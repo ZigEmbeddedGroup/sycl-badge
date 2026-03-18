@@ -1,7 +1,7 @@
 /*
  * Cart XIP Linker Script
  * 
- * This linker script is for building cart programs that run on Core 1
+ * Linker script is for building cart programs that run on Core 1
  * of the SYCL Badge OS. Carts are executed directly from flash (XIP)
  * at the cart_xip region.
  *
@@ -27,9 +27,19 @@ MEMORY
     /* This must match the cart_xip region in the OS linker script */
     FLASH(rx) : ORIGIN = 0x101C0000, LENGTH = 256K
 
-    /* Cart RAM region - for variables, stack, heap */
-    /* This is the process_ram region managed by the OS */
-    RAM(rwx) : ORIGIN = 0x20020000, LENGTH = 384K
+    /* Cart RAM region - for variables, stack, heap.
+     *
+     * IMPORTANT:  FIRST part of process_ram is reserved by the OS for the
+     * cart IPC block and framebuffer, and must NOT be touched by the linker:
+     *
+     *   0x20020000 - 0x2002001F  IPC block (controls, sensors, etc.)   32 B
+     *   0x20020020 - 0x2002A01F  Framebuffer (160 * 128 * 2 bytes)  40960 B
+     *   0x2002A020 - 0x2007FFFF  Cart RAM (variables, heap, stack)   343 KB
+     *
+     * Cart code writes pixels via api.framebuffer which points at 0x20020020.
+     * Cart globals must live at 0x2002A020+ to avoid aliasing those pixels.
+     */
+    RAM(rwx) : ORIGIN = 0x2002A020, LENGTH = 0x55FE0
 }
 
 SECTIONS

@@ -29,12 +29,13 @@ pub const xosc_freq = 12_000_000;
 // For printf-style debug output, use SWO with your debugger software (e.g., RTT or SWO viewer).
 
 // LCD Display Pins (DT018BTFT-SHB on SPI0)
-pub const TFT_CS = gpio.num(19); // SPI0 CSn
-pub const TFT_SCK = gpio.num(23); // SPI0 SCK
-pub const TFT_MOSI = gpio.num(21); // SPI0 TX (SDIO)
-// pub const TFT_RST = gpio.num(20); // Reset (GPIO), tied to hardware
-pub const TFT_DC = gpio.num(22); // Data/Command (GPIO)
-pub const BKLT_PWM = gpio.num(18); // Backlight PWM (controls LED_K1 and LED_K2)
+pub const TFT_CS = gpio.num(17); // SPI0 CSn
+pub const TFT_SCK = gpio.num(18); // SPI0 SCK
+pub const TFT_MOSI = gpio.num(19); // SPI0 TX (SDIO)
+// pub const TFT_RST = gpio.num(21); // Reset (GPIO), tied to hardware
+pub const TFT_DC = gpio.num(21); // Data/Command (GPIO)
+pub const BKLT_PWM = gpio.num(16); // Backlight PWM (controls LED_K1 and LED_K2)
+pub const LCD_TE = gpio.num(20); // LCD Tearing Effect output (GPIO input, optional for sync)
 // Note: TFT_LITE (backlight) connected directly to VBUS (5V)
 // Note: SPI4W tied to 3V3 (High = 4-wire SPI mode)
 
@@ -55,3 +56,7 @@ pub const button_select = gpio.num(38); // SELECT1
 
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;
+
+// Buzzer / Speaker (CMT-7525-80-SMT-TR)
+pub const buzzer_enable = gpio.num(8); // SPKR_EN  - speaker enable (active-high)
+pub const buzzer_pwm = gpio.num(9); // SPKR_A0  - PWM audio output (PWM slice 4, channel B)

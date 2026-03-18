@@ -37,10 +37,13 @@ export class Runtime {
         }
 
         this.compositor = new WebGLCompositor(gl);
-        
+
         this.apu = new APU();
 
-        this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE);
+        // Allocate full external flash storage (4MB for V2 badge)
+        // V2 badge has 2MB internal flash (RP2354B) + 2MB external flash
+        // Carts access the external flash via read_flash/write_flash_page
+        this.flashBuffer = new ArrayBuffer(constants.FLASH_PAGE_SIZE * constants.FLASH_PAGE_COUNT);
 
         this.memory = new WebAssembly.Memory({initial: 64, maximum: 64});
         this.data = new DataView(this.memory.buffer);
@@ -60,7 +63,7 @@ export class Runtime {
     setControls (controls: number) {
         this.data.setUint16(constants.ADDR_CONTROLS, controls, true);
     }
-    
+
     setLightLevel (value: number) {
         this.data.setUint16(constants.ADDR_LIGHT_LEVEL, value, true);
     }
@@ -135,15 +138,16 @@ export class Runtime {
         };
 
         await this.bluescreenOnError(async () => {
-            const module = await WebAssembly.instantiate(wasmBuffer, { env });
-            this.wasm = module.instance;
+            const result = await WebAssembly.instantiate(wasmBuffer as BufferSource, { env }) as WebAssembly.WebAssemblyInstantiatedSource;
+            const instance = result.instance;
+            this.wasm = instance;
 
             // Call the WASI _start/_initialize function (different from WASM-4's start callback!)
-            if (typeof this.wasm.exports["_start"] === 'function') {
-                this.wasm.exports._start();
+            if (typeof instance.exports["_start"] === 'function') {
+                (instance.exports._start as Function)();
             }
-            if (typeof this.wasm.exports["_initialize"] === 'function') {
-                this.wasm.exports._initialize();
+            if (typeof instance.exports["_initialize"] === 'function') {
+                (instance.exports._initialize as Function)();
             }
         });
     }
@@ -176,16 +180,23 @@ export class Runtime {
     }
 
     read_flash (offset: number, dstPtr: number, length: number): number {
-        const src = new Uint8Array(this.flashBuffer, offset, length);
-        const dst = new Uint8Array(this.memory.buffer, dstPtr, length);
+        const available = Math.max(0, this.flashBuffer.byteLength - offset);
+        const readLen = Math.min(length, available);
+        if (readLen <= 0) return 0;
 
+        const src = new Uint8Array(this.flashBuffer, offset, readLen);
+        const dst = new Uint8Array(this.memory.buffer, dstPtr, readLen);
         dst.set(src);
 
-        return src.length;
+        return readLen;
     }
 
     write_flash_page (page: number, srcPtr: number) {
-        // TODO: Make dangerous write crash!!
+        // Validate page number is within bounds
+        if (page < 0 || page >= constants.FLASH_PAGE_COUNT) {
+            console.error(`Flash write out of bounds: page ${page} (max ${constants.FLASH_PAGE_COUNT - 1})`);
+            return;
+        }
 
         const src = new Uint8Array(this.memory.buffer, srcPtr, constants.FLASH_PAGE_SIZE);
         const dst = new Uint8Array(this.flashBuffer, page * constants.FLASH_PAGE_SIZE, constants.FLASH_PAGE_SIZE);
@@ -255,7 +266,7 @@ export class Runtime {
         const messageY = 52;
 
         this.framebuffer.fillScreen(blue);
-        
+
         this.framebuffer.drawHLine(grey, headerX, headerY-1, headerWidth);
         this.framebuffer.drawText(blue, grey, toCharArr(headerTitle), headerX, headerY);
         this.framebuffer.drawText(grey, blue, toCharArr(text), messageX, messageY);

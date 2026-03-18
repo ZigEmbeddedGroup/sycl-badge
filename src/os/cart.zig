@@ -4,6 +4,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 
 const multicore = @import("system/multicore.zig");
+const interrupts = @import("system/interrupts.zig");
 const mailbox = @import("ipc/mailbox.zig");
 const loader = @import("loader/loader.zig");
 const storage = @import("loader/storage.zig");
@@ -23,6 +24,10 @@ fn getCartXipStart() u32 {
 /// Core 1 main entry point
 /// Initializes IPC, waits for Core 0 to signal start, then enters main loop
 pub fn main() noreturn {
+    // Disable interrupts on Core 1 to prevent unhandled IRQs (e.g. DMA, USB)
+    // from reaching the default panic handler when running cart code.
+    interrupts.disableInterrupts();
+
     // Initialize Core 1's environment
     multicore.initCore1Environment();
 
@@ -111,32 +116,24 @@ fn handleMessage(msg: mailbox.Message) void {
     }
 }
 
-/// Execute a cart loaded in cart_xip region
-/// vector_table_offset: Offset from cart_xip_start to the vector table
-/// (The loader scans for a valid vector table pattern and returns its address)
+/// Execute a cart loaded in cart_xip region.
+/// Core 0 is the sole authority over loader state transitions (markRunning /
+/// stop), so Core 1 must NOT touch loader.cart_state.  Doing so from both
+/// cores creates a data race that can make the kernel see the state flicker,
+/// causing it to treat the cart as stopped and restart the menu while the
+/// cart is still running.
 fn executeCart(vector_table_offset: u24) void {
     const cart_xip_start = getCartXipStart();
     const vector_table_addr = cart_xip_start + vector_table_offset;
 
-    // Signal that we're starting execution
     mailbox.send(mailbox.MessageType.CART_RUNNING);
 
-    // Mark cart as running in loader state
-    loader.markRunning();
-
-    // Read initial SP and entry point from the vector table
-    // ARM Cortex-M vector table: [0] = initial SP, [1] = Reset_Handler
     const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
     const initial_sp = vector_table[0];
     const entry_point = vector_table[1];
 
-    // Jump to cart entry point
-    // This is a one-way jump - the cart takes over Core 1
+    // One-way jump — the cart takes over Core 1.  jumpToCart never returns.
     jumpToCart(initial_sp, entry_point);
-
-    // If we somehow return (cart exited), signal completion
-    mailbox.send(mailbox.MessageType.CART_FINISHED);
-    loader.stop();
 }
 
 /// Jump to cart code with new stack pointer

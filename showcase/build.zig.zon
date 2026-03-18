@@ -15,6 +15,7 @@
         .@"space-shooter" = .{ .path = "carts/space-shooter" },
         .dvd = .{ .path = "carts/dvd" },
         .zeroman = .{ .path = "carts/zeroman" },
+        .lcd_text = .{ .path = "carts/lcd-text" },
     },
     .paths = .{
         "README.md",

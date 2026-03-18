@@ -12,6 +12,7 @@ const carts = .{
     .{ "raytracer", @import("raytracer") },
     .{ "neopixelpuzzle", @import("neopixelpuzzle") },
     .{ "space-shooter", @import("space-shooter") },
+    .{ "lcd_text", @import("lcd_text") },
 };
 
 pub fn build(b: *std.Build) void {

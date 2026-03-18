@@ -11,9 +11,9 @@ const FONT_HEIGHT: u32 = cart.font_height;
 
 // Edit these blocks to display your own text pages.
 const text_blocks = [_][]const u8{
-    "Hello World!",
-    "WHAT\n DOES",
-    "THAT\n MEAN?",
+    "\n\n\n\n\n\n\nHello World!",
+    "WHAT\nDOES",
+    "THAT\nMEAN?",
     "ALSO!",
 };
 
@@ -86,14 +86,6 @@ fn draw_page() void {
         .fill_color = .{ .r = 0, .g = 0, .b = 0 },
     });
 
-    // Title bar
-    cart.text(.{
-        .str = "L/R:PAGE | U/D:SIZE | A:COLOR",
-        .x = 0,
-        .y = 0,
-        .text_color = .{ .r = 31, .g = 31, .b = 0 },
-    });
-
     // Main text content
     const text_color = if (use_zig_color)
         cart.DisplayColor{ .r = 30, .g = 41, .b = 4 }
@@ -102,8 +94,9 @@ fn draw_page() void {
 
     cart.text(.{
         .str = text_blocks[block_idx],
-        .x = 0,
-        .y = @as(i32, @intCast(cart.font_height + 2)),
+        .x = 30, //@as(i32, @intCast(cart.screen_width / 2)) - @as(i32, @intCast((FONT_WIDTH * text_scale * text_blocks[block_idx].len) / 2)),
+        .y = 0,
+        .scale = text_scale,
         .text_color = text_color,
     });
 }

@@ -109,7 +109,7 @@ const is_wasm = switch (builtin.target.cpu.arch) {
 const base = if (is_wasm) 0 else 0x20020000;
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
-pub const controls: *volatile const Controls = @ptrFromInt(base + 0x04);
+pub const controls: *const volatile Controls = @ptrFromInt(base + 0x04);
 pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
@@ -201,7 +201,13 @@ pub inline fn blit(options: BlitOptions) void {
                 const sx = options.src_x + @as(u32, @intCast(if (flip_x) signed_width - signed_x - 1 else signed_x));
                 const sy = options.src_y + @as(u32, @intCast(if (flags.flip_y) signed_height - signed_y - 1 else signed_y));
 
-                framebuffer[tx][ty].setColor(options.sprite[sy * stride + sx]);
+                // Use clipPixel and Pixel.fromColor so any out-of-bounds tx/ty are safely
+                // discarded instead of causing a hard fault when indexing the framebuffer.
+                clipPixel(
+                    @intCast(tx),
+                    @intCast(ty),
+                    Pixel.fromColor(options.sprite[sy * stride + sx]),
+                );
             }
         }
     }
@@ -412,6 +418,7 @@ pub const TextOptions = struct {
     str: []const u8,
     x: i32,
     y: i32,
+    scale: u32 = 1,
     text_color: ?DisplayColor = null,
     background_color: ?DisplayColor = null,
 };
@@ -420,7 +427,7 @@ pub const TextOptions = struct {
 pub inline fn text(options: TextOptions) void {
     if (is_wasm) {
         struct {
-            extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32) void;
+            extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32, scale: u32) void;
         }.text(
             DisplayColor.Optional.from(options.text_color),
             DisplayColor.Optional.from(options.background_color),
@@ -428,6 +435,7 @@ pub inline fn text(options: TextOptions) void {
             options.str.len,
             options.x,
             options.y,
+            options.scale,
         );
     } else {
         // Font bitmap: [char - ' '][row] where each byte is 8 pixels, 0-bit = foreground.
@@ -436,18 +444,22 @@ pub inline fn text(options: TextOptions) void {
         const font_data = @import("board").font.font;
         const text_pixel: ?Pixel = if (options.text_color) |c| Pixel.fromColor(c) else null;
         const bg_pixel: ?Pixel = if (options.background_color) |c| Pixel.fromColor(c) else null;
+        const scale = @max(options.scale, 1);
+        const scale_usize: usize = @intCast(scale);
+        const line_step: i32 = @as(i32, @intCast(@as(u32, 8) * scale));
 
         var char_x: i32 = options.x;
         var char_y: i32 = options.y;
 
+        trace("T:pre");
         for (options.str) |char| {
             if (char == '\n') {
-                char_y += 8;
+                char_y += line_step;
                 char_x = options.x;
                 continue;
             }
             if (char < 32 or char > 255) {
-                char_x += 8;
+                char_x += line_step;
                 continue;
             }
 
@@ -458,12 +470,19 @@ pub inline fn text(options: TextOptions) void {
                     const is_fg = (row_bits & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
                     const px = if (is_fg) text_pixel else bg_pixel;
                     if (px) |p| {
-                        clipPixel(char_x + @as(i32, @intCast(col)), char_y + @as(i32, @intCast(row)), p);
+                        for (0..scale_usize) |sy| {
+                            for (0..scale_usize) |sx| {
+                                const dx = char_x + @as(i32, @intCast(col * scale_usize + sx));
+                                const dy = char_y + @as(i32, @intCast(row * scale_usize + sy));
+                                clipPixel(dx, dy, p);
+                            }
+                        }
                     }
                 }
             }
-            char_x += 8;
+            char_x += line_step;
         }
+        trace("T:ok");
     }
 }
 
@@ -557,8 +576,8 @@ pub inline fn tone(options: ToneOptions) void {
         }.tone(options.frequency, options.duration, options.volume, options.flags);
     } else {
         const CART_TONE: u32 = 0x27000000;
-        const CART_TONE_FREQ: u32 = 0x200250A0;
-        const CART_TONE_DURATION: u32 = 0x200250A4;
+        const CART_TONE_FREQ: u32 = 0x2002A0A0;
+        const CART_TONE_DURATION: u32 = 0x2002A0A4;
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
         const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
         const FIFO_RDY: u32 = 1 << 1;
@@ -643,7 +662,7 @@ pub inline fn trace(x: []const u8) void {
             extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
         }.trace(x.ptr, x.len);
     } else {
-        const TRACE_BUF: u32 = 0x20025020;
+        const TRACE_BUF: u32 = 0x2002A020;
         const TRACE_BUF_SIZE: usize = 128;
         const CART_TRACE: u8 = 0x26;
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);

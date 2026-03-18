@@ -97,16 +97,19 @@ pub const MessageType = struct {
 
     /// Cart trace (debug) messages: type 0x26, payload = length.
     /// Cart writes string to CART_TRACE_BUF before sending.
+    /// Located at 0x2002A020 (immediately after the framebuffer at 0x20020020+0xA000).
+    /// The cart linker script reserves 0x2002A020–0x2002A0FF for IPC buffers so
+    /// cart globals never alias these addresses.
     pub const CART_TRACE: u8 = 0x26;
-    pub const CART_TRACE_BUF: u32 = 0x20025020; // 128 bytes after framebuffer
+    pub const CART_TRACE_BUF: u32 = 0x2002A020; // 128 bytes, just after framebuffer
     pub const CART_TRACE_BUF_SIZE: u32 = 128;
 
     /// Cart tone (buzzer) messages: type 0x27.
     /// Cart writes freq (u32) and duration (u32) to CART_TONE_* before sending.
     /// Duration is in 60ths of a second (same as ToneOptions); kernel converts to ms.
     pub const CART_TONE: u8 = 0x27;
-    pub const CART_TONE_FREQ: u32 = 0x200250A0; // freq_hz (u32)
-    pub const CART_TONE_DURATION: u32 = 0x200250A4; // duration in 60ths (u32)
+    pub const CART_TONE_FREQ: u32 = 0x2002A0A0; // freq_hz (u32)
+    pub const CART_TONE_DURATION: u32 = 0x2002A0A4; // duration in 60ths (u32)
 
     // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x30000000;

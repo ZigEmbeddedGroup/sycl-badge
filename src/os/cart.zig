@@ -132,6 +132,11 @@ fn executeCart(vector_table_offset: u24) void {
     const initial_sp = vector_table[0];
     const entry_point = vector_table[1];
 
+    // Point Core 1's VTOR at the cart's vector table so that any exceptions
+    // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
+    const VTOR: *volatile u32 = @ptrFromInt(0xE000ED08);
+    VTOR.* = vector_table_addr;
+
     // One-way jump — the cart takes over Core 1.  jumpToCart never returns.
     jumpToCart(initial_sp, entry_point);
 }

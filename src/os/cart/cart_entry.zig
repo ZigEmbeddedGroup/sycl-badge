@@ -6,12 +6,35 @@
 //! The build system injects the cart's source as "user_cart". Because the cart
 //! uses `export fn start/update` (not `pub`), we declare them as extern symbols
 //! and let the linker resolve them from the same binary.
+const builtin = @import("builtin");
 const cart_api = @import("cart-api");
 
 // Pull in the user cart module so its exported symbols are linked.
+const user_cart = @import("user_cart");
 comptime {
-    _ = @import("user_cart");
+    _ = user_cart;
 }
+
+// ─── Panic Handler ────────────────────────────────────────────────────────────
+// If the user cart defines `pub fn panic`, wire it up as the root-module panic
+// so Zig uses it instead of microzig.panic (which calls @breakpoint() → HardFault).
+// If not, fall back to a default that sends the message via cart.trace() and halts
+// with WFE so Core 0 has time to print it before the system freezes.
+
+fn default_panic(msg: []const u8, _: ?*@import("std").builtin.StackTrace, _: ?usize) noreturn {
+    cart_api.trace(msg);
+    while (true) {
+        switch (comptime builtin.cpu.arch) {
+            .wasm32, .wasm64 => {},
+            else => asm volatile ("wfe"),
+        }
+    }
+}
+
+pub const panic = if (@hasDecl(user_cart, "panic"))
+    user_cart.panic
+else
+    default_panic;
 
 /// These are provided by the user cart as `export fn start()`/`export fn update()`.
 extern fn start() void;
@@ -34,7 +57,7 @@ pub fn init() void {
     // Grant full access to CP10 and CP11 (the FPU).
     CPACR.* = CPACR.* | (0xF << 20);
 
-    // Barriers so subsequent instructions see the new FPU state.
+    // Barriers so subsequent instructions see the new FPU/VTOR state.
     asm volatile ("dsb");
     asm volatile ("isb");
 }

@@ -165,9 +165,9 @@ export class Runtime {
         }
     }
 
-    text (textColor: number, backgroundColor: number, textPtr: number, byteLength: number, x: number, y: number) {
+    text (textColor: number, backgroundColor: number, textPtr: number, byteLength: number, x: number, y: number, scale: number) {
         const text = new Uint8Array(this.memory.buffer, textPtr, byteLength);
-        this.framebuffer.drawText(textColor, backgroundColor, text, x, y);
+        this.framebuffer.drawText(textColor, backgroundColor, text, x, y, scale);
     }
 
     blit (spritePtr: number, x: number, y: number, width: number, height: number, srcX: number, srcY: number, stride: number, flags: number) {

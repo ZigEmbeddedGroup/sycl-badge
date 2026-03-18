@@ -29,17 +29,20 @@ MEMORY
 
     /* Cart RAM region - for variables, stack, heap.
      *
-     * IMPORTANT:  FIRST part of process_ram is reserved by the OS for the
-     * cart IPC block and framebuffer, and must NOT be touched by the linker:
+     * IMPORTANT:  The first part of process_ram is reserved by the OS for the
+     * cart IPC block, framebuffer, and IPC buffers. Do NOT touch these ranges:
      *
-     *   0x20020000 - 0x2002001F  IPC block (controls, sensors, etc.)   32 B
-     *   0x20020020 - 0x2002A01F  Framebuffer (160 * 128 * 2 bytes)  40960 B
-     *   0x2002A020 - 0x2007FFFF  Cart RAM (variables, heap, stack)   343 KB
+     *   0x20020000 - 0x2002001F  IPC block (controls, sensors, etc.)    32 B
+     *   0x20020020 - 0x2002A01F  Framebuffer (160 * 128 * 2 bytes)   40960 B
+     *   0x2002A020 - 0x2002A09F  CART_TRACE_BUF (128 bytes)            128 B
+     *   0x2002A0A0 - 0x2002A0A7  CART_TONE_FREQ + CART_TONE_DURATION     8 B
+     *   0x2002A0A8 - 0x2002A0FF  Reserved IPC padding                   88 B
+     *   0x2002A100 - 0x2007FFFF  Cart RAM (variables, heap, stack)   ~343 KB
      *
-     * Cart code writes pixels via api.framebuffer which points at 0x20020020.
-     * Cart globals must live at 0x2002A020+ to avoid aliasing those pixels.
+     * Cart code writes pixels via api.framebuffer (0x20020020).
+     * Cart globals start at 0x2002A100 to avoid aliasing the IPC buffers above.
      */
-    RAM(rwx) : ORIGIN = 0x2002A020, LENGTH = 0x55FE0
+    RAM(rwx) : ORIGIN = 0x2002A100, LENGTH = 0x55F00
 }
 
 SECTIONS

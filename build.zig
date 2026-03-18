@@ -99,6 +99,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/neopixel-joystick/main.zig"),
     });
 
+    // Build LCD text viewer cart
+    add_microzig_cart(builder, &dep, .{
+        .name = "lcd-text",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/lcd-text/main.zig"),
+    });
+
     // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
     add_os_cart(builder, &dep, .{
         .name = "space-shooter",

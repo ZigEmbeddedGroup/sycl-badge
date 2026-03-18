@@ -289,16 +289,26 @@ pub fn main() !void {
             if (now_us -% btn_diag_last_us >= BTN_DIAG_US) {
                 btn_diag_last_us = now_us;
                 const start_gpio = gpio.read(board.button_start); // 0=pressed(active-low), 1=released
-                const sel_gpio   = gpio.read(board.button_select);
-                const a_gpio     = gpio.read(board.button_a);
-                const b_gpio     = gpio.read(board.button_b);
-                const up_gpio    = gpio.read(board.joystick_up);
-                const dn_gpio    = gpio.read(board.joystick_down);
+                const sel_gpio = gpio.read(board.button_select);
+                const a_gpio = gpio.read(board.button_a);
+                const b_gpio = gpio.read(board.button_b);
+                const up_gpio = gpio.read(board.joystick_up);
+                const dn_gpio = gpio.read(board.joystick_down);
                 const raw_u9: u9 = @bitCast(live_btn);
                 console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={d} SEL={d} A={d} B={d} UP={d} DN={d} | processed: start={} sel={} a={} b={} up={} dn={}\r\n", .{
                     raw_u9,
-                    start_gpio, sel_gpio, a_gpio, b_gpio, up_gpio, dn_gpio,
-                    live_btn.start, live_btn.select, live_btn.a, live_btn.b, live_btn.up, live_btn.down,
+                    start_gpio,
+                    sel_gpio,
+                    a_gpio,
+                    b_gpio,
+                    up_gpio,
+                    dn_gpio,
+                    live_btn.start,
+                    live_btn.select,
+                    live_btn.a,
+                    live_btn.b,
+                    live_btn.up,
+                    live_btn.down,
                 });
             }
 
@@ -392,6 +402,11 @@ fn hashCart(name: []const u8, size: u32) void {
 
 /// Refresh the cart list display on LCD
 fn refreshCartDisplay() void {
+    const backlight_enable_pin = board.BKLT_PWM;
+    backlight_enable_pin.set_function(.sio);
+    backlight_enable_pin.set_direction(.out);
+    backlight_enable_pin.put(1); // Ensure backlight is on for menu
+    lcd.setBacklight(true);
     lcd.fillScreen(lcd.BLACK);
 
     // Header
@@ -528,7 +543,7 @@ fn displayCart(name: []const u8, size: u32) void {
     // Strip .uf2 / .UF2 extension for cleaner display
     const display_name = if (name.len >= 4 and
         (std.mem.eql(u8, name[name.len - 4 ..], ".uf2") or
-        std.mem.eql(u8, name[name.len - 4 ..], ".UF2")))
+            std.mem.eql(u8, name[name.len - 4 ..], ".UF2")))
         name[0 .. name.len - 4]
     else
         name;

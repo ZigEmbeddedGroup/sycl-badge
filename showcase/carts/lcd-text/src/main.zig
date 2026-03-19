@@ -12,6 +12,32 @@ const FONT_HEIGHT: u32 = cart.font_height;
 // Edit these blocks to display your own text pages.
 const text_blocks = [_][]const u8{ "Hello\nWorld!", "Lanyard!", "THAT\nMEAN?", "ALSO!", "Tiny\nComputer!" };
 
+// Add as many lines as you want for the scrolling page.
+const scroll_lines = [_][]const u8{
+    "4MB Storage\n",
+    "",
+    "512kB RAM\n",
+    "",
+    "RP2354B MCU\n",
+    "",
+    "Custom OS\n",
+    "",
+    "FAT12 Filesystem\n",
+    "",
+    "Light Sensor\n",
+    "",
+    "160x128 LCD\n",
+    "",
+    "USB-C Port\n",
+    "",
+    "USB/UART Console\n",
+};
+
+const SCROLL_PAGE_INDEX: usize = text_blocks.len;
+const TOTAL_PAGES: usize = text_blocks.len + 1;
+const SCROLL_SPEED_PX: i32 = 1;
+const SCROLL_LINE_GAP: u32 = 2;
+
 var block_idx: usize = 0;
 var last_left = false;
 var last_right = false;
@@ -24,8 +50,18 @@ var use_zig_color = false;
 var blink_count: u32 = 0;
 var blink_timer: u32 = 0;
 const BLINK_FRAME_RATE: u32 = 15; // Adjust to change blink speed
+var scroll_y: i32 = @as(i32, @intCast(cart.screen_height));
+
+fn is_scroll_page() bool {
+    return block_idx == SCROLL_PAGE_INDEX;
+}
+
+fn reset_scroll() void {
+    scroll_y = @as(i32, @intCast(cart.screen_height));
+}
 
 export fn start() void {
+    reset_scroll();
     draw_page();
 }
 
@@ -39,21 +75,24 @@ export fn update() void {
 
     if (left_pressed and !last_left) {
         if (block_idx == 0) {
-            block_idx = text_blocks.len - 1;
+            block_idx = TOTAL_PAGES - 1;
         } else {
             block_idx -= 1;
         }
+        if (is_scroll_page()) reset_scroll();
         draw_page();
     }
 
     if (right_pressed and !last_right) {
-        block_idx = (block_idx + 1) % text_blocks.len;
+        block_idx = (block_idx + 1) % TOTAL_PAGES;
+        if (is_scroll_page()) reset_scroll();
         draw_page();
     }
 
     if (up_pressed and !last_up) {
         if (text_scale < 4) {
             text_scale += 1;
+            if (is_scroll_page()) reset_scroll();
             draw_page();
         }
     }
@@ -61,6 +100,7 @@ export fn update() void {
     if (down_pressed and !last_down) {
         if (text_scale > 1) {
             text_scale -= 1;
+            if (is_scroll_page()) reset_scroll();
             draw_page();
         }
     }
@@ -90,6 +130,16 @@ export fn update() void {
             blink_count -= 1;
         }
         draw_page_with_blink(blink_count % 2 == 0);
+    } else if (is_scroll_page()) {
+        const line_step = @as(i32, @intCast(FONT_HEIGHT * text_scale + SCROLL_LINE_GAP));
+        const content_height = @as(i32, @intCast(scroll_lines.len)) * line_step;
+
+        scroll_y -= SCROLL_SPEED_PX;
+        if (scroll_y + content_height < 0) {
+            reset_scroll();
+        }
+
+        draw_page();
     } else {
         draw_page();
     }
@@ -157,24 +207,42 @@ fn draw_page_with_blink(show_text: bool) void {
         else
             cart.DisplayColor{ .r = 31, .g = 63, .b = 31 };
 
-        const text = text_blocks[block_idx];
-        const num_lines = count_lines(text);
-        const total_height = num_lines * FONT_HEIGHT * text_scale;
-        const start_y = @as(i32, @intCast(cart.screen_height / 2)) - @as(i32, @intCast(total_height / 2));
+        if (is_scroll_page()) {
+            const line_step = @as(i32, @intCast(FONT_HEIGHT * text_scale + SCROLL_LINE_GAP));
 
-        var line_idx: u32 = 0;
-        while (line_idx < num_lines) : (line_idx += 1) {
-            const line = get_line(text, line_idx);
-            const line_width_px = line.len * FONT_WIDTH * text_scale;
-            const line_x = @as(i32, @intCast(cart.screen_width / 2)) - @as(i32, @intCast(line_width_px / 2));
+            for (scroll_lines, 0..) |line, idx| {
+                const y = scroll_y + @as(i32, @intCast(idx)) * line_step;
+                const line_width_px = @as(u32, @intCast(line.len)) * FONT_WIDTH * text_scale;
+                const line_x = @as(i32, @intCast(cart.screen_width / 2)) - @as(i32, @intCast(line_width_px / 2));
 
-            cart.text(.{
-                .str = line,
-                .x = line_x,
-                .y = start_y + @as(i32, @intCast(line_idx * FONT_HEIGHT * text_scale)),
-                .scale = text_scale,
-                .text_color = text_color,
-            });
+                cart.text(.{
+                    .str = line,
+                    .x = line_x,
+                    .y = y,
+                    .scale = text_scale,
+                    .text_color = text_color,
+                });
+            }
+        } else {
+            const text = text_blocks[block_idx];
+            const num_lines = count_lines(text);
+            const total_height = num_lines * FONT_HEIGHT * text_scale;
+            const start_y = @as(i32, @intCast(cart.screen_height / 2)) - @as(i32, @intCast(total_height / 2));
+
+            var line_idx: u32 = 0;
+            while (line_idx < num_lines) : (line_idx += 1) {
+                const line = get_line(text, line_idx);
+                const line_width_px = line.len * FONT_WIDTH * text_scale;
+                const line_x = @as(i32, @intCast(cart.screen_width / 2)) - @as(i32, @intCast(line_width_px / 2));
+
+                cart.text(.{
+                    .str = line,
+                    .x = line_x,
+                    .y = start_y + @as(i32, @intCast(line_idx * FONT_HEIGHT * text_scale)),
+                    .scale = text_scale,
+                    .text_color = text_color,
+                });
+            }
         }
     }
 }

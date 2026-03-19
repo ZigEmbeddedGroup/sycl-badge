@@ -1,7 +1,7 @@
 /// Neopixel Puzzle Cart for Badge V2 (RP2354B)
 ///
-/// Press any joystick direction to light LEDs one-by-one in different colors.
-/// After all 5 LEDs are lit, the strip enters a color cycling animation.
+/// Staged animation: blank, then LEDs fill one-by-one each second.
+/// After all 5 LEDs are lit, the strip enters faster color cycling.
 ///
 /// Hardware: 5 WS2812B neopixels on GPIO 15
 const microzig = @import("microzig");
@@ -19,6 +19,9 @@ const LED_PIN: u5 = @intCast(@intFromEnum(board.led_pin));
 const BKLT_EN_PIN: u5 = @intCast(@intFromEnum(board.BKLT_PWM));
 const NUM_LEDS = 5;
 const BRIGHTNESS_PERCENT: u8 = 15;
+const TICK_MS: u32 = 20;
+const FILL_STAGE_INTERVAL_TICKS: u32 = 1000 / TICK_MS;
+const FINAL_CYCLE_INTERVAL_TICKS: u32 = 120 / TICK_MS;
 
 // ============================================================================
 // Neopixel Driver for WS2812B
@@ -120,47 +123,24 @@ const Neopixels = struct {
 };
 
 // ============================================================================
-// Input Handling
-// ============================================================================
-
-const ButtonState = struct {
-    left: bool = false,
-    right: bool = false,
-    up: bool = false,
-    down: bool = false,
-
-    fn read() ButtonState {
-        return .{
-            .left = board.joystick_left.read() == 1,
-            .right = board.joystick_right.read() == 1,
-            .up = board.joystick_up.read() == 1,
-            .down = board.joystick_down.read() == 1,
-        };
-    }
-
-    fn anyPressed(self: ButtonState) bool {
-        return self.left or self.right or self.up or self.down;
-    }
-};
-
-// ============================================================================
 // Animation State
 // ============================================================================
 
+// Pink, Purple, Blue, Green, Yellow
 const color_palette = [_]NeopixelColor{
-    .{ .r = 32, .g = 20, .b = 26 }, // Pink
-    .{ .r = 28, .g = 17, .b = 31 }, // Purple
-    .{ .r = 19, .g = 26, .b = 30 }, // Blue
-    .{ .r = 19, .g = 30, .b = 23 }, // Green
-    .{ .r = 29, .g = 30, .b = 19 }, // Zig Yellow
+    .{ .r = 32, .g = 0, .b = 16 }, // Magenta
+    .{ .r = 16, .g = 0, .b = 32 }, // Purple
+    .{ .r = 0, .g = 0, .b = 32 }, // Blue
+    .{ .r = 0, .g = 32, .b = 0 }, // Green
+    .{ .r = 32, .g = 32, .b = 0 }, // Yellow
 };
 
 var global = struct {
     lit_count: usize = 0,
     cycle_phase: usize = 0,
-    frame_count: u32 = 0,
+    stage_ticks: u32 = 0,
     complete: bool = false,
-    last_buttons: ButtonState = .{},
+    cycle_started: bool = false,
 }{};
 
 fn applyBrightness(color: NeopixelColor) NeopixelColor {
@@ -173,10 +153,11 @@ fn applyBrightness(color: NeopixelColor) NeopixelColor {
 
 fn renderProgress() void {
     var leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
-
-    for (0..global.lit_count) |i| {
-        const led_index = (NUM_LEDS - 1) - i;
-        leds[led_index] = applyBrightness(color_palette[i % color_palette.len]);
+    if (global.lit_count > 0 and global.lit_count <= NUM_LEDS) {
+        const stage_color_index = (global.lit_count - 1) % color_palette.len;
+        const stage_color = applyBrightness(color_palette[stage_color_index]);
+        const led_index = NUM_LEDS - global.lit_count;
+        leds[led_index] = stage_color;
     }
 
     Neopixels.write(&leds);
@@ -184,9 +165,10 @@ fn renderProgress() void {
 
 fn renderCycle() void {
     var leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+    const cycle_color = applyBrightness(color_palette[global.cycle_phase % color_palette.len]);
 
     for (0..NUM_LEDS) |i| {
-        leds[i] = applyBrightness(color_palette[(i + global.cycle_phase) % color_palette.len]);
+        leds[i] = cycle_color;
     }
 
     Neopixels.write(&leds);
@@ -214,61 +196,44 @@ pub fn main() !void {
     backlight_enable_pin.set_direction(.out);
     backlight_enable_pin.put(0); // Disable backlight
 
-    // Initialize joystick directions as inputs
-    board.joystick_left.set_function(.sio);
-    board.joystick_left.set_direction(.in);
-    board.joystick_left.set_pull(.down);
-
-    board.joystick_right.set_function(.sio);
-    board.joystick_right.set_direction(.in);
-    board.joystick_right.set_pull(.down);
-
-    board.joystick_up.set_function(.sio);
-    board.joystick_up.set_direction(.in);
-    board.joystick_up.set_pull(.down);
-
-    board.joystick_down.set_function(.sio);
-    board.joystick_down.set_direction(.in);
-    board.joystick_down.set_pull(.down);
-
     Neopixels.clear();
     time.sleep_ms(100);
 
     renderProgress();
 
     while (true) {
-        global.frame_count +%= 1;
-
-        const buttons = ButtonState.read();
-        const just_pressed =
-            (buttons.left and !global.last_buttons.left) or
-            (buttons.right and !global.last_buttons.right) or
-            (buttons.up and !global.last_buttons.up) or
-            (buttons.down and !global.last_buttons.down);
+        global.stage_ticks += 1;
 
         if (!global.complete) {
-            if (just_pressed and global.lit_count < NUM_LEDS) {
+            if (global.stage_ticks >= FILL_STAGE_INTERVAL_TICKS) {
+                global.stage_ticks = 0;
                 global.lit_count += 1;
                 renderProgress();
 
                 if (global.lit_count >= NUM_LEDS) {
                     global.complete = true;
                     global.cycle_phase = 0;
-                    renderCycle();
+                    global.stage_ticks = 0;
+                    global.cycle_started = false;
                 }
             }
         } else {
-            if (global.frame_count % 6 == 0) {
-                global.cycle_phase = (global.cycle_phase + 1) % color_palette.len;
-                renderCycle();
-            }
-
-            if (just_pressed) {
-                led_pin.toggle();
+            if (!global.cycle_started) {
+                // Hold the 5th LED for one full second before fast cycling starts.
+                if (global.stage_ticks >= FILL_STAGE_INTERVAL_TICKS) {
+                    global.stage_ticks = 0;
+                    global.cycle_started = true;
+                    renderCycle();
+                }
+            } else {
+                if (global.stage_ticks >= FINAL_CYCLE_INTERVAL_TICKS) {
+                    global.stage_ticks = 0;
+                    global.cycle_phase = (global.cycle_phase + 1) % color_palette.len;
+                    renderCycle();
+                }
             }
         }
 
-        global.last_buttons = buttons;
-        time.sleep_ms(20);
+        time.sleep_ms(TICK_MS);
     }
 }

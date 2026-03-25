@@ -129,18 +129,15 @@ fn writeData(data: []const u8) void {
     pins.cs.put(1); // Deselect
 }
 
-// Helper: start a data transfer without toggling CS/DC for each chunk
 fn startData() void {
     pins.dc.put(1);
     pins.cs.put(0);
 }
 
-// Helper: end a data transfer (deselect)
 fn endData() void {
     pins.cs.put(1);
 }
 
-// Helper: write data while assuming CS already low and DC set to data mode
 fn writeDataNoCS(data: []const u8) void {
     var dummy = std.mem.zeroes([256]u8);
     const chunk_size = @min(data.len, dummy.len);

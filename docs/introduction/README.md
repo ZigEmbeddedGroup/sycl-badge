@@ -1,29 +1,27 @@
 # Introduction
 
-This is a short introduction containing some information and a small example meant to show how to use the badge.
-
-**It is strongly recommended that you read through this entire document.**
+This is a short introduction with a small cart example so you can quickly get from source code to running on the simulator and badge hardware.
 
 ## Quick Badge Facts
 
-The badge is based on the PyBadge and is equipped with:
+The badge is equipped with:
 
 - A 32-bit ARM CPU
 - A light sensor
-- A 160x128 16-bit RGB (RGB565) screen
-- 5 24-bit RGB LEDs (neopixels)
+- A 160x128 16-bit RGB screen (RGB565)
+- 5 RGB LEDs (neopixels)
 - 1 red LED on the back
 - A speaker
-- Start/option buttons
+- Start/select buttons
 - A/B buttons
-- A navstick/d-pad with up/down/left/right + click
-- 2MB flash separate from the microcontroller's flash
+- A navstick (up/down/left/right + click)
+- 2MB external flash separate from MCU flash
 
 ## Setup
 
-Install Zig 0.15.1. You can find [the binaries on the Zig website](https://ziglang.org/download/), or obtain them via a version manager such as [`zigup`](https://github.com/marler8997/zigup).
+Install Zig 0.15.1 from [ziglang.org](https://ziglang.org/download/) or a version manager such as [zigup](https://github.com/marler8997/zigup).
 
-Clone this repository and enter this directory:
+Clone the repository:
 
 ```bash
 git clone https://github.com/ZigEmbeddedGroup/sycl-badge
@@ -31,52 +29,59 @@ cd sycl-badge
 cd docs/introduction
 ```
 
-## The Example
+## Example Cart
 
-See `src/hello.zig` and tweak the the values to your liking.
+Edit [src/hello.zig](src/hello.zig) in this folder.
 
-### Running on the simulator
+### Build the Example
 
-The simulator is ideal for fast iteration as it supports live reloading.
+```bash
+zig build
+```
 
-Run `zig build` and wait for build to finish.
+### Run in Simulator (Live Reload)
 
-Run `zig build watch` and head over to https://badgesim.microzig.tech/.
+This folder defines a `watch` step in [build.zig](build.zig).
 
-(It's been noted that the live reloaders may be a little finnicky. If they don't work at all, please let Auguste know.)
+1. Start the watcher in this folder:
 
-Once you're happy with what you've made, read on to learn how to flash your code onto the badge!
+```bash
+zig build watch
+```
 
-## Hard(ware) mode
+2. Open the simulator:
+- Hosted: <https://badgesim.microzig.tech/>
+- Local UI: run [simulator](../../simulator/README.md) and open `http://localhost:1234`
+
+When `zig build watch` is active, the simulator can fetch `cart.wasm` from `http://localhost:2468` and reload on changes.
+
+## Run on Hardware
 
 ### Power and Boot
 
-Your badge can be powered via the USB-C port, but to allow cordless use of the badge, you've been provided with a battery and two pieces of velcro.
+The badge can be powered from USB-C or battery. When charging over USB-C, do not leave the badge unattended.
 
-Place one piece of velcro on the back of the board where space has been left available, and the other piece of velcro on the battery. Then plug the connector on the battery into the similar connector on the back of the board. Finally, attach the battery's velcro to the board's.
+### Uploading a UF2
 
-Once the battery is connected, it can be charged via the USB-C port. **NOTE:** As this is an educational tool and not a piece of consumer electronics, this badge has not undergone rigorous power testing. When charging your battery please don't leave it unattended.
+1. Build your cart in this folder:
 
-There is an on/off switch located at the top of the badge. Try booting the badge now if you haven't already!
+```bash
+zig build
+```
 
-### Uploading
-
-Run `zig build`, then find `hello.uf2` in the `zig-cache/zig-out/firmware` directory.
-
-Plug in your badge. It should appear as a mass storage device/USB drive.
-
-Copy `hello.uf2` in place of the `CURRENT.UF2` present on the badge USB drive.
-
-Your program will run immediately.
+2. Find `hello.uf2` in `zig-out/firmware`.
+3. Plug in the badge so it appears as a mass storage drive.
+4. Copy `hello.uf2` to the badge drive, replacing `CURRENT.UF2`.
+5. The new program runs immediately.
 
 ### Resetting
 
-You'll find a brass colored button on the back of the board, at the top. This is the reset button. Press it once to restart your program and twice to go back to the bootloader and upload a new program.
+Use the reset button on the back of the board near the top:
 
-## Need help?
+- Press once to restart the current program.
+- Press twice to enter bootloader mode for uploading.
 
-Please ask someone with a staff badge (most likely Auguste) - we'd be happy to help!
+## Need Help?
 
-If you can't locate one of us, please post your question in the Discord thread and we'll get back to you as quickly as possible!
+Ask a staff member at the event or post in the project Discord thread.
 
-## Have fun!

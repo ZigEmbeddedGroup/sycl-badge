@@ -144,7 +144,6 @@ pub fn abortCartChannels() void {
 pub fn updateLCD(framebuffer: []const u8) void {
     const was_busy = DMA.CH0_CTRL_TRIG.read().BUSY != 0;
 
-    // Stop if running
     if (was_busy) {
         stopLCD();
     }
@@ -155,7 +154,6 @@ pub fn updateLCD(framebuffer: []const u8) void {
     DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = lcd_framebuffer_addr });
     DMA.CH0_TRANS_COUNT.write(.{ .COUNT = lcd_framebuffer_len, .MODE = .NORMAL });
 
-    // Restart if it was running
     if (was_busy) {
         startLCD();
     }

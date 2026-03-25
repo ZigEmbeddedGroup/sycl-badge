@@ -181,6 +181,6 @@ pub fn attach(id: RegionId) ?[]u8 {
     return null; // Region not found
 }
 
-/// Direct access to the shared memory pool base address
-/// might lead to errors not 10000% sure not really an expert at this
+/// Direct access to the shared memory pool base address.
+/// Bypasses the allocator, use allocate() and release() for safe memory management.
 pub const SHARED_MEM_BASE: *align(4) [SHARED_MEM_POOL_SIZE]u8 = @ptrFromInt(SHARED_MEM_BASE_ADDR);

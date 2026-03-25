@@ -10,7 +10,7 @@ const FONT_WIDTH: u32 = cart.font_width;
 const FONT_HEIGHT: u32 = cart.font_height;
 
 // Edit these blocks to display your own text pages.
-const text_blocks = [_][]const u8{ "Hello\nWorld!", "Lanyard!", "THAT\nMEAN?", "ALSO!", "Tiny\nComputer!" };
+const text_blocks = [_][]const u8{ "Hello\nWorld!", "WHAT\nDOES", "THAT\nMEAN?", "ALSO!", "Tiny\nComputer!", "S\nY\nC\nL", "Software\nYou Can Love", "SYCL\nConference\n2026", "YES", "Simple", "Transparent", "Genuine Care", "What is the\nConference?", "Who made it?", "What can the\nbadge do?" };
 
 // Add as many lines as you want for the scrolling page.
 const scroll_lines = [_][]const u8{

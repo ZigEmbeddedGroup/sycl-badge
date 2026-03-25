@@ -24,6 +24,22 @@ The OS kernel runs on Core 0 and manages hardware, storage, display updates, and
 - System services: [system](system)
 - Cart API exposed to cart code: [cart/api.zig](cart/api.zig)
 
+## Button Commands
+
+The OS intercepts button input for system operations. Carts receive updated button state every frame but cannot prevent these system commands.
+
+### Menu Navigation (Cart Not Running)
+
+- **Up/Down**: Navigate the cart selection list
+- **A**: Launch the selected cart
+
+### System Controls (Always Active)
+
+- **Joystick Click (press-in)**: Toggle FPS overlay on/off at any time
+- **Start + Select** (hold 250ms): Stop running cart and return to cart selection menu
+  - Prevents accidental exit since Start may be used by carts
+  - Halts Core 1, resets all hardware (buzzer, PWM, display, etc.), and restores the menu display
+
 ## Build Notes
 
 OS kernel artifacts are configured in [../../build.zig](../../build.zig) through `add_os`.

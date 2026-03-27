@@ -126,23 +126,25 @@ fn log(comptime fmt: []const u8, args: anytype) void {
 
 pub fn panic(
     msg: []const u8,
-    trace: ?*std.builtin.StackTrace,
-    ret_addr: ?usize,
+    _: ?*std.builtin.StackTrace,
+    _: ?usize,
 ) noreturn {
-    log("panic: {s}", .{msg});
-    if (trace) |t| {
-        cart.trace("dumping error trace...");
-        _ = t;
-        //std.debug.dumpStackTrace(t.*);
-    } else {
-        cart.trace("no error trace");
-    }
-    cart.trace("dumping current stack...");
-    _ = ret_addr;
-    //std.debug.dumpCurrentStackTrace(ret_addr);
-    cart.trace("breakpoint");
+    // Single trace call: TRACE_BUF is a shared 128-byte buffer and every
+    // cart.trace() overwrites it.  If we make multiple calls before Core 0
+    // drains the FIFO, each subsequent call trashes the previous message and
+    // the kernel prints the *last* one for every queued entry.  One call =
+    // one correct message in the console.
+    log("PANIC: {s}", .{msg});
+    // Loop without @breakpoint().  @breakpoint() is a BKPT instruction that
+    // causes a HardFault (no debugger attached), which triggers the OS kernel
+    // panic handler on Core 1 and reboots the system before Core 0 can print
+    // the trace message above.
+    // Use a low-power wait on ARM, plain spin on other targets (e.g. WASM).
     while (true) {
-        @breakpoint();
+        switch (comptime @import("builtin").cpu.arch) {
+            .wasm32, .wasm64 => {},
+            else => asm volatile ("wfe"),
+        }
     }
 }
 
@@ -353,7 +355,9 @@ fn eatTone(blob: *const Blob) void {
 }
 
 export fn start() void {
+    cart.trace("blobs:start");
     initStartMenuMusic();
+    cart.trace("blobs:start-done");
 }
 
 fn initStartMenuMusic() void {
@@ -420,7 +424,10 @@ fn clear() void {
 }
 
 export fn update() void {
+    cart.trace("blobs:update");
+    cart.trace("blobs:pre-clear");
     clear();
+    cart.trace("blobs:post-clear");
     switch (global.mode) {
         .start_menu => updateStartMenu(&global.mode.start_menu),
         .settings => updateSettingsMode(&global.mode.settings),
@@ -431,44 +438,36 @@ export fn update() void {
 fn updateStartMenu(start_menu: *StartMenu) void {
     // TODO: play cool music
     global.rand_seed +%= 1;
-    cart.blit(.{
-        .sprite = &startlogo.blobs,
-        .x = (160 - startlogo.blobs_width) / 2,
-        .y = 3,
-        .width = startlogo.blobs_width,
-        .height = startlogo.blobs_height,
-        .flags = .{},
+    cart.trace("blobs:pre-blit");
+    // TEMP: replace logo blit with a simple filled rect to isolate crashes
+    cart.rect(.{
+        .x = 20,
+        .y = 10,
+        .width = 120,
+        .height = 60,
+        .fill_color = colors.bg2,
     });
-    textCenter("Controls:", 65, colors.bg2);
-    cart.text(.{
-        .str = "Direction: \x84 \x85",
-        .x = 25,
-        .y = 76,
-        .text_color = colors.bg2,
-    });
-    cart.text(.{
-        .str = "Dash: \x81",
-        .x = 25,
-        .y = 89,
-        .text_color = colors.bg2,
-    });
-    cart.text(.{
-        .str = "Menu: \x80",
-        .x = 25,
-        .y = 102,
-        .text_color = colors.bg2,
-    });
-    textCenter("Press \x80 to start", 118, colors.fg2);
-    tickMultitones();
+    cart.trace("blobs:post-blit");
+    cart.trace("blobs:skip-text-tone");
 
-    if (!isButtonTriggered(.a, &start_menu.button1_released))
+    cart.trace("blobs:pre-btn");
+    if (!isButtonTriggered(.a, &start_menu.button1_released)) {
+        cart.trace("blobs:btn-no");
         return;
+    }
+    cart.trace("blobs:btn-yes");
 
     log("random seed: {}", .{global.rand_seed});
+    cart.trace("blobs:after-seed-log");
+
     global.rand = std.Random.DefaultPrng.init(global.rand_seed);
+    cart.trace("blobs:after-prng");
+
     for (&points_buf) |*pt| {
         pt.* = getRandomPoint();
     }
+    cart.trace("blobs:after-points");
+
     for (&global.blobs, 0..) |*blob, i| {
         const is_potential_player = (i < 4);
         const start_boost: i32 = if (is_potential_player) 0 else @as(i32, @intFromFloat(@floor(300 * getRandomScale(2))));
@@ -480,16 +479,22 @@ fn updateStartMenu(start_menu: *StartMenu) void {
             .digesting = 0,
         };
     }
+    cart.trace("blobs:after-blobs");
+
     for (&global.ai_controls) |*c| {
         c.* = .none;
     }
+    cart.trace("blobs:after-ai");
 
     global.multitones_count = 0;
+    cart.trace("blobs:after-mtones");
+
     global.mode = Mode{
         .play = .{
             .intro_frame = 0, // do show intro frame
         },
     };
+    cart.trace("blobs:after-mode");
 }
 
 fn updateSettingsMode(settings: *Settings) void {
@@ -587,6 +592,8 @@ fn tickMultitones() void {
 }
 
 fn updatePlayMode(play: *Play) void {
+    cart.trace("blobs:play-enter");
+
     // check if the user wants to enter the settings
     if (isButtonTriggered(.a, &play.button1_released)) {
         // NOTE: this will invalidate `play` so we
@@ -595,7 +602,10 @@ fn updatePlayMode(play: *Play) void {
         return;
     }
 
+    cart.trace("blobs:play-after-btn");
+
     tickMultitones();
+    cart.trace("blobs:play-after-tones");
 
     if (global.my_eat_tone_frame) |*f| {
         f.* = f.* + 1;
@@ -603,6 +613,7 @@ fn updatePlayMode(play: *Play) void {
             global.my_eat_tone_frame = null;
         }
     }
+    cart.trace("blobs:play-after-eat-frame");
 
     for (0..4) |player_index| {
         updateAngle(&global.blobs[player_index], getControl(
@@ -611,6 +622,7 @@ fn updatePlayMode(play: *Play) void {
         ));
         global.blobs[player_index].dashing = cart.controls.b;
     }
+    cart.trace("blobs:play-after-players");
 
     for (global.blobs[4..], 0..) |*blob, i| {
         if (blob.mass == 0) continue;
@@ -636,6 +648,7 @@ fn updatePlayMode(play: *Play) void {
         }
         updateAngle(blob, control_ref.*);
     }
+    cart.trace("blobs:play-after-ai-move");
 
     // blobs digest
     for (&global.blobs) |*blob| {
@@ -646,6 +659,7 @@ fn updatePlayMode(play: *Play) void {
             blob.digesting -= digest;
         }
     }
+    cart.trace("blobs:play-after-digest");
 
     var sines: [global.blobs.len]f32 = undefined;
     var cosines: [global.blobs.len]f32 = undefined;
@@ -675,6 +689,7 @@ fn updatePlayMode(play: *Play) void {
             .y = clamp(i32, blob.pos_pt.y + diff_y, min_y, max_y),
         };
     }
+    cart.trace("blobs:play-after-move");
 
     // TODO: this *might* need some optimization?
     for (&global.blobs, 0..) |*blob, blob_index| {
@@ -700,6 +715,7 @@ fn updatePlayMode(play: *Play) void {
             blobs.eaten.digesting = 0; // important!
         }
     }
+    cart.trace("blobs:play-after-eat-blobs");
 
     // eat nibbles
     for (&global.blobs, 0..) |*blob, blob_index| {
@@ -716,6 +732,7 @@ fn updatePlayMode(play: *Play) void {
             pt.* = getRandomPoint();
         }
     }
+    cart.trace("blobs:play-after-eat-nibbles");
 
     const my_blob = global.myBlob();
     const my_player = play.myPlayer();

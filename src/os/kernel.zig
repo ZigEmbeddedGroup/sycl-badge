@@ -101,13 +101,19 @@ var button_start_was_pressed: bool = false;
 var cursor_index: usize = 0; // Which cart is currently selected
 var cart_count: usize = 0; // Total number of carts
 var draw_index: usize = 0; // Current cart being drawn
+var list_top_index: usize = 0; // First visible cart index in menu list
+
+const CART_LIST_Y_START: u16 = 14;
+const CART_LIST_ROW_HEIGHT: u16 = 10;
+const CART_LIST_VISIBLE_ROWS: usize = 11;
 
 // Cart name storage for running selected cart
-const MAX_CARTS: usize = 16;
+const MAX_CARTS: usize = 64;
 const MAX_CART_NAME_LEN: usize = 64;
 var cart_names: [MAX_CARTS][MAX_CART_NAME_LEN]u8 = undefined;
 var cart_name_lengths: [MAX_CARTS]usize = undefined;
 var collect_index: usize = 0;
+var cart_list_truncated: bool = false;
 
 pub fn main() !void {
     // Initialize all drivers and kernel systems
@@ -411,14 +417,30 @@ fn refreshCartDisplay() void {
 
     // Header
     lcd.drawString(0, 2, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
-    cart_y_pos = 14; // below header (8px char + 4px gap)
+    cart_y_pos = CART_LIST_Y_START; // below header (8px char + 4px gap)
 
     draw_index = 0;
     cart_count = 0;
+    cart_list_truncated = false;
     storage.listCarts(countCart);
 
     if (cursor_index >= cart_count) {
         cursor_index = 0;
+    }
+
+    if (cart_count <= CART_LIST_VISIBLE_ROWS) {
+        list_top_index = 0;
+    } else {
+        if (cursor_index < list_top_index) {
+            list_top_index = cursor_index;
+        } else if (cursor_index >= list_top_index + CART_LIST_VISIBLE_ROWS) {
+            list_top_index = cursor_index - CART_LIST_VISIBLE_ROWS + 1;
+        }
+
+        const max_top = cart_count - CART_LIST_VISIBLE_ROWS;
+        if (list_top_index > max_top) {
+            list_top_index = max_top;
+        }
     }
 
     draw_index = 0;
@@ -427,6 +449,18 @@ fn refreshCartDisplay() void {
 
     draw_index = 0;
     storage.listCarts(displayCart);
+
+    if (list_top_index > 0) {
+        lcd.drawString(146, CART_LIST_Y_START, "^", lcd.CYAN, lcd.BLACK, 1);
+    }
+    if (cart_count > list_top_index + CART_LIST_VISIBLE_ROWS) {
+        const bottom_y = CART_LIST_Y_START + @as(u16, @intCast((CART_LIST_VISIBLE_ROWS - 1) * CART_LIST_ROW_HEIGHT));
+        lcd.drawString(146, bottom_y, "v", lcd.CYAN, lcd.BLACK, 1);
+    }
+
+    if (cart_list_truncated) {
+        lcd.drawString(0, 118, "(showing first 64)", lcd.RED, lcd.BLACK, 1);
+    }
 
     if (cart_count == 0) {
         lcd.drawString(0, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
@@ -437,7 +471,11 @@ fn refreshCartDisplay() void {
 fn countCart(name: []const u8, size: u32) void {
     _ = name;
     _ = size;
-    cart_count += 1;
+    if (cart_count < MAX_CARTS) {
+        cart_count += 1;
+    } else {
+        cart_list_truncated = true;
+    }
 }
 
 /// Callback to collect cart names
@@ -552,10 +590,11 @@ fn displayCart(name: []const u8, size: u32) void {
     const cursor = if (draw_index == cursor_index) ">" else " ";
     const text = std.fmt.bufPrint(&buf, "{s}{s}", .{ cursor, display_name }) catch return;
 
-    if (cart_y_pos < 128) {
+    if (draw_index >= list_top_index and draw_index < list_top_index + CART_LIST_VISIBLE_ROWS) {
+        const row = draw_index - list_top_index;
+        const y = CART_LIST_Y_START + @as(u16, @intCast(row)) * CART_LIST_ROW_HEIGHT;
         const color = if (draw_index == cursor_index) lcd.YELLOW else lcd.WHITE;
-        lcd.drawString(0, cart_y_pos, text, color, lcd.BLACK, 1);
-        cart_y_pos += 10;
+        lcd.drawString(0, y, text, color, lcd.BLACK, 1);
     }
 
     draw_index += 1;

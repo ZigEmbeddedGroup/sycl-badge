@@ -497,9 +497,6 @@ fn updatePlayMode(play: *Play) void {
 fn updateStartMenu(start_menu: *StartMenu) void {
     fillScreen(Col.bg);
     textCenter("BLOBS V2", 24, Col.player);
-    textCenter("Rotational Controls", 48, Col.hud_on);
-    textCenter("Large Point-Space World", 62, Col.hud_on);
-    textCenter("Dynamic Zoom + Camera", 74, Col.hud_on);
     textCenter("Press A to Start", 108, Col.pellet);
 
     if (isButtonTriggered(.a, &start_menu.a_released)) {

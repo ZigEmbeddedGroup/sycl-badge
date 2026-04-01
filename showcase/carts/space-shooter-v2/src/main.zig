@@ -422,7 +422,7 @@ fn tickGameOver() void {
 fn drawIntro() void {
     fillScreen(Col.bg);
     cart.text(.{ .str = "SPACE SHOOTER V2", .x = 20, .y = 40, .text_color = Col.text });
-    cart.text(.{ .str = "OS-SAFE BUILD", .x = 30, .y = 52, .text_color = Col.text_dim });
+    cart.text(.{ .str = "OS Compatible", .x = 30, .y = 52, .text_color = Col.text_dim });
 
     if ((intro_blink / 24) % 2 == 0) {
         cart.text(.{ .str = "PRESS A TO START", .x = 24, .y = 78, .text_color = Col.text });

@@ -125,9 +125,19 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/space-shooter/src/main.zig"),
     });
     add_os_cart(builder, &dep, .{
+        .name = "space-shooter-v2",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/space-shooter-v2/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
         .name = "blobs",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/blobs/src/blobs.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "blobs-v2",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/blobs-v2/src/main.zig"),
     });
     add_os_cart(builder, &dep, .{
         .name = "plasma",

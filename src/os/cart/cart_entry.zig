@@ -7,6 +7,7 @@
 //! uses `export fn start/update` (not `pub`), we declare them as extern symbols
 //! and let the linker resolve them from the same binary.
 const builtin = @import("builtin");
+const microzig = @import("microzig");
 const cart_api = @import("cart-api");
 
 // Pull in the user cart module so its exported symbols are linked.
@@ -63,6 +64,10 @@ pub fn init() void {
 }
 
 pub fn main() noreturn {
+    // Carts use a polling model (buttons from IPC + present handshake), so
+    // mask interrupts on Core 1 to avoid unexpected IRQ vectors in user carts.
+    microzig.cpu.interrupt.disable_interrupts();
+
     start();
     while (true) {
         update();

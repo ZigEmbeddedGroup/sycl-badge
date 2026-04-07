@@ -572,6 +572,61 @@ pub fn writeCartBuffer(buffer: []const u8) void {
     writeCommandWithData(.MADCTL, &.{0x60});
 }
 
+/// Write only a rectangle from a column-major cart framebuffer.
+///
+/// Rect is in cart coordinates (x:0..159, y:0..127), where x is horizontal
+/// and y is vertical on the user-facing display.
+pub fn writeCartBufferRect(buffer: []const u8, x: u16, y: u16, w: u16, h: u16) void {
+    // If the update is very large, full-frame transfer is usually cheaper.
+    const area: u32 = @as(u32, w) * @as(u32, h);
+    if (area >= (width * height * 3) / 4) {
+        writeCartBuffer(buffer);
+        return;
+    }
+
+    if (x >= width or y >= height or w == 0 or h == 0) return;
+
+    const x0: u16 = x;
+    const y0: u16 = y;
+    const x1: u16 = @min(x + w - 1, width - 1);
+    const y1: u16 = @min(y + h - 1, height - 1);
+
+    const rw: u16 = x1 - x0 + 1;
+    const rh: u16 = y1 - y0 + 1;
+    if (rw == 0 or rh == 0) return;
+
+    // MV=0/MX=1/MY=0 mode matching writeCartBuffer.
+    writeCommandWithData(.MADCTL, &.{0x40});
+
+    // In this mode, cart x maps to native row and cart y maps to native col (reversed).
+    const col_start: u16 = 127 - y1;
+    const col_end: u16 = 127 - y0;
+    const row_start: u16 = x0;
+    const row_end: u16 = x1;
+
+    writeCommand(.CASET);
+    writeData(&[_]u8{ 0x00, @truncate(col_start + xstart), 0x00, @truncate(col_end + xstart) });
+    writeCommand(.RASET);
+    writeData(&[_]u8{ 0x00, @truncate(row_start + ystart), 0x00, @truncate(row_end + ystart) });
+    writeCommand(.RAMWR);
+
+    // Stream data in cart-native order: x-major, y-minor.
+    const bytes_per_col: usize = height * 2; // 128 pixels * 2 bytes
+    const y_offset_bytes: usize = @as(usize, y0) * 2;
+    const col_span_bytes: usize = @as(usize, rh) * 2;
+
+    startData();
+    var cx: u16 = x0;
+    while (cx <= x1) : (cx += 1) {
+        const col_base = @as(usize, cx) * bytes_per_col + y_offset_bytes;
+        writeDataNoCS(buffer[col_base .. col_base + col_span_bytes]);
+    }
+    endData();
+
+    // Restore landscape MADCTL for direct-draw UI operations.
+    writeCommandWithData(.MADCTL, &.{0x60});
+}
+
 /// Write RGB565 framebuffer to display
 /// Copies to internal buffer and triggers DMA transfer
 pub fn writeFramebuffer(source_fb: []const Color16) void {

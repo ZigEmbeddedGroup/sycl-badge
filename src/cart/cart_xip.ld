@@ -33,16 +33,19 @@ MEMORY
      * cart IPC block, framebuffer, and IPC buffers. Do NOT touch these ranges:
      *
      *   0x20020000 - 0x2002001F  IPC block (controls, sensors, etc.)    32 B
-     *   0x20020020 - 0x2002A01F  Framebuffer (160 * 128 * 2 bytes)   40960 B
-     *   0x2002A020 - 0x2002A09F  CART_TRACE_BUF (128 bytes)            128 B
-     *   0x2002A0A0 - 0x2002A0A7  CART_TONE_FREQ + CART_TONE_DURATION     8 B
-     *   0x2002A0A8 - 0x2002A0FF  Reserved IPC padding                   88 B
-     *   0x2002A100 - 0x2007FFFF  Cart RAM (variables, heap, stack)   ~343 KB
+    *   0x20020020 - 0x2002A01F  Framebuffer 0 (160 * 128 * 2)      40960 B
+    *   0x2002A020 - 0x2003401F  Framebuffer 1 (160 * 128 * 2)      40960 B
+    *   0x20034020 - 0x2003409F  CART_TRACE_BUF (128 bytes)            128 B
+    *   0x200340A0 - 0x200340A7  CART_TONE_FREQ + CART_TONE_DURATION     8 B
+    *   0x200340A8 - 0x200340AF  Reserved IPC padding                    8 B
+    *   0x200340B0 - 0x200340B7  Dirty-rect metadata (x,y,w,h u16)       8 B
+    *   0x200340B8 - 0x200340FF  Reserved IPC padding                   72 B
+    *   0x20034100 - 0x2007FFFF  Cart RAM (variables, heap, stack)   ~303 KB
      *
-     * Cart code writes pixels via api.framebuffer (0x20020020).
-     * Cart globals start at 0x2002A100 to avoid aliasing the IPC buffers above.
+     * Cart code writes pixels via api.framebuffer (active draw buffer).
+     * Cart globals start at 0x20034100 to avoid aliasing IPC/framebuffers.
      */
-    RAM(rwx) : ORIGIN = 0x2002A100, LENGTH = 0x55F00
+    RAM(rwx) : ORIGIN = 0x20034100, LENGTH = 0x4BF00
 }
 
 SECTIONS
@@ -119,8 +122,8 @@ SECTIONS
     } > RAM
 
     /* Stack at end of RAM, grows downward */
-    /* Reserve 16KB for stack */
-    __stack_size__ = 16K;
+    /* Reserve 32KB for stack to reduce overflow risk in complex carts. */
+    __stack_size__ = 32K;
     __stack_top__ = ORIGIN(RAM) + LENGTH(RAM);
     __stack_limit__ = __stack_top__ - __stack_size__;
 

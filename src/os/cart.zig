@@ -15,10 +15,44 @@ pub const panic = @import("system/panic.zig").panic;
 
 /// Linker symbols for cart_xip region
 extern const __cart_xip_start__: u8;
+extern const __cart_xip_end__: u8;
 
 /// Get cart_xip base address
 fn getCartXipStart() u32 {
     return @intFromPtr(&__cart_xip_start__);
+}
+
+fn getCartXipEnd() u32 {
+    return @intFromPtr(&__cart_xip_end__);
+}
+
+fn clearCore1InterruptAndFaultState() void {
+    // Disable all external IRQs for Core 1 and clear pending bits.
+    const NVIC_ICER0: *volatile u32 = @ptrFromInt(0xE000E180);
+    const NVIC_ICER1: *volatile u32 = @ptrFromInt(0xE000E184);
+    const NVIC_ICPR0: *volatile u32 = @ptrFromInt(0xE000E280);
+    const NVIC_ICPR1: *volatile u32 = @ptrFromInt(0xE000E284);
+    NVIC_ICER0.* = 0xFFFF_FFFF;
+    NVIC_ICER1.* = 0xFFFF_FFFF;
+    NVIC_ICPR0.* = 0xFFFF_FFFF;
+    NVIC_ICPR1.* = 0xFFFF_FFFF;
+
+    // Disable SysTick and clear pending exceptions that can fire immediately after handoff if not cleaned.
+    const SYST_CSR: *volatile u32 = @ptrFromInt(0xE000E010);
+    const SCB_ICSR: *volatile u32 = @ptrFromInt(0xE000ED04);
+    SYST_CSR.* = 0;
+    SCB_ICSR.* = (1 << 27) | (1 << 25); // PENDSVCLR | PENDSTCLR
+
+    // Clear sticky fault status so stale kernel/cart faults don't poison next cart launch.
+    const SCB_CFSR: *volatile u32 = @ptrFromInt(0xE000ED28);
+    const SCB_HFSR: *volatile u32 = @ptrFromInt(0xE000ED2C);
+    const SCB_DFSR: *volatile u32 = @ptrFromInt(0xE000ED30);
+    SCB_CFSR.* = 0xFFFF_FFFF;
+    SCB_HFSR.* = 0xFFFF_FFFF;
+    SCB_DFSR.* = 0xFFFF_FFFF;
+
+    asm volatile ("dsb");
+    asm volatile ("isb");
 }
 
 /// Core 1 main entry point
@@ -124,6 +158,7 @@ fn handleMessage(msg: mailbox.Message) void {
 /// cart is still running.
 fn executeCart(vector_table_offset: u24) void {
     const cart_xip_start = getCartXipStart();
+    const cart_xip_end = getCartXipEnd();
     const vector_table_addr = cart_xip_start + vector_table_offset;
 
     mailbox.send(mailbox.MessageType.CART_RUNNING);
@@ -132,10 +167,36 @@ fn executeCart(vector_table_offset: u24) void {
     const initial_sp = vector_table[0];
     const entry_point = vector_table[1];
 
+    // Validate SP/PC from cart vector table before taking over Core 1.
+    // Bad values here often show up later as UsageFault INVSTATE on first
+    // exception entry/return.
+    if ((initial_sp & 0x7) != 0) {
+        mailbox.send(mailbox.MessageType.CART_CRASHED);
+        return;
+    }
+    if (initial_sp < 0x2002A100 or initial_sp > 0x20080000) {
+        mailbox.send(mailbox.MessageType.CART_CRASHED);
+        return;
+    }
+    if ((entry_point & 0x1) == 0) {
+        mailbox.send(mailbox.MessageType.CART_CRASHED);
+        return;
+    }
+    const entry_even = entry_point & 0xFFFF_FFFE;
+    if (entry_even < cart_xip_start or entry_even >= cart_xip_end) {
+        mailbox.send(mailbox.MessageType.CART_CRASHED);
+        return;
+    }
+
+    clearCore1InterruptAndFaultState();
+
     // Point Core 1's VTOR at the cart's vector table so that any exceptions
     // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
     const VTOR: *volatile u32 = @ptrFromInt(0xE000ED08);
     VTOR.* = vector_table_addr;
+
+    asm volatile ("dsb");
+    asm volatile ("isb");
 
     // One-way jump — the cart takes over Core 1.  jumpToCart never returns.
     jumpToCart(initial_sp, entry_point);

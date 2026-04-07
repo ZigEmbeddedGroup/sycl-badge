@@ -332,15 +332,44 @@ pub fn main() !void {
                     const duration_ms: u32 = (duration_60ths * 1000) / 60;
                     gpio.buzzer.tone(freq);
                     tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
-                } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY) {
+                } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
+                    mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
+                {
                     // Write button state into the IPC block for the cart to read.
                     const btn = button_poller.read();
                     ipc_controls.* = @as(u16, @as(u9, @bitCast(btn))); // u9 zero-extends to u16
 
-                    // Flush the shared-RAM framebuffer (40960 bytes at 0x20020020)
+                    const fb_bytes: usize = 160 * 128 * 2;
+                    const fb_base: usize = 0x20020020;
+                    const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
+                        @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
+                    else
+                        0;
+                    const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
+                    const has_dirty_rect: bool = is_v2 and
+                        (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
+
+                    // Flush selected shared-RAM framebuffer.
                     _ = fps_overlay.tick();
-                    const fb_ptr: [*]const u8 = @ptrFromInt(0x20020020);
-                    lcd.writeCartBuffer(fb_ptr[0 .. 160 * 128 * 2]);
+                    const fb_ptr: [*]const u8 = @ptrFromInt(fb_base + fb_index * fb_bytes);
+                    if (has_dirty_rect) {
+                        const rx: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_X))).*;
+                        const ry: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_Y))).*;
+                        const rw: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_W))).*;
+                        const rh: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_H))).*;
+
+                        // Fallback to full-frame if rect metadata is invalid.
+                        if (rw == 0 or rh == 0 or rx >= 160 or ry >= 128) {
+                            lcd.writeCartBuffer(fb_ptr[0..fb_bytes]);
+                        } else {
+                            lcd.writeCartBufferRect(fb_ptr[0..fb_bytes], rx, ry, rw, rh);
+                        }
+                    } else if (!is_v2) {
+                        // Legacy carts always imply full-frame updates.
+                        lcd.writeCartBuffer(fb_ptr[0..fb_bytes]);
+                    } else {
+                        // No visual change this frame: skip LCD transfer.
+                    }
                     fps_overlay.render();
 
                     mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);

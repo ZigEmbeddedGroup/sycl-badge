@@ -95,21 +95,35 @@ pub const MessageType = struct {
     pub const FRAMEBUFFER_READY: Message = 0x25000001;
     pub const FRAMEBUFFER_DONE: Message = 0x25000002;
 
+    // Async/double-buffer framebuffer present (type + payload)
+    // Message type: 0x28
+    // payload bit 0 = buffer index (0 or 1)
+    // payload bit 1 = dirty-rect present (1 = use CART_DIRTY_RECT_*)
+    pub const FRAMEBUFFER_READY_V2: u8 = 0x28;
+
     /// Cart trace (debug) messages: type 0x26, payload = length.
     /// Cart writes string to CART_TRACE_BUF before sending.
-    /// Located at 0x2002A020 (immediately after the framebuffer at 0x20020020+0xA000).
-    /// The cart linker script reserves 0x2002A020–0x2002A0FF for IPC buffers so
+    /// Located at 0x20034020 (immediately after two framebuffers:
+    /// 0x20020020 + 2 * 0xA000).
+    /// The cart linker script reserves 0x20034020–0x200340FF for IPC buffers so
     /// cart globals never alias these addresses.
     pub const CART_TRACE: u8 = 0x26;
-    pub const CART_TRACE_BUF: u32 = 0x2002A020; // 128 bytes, just after framebuffer
+    pub const CART_TRACE_BUF: u32 = 0x20034020; // 128 bytes, after both framebuffers
     pub const CART_TRACE_BUF_SIZE: u32 = 128;
 
     /// Cart tone (buzzer) messages: type 0x27.
     /// Cart writes freq (u32) and duration (u32) to CART_TONE_* before sending.
     /// Duration is in 60ths of a second (same as ToneOptions); kernel converts to ms.
     pub const CART_TONE: u8 = 0x27;
-    pub const CART_TONE_FREQ: u32 = 0x2002A0A0; // freq_hz (u32)
-    pub const CART_TONE_DURATION: u32 = 0x2002A0A4; // duration in 60ths (u32)
+    pub const CART_TONE_FREQ: u32 = 0x200340A0; // freq_hz (u32)
+    pub const CART_TONE_DURATION: u32 = 0x200340A4; // duration in 60ths (u32)
+
+    /// Dirty-rectangle metadata for FRAMEBUFFER_READY_V2 (all u16).
+    /// Rect is in cart space: x:[0..159], y:[0..127], width:[1..160], height:[1..128]
+    pub const CART_DIRTY_RECT_X: u32 = 0x200340B0;
+    pub const CART_DIRTY_RECT_Y: u32 = 0x200340B2;
+    pub const CART_DIRTY_RECT_W: u32 = 0x200340B4;
+    pub const CART_DIRTY_RECT_H: u32 = 0x200340B6;
 
     // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x30000000;

@@ -3,8 +3,10 @@ const cart = @import("cart-api");
 const WIDTH: i32 = @intCast(cart.screen_width);
 const HEIGHT: i32 = @intCast(cart.screen_height);
 
-const MAX_PELLETS = 70; // 56; // I've tried larger numbers, it crashes
+const MAX_PELLETS = 70; //70; // 56; // I've tried larger numbers, it crashes
 const MAX_BOTS = 6;
+const START_BOTS = 2;
+const PELLET_CHECKS_PER_FRAME = 40;
 const PELLET_SIZE_PT: i32 = 24;
 const ARENA_HALF_WIDTH_PT: i32 = 3200;
 const ARENA_HALF_HEIGHT_PT: i32 = 2560;
@@ -86,6 +88,7 @@ var mode: Mode = .{ .start_menu = .{} };
 const Camera = struct { x: i32, y: i32 };
 var points_per_pixel: i32 = 6;
 var camera_center: Camera = .{ .x = 0, .y = 0 };
+var pellet_scan_index: usize = 0;
 
 const DIRS = 16;
 const DirVec = struct { x: i32, y: i32 };
@@ -135,6 +138,7 @@ fn overlapSquare(ax: i32, ay: i32, as: i32, bx: i32, by: i32, bs: i32) bool {
 }
 
 fn fillScreen(color: cart.DisplayColor) void {
+    cart.markDirtyRect(0, 0, WIDTH, HEIGHT);
     const px = cart.Pixel.fromColor(color);
     for (cart.framebuffer) |*col| {
         @memset(col, px);
@@ -151,27 +155,20 @@ fn fillRect(x: i32, y: i32, w: i32, h: i32, color: cart.DisplayColor) void {
     if (x0 >= x1 or y0 >= y1) return;
 
     const px = cart.Pixel.fromColor(color);
-    var yy: i32 = y0;
-    while (yy < y1) : (yy += 1) {
-        var xx: i32 = x0;
-        while (xx < x1) : (xx += 1) {
-            cart.framebuffer[@intCast(xx)][@intCast(yy)] = px;
-        }
+    var xx: i32 = x0;
+    while (xx < x1) : (xx += 1) {
+        @memset(cart.framebuffer[@intCast(xx)][@intCast(y0)..@intCast(y1)], px);
     }
+    cart.markDirtyRect(x0, y0, x1 - x0, y1 - y0);
 }
 
 fn spawnPellet(i: usize) void {
     const margin = PELLET_SIZE_PT;
-    var tries: u8 = 0;
-    while (true) {
-        const px = randRange(-ARENA_HALF_WIDTH_PT + margin, ARENA_HALF_WIDTH_PT - margin);
-        const py = randRange(-ARENA_HALF_HEIGHT_PT + margin, ARENA_HALF_HEIGHT_PT - margin);
-        if (!overlapSquare(player.x - 80, player.y - 80, player.size + 160, px, py, PELLET_SIZE_PT) or tries >= 6) {
-            pellets[i] = .{ .x = px, .y = py, .alive = true };
-            return;
-        }
-        tries +%= 1;
-    }
+    pellets[i] = .{
+        .x = randRange(-ARENA_HALF_WIDTH_PT + margin, ARENA_HALF_WIDTH_PT - margin),
+        .y = randRange(-ARENA_HALF_HEIGHT_PT + margin, ARENA_HALF_HEIGHT_PT - margin),
+        .alive = true,
+    };
 }
 
 fn spawnBot(idx: usize) void {
@@ -201,6 +198,7 @@ fn resetGame() void {
     player = .{ .x = 0, .y = 0, .size = 96, .dir = 0, .score = 0, .hp = 5 };
     points_per_pixel = 6;
     camera_center = .{ .x = 0, .y = 0 };
+    pellet_scan_index = 0;
 
     for (&pellets, 0..) |*p, i| {
         p.* = .{ .x = 0, .y = 0, .alive = false };
@@ -209,7 +207,7 @@ fn resetGame() void {
 
     for (&bots, 0..) |*b, i| {
         b.* = .{ .x = 0, .y = 0, .dir = 0, .ai_control = .none, .size = 0, .alive = false };
-        if (i < 4) spawnBot(i);
+        if (i < START_BOTS) spawnBot(i);
     }
 }
 
@@ -307,7 +305,12 @@ fn updatePlayer() void {
 }
 
 fn updatePellets() void {
-    for (&pellets, 0..) |*p, i| {
+    var checks: usize = 0;
+    while (checks < @min(MAX_PELLETS, PELLET_CHECKS_PER_FRAME)) : (checks += 1) {
+        const i = pellet_scan_index;
+        pellet_scan_index = (pellet_scan_index + 1) % MAX_PELLETS;
+        const p = &pellets[i];
+
         if (!p.alive) {
             spawnPellet(i);
             continue;
@@ -411,15 +414,35 @@ fn drawScene() void {
     fillScreen(Col.bg);
     drawHud();
 
+    var dirty_min_x: i32 = WIDTH;
+    var dirty_min_y: i32 = HEIGHT;
+    var dirty_max_x: i32 = 0;
+    var dirty_max_y: i32 = 0;
+
     for (pellets) |p| {
         if (!p.alive) continue;
 
         const px = ptToPxX(p.x);
         const py = ptToPxY(p.y);
         const ps = clamp(sizePtToPx(PELLET_SIZE_PT), 2, 3);
-        if (px + ps < 0 or py + ps < 0 or px >= WIDTH or py >= HEIGHT) continue;
+        const x0 = clamp(px, 0, WIDTH);
+        const y0 = clamp(py, 0, HEIGHT);
+        const x1 = clamp(px + ps, 0, WIDTH);
+        const y1 = clamp(py + ps, 0, HEIGHT);
+        if (x0 >= x1 or y0 >= y1) continue;
 
-        fillRect(px, py, ps, ps, Col.pellet);
+        const pixel = cart.Pixel.fromColor(Col.pellet);
+        var xx: i32 = x0;
+        while (xx < x1) : (xx += 1) {
+            @memset(cart.framebuffer[@intCast(xx)][@intCast(y0)..@intCast(y1)], pixel);
+        }
+        dirty_min_x = @min(dirty_min_x, x0);
+        dirty_min_y = @min(dirty_min_y, y0);
+        dirty_max_x = @max(dirty_max_x, x1);
+        dirty_max_y = @max(dirty_max_y, y1);
+    }
+    if (dirty_max_x > dirty_min_x) {
+        cart.markDirtyRect(dirty_min_x, dirty_min_y, dirty_max_x - dirty_min_x, dirty_max_y - dirty_min_y);
     }
 
     for (bots) |b| {
@@ -495,11 +518,12 @@ fn updatePlayMode(play: *Play) void {
 }
 
 fn updateStartMenu(start_menu: *StartMenu) void {
+    _ = start_menu;
     fillScreen(Col.bg);
     textCenter("BLOBS V2", 24, Col.player);
     textCenter("Press A to Start", 108, Col.pellet);
 
-    if (isButtonTriggered(.a, &start_menu.a_released)) {
+    if (cart.controls.a) {
         resetGame();
         mode = .{ .play = .{} };
     }

@@ -107,6 +107,12 @@ const is_wasm = switch (builtin.target.cpu.arch) {
 // and writes pixels. Using process_ram avoids colliding with kernel_ram
 // (0x20000000) where the OS keeps its own data structures.
 const base = if (is_wasm) 0 else 0x20020000;
+const framebuffer_bytes: usize = screen_width * screen_height * @sizeOf(Pixel);
+const framebuffer0_addr: usize = base + 0x20;
+const framebuffer1_addr: usize = framebuffer0_addr + framebuffer_bytes;
+const trace_buf_addr: usize = framebuffer1_addr + framebuffer_bytes;
+const tone_freq_addr: usize = trace_buf_addr + 0x80;
+const tone_duration_addr: usize = tone_freq_addr + 0x04;
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
 pub const controls: *const volatile Controls = @ptrFromInt(base + 0x04);
@@ -114,7 +120,66 @@ pub const light_level: *u12 = @ptrFromInt(base + 0x06);
 pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
 pub const red_led: *bool = @ptrFromInt(base + 0x1c);
 pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
-pub const framebuffer: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(base + 0x20);
+const framebuffer0: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(framebuffer0_addr);
+const framebuffer1: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(framebuffer1_addr);
+pub var framebuffer: *volatile [screen_width][screen_height]Pixel = framebuffer0;
+var draw_buffer_index: u1 = 0;
+var has_in_flight_frame: bool = false;
+var present_timeout_events: u32 = 0;
+
+const dirty_rect_x_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x90);
+const dirty_rect_y_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x92);
+const dirty_rect_w_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x94);
+const dirty_rect_h_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x96);
+
+const present_wait_spin_limit: u32 = 8_000_000;
+
+var dirty_any: bool = false;
+var dirty_min_x: u16 = 0;
+var dirty_min_y: u16 = 0;
+var dirty_max_x: u16 = 0;
+var dirty_max_y: u16 = 0;
+
+fn updateDrawBufferPointer() void {
+    framebuffer = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
+}
+
+fn resetDirtyRect() void {
+    dirty_any = false;
+    dirty_min_x = 0;
+    dirty_min_y = 0;
+    dirty_max_x = 0;
+    dirty_max_y = 0;
+}
+
+pub inline fn markDirtyRect(x: i32, y: i32, w: i32, h: i32) void {
+    if (w <= 0 or h <= 0) return;
+
+    const x0 = @max(x, 0);
+    const y0 = @max(y, 0);
+    const x1 = @min(x +| w, @as(i32, @intCast(screen_width)));
+    const y1 = @min(y +| h, @as(i32, @intCast(screen_height)));
+    if (x0 >= x1 or y0 >= y1) return;
+
+    const ux0: u16 = @intCast(x0);
+    const uy0: u16 = @intCast(y0);
+    const ux1: u16 = @intCast(x1 - 1);
+    const uy1: u16 = @intCast(y1 - 1);
+
+    if (!dirty_any) {
+        dirty_any = true;
+        dirty_min_x = ux0;
+        dirty_min_y = uy0;
+        dirty_max_x = ux1;
+        dirty_max_y = uy1;
+        return;
+    }
+
+    if (ux0 < dirty_min_x) dirty_min_x = ux0;
+    if (uy0 < dirty_min_y) dirty_min_y = uy0;
+    if (ux1 > dirty_max_x) dirty_max_x = ux1;
+    if (uy1 > dirty_max_y) dirty_max_y = uy1;
+}
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -188,6 +253,8 @@ pub inline fn blit(options: BlitOptions) void {
                 @intCast(@min(signed_height, @as(i32, @intCast(screen_height)) - options.y)),
             };
 
+        markDirtyRect(options.x, options.y, if (flags.rotate) signed_height else signed_width, if (flags.rotate) signed_width else signed_height);
+
         for (clip_y_min..clip_y_max) |y| {
             for (clip_x_min..clip_x_max) |x| {
                 const signed_x: i32 = @intCast(x);
@@ -203,11 +270,9 @@ pub inline fn blit(options: BlitOptions) void {
 
                 // Use clipPixel and Pixel.fromColor so any out-of-bounds tx/ty are safely
                 // discarded instead of causing a hard fault when indexing the framebuffer.
-                clipPixel(
-                    @intCast(tx),
-                    @intCast(ty),
-                    Pixel.fromColor(options.sprite[sy * stride + sx]),
-                );
+                if (tx < screen_width and ty < screen_height) {
+                    framebuffer[tx][ty] = Pixel.fromColor(options.sprite[sy * stride + sx]);
+                }
             }
         }
     }
@@ -241,8 +306,12 @@ pub inline fn line(options: LineOptions) void {
         const sy: i32 = if (y0 < y1) 1 else -1;
         var err = dx + dy;
 
+        markDirtyRect(@min(options.x1, options.x2), @min(options.y1, options.y2), @abs(options.x2 - options.x1) + 1, @abs(options.y2 - options.y1) + 1);
+
         while (true) {
-            clipPixel(x0, y0, pixel);
+            if (x0 >= 0 and x0 < screen_width and y0 >= 0 and y0 < screen_height) {
+                framebuffer[@intCast(x0)][@intCast(y0)] = pixel;
+            }
             if (x0 == x1 and y0 == y1) break;
             const e2 = 2 * err;
             if (e2 >= dy) {
@@ -285,8 +354,34 @@ pub inline fn oval(options: OvalOptions) void {
         const stroke_color = DisplayColor.Optional.from(options.stroke_color);
         const fill_color = DisplayColor.Optional.from(options.fill_color);
 
+        // Fast path: small fill-only ovals use direct memset instead of ellipse algorithm
+        // This is crucial for performance when rendering many small circles (e.g., pellets).
+        // Threshold: width/height <= 8 pixels and fill-only (no stroke).
+        if (options.width <= 8 and options.height <= 8 and stroke_color == .none and fill_color != .none) {
+            const x = options.x;
+            const y = options.y;
+            const w = @as(i32, @intCast(options.width));
+            const h = @as(i32, @intCast(options.height));
+
+            const min_x: usize = @intCast(@max(x, 0));
+            const min_y: usize = @intCast(@max(y, 0));
+            const max_x: usize = @intCast(@min(x + w, @as(i32, @intCast(screen_width))));
+            const max_y: usize = @intCast(@min(y + h, @as(i32, @intCast(screen_height))));
+
+            if (min_x >= max_x or min_y >= max_y) return;
+
+            const fill_pixel = Pixel.fromColor(fill_color.unwrap().?);
+            for (framebuffer[min_x..max_x]) |*col| {
+                @memset(col[min_y..max_y], fill_pixel);
+            }
+            markDirtyRect(x, y, w, h);
+            return;
+        }
+
         const signed_width: i32 = @intCast(options.width);
         const signed_height: i32 = @intCast(options.height);
+
+        markDirtyRect(options.x, options.y, signed_width, signed_height);
 
         var a = signed_width - 1;
         const b = signed_height - 1;
@@ -391,21 +486,29 @@ pub inline fn rect(options: RectOptions) void {
         const max_x: usize = @intCast(@min(end_x, screen_width));
         const max_y: usize = @intCast(@min(end_y, screen_height));
 
+        markDirtyRect(options.x, options.y, @intCast(end_x - options.x), @intCast(end_y - options.y));
+
         if (stroke_color) |sc| {
             const stroke_pixel = Pixel.fromColor(sc);
-            if (options.x >= 0) @memset(framebuffer[min_x][min_y..max_y], stroke_pixel);
-            if (options.width > 1 and end_x <= screen_width) @memset(framebuffer[max_x - 1][min_y..max_y], stroke_pixel);
-            if (options.width > 2) {
-                if (options.y >= 0) {
-                    for (framebuffer[min_x + 1 .. max_x - 1]) |*col| col[min_y] = stroke_pixel;
+            if (min_x < max_x and min_y < max_y) {
+                @memset(framebuffer[min_x][min_y..max_y], stroke_pixel);
+                if (max_x > min_x + 1) {
+                    @memset(framebuffer[max_x - 1][min_y..max_y], stroke_pixel);
                 }
-                if (options.height > 1 and end_y <= screen_height) {
-                    for (framebuffer[min_x + 1 .. max_x - 1]) |*col| col[max_y - 1] = stroke_pixel;
+            }
+            if (max_x > min_x + 2 and min_y + 1 < max_y) {
+                for (framebuffer[min_x + 1 .. max_x - 1]) |*col| {
+                    col[min_y] = stroke_pixel;
+                    col[max_y - 1] = stroke_pixel;
                 }
-                if (options.height > 2) if (fill_color) |fc| {
-                    const fill_pixel = Pixel.fromColor(fc);
-                    for (framebuffer[min_x + 1 .. max_x - 1]) |*col| @memset(col[min_y + 1 .. max_y - 1], fill_pixel);
-                };
+            }
+            if (fill_color) |fc| {
+                const fill_pixel = Pixel.fromColor(fc);
+                if (max_x > min_x + 2 and max_y > min_y + 2) {
+                    for (framebuffer[min_x + 1 .. max_x - 1]) |*col| {
+                        @memset(col[min_y + 1 .. max_y - 1], fill_pixel);
+                    }
+                }
             }
         } else if (fill_color) |fc| {
             const fill_pixel = Pixel.fromColor(fc);
@@ -448,10 +551,25 @@ pub inline fn text(options: TextOptions) void {
         const scale_usize: usize = @intCast(scale);
         const line_step: i32 = @as(i32, @intCast(@as(u32, 8) * scale));
 
+        var longest_line: i32 = 0;
+        var current_line: i32 = 0;
+        var line_count: i32 = 1;
+        for (options.str) |char| {
+            if (char == '\n') {
+                if (current_line > longest_line) longest_line = current_line;
+                current_line = 0;
+                line_count += 1;
+            } else if (char >= 32 and char <= 255) {
+                current_line += 1;
+            }
+        }
+        if (current_line > longest_line) longest_line = current_line;
+        if (longest_line > 0 and line_count > 0) {
+            markDirtyRect(options.x, options.y, longest_line * line_step, line_count * line_step);
+        }
+
         var char_x: i32 = options.x;
         var char_y: i32 = options.y;
-
-        trace("T:pre");
         for (options.str) |char| {
             if (char == '\n') {
                 char_y += line_step;
@@ -470,11 +588,17 @@ pub inline fn text(options: TextOptions) void {
                     const is_fg = (row_bits & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
                     const px = if (is_fg) text_pixel else bg_pixel;
                     if (px) |p| {
+                        const base_dx = char_x + @as(i32, @intCast(col * scale_usize));
+                        const base_dy = char_y + @as(i32, @intCast(row * scale_usize));
                         for (0..scale_usize) |sy| {
-                            for (0..scale_usize) |sx| {
-                                const dx = char_x + @as(i32, @intCast(col * scale_usize + sx));
-                                const dy = char_y + @as(i32, @intCast(row * scale_usize + sy));
-                                clipPixel(dx, dy, p);
+                            const dy: i32 = base_dy + @as(i32, @intCast(sy));
+                            if (dy >= 0 and dy < screen_height) {
+                                for (0..scale_usize) |sx| {
+                                    const dx: i32 = base_dx + @as(i32, @intCast(sx));
+                                    if (dx >= 0 and dx < screen_width) {
+                                        framebuffer[@intCast(dx)][@intCast(dy)] = p;
+                                    }
+                                }
                             }
                         }
                     }
@@ -482,7 +606,6 @@ pub inline fn text(options: TextOptions) void {
             }
             char_x += line_step;
         }
-        trace("T:ok");
     }
 }
 
@@ -504,8 +627,12 @@ pub inline fn hline(options: StraightLineOptions) void {
         const end_x = options.x +| @min(options.len, std.math.maxInt(i32));
         if (end_x <= 0) return;
         const pixel = Pixel.fromColor(options.color);
-        for (framebuffer[@max(options.x, 0)..@intCast(@min(end_x, screen_width))]) |*col| {
-            col[@intCast(options.y)] = pixel;
+        markDirtyRect(options.x, options.y, @intCast(end_x - options.x), 1);
+        const start_x: usize = @intCast(@max(options.x, 0));
+        const end_x_clamped: usize = @intCast(@min(end_x, screen_width));
+        const y_idx: usize = @intCast(options.y);
+        for (framebuffer[start_x..end_x_clamped]) |*col| {
+            col[y_idx] = pixel;
         }
     }
 }
@@ -521,6 +648,7 @@ pub inline fn vline(options: StraightLineOptions) void {
         const end_y = options.y +| @min(options.len, std.math.maxInt(i32));
         if (end_y <= 0) return;
         const pixel = Pixel.fromColor(options.color);
+        markDirtyRect(options.x, options.y, 1, @intCast(end_y - options.y));
         @memset(framebuffer[@intCast(options.x)][@max(options.y, 0)..@intCast(@min(end_y, screen_height))], pixel);
     }
 }
@@ -576,16 +704,14 @@ pub inline fn tone(options: ToneOptions) void {
         }.tone(options.frequency, options.duration, options.volume, options.flags);
     } else {
         const CART_TONE: u32 = 0x27000000;
-        const CART_TONE_FREQ: u32 = 0x2002A0A0;
-        const CART_TONE_DURATION: u32 = 0x2002A0A4;
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
         const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
         const FIFO_RDY: u32 = 1 << 1;
 
         if (options.frequency == 0) return;
 
-        const freq_ptr: *volatile u32 = @ptrFromInt(CART_TONE_FREQ);
-        const dur_ptr: *volatile u32 = @ptrFromInt(CART_TONE_DURATION);
+        const freq_ptr: *volatile u32 = @ptrFromInt(tone_freq_addr);
+        const dur_ptr: *volatile u32 = @ptrFromInt(tone_duration_addr);
         freq_ptr.* = options.frequency;
         dur_ptr.* = options.duration;
 
@@ -662,7 +788,6 @@ pub inline fn trace(x: []const u8) void {
             extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
         }.trace(x.ptr, x.len);
     } else {
-        const TRACE_BUF: u32 = 0x2002A020;
         const TRACE_BUF_SIZE: usize = 128;
         const CART_TRACE: u8 = 0x26;
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
@@ -670,7 +795,7 @@ pub inline fn trace(x: []const u8) void {
         const FIFO_RDY: u32 = 1 << 1;
 
         const len: u24 = @intCast(@min(x.len, TRACE_BUF_SIZE - 1));
-        const buf: [*]volatile u8 = @ptrFromInt(TRACE_BUF);
+        const buf: [*]volatile u8 = @ptrFromInt(trace_buf_addr);
         for (x[0..len], 0..) |c, i| buf[i] = c;
         buf[len] = 0;
 
@@ -704,30 +829,115 @@ pub inline fn present() void {
 
     // Message constants — must match mailbox.MessageType values in the OS.
     const FRAMEBUFFER_READY: u32 = 0x25000001;
+    const FRAMEBUFFER_READY_V2: u8 = 0x28;
     const FRAMEBUFFER_DONE: u32 = 0x25000002;
 
-    // Drain any stale messages so we don't mistake an old reply for DONE.
+    // Drain completion messages to release the in-flight slot.
     while (SIO_FIFO_ST.* & FIFO_VLD != 0) {
-        _ = SIO_FIFO_RD.*;
+        const reply = SIO_FIFO_RD.*;
+        if (reply == FRAMEBUFFER_DONE) {
+            has_in_flight_frame = false;
+        }
     }
 
-    // Wait until the write FIFO has space, then send FRAMEBUFFER_READY.
+    if (has_in_flight_frame) {
+        var spins: u32 = 0;
+        while (has_in_flight_frame) {
+            while (SIO_FIFO_ST.* & FIFO_VLD == 0) {
+                asm volatile ("nop");
+                spins +%= 1;
+                if (spins >= present_wait_spin_limit) {
+                    // Stop waiting rather than deadlocking Core 1 forever.
+                    present_timeout_events +%= 1;
+                    // Keep trace volume low: log only occasionally.
+                    if ((present_timeout_events & 0x3f) == 0x01) {
+                        trace("[PRESENT] timeout waiting FRAMEBUFFER_DONE");
+                    }
+                    return;
+                }
+            }
+            const reply = SIO_FIFO_RD.*;
+            if (reply == FRAMEBUFFER_DONE) {
+                has_in_flight_frame = false;
+            }
+        }
+    }
+
+    // Publish the completed draw buffer.
+    // payload bit0 = buffer index, bit1 = dirty-rect present.
+    var payload: u32 = draw_buffer_index;
+    if (dirty_any) {
+        dirty_rect_x_ptr.* = dirty_min_x;
+        dirty_rect_y_ptr.* = dirty_min_y;
+        dirty_rect_w_ptr.* = dirty_max_x - dirty_min_x + 1;
+        dirty_rect_h_ptr.* = dirty_max_y - dirty_min_y + 1;
+        payload |= 0x2;
+    } else if (computeDirtyRectLegacyFallback()) |r| {
+        dirty_rect_x_ptr.* = r.x;
+        dirty_rect_y_ptr.* = r.y;
+        dirty_rect_w_ptr.* = r.w;
+        dirty_rect_h_ptr.* = r.h;
+        payload |= 0x2;
+    }
+
+    const ready_v2: u32 = (@as(u32, FRAMEBUFFER_READY_V2) << 24) | payload;
+    var ready_spins: u32 = 0;
     while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
         asm volatile ("nop");
+        ready_spins +%= 1;
+        if (ready_spins >= present_wait_spin_limit) {
+            present_timeout_events +%= 1;
+            if ((present_timeout_events & 0x3f) == 0x01) {
+                trace("[PRESENT] timeout waiting FIFO_RDY");
+            }
+            return;
+        }
     }
-    SIO_FIFO_WR.* = FRAMEBUFFER_READY;
+    SIO_FIFO_WR.* = ready_v2;
     // SEV to wake Core 0 in case it's in WFE.
     asm volatile ("sev");
 
-    // Block until Core 0 replies with FRAMEBUFFER_DONE.
-    // This ensures we don't start writing the next frame while the DMA
-    // transfer from the shared framebuffer is still in progress.
-    while (true) {
-        while (SIO_FIFO_ST.* & FIFO_VLD == 0) {
-            asm volatile ("nop");
+    has_in_flight_frame = true;
+    // Switch draw buffer immediately so cart can render next frame while
+    // Core 0 flushes the published one.
+    draw_buffer_index = if (draw_buffer_index == 0) 1 else 0;
+    updateDrawBufferPointer();
+    resetDirtyRect();
+
+    // Keep backward compatibility in case kernel only supports v1 ready.
+    _ = FRAMEBUFFER_READY;
+}
+
+fn computeDirtyRectLegacyFallback() ?struct { x: u16, y: u16, w: u16, h: u16 } {
+    const cur = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
+    const prev = if (draw_buffer_index == 0) framebuffer1 else framebuffer0;
+
+    var any = false;
+    var min_x: u32 = screen_width;
+    var min_y: u32 = screen_height;
+    var max_x: u32 = 0;
+    var max_y: u32 = 0;
+
+    var x: u32 = 0;
+    while (x < screen_width) : (x += 1) {
+        var y: u32 = 0;
+        while (y < screen_height) : (y += 1) {
+            if (cur[x][y].bits != prev[x][y].bits) {
+                any = true;
+                if (x < min_x) min_x = x;
+                if (y < min_y) min_y = y;
+                if (x > max_x) max_x = x;
+                if (y > max_y) max_y = y;
+            }
         }
-        const reply = SIO_FIFO_RD.*;
-        if (reply == FRAMEBUFFER_DONE) break;
-        // Ignore other messages (e.g. leftover control messages).
     }
+
+    if (!any) return null;
+
+    return .{
+        .x = @intCast(min_x),
+        .y = @intCast(min_y),
+        .w = @intCast(max_x - min_x + 1),
+        .h = @intCast(max_y - min_y + 1),
+    };
 }

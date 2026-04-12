@@ -1,0 +1,6 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "SYCL Badge 2024")(type "KiCad")(uri "${KIPRJMOD}/SYCL Badge 2024.pretty")(options "")(descr ""))
+  (lib (name "1054500101_v1")(type "KiCad")(uri "${KIPRJMOD}/1054500101_v1/KiCADv6/footprints.pretty")(options "")(descr ""))
+  (lib (name "CAT4104V_GT3")(type "KiCad")(uri "C:/Users/Vanessa/Downloads/CAT4104V_GT3/KiCADv6/footprints.pretty")(options "")(descr ""))
+)

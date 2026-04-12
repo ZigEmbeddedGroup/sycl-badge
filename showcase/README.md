@@ -14,6 +14,8 @@ zig build
 
 Outputs are written to `zig-out/firmware`.
 
+Additionally, building in the showcase directory just re-routes the command to the root zig build.
+
 ### Flash to Badge Hardware
 
 1. Build with `zig build`.

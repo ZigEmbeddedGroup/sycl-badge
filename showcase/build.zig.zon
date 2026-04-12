@@ -1,22 +1,8 @@
 .{
     .name = .sycl_badge_showcase,
-    .fingerprint = 0x53249986100ad559,
+    .fingerprint = 0x53249986dcdd38e9,
     .version = "0.0.0",
-    .dependencies = .{
-        .sycl_badge = .{ .path = ".." },
-
-        // Carts go here
-
-        .blobs = .{ .path = "carts/blobs" },
-        .plasma = .{ .path = "carts/plasma" },
-        .@"metalgear-timer" = .{ .path = "carts/metalgear-timer" },
-        .raytracer = .{ .path = "carts/raytracer" },
-        .neopixelpuzzle = .{ .path = "carts/neopixelpuzzle" },
-        .@"space-shooter" = .{ .path = "carts/space-shooter" },
-        .dvd = .{ .path = "carts/dvd" },
-        .zeroman = .{ .path = "carts/zeroman" },
-        .lcd_text = .{ .path = "carts/lcd-text" },
-    },
+    .dependencies = .{},
     .paths = .{
         "README.md",
         "build.zig.zon",

@@ -1,30 +1,86 @@
-# SYCL 2024 Badge Simulator
+# SYCL Badge V2 Simulator
 
-Simulate your badge on the interwebz.
+Web simulator for SYCL Badge carts.
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 20.x or newer
+- Zig 0.15.1 (needed for building and serving carts)
+
+### Run the Simulator UI Locally
+
+From this folder:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:1234`.
+
+### Serve a Cart with Live Reload
+
+The simulator expects a watcher service at `http://localhost:2468`.
+
+A simple way to start one is the introduction example:
+
+```bash
+cd ../docs/introduction
+zig build watch
+```
+
+That watcher serves:
+
+- `http://localhost:2468/cart.wasm`
+- `ws://localhost:2468/ws` for reload events
+
+If this service is not running, the simulator shows: `Watcher not found. Start and reload.`
+
+## Production Build
+
+```bash
+npm install
+npm run build
+```
+
+The production web build is emitted by Parcel.
+
+## Hosted Simulator
+
+Use the hosted simulator directly at:
+
+- <https://badgesim.microzig.tech/>
 
 ## Controls
 
-- Joystick: Arrow keys/WASD
+- Joystick: Arrow keys or WASD
 - Joystick click: Shift
-- A: Z/K
-- B: X/J
-- Start: Enter/Y
-- Select: Backspace/T
+- A: Z or K
+- B: X or J
+- Start: Enter or Y
+- Select: Backspace or T
 - Open system menu: Escape
 
 ## Supported Hardware Components
 
-- [x] Light Sensor
-- [x] 160x128 RGB screen
-- [x] 5x RGB LEDs
-- [x] 1x Red LED on the back
-- [x] Speaker
-- [x] Start/Option buttons
-- [x] A/B buttons
-- [x] A navstick with up/down/left/right. Unsure up/left will both be activated on diagonal
-- [x] Navstick is pressable too
-- [x] 2MB flash separate from the microcontroller's flash
+- Light sensor
+- 160x128 RGB screen
+- 5 RGB LEDs (neopixels)
+- Back red LED
+- Speaker
+- Start/select buttons
+- A/B buttons
+- Navstick (up/down/left/right + click)
+- 4MB flash model (2MB internal + 2MB external)
 
-## Additional Features
+## Troubleshooting
 
-- [x] Live reload
+- `Watcher not found. Start and reload.`:
+  Start a watcher process (`zig build watch`) in a cart project that supports it.
+- `Watcher was disconnected.`:
+  Restart the watcher and reload the page.
+- UI starts but no cart appears:
+  Confirm `http://localhost:2468/cart.wasm` is reachable.
+

@@ -4,15 +4,15 @@ const std = @import("std");
 const root = @import("root");
 // cart imports
 const carts = .{
-    // TODO: Enable these when zigimg comes out with a 0.15.1 update
-    //.{ "zeroman", @import("zeroman") },
-    //.{ "dvd", @import("dvd") },
+    .{ "zeroman", @import("zeroman") },
+    .{ "dvd", @import("dvd") },
     .{ "blobs", @import("blobs") },
     .{ "plasma", @import("plasma") },
     .{ "metalgear-timer", @import("metalgear-timer") },
     .{ "raytracer", @import("raytracer") },
     .{ "neopixelpuzzle", @import("neopixelpuzzle") },
     .{ "space-shooter", @import("space-shooter") },
+    .{ "lcd_text", @import("lcd_text") },
 };
 
 pub fn build(b: *std.Build) void {

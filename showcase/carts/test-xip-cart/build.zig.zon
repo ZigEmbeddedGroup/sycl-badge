@@ -1,0 +1,16 @@
+.{
+    .name = .test_xip_cart,
+    .fingerprint = 0xa5c555ccf0110b5,
+    .version = "0.0.0",
+    .dependencies = .{
+        .microzig = .{
+            .url = "https://github.com/ZigEmbeddedDev/microzig/releases/download/microzig-0.15.0/microzig-0.15.0.tar.gz",
+            .hash = "microzig-0.15.0-D20YSctp1ACsdZCdjN2xvWdgAW9MBx_jZ1l1ya3IU2QM",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

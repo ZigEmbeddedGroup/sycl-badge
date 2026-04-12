@@ -448,6 +448,48 @@ export class App extends LitElement {
         document.body.removeChild(input);
     }
 
+    exportGameDisk () {
+        const blob = new Blob([this.runtime.flashBuffer], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "sycl-badge-disk.bin";
+        anchor.click();
+        URL.revokeObjectURL(url);
+    }
+
+    importGameDisk () {
+        const input = document.createElement("input");
+        input.style.display = "none";
+        input.type = "file";
+        input.accept = ".bin";
+        input.multiple = false;
+
+        input.addEventListener("change", () => {
+            if (input.files?.[0]) {
+                const reader = new FileReader();
+                reader.addEventListener("load", () => {
+                    const src = new Uint8Array(reader.result as ArrayBuffer);
+                    const dst = new Uint8Array(this.runtime.flashBuffer);
+                    dst.fill(0);
+                    dst.set(src.subarray(0, Math.min(src.length, dst.length)));
+                    this.notifications.show("Disk imported");
+                    this.closeMenu();
+                });
+                reader.readAsArrayBuffer(input.files[0]);
+            }
+        });
+
+        document.body.appendChild(input);
+        input.click();
+        document.body.removeChild(input);
+    }
+
+    clearGameDisk () {
+        new Uint8Array(this.runtime.flashBuffer).fill(0);
+        this.notifications.show("Disk cleared");
+    }
+
     async resetCart (wasmBuffer?: Uint8Array, preserveState: boolean = false) {
         if (!wasmBuffer) {
             wasmBuffer = this.runtime.wasmBuffer!;

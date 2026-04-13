@@ -8,15 +8,20 @@ pub fn main() !void {
     var file = try std.fs.cwd().createFile("simulator/src/font.ts", .{});
     defer file.close();
 
-    try file.writer().writeAll("export const FONT = Uint8Array.of(\n");
+    var buffer: [4096]u8 = undefined;
+    var file_writer = file.writer(&buffer);
+    const writer = &file_writer.interface;
+
+    try writer.writeAll("export const FONT = Uint8Array.of(\n");
     for (font) |char| {
-        try file.writer().writeAll("   ");
+        try writer.writeAll("    ");
         for (char) |byte| {
-            try file.writer().print(" 0x{X:0>2},", .{byte});
+            try writer.print("0x{X:0>2}, ", .{byte});
         }
 
-        try file.writer().writeByte('\n');
+        try writer.writeByte('\n');
     }
 
-    try file.writer().writeAll(");\n");
+    try writer.writeAll(");\n");
+    try file_writer.end();
 }

@@ -1,25 +1,50 @@
 # Software You Can Love Badge
 
-Welcome to the SYCL badge repo!
+Welcome to the SYCL badge repository.
 
-## Get started with the [Introduction](docs/introduction/README.md)!
+## Quick Start
 
-<!--
-Useful information but I think it might confuse folks.
+### Prerequisites
 
-## Uploading firmware using a debugger
+- Zig 0.15.1
+- Node.js 20.x or newer (for the local simulator UI)
 
-```
-target extended-remote /dev/ttyACM{first}
+### Build Firmware and Carts
 
-monitor swd_scan # searches for device
-attach 1
-file zig-out/firmware/pybadge-io.elf
- 
+```bash
+zig build
 ```
 
-## Updating Black Magic Probe firmware
+Build outputs are installed under `zig-out/firmware`.
 
+### Run the Local Simulator UI
+
+```bash
+cd simulator
+npm install
+npm run dev
 ```
-sudo dfu-util -a 0 --dfuse-address 0x08000000:leave -R -D ~/Downloads/blackmagic-firmware-v1.10.0-rc1/blackpill-f401cc/blackmagic-blackpill-f401cc.bin ^C
-```-->
+
+The simulator UI runs on `http://localhost:1234`.
+
+To provide a cart to the simulator with live reload, run a watcher from a cart project that defines a `watch` step (for example [docs/introduction](docs/introduction/README.md)):
+
+```bash
+cd docs/introduction
+zig build watch
+```
+
+### Flash a UF2 to the Badge
+
+1. Plug in the badge over USB so it mounts as a mass storage drive.
+2. Copy a `.uf2` from `zig-out/firmware` onto the badge drive, replacing `CURRENT.UF2`.
+3. The new program starts immediately.
+
+## Documentation Map
+
+- [Introduction](docs/introduction/README.md)
+- [Firmware architecture](src/README.md)
+- [Simulator](simulator/README.md)
+- [Showcase carts](showcase/README.md)
+- [Pinout](docs/pinout.md)
+

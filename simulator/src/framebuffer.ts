@@ -220,18 +220,41 @@ export class Framebuffer {
         }
     }
 
-    drawText (textColor: number, backgroundColor: number, charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number) {
+    drawText (textColor: number, backgroundColor: number, charArray: number[] | Uint8Array | Uint8ClampedArray | Uint16Array, x: number, y: number, scale: number = 1) {
+        const glyphScale = Math.max(1, scale | 0);
         let currentX = x;
         for (let ii = 0, len = charArray.length; ii < len; ++ii) {
             const charCode = charArray[ii];
             if (charCode === 10) {
-                y += 8;
+                y += 8 * glyphScale;
                 currentX = x;
             } else if (charCode >= 32 && charCode <= 255) {
-                this.blitPalette([textColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
-                currentX += 8;
+                if (glyphScale === 1) {
+                    this.blitPalette([textColor, backgroundColor], FONT, currentX, y, 8, 8, 0, (charCode - 32) << 3, 8);
+                } else {
+                    for (let row = 0; row < 8; row++) {
+                        for (let col = 0; col < 8; col++) {
+                            const bitIndex = (((charCode - 32) << 3) + row) * 8 + col;
+                            const byte = FONT[bitIndex >>> 3];
+                            const shift = 7 - (bitIndex & 0x7);
+                            const colorIdx = (byte >>> shift) & 0b1;
+                            const pixelColor = colorIdx === 0 ? textColor : backgroundColor;
+
+                            if (pixelColor !== OPTIONAL_COLOR_NONE) {
+                                const px = currentX + col * glyphScale;
+                                const py = y + row * glyphScale;
+                                for (let sy = 0; sy < glyphScale; sy++) {
+                                    for (let sx = 0; sx < glyphScale; sx++) {
+                                        this.drawPointUnclipped(pixelColor, px + sx, py + sy);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                currentX += 8 * glyphScale;
             } else {
-                currentX += 8;
+                currentX += 8 * glyphScale;
             }
         }
     }

@@ -2,6 +2,22 @@ const std = @import("std");
 const fmt = std.fmt;
 const cart = @import("cart-api");
 
+/// Custom panic handler: sends the message via cart.trace() then halts
+/// without @breakpoint() (which causes a silent HardFault and system reset).
+/// The [CART] prefix lets you spot it immediately in the USB console.
+pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
+    cart.trace(msg);
+    // Loop without triggering a HardFault so Core 0 has time to print the
+    // trace message before the cart freezes.
+    // Use a low-power wait on ARM, plain spin on other targets (e.g. WASM).
+    while (true) {
+        switch (comptime @import("builtin").cpu.arch) {
+            .wasm32, .wasm64 => {},
+            else => asm volatile ("wfe"),
+        }
+    }
+}
+
 const GameScaler: f32 = 1.0;
 const black = defColor(0x000000);
 const white = defColor(0xffffff);
@@ -212,26 +228,11 @@ fn tick_bullets() void {
             bullet.y > cart.screen_height or
             bullet.x < 0 or
             bullet.y < 0) bullet.state = .dead;
-        if (bullet.state != .dead and
-            bullet.x > player.x and
-            bullet.x < player.x + 8 and
-            bullet.y > player.y - 1 and
-            bullet.y < player.y + 1)
-        {
-            bullet.state = .dead;
-
-            if (player.health > 0) {
-                player.health -= 1;
-                player.score = 0;
-                noisy(220.0, 0.2, 80, 1);
-            } else {
-                noisy(440.0, 0.2, 100, 3);
-            }
-        }
     }
 }
 
 fn draw_bullets() void {
+    cart.trace("ss:draw-b");
     for (&bullets) |*bullet| {
         switch (bullet.state) {
             .dot => {
@@ -285,6 +286,7 @@ fn tick_player() void {
 }
 
 fn draw_player() void {
+    cart.trace("ss:draw-p");
     const speed = player.speed;
     const xpos: i32 = @intFromFloat(player.x - @as(f32, @floatFromInt(player.cooldown)) * 0.5);
     if (speed < -0.1) {
@@ -478,9 +480,11 @@ fn tick_enemies() void {
 }
 
 fn draw_enemies() void {
+    cart.trace("ss:draw-e");
     for (&enemies) |*enemy| {
         if (enemy.state == .dead) continue;
         if (enemy.state == .dying) {
+            cart.trace("ss:dying-oval");
             const hw: f32 = @as(f32, @floatFromInt(enemy.cooldown * 2)) * 0.5;
             cart.oval(.{
                 .x = @intFromFloat(enemy.x - hw),
@@ -494,6 +498,7 @@ fn draw_enemies() void {
         const colors = [_]cart.NeopixelColor{ mandarin_sorbet, purp, green, zig };
         const clr = rgb565(colors[level % colors.len]);
         if (enemy.state == .live) {
+            cart.trace("ss:live");
             cart.hline(.{
                 .x = @intFromFloat(enemy.x - EnemyWidth / 2),
                 .y = @intFromFloat(enemy.y + EnemyWidth / 2 - 1),
@@ -525,6 +530,7 @@ fn draw_enemies() void {
                 .height = EnemyWidth,
                 .fill_color = clr,
             });
+            cart.trace("ss:live-oval");
             cart.oval(.{
                 .x = @intFromFloat(enemy.x),
                 .y = @intFromFloat(enemy.y - 3),
@@ -532,11 +538,13 @@ fn draw_enemies() void {
                 .height = 6,
                 .fill_color = rgb565(black),
             });
+            cart.trace("ss:oval-ok");
         }
     }
 }
 
 fn draw_level() void {
+    cart.trace("ss:draw-l");
     if (player.score > 0) {
         var text: [32]u8 = undefined;
         const txt = std.fmt.bufPrintZ(&text, "{}", .{player.score}) catch "-";
@@ -564,6 +572,7 @@ const bannerWidth = cart.font_width * bannerText.len;
 var bannerPos: f32 = cart.screen_width / 2;
 
 fn draw_banner() void {
+    cart.trace("ss:draw-bn");
     cart.text(.{
         .str = bannerText,
         .x = @intFromFloat(bannerPos),
@@ -618,6 +627,14 @@ fn draw_intro_text() void {
 var stateTick: u16 = 0;
 var pixelTick: u8 = 0;
 var quietMode: bool = false;
+var select_held_frames: u8 = 0; // Debounce: require SELECT held to reset from game
+
+// Diagnostic frame counter for crash-location tracing.
+// Every 30 frames we send "ss:F=NNN" via cart.trace() while in game mode.
+// draw_enemies() also sends a trace before each complex drawing operation
+// so the last [CART] message visible in the console before the crash/[PANIC]
+// pinpoints the crash location.
+var diag_frame: u32 = 0;
 
 export fn update() void {
     if (stateTick > 1000) stateTick = 100;
@@ -637,7 +654,8 @@ export fn update() void {
         tick_stars();
         draw_stars();
         draw_intro_text();
-        if (stateTick > 50 and cart.controls.start) {
+        // Accept START after ~10 frames (~166ms) instead of 50 - avoids feeling unresponsive
+        if (stateTick > 10 and cart.controls.start) {
             gameState = .game;
             stateTick = 0;
         }
@@ -662,7 +680,7 @@ export fn update() void {
                 .text_color = rgb565(red),
             });
         }
-        if (stateTick > 50 and cart.controls.start) {
+        if (stateTick > 10 and cart.controls.start) {
             reset_game();
             gameState = .intro;
             stateTick = 0;
@@ -675,11 +693,29 @@ export fn update() void {
             }
         }
     } else {
-        if (stateTick > 50 and cart.controls.select) {
+        // SELECT+DOWN = intentional reset (avoids accidental resets from SELECT noise).
+        // SELECT alone no longer resets - was causing rapid resets to intro screen.
+        if (stateTick > 60 and cart.controls.select and cart.controls.down) {
+            select_held_frames +%= 1;
+        } else {
+            select_held_frames = 0;
+        }
+        if (select_held_frames >= 20) {
             reset_game();
             gameState = .intro;
             stateTick = 0;
+            select_held_frames = 0;
         }
+
+        // Periodic heartbeat every 30 frames (~0.5s at 60fps).
+        // If the crash happens DURING tick_game(), the last [CART] message
+        // will be "ss:tick".  If inside draw_enemies(), it will be "ss:draw-e",
+        // "ss:live", "ss:live-oval", or "ss:dying-oval".
+        diag_frame +%= 1;
+        if (diag_frame % 30 == 0) {
+            cart.trace("ss:tick");
+        }
+
         tick_game();
         if (player.health == 0) {
             gameState = .game_over;
@@ -691,9 +727,13 @@ export fn update() void {
 }
 
 fn tick_game() void {
+    cart.trace("ss:tg-stars");
     tick_stars();
+    cart.trace("ss:tg-bullets");
     tick_bullets();
+    cart.trace("ss:tg-enemies");
     tick_enemies();
+    cart.trace("ss:tg-player");
     tick_player();
 }
 

@@ -34,7 +34,7 @@ const Neopixels = struct {
     /// Write colors to all neopixels
     pub fn write(leds: *const [NUM_LEDS]NeopixelColor) void {
         // Initialize buffer to zero to prevent garbage data
-        var buf: [NUM_LEDS * 3]u8 = [_]u8{0} ** (NUM_LEDS * 3);
+        var buf: [NUM_LEDS * 3]u8 = @splat(0);
 
         for (leds, 0..) |color, i| {
             buf[i * 3 + 0] = color.g;
@@ -166,6 +166,13 @@ var last_buttons = ButtonState{};
 // Main Loop
 // ============================================================================
 
+pub const panic = microzig.panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
 pub fn main() void {
     // Initialize neopixel pin as output and ensure it starts LOW
     board.neopixel_pin.set_function(.sio);
@@ -190,11 +197,11 @@ pub fn main() void {
     board.joystick_right.set_pull(.down);
 
     // Clear all neopixels first
-    const clear_leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+    const clear_leds: [NUM_LEDS]NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
     Neopixels.write(&clear_leds);
 
     // Initial display
-    var leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+    var leds: [NUM_LEDS]NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
     leds[global.position] = color_palette[global.color_index];
     Neopixels.write(&leds);
 
@@ -240,7 +247,7 @@ pub fn main() void {
 
             // Update display if state changed
             if (updated) {
-                leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+                leds = @splat(.{ .r = 0, .g = 0, .b = 0 });
                 leds[global.position] = color_palette[global.color_index];
                 Neopixels.write(&leds);
             }

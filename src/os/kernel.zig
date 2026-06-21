@@ -19,6 +19,11 @@ const mailbox = @import("ipc/mailbox.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
 
 // Simple button poller (similar to badge-v1)
 const ButtonPoller = struct {

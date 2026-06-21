@@ -30,7 +30,7 @@ var echo_enabled: bool = true; // Echoing chars back
 
 // Command History
 var history: [MAX_HISTORY][MAX_LINE_LENGTH]u8 = undefined;
-var history_lengths: [MAX_HISTORY]usize = [_]usize{0} ** MAX_HISTORY;
+var history_lengths: [MAX_HISTORY]usize = @splat(0);
 var history_count: usize = 0; // Total commands stored
 var history_index: usize = 0; // Current position in history (for up/down)
 var in_history_mode: bool = false; // Sets if we are browsing history

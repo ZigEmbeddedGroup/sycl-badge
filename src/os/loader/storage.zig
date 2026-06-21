@@ -60,11 +60,11 @@ pub fn init() void {
 /// Call this when the root directory is full of deleted entries.
 pub fn wipeStorage() void {
 
-    // TODO: might have to clear all this and only do formatVolume at the end, to 
-    // avoid doing multiple flash erases if the root is very full of deleted entries. 
-    // Or we could optimize formatVolume to not rewrite the FAT and root if they look 
+    // TODO: might have to clear all this and only do formatVolume at the end, to
+    // avoid doing multiple flash erases if the root is very full of deleted entries.
+    // Or we could optimize formatVolume to not rewrite the FAT and root if they look
     // mostly correct, and just do a single erase+format at the end.
-    
+
     flushPendingWrites();
 
     const base = romfsBase();
@@ -249,7 +249,7 @@ fn isSizeCorrect() bool {
 
 fn formatVolume() void {
     const volume_sectors = volumeTotalSectors();
-    var boot_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
+    var boot_sector: [SECTOR_SIZE]u8 = @splat(0);
     boot_sector[0] = 0xEB;
     boot_sector[1] = 0x3C;
     boot_sector[2] = 0x90;
@@ -277,7 +277,7 @@ fn formatVolume() void {
 
     const fat_start = RESERVED_SECTORS;
     const fat_secs = fatSectors();
-    var sector_buf: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
+    var sector_buf: [SECTOR_SIZE]u8 = @splat(0);
     sector_buf[0] = MEDIA_DESCRIPTOR;
     sector_buf[1] = 0xFF;
     sector_buf[2] = 0xFF;
@@ -305,13 +305,13 @@ fn formatVolume() void {
     const root_lba = fat_start + (@as(u32, NUM_FATS) * fat_secs);
     const root_secs = rootDirSectors();
     var j: u16 = 0;
-    var zero_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
+    var zero_sector: [SECTOR_SIZE]u8 = @splat(0);
     while (j < root_secs) : (j += 1) {
         writeSector(root_lba + j, zero_sector[0..]);
     }
 
     // Write a volume label entry in the first root directory sector.
-    var label_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
+    var label_sector: [SECTOR_SIZE]u8 = @splat(0);
     @memcpy(label_sector[DIR_NAME .. DIR_NAME + 11], "SYCLBADGE  ");
     label_sector[DIR_ATTR] = 0x08; // Volume label
     writeSector(root_lba, label_sector[0..]);

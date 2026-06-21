@@ -65,12 +65,7 @@ inline fn rgb565(clr: cart.NeopixelColor) cart.DisplayColor {
 var rand: std.Random.DefaultPrng = undefined;
 fn rand_float() f32 {
     const byte_count = 2;
-    const UInt = @Type(std.builtin.Type{
-        .int = .{
-            .signedness = .unsigned,
-            .bits = byte_count * 8,
-        },
-    });
+    const UInt = @Int(.unsigned, byte_count * 8);
     var buf: [byte_count]u8 = undefined;
     rand.fill(&buf);
     const r = std.mem.readInt(UInt, &buf, .big);
@@ -547,7 +542,7 @@ fn draw_level() void {
     cart.trace("ss:draw-l");
     if (player.score > 0) {
         var text: [32]u8 = undefined;
-        const txt = std.fmt.bufPrintZ(&text, "{}", .{player.score}) catch "-";
+        const txt = std.fmt.bufPrintSentinel(&text, "{}", .{player.score}, 0) catch "-";
         cart.text(.{
             .str = txt,
             .x = @intCast((cart.screen_width - cart.font_width * txt.len) / 2),
@@ -600,8 +595,8 @@ const introText = &[_][]const u8{
     "Press START",
 };
 const spacing = (cart.font_height * 4 / 3);
-var shakex: [introText.len]i32 = .{0} ** introText.len;
-var shakey: [introText.len]i32 = .{0} ** introText.len;
+var shakex: [introText.len]i32 = @splat(0);
+var shakey: [introText.len]i32 = @splat(0);
 
 fn draw_intro_text() void {
     const y_start = (cart.screen_height - (cart.font_height + spacing * (introText.len - 1))) / 2;

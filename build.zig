@@ -4,7 +4,7 @@ const Build = std.Build;
 const microzig = @import("microzig");
 
 const MicroBuild = microzig.MicroBuild(.{
-    .atsam = true,
+    .samd51 = true,
     .rp2xxx = true,
 });
 
@@ -197,7 +197,7 @@ pub const CartOptions = struct {
 };
 
 fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
-    return mb.ports.atsam.chips.atsamd51j19.derive(.{
+    return mb.ports.samd51.chips.atsamd51j19.derive(.{
         .preferred_binary_format = .elf,
         .board = .{
             .name = "SYCL Badge V2",
@@ -271,7 +271,7 @@ pub fn add_os(
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 
     const os: *OS = b.allocator.create(OS) catch @panic("OOM");
-    os.* = .{ .exe = fw.artifact, .uf2_output = fw.artifact.getEmittedBin() };
+    os.* = .{ .exe = fw.exe, .uf2_output = fw.exe.getEmittedBin() };
     return os;
 }
 
@@ -331,9 +331,10 @@ pub fn add_cart(
         .root_source_file = d.builder.path("src/badge-v1/badge.zig"),
         .linker_script = .{
             .file = d.builder.path("src/badge-v1/cart.ld"),
+            .assert_microzig_main = false,
         },
     });
-    fw.artifact.linkLibrary(cart_lib);
+    fw.exe.root_module.linkLibrary(cart_lib);
 
     const cart: *Cart = b.allocator.create(Cart) catch @panic("OOM");
     cart.* = .{
@@ -463,12 +464,13 @@ pub fn add_microzig_cart(b: *Build, dep: *Build.Dependency, options: MicroZigCar
         .linker_script = .{
             .file = dep.builder.path("src/cart/cart_xip.ld"),
             .generate = .none, // Don't generate microzig's default linker script
+            .assert_microzig_main = false,
         },
     });
 
     // Inject user's main.zig as "user_main" module into the app module
     // (app_mod is cart_entry.zig, which imports user_main)
-    fw.app_mod.addImport("user_main", user_main_module);
+    fw.exe.root_module.addImport("user_main", user_main_module);
 
     // Give user_main access to microzig so they can use the HAL
     user_main_module.addImport("microzig", fw.core_mod);
@@ -515,12 +517,13 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .linker_script = .{
             .file = dep.builder.path("src/cart/cart_xip.ld"),
             .generate = .none,
+            .assert_microzig_main = false,
         },
     });
 
     // Inject cart and api modules into the entry wrapper
-    fw.app_mod.addImport("user_cart", user_cart_module);
-    fw.app_mod.addImport("cart-api", cart_api_module);
+    fw.exe.root_module.addImport("user_cart", user_cart_module);
+    fw.exe.root_module.addImport("cart-api", cart_api_module);
     user_cart_module.addImport("microzig", fw.core_mod);
 
     // Share the board module with cart-api so that font.zig belongs to exactly

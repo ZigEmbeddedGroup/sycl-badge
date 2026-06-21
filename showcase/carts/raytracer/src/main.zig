@@ -23,7 +23,7 @@ export fn update() void {
     main_program() catch return;
 }
 
-var buffer = [_]u8{0} ** 16384;
+var buffer: [16384]u8 = @splat(0);
 pub fn main_program() !void {
     // Allocator
 

@@ -295,7 +295,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         }
 
         fn prepare_inquiry(self: *Self) void {
-            var resp: [36]u8 = [_]u8{0} ** 36;
+            var resp: [36]u8 = @splat(0);
             // Byte 0: Peripheral Device Type (0x00 = Direct Access Block Device / Disk)
             resp[0] = 0x00;
             // Byte 1: RMB bit (0x80 = Removable Media)
@@ -331,7 +331,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
 
         fn prepare_read_capacity_16(self: *Self) void {
             const total: u64 = storage.totalSectors() - 1;
-            var resp: [32]u8 = [_]u8{0} ** 32;
+            var resp: [32]u8 = @splat(0);
             write_be_u64(resp[0..8], total);
             write_be_u32(resp[8..12], @intCast(storage.SECTOR_SIZE));
             self.queue_in(resp[0..resp.len]);
@@ -339,7 +339,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
 
         fn prepare_read_format_capacities(self: *Self) void {
             const total = storage.totalSectors();
-            var resp: [12]u8 = [_]u8{0} ** 12;
+            var resp: [12]u8 = @splat(0);
             // Capacity list length = 8
             resp[3] = 8;
             // Number of blocks (total sectors)
@@ -374,7 +374,7 @@ pub fn MscClassDriver(comptime UsbDeviceType: type) type {
         }
 
         fn prepare_request_sense(self: *Self) void {
-            var resp: [18]u8 = [_]u8{0} ** 18;
+            var resp: [18]u8 = @splat(0);
             resp[0] = 0x70; // Response code: current error
             resp[2] = self.sense.key;
             resp[7] = 10; // Additional sense length

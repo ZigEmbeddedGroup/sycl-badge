@@ -7,6 +7,13 @@ const time = microzig.hal.time;
 // Pico 2 has LED on GPIO 25
 const led_pin = gpio.num(14);
 
+pub const panic = microzig.panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
 pub fn main() !void {
     // Initialize the LED pin as output
     led_pin.set_function(.sio);

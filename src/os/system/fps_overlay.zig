@@ -21,7 +21,7 @@ var fps_display: u32 = 0;
 // variations.  Pre-filled with ~30 fps so the counter looks sane on first show.
 
 const AVG_WINDOW: usize = 8;
-var frame_times: [AVG_WINDOW]u32 = [_]u32{33_334} ** AVG_WINDOW;
+var frame_times: [AVG_WINDOW]u32 = @splat(33_334);
 var frame_time_index: usize = 0;
 var frame_time_sum: u32 = 33_334 * AVG_WINDOW;
 

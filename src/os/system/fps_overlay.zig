@@ -54,7 +54,7 @@ fn AveragingBuffer(comptime T: type, comptime window: u32) type {
             self.index = (self.index + 1) % window;
         }
     };
-} 
+}
 
 var frame_times: AveragingBuffer(u32, 8) = .{};
 var poll_max_history: AveragingBuffer(u32, 32) = .{};
@@ -107,7 +107,7 @@ const DebugTextOptions = struct {
     text: []const u8,
     x: i16,
     y: i16,
-    alignment: enum{ left, center, right },
+    alignment: enum { left, center, right },
     color: lcd.Color16,
     bg_color: lcd.Color16 = lcd.BLACK,
 };
@@ -247,7 +247,8 @@ pub fn poll() void {
 pub fn submit_lcd_work() void {
     // Tick the display state machine
     if (curr_debug_text < num_debug_texts) {
-        const z = terry.core0.zone("fps_overlay.submit_lcd_work", @src()); defer z.end();
+        const z = terry.core0.zone("fps_overlay.submit_lcd_work", @src());
+        defer z.end();
 
         const curr = &debug_texts[curr_debug_text];
         // Render the text
@@ -264,7 +265,8 @@ pub fn submit_lcd_work() void {
 /// lcd.writeCartBuffer() or lcd.present()), while the SPI bus is idle,
 /// so the overlay renders on top of the cart frame.
 fn add_cart_debug_text() void {
-    const z = terry.core0.zone("fps_overlay.add_cart_debug_text", @src()); defer z.end();
+    const z = terry.core0.zone("fps_overlay.add_cart_debug_text", @src());
+    defer z.end();
 
     // Yellow text on black.
     // Right-justify the FPS value in 3 characters
@@ -286,12 +288,12 @@ fn add_cart_debug_text() void {
     if (display_max_audio_delay != 0) {
         const poll_max_max = poll_max_history.max();
         const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{poll_max_max * 100 / display_max_audio_delay}) catch "!!!%";
-        add_debug_text(.{ .text = audio_delay_str, .x = 4*font_width, .y = 0, .alignment = .left, .color = lcd.RED });
+        add_debug_text(.{ .text = audio_delay_str, .x = 4 * font_width, .y = 0, .alignment = .left, .color = lcd.RED });
     }
 
     if (display_max_audio != 0) {
         const audio_max_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio}) catch "!!!!";
-        add_debug_text(.{ .text = audio_max_str, .x = 4*font_width, .y = font_height, .alignment = .left, .color = lcd.RED });
+        add_debug_text(.{ .text = audio_max_str, .x = 4 * font_width, .y = font_height, .alignment = .left, .color = lcd.RED });
     }
 }
 
@@ -316,7 +318,7 @@ fn add_os_debug_text() void {
         const revision = rev.rev;
         const reading: u32 = rev.raw_reading;
         const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
-        add_debug_text(.{ .text = rev_str, .x = lcd.width, .y = lcd.height - 2*font_height, .alignment = .right, .color = lcd.WHITE });
+        add_debug_text(.{ .text = rev_str, .x = lcd.width, .y = lcd.height - 2 * font_height, .alignment = .right, .color = lcd.WHITE });
 
         const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
         add_debug_text(.{ .text = read_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE });

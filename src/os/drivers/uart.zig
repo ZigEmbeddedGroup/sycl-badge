@@ -11,24 +11,24 @@
 ///   - Pin 6: UART0 RX (GPIO1)
 const std = @import("std");
 const microzig = @import("microzig");
-const hal = microzig.hal;
+const rp2xxx = microzig.hal;
 const board = microzig.board;
 
 // Re-export HAL types
-pub const Config = hal.uart.Config;
-pub const WordBits = hal.uart.WordBits;
-pub const StopBits = hal.uart.StopBits;
-pub const Parity = hal.uart.Parity;
-pub const TransmitError = hal.uart.TransmitError;
-pub const ReceiveError = hal.uart.ReceiveError;
+pub const Config = rp2xxx.uart.Config;
+pub const WordBits = rp2xxx.uart.WordBits;
+pub const StopBits = rp2xxx.uart.StopBits;
+pub const Parity = rp2xxx.uart.Parity;
+pub const TransmitError = rp2xxx.uart.TransmitError;
+pub const ReceiveError = rp2xxx.uart.ReceiveError;
 
 // Use UART0
-const uart_instance = hal.uart.instance.num(0);
+const uart_instance = rp2xxx.uart.instance.num(0);
 
 /// UART0 default settings init (115200 baud, 8N1)
 pub fn init() void {
     // Get the clock config
-    const clock_config = hal.clock_config;
+    const clock_config = rp2xxx.clock_config;
 
     // GPIO pins config for UART0
     const tx_pin = board.UART0_TX;
@@ -45,6 +45,8 @@ pub fn init() void {
         .stop_bits = .one,
         .parity = .none,
     });
+
+    rp2xxx.uart.init_logger(uart_instance);
 }
 
 /// UART init with config
@@ -85,7 +87,7 @@ pub fn println(str: []const u8) void {
 }
 
 /// Get a writer with std.fmt
-pub fn writer() hal.uart.UART.Writer {
+pub fn writer() rp2xxx.uart.UART.Writer {
     return uart_instance.writer();
 }
 

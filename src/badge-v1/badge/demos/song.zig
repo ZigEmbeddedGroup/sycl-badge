@@ -174,8 +174,8 @@ const song: [3][]const Note = .{
 };
 
 var time: f32 = 0.0;
-var channels_note_index = [1]usize{0} ** song.len;
-var channels_note_start = [1]f32{0.0} ** song.len;
+var channels_note_index: [song.len]usize = @splat(0);
+var channels_note_start: [song.len]f32 = @splat(0);
 
 export fn start() void {}
 

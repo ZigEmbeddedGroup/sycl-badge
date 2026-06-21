@@ -56,7 +56,7 @@ export fn update() void {
         .r = @intFromFloat(color.r * neopixel_brightness),
         .b = @intFromFloat(color.b * neopixel_brightness),
     } else .{ .g = 0, .r = 0, .b = 0 };
-    cart.neopixels.* = .{np_color} ** 5;
+    cart.neopixels.* = @splat(np_color);
 }
 
 pub fn drawDvd(sprite: anytype, pos_x: usize, pos_y: usize, color: Rgb) void {

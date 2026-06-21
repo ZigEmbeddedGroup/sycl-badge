@@ -104,6 +104,13 @@ const font_data: [26][8]u8 = .{
 // Main Entry Point
 // ============================================================================
 
+pub const panic = microzig.panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
 pub fn main() !void {
     // Configure control pins as GPIO outputs
     TFT_CS.set_function(.sio);

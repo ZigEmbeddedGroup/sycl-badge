@@ -290,7 +290,7 @@ fn writeCommand(cmd: Command) void {
     pins.cs.put(1); // Deselect first
     pins.dc.put(0); // Command mode
     pins.cs.put(0); // Select
-    spi_instance.write_blocking(u8, &.{@intFromEnum(cmd)});
+    spi_instance.write_blocking(u8, &.{@backingInt(cmd)});
     pins.cs.put(1); // Deselect
 }
 

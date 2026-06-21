@@ -263,7 +263,7 @@ pub fn set_channel(channel: usize, state: Channel) void {
     NVIC.ISER[32 / 32].write(.{ .SETENA = 1 << 32 % 32 });
 }
 
-var channels_storage: [4]Channel = .{Channel{
+var channels_storage: [4]Channel = @splat(.{
     .duty = 0,
     .phase = 0,
     .phase_step = 0,
@@ -282,10 +282,10 @@ var channels_storage: [4]Channel = .{Channel{
     .attack_volume_step = 0,
     .decay_volume_step = 0,
     .release_volume_step = 0,
-}} ** 4;
+});
 const channels: *volatile [4]Channel = &channels_storage;
 
-var sample_buffer_storage: [2][512]u16 = .{.{0} ** 512} ** 2;
+var sample_buffer_storage: [2][512]u16 = @splat(@splat(0));
 
 const board = @import("../board.zig");
 const std = @import("std");

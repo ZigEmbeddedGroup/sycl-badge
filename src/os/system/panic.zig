@@ -13,6 +13,7 @@ const console = @import("console.zig");
 const led = badge.led_pin;
 
 pub fn panic(message: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
+    @breakpoint();
     // Ensure LED is configured
     led.set_function(.sio);
     led.set_direction(.out);

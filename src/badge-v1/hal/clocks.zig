@@ -112,13 +112,14 @@ pub const Frequencies = struct {
                     .OSCCTRL_FDPLL0_32K = 0,
                 };
 
-                ret.EVSYS = .{0} ** 12;
+                ret.EVSYS = @splat(0);
 
-                inline for (@typeInfo(Peripherals).@"struct".fields) |field| {
-                    if (@typeInfo(field.type) != .int)
+                const info = @typeInfo(Peripherals).@"struct";
+                inline for (info.field_names, info.field_types) |field_name, field_type| {
+                    if (@typeInfo(field_type) != .int)
                         break;
 
-                    @field(ret, field.name) = get_peripheral_clock_freq_hz(@field(gclk.PeripheralIndex, "GCLK_" ++ field.name));
+                    @field(ret, field_name) = get_peripheral_clock_freq_hz(@field(gclk.PeripheralIndex, "GCLK_" ++ field_name));
                 }
                 break :blk ret;
             },
@@ -479,14 +480,15 @@ pub fn get_state() State {
             },
             .peripherals = blk: {
                 var ret: State.Peripherals = undefined;
-                inline for (@typeInfo(State.Peripherals).@"struct".fields, 0..) |field, i| {
-                    if (@typeInfo(field.type) == .@"union")
+                const info = @typeInfo(State.Peripherals).@"struct";
+                inline for (info.field_names, info.field_types, 0..) |field_name, field_type, i| {
+                    if (@typeInfo(field_type) == .@"union")
                         ret.slow = .{ .OSCCTRL_FDPLL0_32K = get_peripheral(i) }
-                    else if (@typeInfo(field.type) == .array) {
+                    else if (@typeInfo(field_type) == .array) {
                         for (0..12) |j| {
                             ret.EVSYS[j] = get_peripheral(i + j);
                         }
-                    } else @field(ret, field.name) = get_peripheral(i);
+                    } else @field(ret, field_name) = get_peripheral(i);
                 }
 
                 break :blk ret;

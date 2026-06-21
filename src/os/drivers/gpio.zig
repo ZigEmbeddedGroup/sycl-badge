@@ -84,7 +84,7 @@ const button_pins = [_]Pin{
 const button_pin_numbers = blk: {
     var numbers: [button_pins.len]u8 = undefined;
     for (button_pins, 0..) |p, i| {
-        numbers[i] = @intFromEnum(p);
+        numbers[i] = @backingInt(p);
     }
     break :blk numbers;
 };
@@ -102,7 +102,7 @@ pub fn initButtons() void {
 
 /// Check if a pin number corresponds to a button/joystick pin
 fn isButtonPin(pin: Pin) bool {
-    const pin_num = @intFromEnum(pin);
+    const pin_num = @backingInt(pin);
     for (button_pin_numbers) |bp_num| {
         if (pin_num == bp_num) return true;
     }

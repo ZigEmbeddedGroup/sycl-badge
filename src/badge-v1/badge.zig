@@ -43,6 +43,13 @@ const adc = hal.adc.num(0);
 
 const utils = @import("utils.zig");
 
+pub const panic = microzig.panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
 pub const microzig_options: microzig.Options = .{
     .interrupts = .{
         .SVCall = microzig.interrupt.Handler{ .naked = cart.svcall_handler },

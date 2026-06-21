@@ -12,7 +12,6 @@ const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
-const debug_log = @import("../debug_log.zig");
 const multicore = @import("multicore.zig");
 const fps_overlay = @import("fps_overlay.zig");
 const badge = microzig.board;
@@ -31,7 +30,7 @@ var echo_enabled: bool = true; // Echoing chars back
 
 // Command History
 var history: [MAX_HISTORY][MAX_LINE_LENGTH]u8 = undefined;
-var history_lengths: [MAX_HISTORY]usize = [_]usize{0} ** MAX_HISTORY;
+var history_lengths: [MAX_HISTORY]usize = @splat(0);
 var history_count: usize = 0; // Total commands stored
 var history_index: usize = 0; // Current position in history (for up/down)
 var in_history_mode: bool = false; // Sets if we are browsing history
@@ -1448,13 +1447,8 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 loader.LoadError.ReadError => println("Storage read error\r\n"),
             }
 
-            // Dump debug logs to console for diagnostic info
-            debug_log.forEachEntry(consolePrintLog);
             return;
         };
-
-        // Dump loader/storage logs (verification/erase info)
-        debug_log.forEachEntry(consolePrintLog);
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
@@ -1503,7 +1497,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     if (std.mem.eql(u8, subcmd, "diag")) {
         println("\r\nCart diagnostic log:\r\n");
-        debug_log.forEachEntry(consolePrintLog);
+        // TODO: should console expose debug logs?
         println("");
         return;
     }

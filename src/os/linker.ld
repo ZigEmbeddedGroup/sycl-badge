@@ -283,7 +283,7 @@ SECTIONS
 
   /* All sanity checks */
   ASSERT(__stack_limit__ >= __heap_limit__, "ERROR: Heap would overflow into stack region")
-  ASSERT(__data_start_flash__ <= 0x10080000, "ERROR: Kernel code exceeds 512KB flash allocation")
+  ASSERT(__data_start_flash__ <= 0x10080000, "ERROR: Kernel code exceeds 64KB budget")
   ASSERT(__data_end__ <= __kernel_ram_end__, "ERROR: .data section too large for kernel_ram")
   ASSERT(__bss_end__ <= __kernel_ram_end__, "ERROR: .bss section overflows kernel_ram")
   ASSERT(__bss_end__ <= __shared_mem_start__, "ERROR: .bss section overlaps shared_mem")

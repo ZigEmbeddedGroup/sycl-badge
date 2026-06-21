@@ -3,6 +3,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
+const rp2xxx = microzig.hal;
 
 const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
@@ -21,11 +22,22 @@ const multicore = @import("system/multicore.zig");
 const terry = @import("system/terry.zig");
 const mailbox = @import("ipc/mailbox.zig");
 const cart_api = @import("cart/api.zig");
-
 const Controls = cart_api.Controls;
+const i2c = @import("drivers/i2c.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
+pub const std_options = microzig.std_options(.{
+    .logFn = rtt.log,
+});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
+pub const microzig_options: microzig.Options = .{
+    .interrupts = @import("interrupts.zig").interrupts,
+};
 
 pub fn read_buttons() Controls {
     return .{
@@ -91,10 +103,6 @@ var cart_name_lengths: [MAX_CARTS]usize = undefined;
 var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
 
-pub const microzig_options: microzig.Options = .{
-    .interrupts = @import("interrupts.zig").interrupts,
-};
-
 var ready_fb_state: terry.core0.TrackedStateMachine(enum {
     not_ready,
     ready_rect,
@@ -127,7 +135,8 @@ pub fn main() !void {
     // Auto-start cart if only one is present in storage
     // _ = loader.autoStartSingleCart();
 
-    const z = terry.core0.zone("Kernel Main Loop", @src()); defer z.end();
+    const z = terry.core0.zone("Kernel Main Loop", @src());
+    defer z.end();
 
     // Main loop
     while (true) {
@@ -139,6 +148,8 @@ pub fn main() !void {
         terry.client.poll();
 
         fps_overlay.poll();
+
+        i2c.poll();
 
         // Process console input
         console.processInput();
@@ -307,7 +318,7 @@ pub fn main() !void {
 
                     // Flush selected shared-RAM framebuffer.
                     fps_overlay.tick_cart();
-                    ready_framebuffer = @volatileCast(@ptrCast(&mailbox.shared_data.framebuffers[fb_index]));
+                    ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[fb_index]));
                     if (has_dirty_rect) {
                         const rx: u16 = mailbox.shared_data.dirty_rect_x;
                         const ry: u16 = mailbox.shared_data.dirty_rect_y;
@@ -335,8 +346,7 @@ pub fn main() !void {
             // Dispatch async LCD work
             if (!lcd.isBusy()) {
                 find_lcd_work: switch (ready_fb_state.state) {
-                    .not_ready => {
-                    },
+                    .not_ready => {},
                     .ready_rect => {
                         const rect = ready_fb_dirty_rect;
                         lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
@@ -403,7 +413,8 @@ pub fn main() !void {
 
 /// Compute a simple hash of cart list to detect changes
 fn computeCartHash() u32 {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     cart_hash_accumulator = 0;
     storage.listCarts(hashCart);
@@ -422,14 +433,15 @@ fn hashCart(name: []const u8, size: u32) void {
 
 /// Refresh the cart list display on LCD
 fn refreshCartDisplay() void {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     const backlight_enable_pin = board.BKLT_PWM;
     backlight_enable_pin.set_function(.sio);
     backlight_enable_pin.set_direction(.out);
     backlight_enable_pin.put(1); // Ensure backlight is on for menu
-    lcd.setBacklight(true);
     lcd.fillScreen(lcd.BLACK);
+    //lcd.setBacklight(true);
 
     // Header
     lcd.drawString(0, 2, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
@@ -486,11 +498,11 @@ fn refreshCartDisplay() void {
     var rev_buf: [16]u8 = undefined;
     const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{d}", .{rev.rev}) catch "rev error";
     const gray: lcd.Color16 = .rgb(0x10, 0x10, 0x10);
-    lcd.drawString(@intCast(lcd.width - 8*rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
+    lcd.drawString(@intCast(lcd.width - 8 * rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
 
     if (rev.debug or rev.rev == rev.unknown) {
         const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
-        lcd.drawString(@intCast(lcd.width - 8*adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
+        lcd.drawString(@intCast(lcd.width - 8 * adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
     }
 
     fps_overlay.redraw();
@@ -522,7 +534,8 @@ fn collectCartName(name: []const u8, size: u32) void {
 fn runSelectedCart() void {
     if (cursor_index >= cart_count) return;
 
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     const name = cart_names[cursor_index][0..cart_name_lengths[cursor_index]];
     console.printf("[BTN] runSelectedCart: loading '{s}'\r\n", .{name});

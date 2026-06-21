@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const microzig = @import("microzig");
 const chip = microzig.chip;
 const FPU = chip.peripherals.FPU;
@@ -503,7 +504,7 @@ fn text(
                 for (0..8) |x_offset| {
                     const dst_x = char_x_offset + @as(i32, @intCast(x_offset));
 
-                    if (pixels[std.mem.readPackedIntNative(u1, &font, base + y_offset * 8 + (7 - x_offset))]) |pixel| {
+                    if (pixels[std.mem.readVarPackedInt(u1, &font, base + y_offset * 8 + (7 - x_offset), 1, builtin.cpu.arch.endian(), .unsigned)]) |pixel| {
                         // TODO: this is slow; check bounds once instead
                         clipPixel(dst_x, dst_y, pixel);
                     }

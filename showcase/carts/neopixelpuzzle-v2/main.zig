@@ -36,7 +36,7 @@ const NeopixelColor = extern struct {
 const Neopixels = struct {
     /// Write colors to all neopixels
     pub fn write(colors: *const [NUM_LEDS]NeopixelColor) void {
-        var buf: [NUM_LEDS * 3]u8 = [_]u8{0} ** (NUM_LEDS * 3);
+        var buf: [NUM_LEDS * 3]u8 = @splat(0);
 
         for (colors, 0..) |color, i| {
             buf[i * 3 + 0] = color.g;
@@ -49,7 +49,7 @@ const Neopixels = struct {
 
     /// Clear all neopixels (set to black)
     pub fn clear() void {
-        const colors = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+        const colors: [NUM_LEDS]NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
         write(&colors);
     }
 
@@ -152,7 +152,7 @@ fn applyBrightness(color: NeopixelColor) NeopixelColor {
 }
 
 fn renderProgress() void {
-    var leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+    var leds: [NUM_LEDS]NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
     if (global.lit_count > 0 and global.lit_count <= NUM_LEDS) {
         const stage_color_index = (global.lit_count - 1) % color_palette.len;
         const stage_color = applyBrightness(color_palette[stage_color_index]);
@@ -164,7 +164,7 @@ fn renderProgress() void {
 }
 
 fn renderCycle() void {
-    var leds = [_]NeopixelColor{.{ .r = 0, .g = 0, .b = 0 }} ** NUM_LEDS;
+    var leds: [NUM_LEDS]NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
     const cycle_color = applyBrightness(color_palette[global.cycle_phase % color_palette.len]);
 
     for (0..NUM_LEDS) |i| {

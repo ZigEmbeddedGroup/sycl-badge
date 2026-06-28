@@ -37,9 +37,8 @@ pub fn init() void {
 // Re-exports
 // ============================================================================
 
-/// Re-export user's main function
-/// MicroZig's start.zig will call this after init()
-pub const main = user.main;
+/// Re-export std_options if user provides them
+pub const std_options: std.Options = if (@hasDecl(user, "std_options")) user.std_options else microzig.std_options(.{});
 
 /// Re-export user's panic handler if they provide one
 /// Otherwise use microzig's panic handler
@@ -48,5 +47,10 @@ pub const panic = if (@hasDecl(user, "panic"))
 else
     microzig.panic;
 
-/// Re-export std_options if user provides them
-pub const std_options = if (@hasDecl(user, "std_options")) user.std_options else struct {};
+comptime {
+    _ = microzig.export_startup();
+}
+
+/// Re-export user's main function
+/// MicroZig's start.zig will call this after init()
+pub const main = user.main;

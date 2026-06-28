@@ -47,6 +47,12 @@ const COLOR_MAGENTA: u16 = 0xF81F;
 // ============================================================================
 // Main Entry Point
 // ============================================================================
+pub const panic = microzig.panic;
+pub const std_options = microzig.std_options(.{});
+
+comptime {
+    _ = microzig.export_startup();
+}
 
 pub fn main() !void {
     // Configure control pins as GPIO outputs

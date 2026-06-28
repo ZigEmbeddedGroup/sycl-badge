@@ -517,7 +517,6 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .linker_script = .{
             .file = dep.builder.path("src/cart/cart_xip.ld"),
             .generate = .none,
-            .assert_microzig_main = false,
         },
     });
 

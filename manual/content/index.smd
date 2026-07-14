@@ -1,0 +1,107 @@
+---
+.title = "Table of contents",
+.date = .date("1990-01-01T00:00:00"),
+.layout = "index.shtml",
+---
+
+# Getting Started with Zine
+
+This sample website showcases:
+
+- A couple simple pages
+  - `content/index.smd`
+  - `content/about.smd`
+- A blog
+  - `content/blog/index.smd`
+  - `content/blog/first-post/index.smd`
+  - `content/blog/second-post.smd`
+- A devlog
+  - `content/devlog/index.smd`
+  - `content/devlog/1990.smd`
+  - `content/devlog/1989.smd`
+
+While a BLOG has each entry be a separate page, a devlog is one single page with
+a list of smaller entries in it, making it a form of microblogging. The relative
+RSS feed will generate a separate item per devlog entry, creating a
+"twitter-like" feed.
+
+This can be a useful pattern for thoughts that are too small for a full blog post
+so consider giving it a try!
+
+The name "devlog" comes from the fact that this kind of microblogging feed works
+well when you have an open source project and you want to give small updates to
+your users, but it might work equally well for other domains, depending on your
+interests and audience. Maybe a "foodlog", a "catlog" or a "treklog" could also
+work well.
+
+The devlog section contains more information about how devlogs can be implemented
+in Zine.
+
+Some examples of devlogs in the wild:
+ - https://zine-ssg.io/log/
+ - https://ziglang.org/devlog/
+
+## Tables
+
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| ADDR     | `0x2000`   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+
+
+## Next steps
+
+Make sure to read the [official Zine docs](https://zine-ssg.io/docs/)
+and then start editing this website!
+
+Start by putting the correct information in `zine.ziggy` and then start editing
+the existing pages. Before deleting existing copy consider giving it a brief
+look as it will show you some SuperMD specific syntax.
+
+HTML markup in Zine is defined via SuperHTML templates:
+- `layouts/index.shtml`
+- `layouts/page.shtml`
+- `layouts/post.shtml`
+- `layouts/blog.shtml`
+- `layouts/blog.xml`
+- `layouts/devlog.shtml`
+- `layouts/devlog.xml`
+- `layouts/devlog-archive.shtml`
+- `layouts/templates/base.shtml`
+
+**If you're running the Zine development server (by running `zine`), then all
+changes you make will be picked up immediately, causing the website to rebuild
+and the page in your browser to refresh**.
+
+### Ziggy Schema files
+
+The following two files are Ziggy Schemas:
+
+- `.zine.ziggy-schema`
+- `content/.smd.ziggy-schema`
+
+These files will be picked up by the Ziggy Language Server to provide you
+with schema checking and documentation for both the Zine config file (`zine.ziggy`)
+and the frontmatter data in your content files.
+
+Make sure to setup your [editing
+environment](https://zine-ssg.io/docs/editors/) correctly to get the best
+authoring experience Zine can offer.
+
+
+### Assets
+
+Lastly, this sample website also includes the following asset files:
+
+- `assets/style.css`
+- `assets/hightlight.css`
+- `assets/under-construction.gif`
+- `assets/katex-tag.js`
+- `assets/katex0.16.21.css`
+- `assets/katex0.16.21.js`
+- `content/blog/first-post/fanzine.jpg`
+
+The first few asset files are **site assets**, while the last is a **page asset** that belongs to the "first post" page.
+
+The Zine docs contain more information about [dealing with assets](https://zine-ssg.io/docs/assets/).
+

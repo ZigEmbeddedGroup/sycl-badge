@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title :text="$site.title"></title>
+                <link type="text/css" rel="stylesheet" href="$site.asset('style.css').link()">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="$site.asset('Temml-Local.css').link()">
+		<script defer src="$site.asset('temml.min.js').link()"></script>
+		<script defer src="$site.asset('render-mathtex.js').link()"></script>
+		<script defer src="$site.asset('scripts/aside.js').link()"></script>
+		<!-- /mathtex -->
+		<super>
+	</head>
+        <header>
+		<h1 class="site-title" :text="$site.title"></h1>
+        </header>
+	<body id="body">
+
+		<super>
+	</body>
+</html>

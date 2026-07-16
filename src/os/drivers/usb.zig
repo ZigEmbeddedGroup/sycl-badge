@@ -11,7 +11,7 @@ const msc = @import("usb_msc.zig");
 
 const USB_Device = rp2xxx.usb.Polled(.{});
 const USB_Serial = usb.drivers.CDC;
-const USB_MSC = @import("usb_msc.zig");
+const USB_MSC = @import("MSC.zig");
 
 var usb_device: USB_Device = undefined;
 
@@ -22,7 +22,7 @@ var usb_controller: usb.DeviceController(.{
     .vendor = USB_Device.default_vendor_id,
     .product = USB_Device.default_product_id,
     .bcd_device = .v1_00,
-    .serial = "someserial",
+    .serial = "someserial12345",
     .max_supported_packet_size = USB_Device.max_supported_packet_size,
     .configurations = &.{
         .{
@@ -36,94 +36,16 @@ var usb_controller: usb.DeviceController(.{
         },
     },
 }, .{
-    // TODO: what is this?
     .{
         .serial = .{
             .itf_notifi = "Board CDC",
             .itf_data = "Board CDC Data",
         },
-        .msc = .{
-            // TODO: what goes in here?
-        },
+        // TODO: come up with arguments for the MSC driver
+        .msc = "",
         .reset = "",
     },
 }) = .init;
-
-// Device configuration
-//const device_configuration: usb.DeviceConfiguration = .{
-//    .device_descriptor = &.{
-//        .descriptor_type = usb.DescType.Device,
-//        .bcd_usb = 0x0200,
-//        .device_class = 0x00,
-//        .device_subclass = 0,
-//        .device_protocol = 0,
-//        .max_packet_size0 = 64,
-//        .vendor = 0x2E8A,
-//        .product = 0x000a,
-//        .bcd_device = 0x0100,
-//        .manufacturer_s = 1,
-//        .product_s = 2,
-//        .serial_s = 3,
-//        .num_configurations = 1,
-//    },
-//    .config_descriptor = &usb_config_descriptor,
-//    .lang_descriptor = "\x04\x03\x09\x04", // length || string descriptor (0x03) || Engl (0x0409)
-//    .descriptor_strings = &.{
-//        &usb.utils.utf8_to_utf16_le("Raspberry Pi"),
-//        &usb.utils.utf8_to_utf16_le("SYCL Badge"),
-//        &usb.utils.utf8_to_utf16_le("SYCLBADGE0001"),
-//        &usb.utils.utf8_to_utf16_le("CDC Console"),
-//    },
-//    .drivers = &drivers,
-//};
-
-// Create USB device instance
-//const usb_dev = usb.Usb(.{});
-//
-//// CDC descriptor constants
-//const msc_descriptor_len = 9 + 7 + 7;
-//const msc_descriptor: [msc_descriptor_len]u8 = blk: {
-//    var desc: [msc_descriptor_len]u8 = undefined;
-//    const itf_desc = usb.types.InterfaceDescriptor{
-//        .interface_number = 2,
-//        .alternate_setting = 0,
-//        .num_endpoints = 2,
-//        .interface_class = 0x08,
-//        .interface_subclass = 0x06,
-//        .interface_protocol = 0x50,
-//        .interface_s = 0,
-//    };
-//    const itf = itf_desc.serialize();
-//    const ep_out_desc = usb.types.EndpointDescriptor{
-//        .endpoint_address = usb.Endpoint.to_address(3, .Out),
-//        .attributes = @intFromEnum(usb.types.TransferType.Bulk),
-//        .max_packet_size = 64,
-//        .interval = 0,
-//    };
-//    const ep_out = ep_out_desc.serialize();
-//    const ep_in_desc = usb.types.EndpointDescriptor{
-//        .endpoint_address = usb.Endpoint.to_address(3, .In),
-//        .attributes = @intFromEnum(usb.types.TransferType.Bulk),
-//        .max_packet_size = 64,
-//        .interval = 0,
-//    };
-//    const ep_in = ep_in_desc.serialize();
-//    @memcpy(desc[0..itf.len], &itf);
-//    @memcpy(desc[itf.len .. itf.len + ep_out.len], &ep_out);
-//    @memcpy(desc[itf.len + ep_out.len ..], &ep_in);
-//    break :blk desc;
-//};
-//
-//const usb_config_len = usb.templates.config_descriptor_len + usb.templates.cdc_descriptor_len + msc_descriptor_len;
-//const usb_config_descriptor =
-//    usb.templates.config_descriptor(1, 3, 0, usb_config_len, 0xc0, 100) ++
-//    usb.templates.cdc_descriptor(0, 4, usb.Endpoint.to_address(1, .In), 8, usb.Endpoint.to_address(2, .Out), usb.Endpoint.to_address(2, .In), 64) ++
-//    msc_descriptor;
-//
-//// CDC class driver instance
-//var driver_cdc: usb.cdc.CdcClassDriver(usb_dev) = .{};
-//var driver_msc: msc.MscClassDriver = .{};
-//var drivers = [_]usb.types.UsbClassDriver{ driver_cdc.driver(), driver_msc.driver() };
 
 /// Initialize the USB device
 /// Sets up the USB in device mode for CDC (virtual serial port)

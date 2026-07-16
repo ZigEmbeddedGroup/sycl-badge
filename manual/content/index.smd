@@ -4,104 +4,50 @@
 .layout = "index.shtml",
 ---
 
-# Getting Started with Zine
+# Acknowledgements
 
-This sample website showcases:
+The hard work of updating the Badge from V1 to V2 was largely done as a capstone
+project at the University of British Columbia. The team comprised of:
 
-- A couple simple pages
-  - `content/index.smd`
-  - `content/about.smd`
-- A blog
-  - `content/blog/index.smd`
-  - `content/blog/first-post/index.smd`
-  - `content/blog/second-post.smd`
-- A devlog
-  - `content/devlog/index.smd`
-  - `content/devlog/1990.smd`
-  - `content/devlog/1989.smd`
+- [Ivan Cheung](https://www.linkedin.com/in/ivan-cheung-0a9e/)
+- [Vanessa Chu](https://www.linkedin.com/in/vanessac3/)
+- [Katie Goncalves](https://www.linkedin.com/in/katie-goncalves/)
+- [Sarah Oskuei](https://www.linkedin.com/in/sarah-oskuei/)
+- [Eric Tannant](https://www.linkedin.com/in/eric-tannant/)
 
-While a BLOG has each entry be a separate page, a devlog is one single page with
-a list of smaller entries in it, making it a form of microblogging. The relative
-RSS feed will generate a separate item per devlog entry, creating a
-"twitter-like" feed.
+The design for this manual is based off [The Proportional
+Web](https://owickstrom.github.io/the-proportional-web/) by [Oskar
+Wickström](https://wickstrom.tech)
 
-This can be a useful pattern for thoughts that are too small for a full blog post
-so consider giving it a try!
+# Introduction
 
-The name "devlog" comes from the fact that this kind of microblogging feed works
-well when you have an open source project and you want to give small updates to
-your users, but it might work equally well for other domains, depending on your
-interests and audience. Maybe a "foodlog", a "catlog" or a "treklog" could also
-work well.
+Congratulations, you're the owner of a brand new SYCL Badge V2. With any luck,
+you're currently at Tables Day, hanging out with your friends during [Software
+You Can Love 2026](https://softwareyoucanlove.ca).
 
-The devlog section contains more information about how devlogs can be implemented
-in Zine.
+The Badge is a constrained, programmable device for you to write, share, and run
+programs called "carts". The custom OS  allows for multiple carts to be
+installed, executing only one at a time. There exist several means for carts to
+interact with the outside world, including but not limited to: buttons, a nav
+stick, an LCD screen, and five RGB LEDs. Carts can be loaded from your personal
+computer onto the Badge through USB. 
 
-Some examples of devlogs in the wild:
- - https://zine-ssg.io/log/
- - https://ziglang.org/devlog/
+This second version of the Badge largely came about due to part sourcing issues.
+Modernizing components fixed this issue, reduced costs, and improved
+performance. The most notable upgrade was changing the MCU to an RP2354. It has
+a hardware USB bootloader, which allows users to recover from a bricked state if
+they decide to author their own OS. The hardware upgrades include:
 
-## Tables
+## Hardware Improvments over V1
 
-| Header 1 | Header 2 | Header 3 |
-|----------|----------|----------|
-| ADDR     | `0x2000`   | Cell 3   |
-| Cell 4   | Cell 5   | Cell 6   |
+| Feature   | V1 | V2 |
+|-----------|----|----|
+| MCU | ATSAMD51J19 | RP2354B |
+| CPU Count | 1 | 2 |
+| CPU Frequency | 120 MHz | 155 MHz |
+| CPU Core | Cortex M3 | Cortex M33/RISC-V |
+| Flash | 512 KB | 4 MB |
+| RAM | 192 KB | 520 KB |
+| Battery | 3.7V LiPo | 3x AAAs |
 
-
-## Next steps
-
-Make sure to read the [official Zine docs](https://zine-ssg.io/docs/)
-and then start editing this website!
-
-Start by putting the correct information in `zine.ziggy` and then start editing
-the existing pages. Before deleting existing copy consider giving it a brief
-look as it will show you some SuperMD specific syntax.
-
-HTML markup in Zine is defined via SuperHTML templates:
-- `layouts/index.shtml`
-- `layouts/page.shtml`
-- `layouts/post.shtml`
-- `layouts/blog.shtml`
-- `layouts/blog.xml`
-- `layouts/devlog.shtml`
-- `layouts/devlog.xml`
-- `layouts/devlog-archive.shtml`
-- `layouts/templates/base.shtml`
-
-**If you're running the Zine development server (by running `zine`), then all
-changes you make will be picked up immediately, causing the website to rebuild
-and the page in your browser to refresh**.
-
-### Ziggy Schema files
-
-The following two files are Ziggy Schemas:
-
-- `.zine.ziggy-schema`
-- `content/.smd.ziggy-schema`
-
-These files will be picked up by the Ziggy Language Server to provide you
-with schema checking and documentation for both the Zine config file (`zine.ziggy`)
-and the frontmatter data in your content files.
-
-Make sure to setup your [editing
-environment](https://zine-ssg.io/docs/editors/) correctly to get the best
-authoring experience Zine can offer.
-
-
-### Assets
-
-Lastly, this sample website also includes the following asset files:
-
-- `assets/style.css`
-- `assets/hightlight.css`
-- `assets/under-construction.gif`
-- `assets/katex-tag.js`
-- `assets/katex0.16.21.css`
-- `assets/katex0.16.21.js`
-- `content/blog/first-post/fanzine.jpg`
-
-The first few asset files are **site assets**, while the last is a **page asset** that belongs to the "first post" page.
-
-The Zine docs contain more information about [dealing with assets](https://zine-ssg.io/docs/assets/).
-
+\* RISC-V cores are not utilized in the Badge V2 at the time of writing.

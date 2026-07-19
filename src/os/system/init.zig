@@ -112,6 +112,9 @@ pub fn init(config: InitConfig) !void {
     clearOnBoot();
     // Copy RAM-resident flash helpers before any flash writes.
     copyRamTextSection();
+
+    debug_log.init();
+
     // 1. Initialize GPIO subsystem
     gpio.init();
 

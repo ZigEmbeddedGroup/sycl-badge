@@ -1443,13 +1443,8 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
                 loader.LoadError.ReadError => println("Storage read error\r\n"),
             }
 
-            // Dump debug logs to console for diagnostic info
-            debug_log.forEachEntry(consolePrintLog);
             return;
         };
-
-        // Dump loader/storage logs (verification/erase info)
-        debug_log.forEachEntry(consolePrintLog);
 
         // Execute the loaded cart
         if (multicore.executeCart(entry_point)) {
@@ -1498,7 +1493,7 @@ fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     if (std.mem.eql(u8, subcmd, "diag")) {
         println("\r\nCart diagnostic log:\r\n");
-        debug_log.forEachEntry(consolePrintLog);
+        // TODO: should console expose debug logs?
         println("");
         return;
     }

@@ -19,7 +19,9 @@ const mailbox = @import("ipc/mailbox.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
-pub const std_options = microzig.std_options(.{});
+pub const std_options = microzig.std_options(.{
+    .logFn = @import("debug_log.zig").log,
+});
 
 comptime {
     _ = microzig.export_startup();

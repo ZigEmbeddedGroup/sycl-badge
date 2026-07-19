@@ -1,6 +1,7 @@
 //! MSC USB Driver for the badge
 //!
 //! Later we'll work on making it hardware agnostic.
+device: *usb.DeviceInterface,
 
 const microzig = @import("microzig");
 const usb = microzig.core.usb;
@@ -41,15 +42,20 @@ pub const Descriptor = extern struct {
     }
 };
 
+/// `self` points to undefined memory
+/// `device` is the handle to the device
+/// `data` is the scratch buffer requested in `alloc_bytes` in `create()`
+///
+/// OUT endpoints are opened before `init`, IN endpoints after, so we can call
+/// `device.ep_listen()` here.
+///
+/// IN endpoint callbacks don't fire until `init()` returns.
 pub fn init(self: *MSC, desc: *const Descriptor, device: *usb.DeviceInterface, data: []u8) void {
-    _ = self;
     std.debug.assert(data.len == desc.ep_in.max_packet_size.into());
-    //self.* = .{
-    //    .device = device,
-    //    .descriptor = desc,
-    //    .packet_buffer = data,
-    //    .tx_ready = .init(false),
-    //};
+    self.* = .{
+        .device = device,
+    };
+
     // TODO: what does this give me?
     device.ep_listen(
         desc.ep_out.endpoint.num,
@@ -57,21 +63,24 @@ pub fn init(self: *MSC, desc: *const Descriptor, device: *usb.DeviceInterface, d
     );
 }
 
+/// Maps endpoint field names to callback functions
+///
+/// IN/OUT is always from the host's perspective
 pub const handlers: usb.DriverHandlers(MSC) = .{
     .ep_in = on_tx_ready,
     .ep_out = on_rx,
 };
 
-pub fn on_tx_ready(self: *MSC, ep_tx: usb.types.Endpoint.Num) void {
+fn on_tx_ready(self: *MSC, ep_tx: usb.types.Endpoint.Num) void {
     _ = self;
     _ = ep_tx;
 }
 
-pub fn on_rx(self: *MSC, ep_rx: usb.types.Endpoint.Num) void {
+fn on_rx(self: *MSC, ep_rx: usb.types.Endpoint.Num) void {
     _ = self;
     _ = ep_rx;
 }
-
+/// Handle SETUP requests on endpoint 0
 pub fn class_request(self: *@This(), setup: *const usb.types.SetupPacket) ?[]const u8 {
     _ = self;
     log.debug("setup: {x}, {}, {}", .{ setup.request, setup.length.into(), setup.value.into() });

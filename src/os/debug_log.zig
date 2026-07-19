@@ -1,41 +1,29 @@
 /// Simple debug log ring buffer for early-boot and loader/storage diagnostics
 const std = @import("std");
+const microzig = @import("microzig");
+const rtt = microzig.cpu.rtt;
 
-pub const ENTRY_LEN = 128;
-pub const MAX_ENTRIES = 32;
+const rtt_instance = rtt.RTT(.{
+    .up_channels = &.{
+        .{ .name = "log", .mode = .NoBlockSkip, .buffer_size = 1024 },
+    },
+    .linker_section = ".bss.rtt_cb",
+});
 
-var entries: [MAX_ENTRIES][ENTRY_LEN]u8 = undefined;
-var lengths: [MAX_ENTRIES]usize = undefined;
-var head: usize = 0;
-var count: usize = 0;
-
-/// Record a message into the ring buffer (truncates if longer than ENTRY_LEN-1)
-pub fn record(msg: []const u8) void {
-    var idx: usize = 0;
-    if (count < MAX_ENTRIES) {
-        idx = (head + count) % MAX_ENTRIES;
-        count += 1;
-    } else {
-        idx = head;
-        head = (head + 1) % MAX_ENTRIES;
-    }
-
-    const to_copy = if (msg.len < ENTRY_LEN - 1) msg.len else ENTRY_LEN - 1;
-    @memcpy(entries[idx][0..to_copy], msg[0..to_copy]);
-    lengths[idx] = to_copy;
-    entries[idx][to_copy] = 0; // NUL terminator for convenience
+pub fn init() void {
+    rtt_instance.init();
 }
 
-/// Iterate over entries in oldest->newest order and invoke `callback` for each.
-/// After iteration the buffer is cleared.
-pub fn forEachEntry(callback: fn (msg: []const u8) void) void {
-    var i: usize = 0;
-    while (i < count) : (i += 1) {
-        const idx = (head + i) % MAX_ENTRIES;
-        callback(entries[idx][0..lengths[idx]]);
-    }
+/// Log to RTT, note that if the 1KB buffer fills, logs are discarded
+pub fn log(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    var buf: [1024]u8 = undefined;
+    var writer = rtt_instance.writer(0, &buf);
 
-    // Clear buffer after dumping
-    head = 0;
-    count = 0;
+    writer.interface.print("[{s}] ({t}): " ++ format ++ "\r\n", .{ level.asText(), scope } ++ args) catch {};
+    writer.interface.flush() catch {};
 }

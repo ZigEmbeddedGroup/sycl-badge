@@ -6,7 +6,7 @@ const storage = @import("storage.zig");
 const uf2 = @import("uf2.zig");
 const rom = @import("../drivers/rom.zig");
 const interrupts = @import("../system/interrupts.zig");
-const debug_log = @import("../debug_log.zig");
+const log = std.log.scoped(.loader);
 
 /// Linker symbols for cart_xip region
 extern const __cart_xip_start__: u8;
@@ -262,10 +262,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         return LoadError.InvalidUF2;
     }
 
-    // Debug: record file/blocks info
-    var _uf2_msg: [128]u8 = undefined;
-    const _uf2_slice = std.fmt.bufPrint(_uf2_msg[0..], "UF2 read: {d} bytes, blocks={d}\r\n", .{ bytes_read, num_blocks }) catch "";
-    if (_uf2_slice.len != 0) debug_log.record(_uf2_slice);
+    log.debug("UF2 read: bytes={d} blocks={d}", .{ bytes_read, num_blocks });
 
     // Erase the cart_xip region
     try eraseCartXipRegion();
@@ -385,7 +382,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     };
 
     const vector_table_addr = findVectorTableAddr(cart_xip_start + min_offset, cart_xip_end) orelse {
-        debug_log.record("findVectorTableAddr: vector not found after programming");
+        log.debug("findVectorTableAddr: vector not found after programming", .{});
         return LoadError.FlashWriteError;
     };
 
@@ -399,14 +396,10 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     const entry_addr = entry & ~@as(u32, 1);
 
     if (!(sp >= RAM_START and sp <= RAM_END and ((sp & 0x7) == 0) and (entry_addr >= cart_xip_start and entry_addr < cart_xip_end and ((entry & 1) == 1)))) {
-        var _verify_msg: [128]u8 = undefined;
-        const _verify_failed_slice = std.fmt.bufPrint(_verify_msg[0..], "Post-program verification FAILED: sp=0x{x} entry=0x{x}\r\n", .{ sp, entry }) catch "";
-        if (_verify_failed_slice.len != 0) debug_log.record(_verify_failed_slice);
+        log.debug("Post-program verification FAILED: sp=0x{x} entry=0x{x}", .{ sp, entry });
         return LoadError.FlashWriteError;
     } else {
-        var _verify_ok_msg: [128]u8 = undefined;
-        const _verify_ok_slice = std.fmt.bufPrint(_verify_ok_msg[0..], "Post-program verification OK: vt=0x{x} sp=0x{x} entry=0x{x}\r\n", .{ vector_table_addr, sp, entry }) catch "";
-        if (_verify_ok_slice.len != 0) debug_log.record(_verify_ok_slice);
+        log.debug("Post-program verification OK: vt=0x{x} sp=0x{x} entry=0x{x}", .{ vector_table_addr, sp, entry });
     }
 
     return vector_table_addr;
@@ -418,10 +411,7 @@ fn eraseCartXipRegion() LoadError!void {
     const cart_xip_size = getCartXipSize();
     const flash_offset = cart_xip_start - XIP_BASE;
 
-    // Record erase attempt for debugging
-    var _erase_msg: [128]u8 = undefined;
-    const _erase_slice = std.fmt.bufPrint(_erase_msg[0..], "eraseCartXipRegion: flash_offset=0x{x}, size={d}\r\n", .{ flash_offset, cart_xip_size }) catch "";
-    if (_erase_slice.len != 0) debug_log.record(_erase_slice);
+    log.debug("eraseCartXipRegion: flash_offset=0x{x}, size={d}", .{ flash_offset, cart_xip_size });
 
     const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();
@@ -438,10 +428,7 @@ fn flushWriteBuffer(erase_block_num: u32, cart_xip_start: u32) LoadError!void {
     const flash_addr = cart_xip_start + (erase_block_num * FLASH_ERASE_BLOCK);
     const flash_offset = flash_addr - XIP_BASE;
 
-    // Debug: record write attempt
-    var _fw_msg: [128]u8 = undefined;
-    const _fw_slice = std.fmt.bufPrint(_fw_msg[0..], "flushWriteBuffer: erase_block={d}, flash_offset=0x{x}\r\n", .{ erase_block_num, flash_offset }) catch "";
-    if (_fw_slice.len != 0) debug_log.record(_fw_slice);
+    log.debug("flushWriteBuffer: erase_block={d}, flash_offset=0x{x}", .{ erase_block_num, flash_offset });
 
     const irq_was_enabled = interrupts.areEnabled();
     interrupts.disableInterrupts();

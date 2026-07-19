@@ -8,24 +8,24 @@ const MicroBuild = microzig.MicroBuild(.{
     .rp2xxx = true,
 });
 
-pub fn build(builder: *Build) void {
-    const optimize = builder.standardOptimizeOption(.{});
+pub fn build(b: *Build) void {
+    const optimize = b.standardOptimizeOption(.{});
 
-    const mz_dep = builder.dependency("microzig", .{});
-    const mb = MicroBuild.init(builder, mz_dep) orelse return;
+    const mz_dep = b.dependency("microzig", .{});
+    const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    _ = builder.addModule("cart-api", .{ .root_source_file = builder.path("src/badge-v1/cart/api.zig") });
+    _ = b.addModule("cart-api", .{ .root_source_file = b.path("src/badge-v1/cart/api.zig") });
 
     // Badge V2 (RP2354B) target setup
-    const badge_v2_target = sycl_badge_v2_microzig_target(mb, builder);
+    const badge_v2_target = sycl_badge_v2_microzig_target(mb, b);
 
-    var dep: std.Build.Dependency = .{ .builder = builder };
-    const feature_test_cart = add_cart(&dep, builder, .{
+    var dep: std.Build.Dependency = .{ .builder = b };
+    const feature_test_cart = add_cart(&dep, b, .{
         .name = "feature_test",
         .optimize = optimize,
-        .root_source_file = builder.path("src/badge-v1/badge/feature_test.zig"),
+        .root_source_file = b.path("src/badge-v1/badge/feature_test.zig"),
     }) orelse return;
-    feature_test_cart.install(builder);
+    feature_test_cart.install(b);
 
     // Badge V2 (RP2354B) demo builds (only blinky works for now)
     inline for (.{
@@ -45,7 +45,7 @@ pub fn build(builder: *Build) void {
         const exe = mb.add_firmware(.{
             .name = std.fmt.comptimePrint("badge.v2.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
+            .root_source_file = b.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
             .target = badge_v2_target,
         });
         mb.install_firmware(exe, .{ .format = .elf });
@@ -56,120 +56,120 @@ pub fn build(builder: *Build) void {
         "neopixels",
         "song",
     }) |name| {
-        const cart = add_cart(&dep, builder, .{
+        const cart = add_cart(&dep, b, .{
             .name = std.fmt.comptimePrint("badge.demo.{s}", .{name}),
             .optimize = optimize,
-            .root_source_file = builder.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
+            .root_source_file = b.path(std.fmt.comptimePrint("src/badge-v1/badge/demos/{s}.zig", .{name})),
         }) orelse return;
-        cart.install(builder);
+        cart.install(b);
     }
 
     // build the OS Kernel (always use ReleaseSmall for minimal size)
-    const sycl_os = add_os(&dep, builder, mz_dep, .{
+    const sycl_os = add_os(&dep, b, mz_dep, .{
         .name = "sycl-os-kernel",
         .optimize = .ReleaseSmall,
     }) orelse return;
-    sycl_os.install(builder);
+    sycl_os.install(b);
 
     // Build test XIP cart (runs on Core 1 with cart_runtime - no microzig)
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "lcd-test",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/lcd-test/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/lcd-test/src/main.zig"),
     });
 
     // Build test MicroZig cart (runs on Core 1 with full MicroZig HAL)
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "test-microzig-cart",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/test-microzig-cart/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/test-microzig-cart/src/main.zig"),
     });
 
     // Build test letters cart (cycles through alphabet on LCD)
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "test-letters-cart",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
+        .root_source_file = b.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
     // Build neopixel-joystick demo cart
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "neopixel-joystick",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/neopixel-joystick/main.zig"),
+        .root_source_file = b.path("showcase/carts/neopixel-joystick/main.zig"),
     });
 
     // Build neopixel puzzle v2 cart
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "neopixelpuzzle-v2",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/neopixelpuzzle-v2/main.zig"),
+        .root_source_file = b.path("showcase/carts/neopixelpuzzle-v2/main.zig"),
     });
 
     // Build LCD text viewer cart
-    add_microzig_cart(builder, &dep, .{
+    add_microzig_cart(b, &dep, .{
         .name = "neopixel-joystick",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/neopixel-joystick/main.zig"),
+        .root_source_file = b.path("showcase/carts/neopixel-joystick/main.zig"),
     });
 
     // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "lcd-text",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/lcd-text/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/lcd-text/src/main.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "space-shooter",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/space-shooter/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/space-shooter/src/main.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "space-shooter-v2",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/space-shooter-v2/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/space-shooter-v2/src/main.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "blobs",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/blobs/src/blobs.zig"),
+        .root_source_file = b.path("showcase/carts/blobs/src/blobs.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "blobs-v2",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/blobs-v2/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/blobs-v2/src/main.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "plasma",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/plasma/src/plasma.zig"),
+        .root_source_file = b.path("showcase/carts/plasma/src/plasma.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "metalgear-timer",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
+        .root_source_file = b.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "neopixelpuzzle",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/neopixelpuzzle/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/neopixelpuzzle/src/main.zig"),
     });
-    add_os_cart(builder, &dep, .{
+    add_os_cart(b, &dep, .{
         .name = "raytracer",
         .optimize = .ReleaseSmall,
-        .root_source_file = builder.path("showcase/carts/raytracer/src/main.zig"),
+        .root_source_file = b.path("showcase/carts/raytracer/src/main.zig"),
     });
 
-    const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
-    const font_export_exe = builder.addExecutable(.{
+    const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
+    const font_export_exe = b.addExecutable(.{
         .name = "font_export_exe",
-        .root_module = builder.createModule(.{
-            .target = builder.graph.host,
-            .root_source_file = builder.path("src/generate_font_ts.zig"),
+        .root_module = b.createModule(.{
+            .target = b.graph.host,
+            .root_source_file = b.path("src/generate_font_ts.zig"),
         }),
     });
 
-    const font_export_run = builder.addRunArtifact(font_export_exe);
+    const font_export_run = b.addRunArtifact(font_export_exe);
     font_export_run.has_side_effects = true;
 
     font_export_step.dependOn(&font_export_run.step);
@@ -213,14 +213,14 @@ fn sycl_badge_microzig_target(mb: *MicroBuild) *microzig.Target {
     });
 }
 
-fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Target {
+fn sycl_badge_v2_microzig_target(mb: *MicroBuild, b: *Build) *microzig.Target {
     // We use the Raspberry Pi Pico 2 board as base, then customize with our board config
     const base_target = mb.ports.rp2xxx.boards.raspberrypi.pico2_arm;
 
     return base_target.derive(.{
         .board = .{
             .name = "SYCL Badge V2",
-            .root_source_file = builder.path("src/board_v2.zig"),
+            .root_source_file = b.path("src/board_v2.zig"),
         },
     });
 }

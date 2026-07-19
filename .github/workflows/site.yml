@@ -1,11 +1,7 @@
-name: Publish Simulator
+name: Site
 on:
   push:
-    paths:
-        - simulator/**
   pull_request:
-    paths:
-        - simulator/**
 
 jobs:
   build:

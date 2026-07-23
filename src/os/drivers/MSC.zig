@@ -56,7 +56,6 @@ pub fn init(self: *MSC, desc: *const Descriptor, device: *usb.DeviceInterface, d
         .device = device,
     };
 
-    // TODO: what does this give me?
     device.ep_listen(
         desc.ep_out.endpoint.num,
         @intCast(desc.ep_out.max_packet_size.into()),

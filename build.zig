@@ -92,6 +92,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
+    // Build test numbers cart (counts down through numbers on LCD)
+    add_microzig_cart(builder, &dep, .{
+        .name = "test-numbers-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/test-numbers-cart/main.zig"),
+    });
+
     // Build neopixel-joystick demo cart
     add_microzig_cart(builder, &dep, .{
         .name = "neopixel-joystick",

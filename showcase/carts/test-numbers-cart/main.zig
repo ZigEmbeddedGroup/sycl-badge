@@ -1,7 +1,7 @@
-/// Test MicroZig Cart - LCD Demo Display Letters
+/// Test MicroZig Cart - LCD Demo Display Countdown
 ///
 /// This cart demonstrates using the LCD via MicroZig's SPI HAL.
-/// It cycles through letters of the alphabet displayed large on screen.
+/// It counts down from 5
 ///
 /// The build system automatically handles the init override to safely run on Core 1.
 /// Hardware (SPI, clocks) is already configured by the OS on Core 0.
@@ -96,13 +96,13 @@ pub fn main() !void {
         // Clear screen to blue
         fillScreen(COLOR_BLUE);
 
-        // Draw the current letter large and centered
-        drawLargeLetter(i, COLOR_YELLOW);
+        // Draw the current glyph large and centered
+        drawLargeGlyph(i, COLOR_YELLOW);
 
         // Toggle LED to show activity
         LED_PIN.toggle();
 
-        // Wait before changing letter
+        // Wait before changing glyph
         time.sleep_ms(1000);
     }
 
@@ -114,18 +114,18 @@ pub fn main() !void {
 // LCD Functions
 // ============================================================================
 
-/// Draw a letter scaled up large and centered on screen
+/// Draw a glyph scaled up large and centered on screen
 /// Scale factor of 12 makes the 8x8 font into 96x96 pixels
-fn drawLargeLetter(letter_idx: usize, color: u16) void {
+fn drawLargeGlyph(glyph_idx: usize, color: u16) void {
     const scale: u16 = 12;
     const char_width: u16 = 8 * scale; // 96 pixels
     const char_height: u16 = 8 * scale; // 96 pixels
 
-    // Center the letter on screen
+    // Center the glyph on screen
     const start_x: u16 = (LCD_WIDTH - char_width) / 2;
     const start_y: u16 = (LCD_HEIGHT - char_height) / 2;
 
-    const glyph = font_data[letter_idx];
+    const glyph = font_data[glyph_idx];
 
     // Draw each row of the glyph
     for (0..8) |row| {

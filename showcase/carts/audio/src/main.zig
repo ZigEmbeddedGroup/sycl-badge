@@ -42,14 +42,14 @@ const names: [c_maj.len][:0]const u8 = .{
 const freqs = blk: {
     var fq: [c_maj.len]f32 = undefined;
     for (&fq, c_maj) |*f, note| {
-        // TODO: Temporary shift two octaves lower for sw speeds
-        f.* = freqFromMidi(note - 24);
+        f.* = freqFromMidi(note);
     }
     break :blk fq;
 };
 
 var note_id: u32 = names.len;
 var global_frame_num: u32 = 0;
+var short: bool = false;
 
 const micros_per_note: u64 = 500_000; // 0.5 second per note
 var change_time: u64 = 0;
@@ -97,6 +97,7 @@ export fn update() void {
             change_time += micros_per_note;
             if (note_id >= c_maj.len) {
                 note_id = 0;
+                short = !short;
             } else {
                 note_id += 1;
             }
@@ -108,6 +109,7 @@ export fn update() void {
             cart.tone2(.{
                 .frequency = freqs[note_id],
                 .volume = 1.0,
+                .duration = if (short) 0.25 else -1.0,
             });
         }
     }

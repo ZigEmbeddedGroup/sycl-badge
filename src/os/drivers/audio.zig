@@ -14,6 +14,7 @@ const hal = microzig.hal;
 const pwm = hal.pwm;
 const board = microzig.board;
 const PWM = microzig.chip.peripherals.PWM;
+const DMA = microzig.chip.peripherals.DMA;
 
 const std = @import("std");
 
@@ -42,11 +43,6 @@ const buzzer_pwm_ch = pwm.Pwm{ .slice_number = @intFromEnum(buzzer_pwm_slice), .
 /// Separate PWM slice used for wave timing control
 const audio_timing_slice: pwm.Slice = @enumFromInt(5);
 
-
-
-// Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
-var tone_stop_at_us: u64 = 0; // 0 = no active tone
-
 var global_volume: f32 = 1.0;
 
 var sound_type: enum {
@@ -56,11 +52,8 @@ var sound_type: enum {
 
 var tone_volume: f32 = 0.0;
 
-// Square wave data
-var out_val: bool = false;
-var square_cc_vals: [2]u32 = undefined;
-
-const buzzer_timing_irq_mask: u32 = @as(u32, 1) << @intCast(@intFromEnum(audio_timing_slice));
+// Needs to be aligned for DMA source
+var square_cc_vals: [2]u32 align(8) = undefined;
 
 /// Initialise buzzer hardware.
 /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
@@ -77,9 +70,6 @@ pub fn init() void {
     buzzer_pwm_slice.set_wrap(@intCast(audio_levels));
 
     buzzer_pwm_ch.set_level(0);
-    // board.buzzer_pwm.set_function(.sio);
-    // board.buzzer_pwm.set_direction(.out);
-    // board.buzzer_pwm.put(0);
 }
 
 pub fn setGlobalVolume(in_vol: f32) void {
@@ -96,22 +86,7 @@ pub fn setGlobalVolume(in_vol: f32) void {
 }
 
 pub fn poll() void {
-    if (sound_type != .off) {
-        // Interrupt abuse >:(
-        if (PWM.INTR.raw & buzzer_timing_irq_mask != 0) {
-            PWM.INTR.write_raw(buzzer_timing_irq_mask);
-            out_val = !out_val;
-            //board.buzzer_pwm.put(@intFromBool(out_val));
-            const level: u16 = if (out_val) level_max else level_min;
-            buzzer_pwm_ch.set_level(level);
-        }
-
-        // Stop buzzer when tone duration expires (non-blocking CART_TONE playback)
-        if (tone_stop_at_us != 0 and timer.micros() >= tone_stop_at_us) {
-            stop();
-            tone_stop_at_us = 0;
-        }
-    }
+    // Leaving this stub for future polling needs
 }
 
 /// Enable or disable the speaker amplifier without changing the PWM output.
@@ -121,8 +96,9 @@ fn setEnable(enabled: bool) void {
 
 fn calcPerceptuallyLinearAmplitudeScaleForVolume(volume: f32) f32 {
     // Adjust the volume on a log scale for perceptual linearity
-    const min_amplitude = 1.0 / @as(comptime_float, audio_levels);
-    const exp_range = @log(min_amplitude);
+    // Total range of 50 dB between min and max volume
+    const db_range = -50.0;
+    const exp_range = db_range / 20.0 * @log(10.0);
     const vol_adjust_exp = exp_range * (1.0 - volume);
     return @exp(vol_adjust_exp);
 }
@@ -145,14 +121,8 @@ fn updateSquareWaveLevels() void {
 /// Start a continuous tone at `freq_hz`.
 /// Passing 0 is equivalent to calling `stop()`.
 /// The speaker enable pin is asserted automatically.
-pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
-    const duration_sec = if (in_duration_sec == -1.0)
-            60 * 60 * 60 // the number of the beats
-        else @max(0.0, in_duration_sec);
-    const duration_us: u64 = @intFromFloat(duration_sec * 1000000.0 + 0.5);
-    tone_stop_at_us = timer.micros() + duration_us;
-
-    if (freq_hz == 0 or duration_sec <= 0.0 or volume < 0) {
+pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32) void {
+    if (freq_hz == 0 or volume <= 0 or (duration_sec != -1.0 and duration_sec <= 0.0)) {
         stop();
         return;
     }
@@ -164,11 +134,8 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     // clock we need to support a pretty wide range with reasonable accuracy.
     // The possible source clocks are 8.4 fractional divs of the sys clock,
     // or 0 for a max div of 256
-    //
-    // Max Freq = Clk Rate * 16 / 65536 / N
-    // N = ceil(Clk Rate * 16 / 65536 / Freq)
-    // Ticks = round(Clk Rate * 16 / N / Freq)
 
+    // We need to trigger DMA twice per wavelength
     const trig_hz = freq_hz * 2.0;
 
     const clk_rate = @as(f32, @floatFromInt(buzzer_sys_clk_hz));
@@ -198,18 +165,53 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     const clk_div_int: u32 = if (clk_div == 256) 0 else @intFromFloat(clk_div);
     const wrap_int: u32 = @intFromFloat(wrap_ticks - 1.0);
 
-    // Then came. The Noise.
     audio_timing_slice.set_phase_correct(use_centered_mode);
     audio_timing_slice.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
     audio_timing_slice.set_wrap(@intCast(wrap_int));
-    audio_timing_slice.enable();
 
-    //buzzer_pwm_ch.set_level(level_min);
-    buzzer_pwm_slice.enable();
+    // Configure DMA ch1 to update the duty cycle
+    // for pin 9 every time the timing slice wraps,
+    // switching between the low part and the high
+    // part of the square wave.
+    DMA.CH1_READ_ADDR.write(.{ .CH1_READ_ADDR = @intFromPtr(&square_cc_vals) });
+    // TODO get_registers() doesn't exist until future versions
+    //DMA.CH1_WRITE_ADDR.write(.{ .CH1_WRITE_ADDR = @intFromPtr(&buzzer_pwm_slice.get_registers().cc) });
+    DMA.CH1_WRITE_ADDR.write(.{ .CH1_WRITE_ADDR = @intFromPtr(&PWM.CH4_CC) });
+    if (duration_sec == -1.0) {
+        DMA.CH1_TRANS_COUNT.write(.{
+            .MODE = .ENDLESS,
+            .COUNT = 1,
+        });
+    } else {
+        const dma_count: u32 = @intFromFloat(@round(duration_sec * trig_hz));
+        DMA.CH1_TRANS_COUNT.write(.{
+            .MODE = .NORMAL, // Count down and stop
+            .COUNT = @intCast(dma_count),
+        });
+    }
+    const TreqEnum = @TypeOf(std.mem.zeroes(@TypeOf(DMA.CH1_CTRL_TRIG).underlying_type).TREQ_SEL);
+    const RingEnum = @TypeOf(std.mem.zeroes(@TypeOf(DMA.CH1_CTRL_TRIG).underlying_type).RING_SIZE);
+    DMA.CH1_CTRL_TRIG.modify(.{
+        .SNIFF_EN = 0,
+        .BSWAP = 0,
+        .IRQ_QUIET = 1, // No interrupts
+        .TREQ_SEL = @as(TreqEnum, @enumFromInt(@intFromEnum(TreqEnum.pwm_wrap0) + @intFromEnum(audio_timing_slice))),
+        .CHAIN_TO = 1, // Chain to self, meaning disable
+        .RING_SEL = 0, // Wrap reads
+        .RING_SIZE = @as(RingEnum, @enumFromInt(3)), // Wrap every 2 values / 8 bytes
+        .INCR_WRITE_REV = 0,
+        .INCR_WRITE = 0,
+        .INCR_READ_REV = 0,
+        .INCR_READ = 1, // Increment read address
+        .DATA_SIZE = .size_32,
+        .HIGH_PRIORITY = 1, // Audio is high priority, delays are audible
+        .EN = 1,
+    });
 
+    // Then came. The Noise.
     sound_type = .square;
-    PWM.INTR.write_raw(buzzer_timing_irq_mask);
-
+    audio_timing_slice.enable();
+    buzzer_pwm_slice.enable();
     setEnable(true);
 }
 
@@ -219,7 +221,7 @@ pub fn stop() void {
     buzzer_pwm_slice.disable();
     audio_timing_slice.disable();
     board.buzzer_pwm.put(0);
-    out_val = false;
+    DMA.CH1_CTRL_TRIG.modify(.{ .EN = 0 });
     sound_type = .off;
 }
 

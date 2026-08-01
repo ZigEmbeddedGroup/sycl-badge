@@ -11,6 +11,7 @@ const HH = H/2;
 const white = DisplayColor{ .b = 31, .g = 63, .r = 31 };
 const black = DisplayColor{ .b = 0, .g = 0, .r = 0 };
 const gray = DisplayColor{ .b = 1, .g = 2, .r = 1 };
+const lt_blue = DisplayColor{ .b = 31, .g = 15, .r = 7 };
 
 // Compute equal temperment frequency from midi note number
 // Compatible with fractional note numbers for microtonal adjustment
@@ -54,6 +55,8 @@ const micros_per_note: u64 = 500_000; // 0.5 second per note
 var change_time: u64 = 0;
 var last_abs_time: u64 = 0;
 
+var volume: f32 = 1.0;
+
 export fn start() void {
     change_time = cart.microsSinceBoot() + micros_per_note;
 }
@@ -63,7 +66,6 @@ export fn update() void {
     defer last_abs_time = abs_time;
 
     const delta_sec: f32 = @as(f32, @floatFromInt(abs_time - last_abs_time)) * 0.000_001;
-    _ = delta_sec;
 
     if (global_frame_num < 2) {
         cart.rect(.{
@@ -76,6 +78,14 @@ export fn update() void {
         global_frame_num += 1;
     } else {
         //cart.trace("[frame]");
+    }
+
+    const controls = cart.controls;
+    if (controls.left) {
+        volume = @max(0.0, volume - delta_sec);
+    }
+    if (controls.right) {
+        volume = @min(1.0, volume + delta_sec);
     }
 
     if (abs_time >= change_time) {
@@ -93,7 +103,7 @@ export fn update() void {
         } else {
             cart.tone2(.{
                 .frequency = freqs[note_id],
-                .volume = 1.0,
+                .volume = volume,
             });
         }
     }
@@ -104,11 +114,19 @@ export fn update() void {
 
     // Clear the center of the screen with a white rect
     cart.rect(.{
-        .x = HW-16,
-        .y = HH-8,
-        .width = 32,
-        .height = 16,
+        .x = HW-34,
+        .y = HH-10,
+        .width = 34*2,
+        .height = 20,
         .fill_color = white,
+    });
+    // Draw the volume slider
+    cart.rect(.{
+        .x = HW-32,
+        .y = HH-8,
+        .width = @intFromFloat(volume * 32 * 2 + 0.5),
+        .height = 16,
+        .fill_color = lt_blue,
     });
     // Draw the text
     cart.text(.{

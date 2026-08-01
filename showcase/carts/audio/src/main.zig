@@ -41,7 +41,8 @@ const names: [c_maj.len][:0]const u8 = .{
 const freqs = blk: {
     var fq: [c_maj.len]f32 = undefined;
     for (&fq, c_maj) |*f, note| {
-        f.* = freqFromMidi(note);
+        // TODO: Temporary shift two octaves lower for sw speeds
+        f.* = freqFromMidi(note - 24);
     }
     break :blk fq;
 };

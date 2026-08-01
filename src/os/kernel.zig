@@ -323,12 +323,12 @@ pub fn main() !void {
             // CART_TRACE: cart debug/panic output via cart.trace().
             while (mailbox.tryReceive()) |msg| {
                 if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
-                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.MessageType.CART_TRACE_BUF_SIZE - 1);
-                    const buf: [*]const u8 = @ptrFromInt(mailbox.MessageType.CART_TRACE_BUF);
+                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.shared_data.trace_buf.len - 1);
+                    const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
                     console.printf("[CART] {s}\r\n", .{buf[0..len]});
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
-                    const freq: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_FREQ))).*;
-                    const duration_60ths: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_DURATION))).*;
+                    const freq: u32 = mailbox.shared_data.tone_freq;
+                    const duration_60ths: u32 = mailbox.shared_data.tone_duration;
                     const duration_ms: u32 = (duration_60ths * 1000) / 60;
                     gpio.buzzer.tone(freq);
                     tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
@@ -353,10 +353,10 @@ pub fn main() !void {
                     _ = fps_overlay.tick();
                     const fb_ptr: [*]const u8 = @ptrFromInt(fb_base + fb_index * fb_bytes);
                     if (has_dirty_rect) {
-                        const rx: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_X))).*;
-                        const ry: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_Y))).*;
-                        const rw: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_W))).*;
-                        const rh: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_H))).*;
+                        const rx: u16 = mailbox.shared_data.dirty_rect_x;
+                        const ry: u16 = mailbox.shared_data.dirty_rect_y;
+                        const rw: u16 = mailbox.shared_data.dirty_rect_w;
+                        const rh: u16 = mailbox.shared_data.dirty_rect_h;
 
                         // Fallback to full-frame if rect metadata is invalid.
                         if (rw == 0 or rh == 0 or rx >= 160 or ry >= 128) {

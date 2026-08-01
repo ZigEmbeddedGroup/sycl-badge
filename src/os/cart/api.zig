@@ -84,7 +84,7 @@ pub const Pixel = extern struct {
 /// Button layout must match kernel.zig ButtonPoller.Buttons exactly:
 /// start, select, a, b, click, up, down, left, right (bits 0-8).
 /// Kernel writes u9 to ipc_controls (0x20020004) each frame when cart sends FRAMEBUFFER_READY.
-pub const Controls = packed struct(u9) {
+pub const Controls = packed struct(u16) {
     start: bool,
     select: bool,
     a: bool,
@@ -94,6 +94,7 @@ pub const Controls = packed struct(u9) {
     down: bool,
     left: bool,
     right: bool,
+    _: u7,
 };
 
 const is_wasm = switch (builtin.target.cpu.arch) {
@@ -106,31 +107,38 @@ const is_wasm = switch (builtin.target.cpu.arch) {
 // the framebuffer back to DMA it to the LCD. The cart (Core 1) reads inputs
 // and writes pixels. Using process_ram avoids colliding with kernel_ram
 // (0x20000000) where the OS keeps its own data structures.
-const base = if (is_wasm) 0 else 0x20020000;
-const framebuffer_bytes: usize = screen_width * screen_height * @sizeOf(Pixel);
-const framebuffer0_addr: usize = base + 0x20;
-const framebuffer1_addr: usize = framebuffer0_addr + framebuffer_bytes;
-const trace_buf_addr: usize = framebuffer1_addr + framebuffer_bytes;
-const tone_freq_addr: usize = trace_buf_addr + 0x80;
-const tone_duration_addr: usize = tone_freq_addr + 0x04;
+const base = if (is_wasm) 4 else 0x20020004;
+pub const CartIPCData = extern struct {
+    controls: Controls,
+    light_level: u16,
+    neopixels: [5]NeopixelColor,
+    _pad1: [5]u8,
+    red_led: bool,
+    _pad2: u8,
+    battery_level: u16,
+    framebuffers: [2][screen_width][screen_height]Pixel,
+    trace_buf: [0x80]u8,
+    tone_freq: u32,
+    tone_duration: u32,
+    dirty_rect_x: u16,
+    dirty_rect_y: u16,
+    dirty_rect_w: u16,
+    dirty_rect_h: u16,
+};
+const ipc_data: *volatile CartIPCData = @ptrFromInt(base);
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
-pub const controls: *const volatile Controls = @ptrFromInt(base + 0x04);
-pub const light_level: *u12 = @ptrFromInt(base + 0x06);
-pub const neopixels: *[5]NeopixelColor = @ptrFromInt(base + 0x08);
-pub const red_led: *bool = @ptrFromInt(base + 0x1c);
-pub const battery_level: *u12 = @ptrFromInt(base + 0x1e);
-const framebuffer0: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(framebuffer0_addr);
-const framebuffer1: *volatile [screen_width][screen_height]Pixel = @ptrFromInt(framebuffer1_addr);
+pub const controls: *const volatile Controls = &ipc_data.controls;
+pub const light_level: *volatile u12 = @ptrCast(&ipc_data.light_level);
+pub const neopixels: *volatile [5]NeopixelColor = &ipc_data.neopixels;
+pub const red_led: *volatile bool = &ipc_data.red_led;
+pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
+const framebuffer0: *volatile [screen_width][screen_height]Pixel = &ipc_data.framebuffers[0];
+const framebuffer1: *volatile [screen_width][screen_height]Pixel = &ipc_data.framebuffers[1];
 pub var framebuffer: *volatile [screen_width][screen_height]Pixel = framebuffer0;
 var draw_buffer_index: u1 = 0;
 var has_in_flight_frame: bool = false;
 var present_timeout_events: u32 = 0;
-
-const dirty_rect_x_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x90);
-const dirty_rect_y_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x92);
-const dirty_rect_w_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x94);
-const dirty_rect_h_ptr: *volatile u16 = @ptrFromInt(trace_buf_addr + 0x96);
 
 const present_wait_spin_limit: u32 = 8_000_000;
 
@@ -710,10 +718,8 @@ pub inline fn tone(options: ToneOptions) void {
 
         if (options.frequency == 0) return;
 
-        const freq_ptr: *volatile u32 = @ptrFromInt(tone_freq_addr);
-        const dur_ptr: *volatile u32 = @ptrFromInt(tone_duration_addr);
-        freq_ptr.* = options.frequency;
-        dur_ptr.* = options.duration;
+        ipc_data.tone_freq = options.frequency;
+        ipc_data.tone_duration = options.duration;
 
         while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
         SIO_FIFO_WR.* = CART_TONE;
@@ -795,7 +801,7 @@ pub inline fn trace(x: []const u8) void {
         const FIFO_RDY: u32 = 1 << 1;
 
         const len: u24 = @intCast(@min(x.len, TRACE_BUF_SIZE - 1));
-        const buf: [*]volatile u8 = @ptrFromInt(trace_buf_addr);
+        const buf: [*]volatile u8 = &ipc_data.trace_buf;
         for (x[0..len], 0..) |c, i| buf[i] = c;
         buf[len] = 0;
 
@@ -867,16 +873,16 @@ pub inline fn present() void {
     // payload bit0 = buffer index, bit1 = dirty-rect present.
     var payload: u32 = draw_buffer_index;
     if (dirty_any) {
-        dirty_rect_x_ptr.* = dirty_min_x;
-        dirty_rect_y_ptr.* = dirty_min_y;
-        dirty_rect_w_ptr.* = dirty_max_x - dirty_min_x + 1;
-        dirty_rect_h_ptr.* = dirty_max_y - dirty_min_y + 1;
+        ipc_data.dirty_rect_x = dirty_min_x;
+        ipc_data.dirty_rect_y = dirty_min_y;
+        ipc_data.dirty_rect_w = dirty_max_x - dirty_min_x + 1;
+        ipc_data.dirty_rect_h = dirty_max_y - dirty_min_y + 1;
         payload |= 0x2;
     } else if (computeDirtyRectLegacyFallback()) |r| {
-        dirty_rect_x_ptr.* = r.x;
-        dirty_rect_y_ptr.* = r.y;
-        dirty_rect_w_ptr.* = r.w;
-        dirty_rect_h_ptr.* = r.h;
+        ipc_data.dirty_rect_x = r.x;
+        ipc_data.dirty_rect_y = r.y;
+        ipc_data.dirty_rect_w = r.w;
+        ipc_data.dirty_rect_h = r.h;
         payload |= 0x2;
     }
 

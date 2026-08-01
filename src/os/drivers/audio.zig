@@ -54,11 +54,11 @@ var sound_type: enum {
     square,
 } = .off;
 
+var tone_volume: f32 = 0.0;
+
 // Square wave data
 var out_val: bool = false;
-var level_min: u16 = 0;
-var level_max: u16 = 0;
-var tone_volume: f32 = 0.0;
+var square_cc_vals: [2]u32 = undefined;
 
 const buzzer_timing_irq_mask: u32 = @as(u32, 1) << @intCast(@intFromEnum(audio_timing_slice));
 
@@ -138,8 +138,8 @@ fn updateSquareWaveLevels() void {
     // Use round and floor to allow amplitudes with an odd number of divisions
     const min_f: f32 = @max(0.0, @min(@round(midpoint - amplitude), audio_levels));
     const max_f: f32 = @max(0.0, @min(@floor(midpoint + amplitude), audio_levels));
-    level_min = @as(u16, @intFromFloat(min_f));
-    level_max = @as(u16, @intFromFloat(max_f));
+    square_cc_vals[0] = @as(u32, @intFromFloat(min_f)) << 16;
+    square_cc_vals[1] = @as(u32, @intFromFloat(max_f)) << 16;
 }
 
 /// Start a continuous tone at `freq_hz`.
@@ -204,7 +204,7 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     audio_timing_slice.set_wrap(@intCast(wrap_int));
     audio_timing_slice.enable();
 
-    buzzer_pwm_ch.set_level(level_min);
+    //buzzer_pwm_ch.set_level(level_min);
     buzzer_pwm_slice.enable();
 
     sound_type = .square;

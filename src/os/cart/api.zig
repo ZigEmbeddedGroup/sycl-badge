@@ -15,6 +15,29 @@ pub const font_height: u32 = 8;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
+// │ Time Functions                                                            │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+
+pub fn microsSinceBoot() u64 {
+    if (is_wasm) {
+        // TODO
+        const statics = struct {
+            var last_val: u64 = 0;
+        };
+        statics.last_val += 1000;
+        return statics.last_val;
+    } else {
+        const TIMER0_TIMEHR: *volatile u32 = @ptrFromInt(0x400b0008);
+        const TIMER0_TIMELR: *volatile u32 = @ptrFromInt(0x400b000c);
+        const lr = TIMER0_TIMELR.*; // always lr first
+        const hr = TIMER0_TIMEHR.*;
+        return (@as(u64, hr) << 32) | lr;
+    }
+}
+
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
 // │ Memory Addresses                                                          │
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘

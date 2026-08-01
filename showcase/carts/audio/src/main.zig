@@ -88,6 +88,10 @@ export fn update() void {
         volume = @min(1.0, volume + delta_sec);
     }
 
+    if (controls.left or controls.right) {
+        cart.setGlobalVolume(volume);
+    }
+
     if (abs_time >= change_time) {
         while (abs_time >= change_time) {
             change_time += micros_per_note;
@@ -103,7 +107,7 @@ export fn update() void {
         } else {
             cart.tone2(.{
                 .frequency = freqs[note_id],
-                .volume = volume,
+                .volume = 1.0,
             });
         }
     }

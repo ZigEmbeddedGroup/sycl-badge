@@ -149,6 +149,7 @@ pub const CartIPCData = extern struct {
     dirty_rect_h: u16,
     tone_volume: f32,
     tone_flags: u32,
+    global_volume: f32,
 };
 const ipc_data: *volatile CartIPCData = @ptrFromInt(base);
 
@@ -806,6 +807,26 @@ pub inline fn tone2(options: Tone2Options) void {
 
         while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
         SIO_FIFO_WR.* = CART_TONE;
+        asm volatile ("sev");
+    }
+}
+
+/// Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually
+/// linear scale from about -50dB to 0dB adjustment from the maximum
+/// speaker volume.
+pub inline fn setGlobalVolume(volume: f32) void {
+    if (is_wasm) {
+        // TODO wasm volume
+    } else {
+        const CART_VOLUME: u32 = 0x29000000;
+        const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
+        const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
+        const FIFO_RDY: u32 = 1 << 1;
+
+        ipc_data.global_volume = volume;
+
+        while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
+        SIO_FIFO_WR.* = CART_VOLUME;
         asm volatile ("sev");
     }
 }

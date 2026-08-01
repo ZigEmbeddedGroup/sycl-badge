@@ -118,6 +118,10 @@ pub const MessageType = struct {
     /// Duration is in 60ths of a second (same as ToneOptions); kernel converts to ms.
     pub const CART_TONE: u8 = 0x27;
 
+    /// Cart volume update: type 0x29
+    /// Cart writes global volume before sending
+    pub const CART_VOLUME: u8 = 0x29;
+
     // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x30000000;
 

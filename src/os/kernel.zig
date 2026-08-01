@@ -177,7 +177,7 @@ pub fn main() !void {
                     console.println("[STOP] 2: stopDMA");
                     lcd.stopDMA();
                     console.println("[STOP] 3a: resetCartBuzzer");
-                    audio.stop();
+                    audio.reset();
                     console.println("[STOP] 3b: resetCartPWM");
                     gpio.resetCartPWM();
                     console.println("[STOP] 3c: resetCartPIO");
@@ -325,6 +325,9 @@ pub fn main() !void {
                     const duration_sec: f32 = mailbox.shared_data.tone_duration;
                     const volume = mailbox.shared_data.tone_volume;
                     audio.tone(freq, duration_sec, volume);
+                } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
+                    const volume = mailbox.shared_data.global_volume;
+                    audio.setGlobalVolume(volume);
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {

@@ -47,10 +47,18 @@ const audio_timing_slice: pwm.Slice = @enumFromInt(5);
 // Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
 var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
+var global_volume: f32 = 1.0;
+
+var sound_type: enum {
+    off,
+    square,
+} = .off;
+
+// Square wave data
 var out_val: bool = false;
-var is_sounding: bool = false;
 var level_min: u16 = 0;
 var level_max: u16 = 0;
+var tone_volume: f32 = 0.0;
 
 const buzzer_timing_irq_mask: u32 = @as(u32, 1) << @intCast(@intFromEnum(audio_timing_slice));
 
@@ -74,8 +82,21 @@ pub fn init() void {
     // board.buzzer_pwm.put(0);
 }
 
+pub fn setGlobalVolume(in_vol: f32) void {
+    const vol = @max(0.0, @min(1.0, in_vol));
+    if (global_volume != vol) {
+        global_volume = vol;
+        switch (sound_type) {
+            .off => {},
+            .square => {
+                updateSquareWaveLevels();
+            },
+        }
+    }
+}
+
 pub fn poll() void {
-    if (is_sounding) {
+    if (sound_type != .off) {
         // Interrupt abuse >:(
         if (PWM.INTR.raw & buzzer_timing_irq_mask != 0) {
             PWM.INTR.write_raw(buzzer_timing_irq_mask);
@@ -98,26 +119,17 @@ fn setEnable(enabled: bool) void {
     board.buzzer_enable.put(@intFromBool(enabled));
 }
 
-/// Start a continuous tone at `freq_hz`.
-/// Passing 0 is equivalent to calling `stop()`.
-/// The speaker enable pin is asserted automatically.
-pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
-    const duration_sec = if (in_duration_sec == -1.0)
-            60 * 60 * 60 // the number of the beats
-        else @max(0.0, in_duration_sec);
-    const duration_us: u64 = @intFromFloat(duration_sec * 1000000.0 + 0.5);
-    tone_stop_at_us = timer.micros() + duration_us;
-
-    if (freq_hz == 0 or duration_sec <= 0.0 or volume <= 0) {
-        stop();
-        return;
-    }
-
+fn calcPerceptuallyLinearAmplitudeScaleForVolume(volume: f32) f32 {
     // Adjust the volume on a log scale for perceptual linearity
     const min_amplitude = 1.0 / @as(comptime_float, audio_levels);
     const exp_range = @log(min_amplitude);
     const vol_adjust_exp = exp_range * (1.0 - volume);
-    const vol_amplitude = @exp(vol_adjust_exp);
+    return @exp(vol_adjust_exp);
+}
+
+fn updateSquareWaveLevels() void {
+    const volume = global_volume * tone_volume;
+    const vol_amplitude = calcPerceptuallyLinearAmplitudeScaleForVolume(volume);
 
     const midpoint = @as(f32, @floatFromInt(audio_levels)) / 2;
     const amplitude = midpoint * vol_amplitude; // exp scale is more accurate but sq works for now.
@@ -128,6 +140,25 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     const max_f: f32 = @max(0.0, @min(@floor(midpoint + amplitude), audio_levels));
     level_min = @as(u16, @intFromFloat(min_f));
     level_max = @as(u16, @intFromFloat(max_f));
+}
+
+/// Start a continuous tone at `freq_hz`.
+/// Passing 0 is equivalent to calling `stop()`.
+/// The speaker enable pin is asserted automatically.
+pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
+    const duration_sec = if (in_duration_sec == -1.0)
+            60 * 60 * 60 // the number of the beats
+        else @max(0.0, in_duration_sec);
+    const duration_us: u64 = @intFromFloat(duration_sec * 1000000.0 + 0.5);
+    tone_stop_at_us = timer.micros() + duration_us;
+
+    if (freq_hz == 0 or duration_sec <= 0.0 or volume < 0) {
+        stop();
+        return;
+    }
+
+    tone_volume = volume;
+    updateSquareWaveLevels();
 
     // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
     // clock we need to support a pretty wide range with reasonable accuracy.
@@ -176,7 +207,7 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     buzzer_pwm_ch.set_level(level_min);
     buzzer_pwm_slice.enable();
 
-    is_sounding = true;
+    sound_type = .square;
     PWM.INTR.write_raw(buzzer_timing_irq_mask);
 
     setEnable(true);
@@ -189,5 +220,11 @@ pub fn stop() void {
     audio_timing_slice.disable();
     board.buzzer_pwm.put(0);
     out_val = false;
-    is_sounding = false;
+    sound_type = .off;
+}
+
+/// Reset the audio module for a new cart
+pub fn reset() void {
+    stop();
+    global_volume = 1.0;
 }

@@ -195,7 +195,7 @@ fn clearNeopixels() linksection(".data") void {
 ///   • Reconfigures all button/joystick pins as pull-up inputs so they are
 ///     readable by the kernel again.
 pub fn resetCartHardware() void {
-    audio.stop();
+    audio.reset();
     resetCartPWM();
     resetCartPIO();
     resetCartNeopixels();

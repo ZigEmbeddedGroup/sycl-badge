@@ -11,18 +11,38 @@
 
 const microzig = @import("microzig");
 const hal = microzig.hal;
+const pwm = hal.pwm;
 const board = microzig.board;
 const PWM = microzig.chip.peripherals.PWM;
+
+const std = @import("std");
 
 const timer = @import("timer.zig");
 
 /// System clock in Hz (125 MHz for RP2354B)
 /// TODO: This isn't quite right, the notes come out
 /// somewhere around 400 cents higher than they should
-const buzzer_sys_clk_hz: u32 = 120_000_000;
+const buzzer_sys_clk_hz: u32 = 125_000_000;
+/// Integer pre-divider applied to the system clock before the PWM counter.
+const buzzer_pwm_clk_div = 1;
+/// Number of possible values in an audio buffer
+const audio_levels = 250;
+/// Speed of the pwm cycle for controlling volume,
+/// too fast for humans to hear (or for the speaker to even create)
+const audio_pwm_cycle_hz = 500_000;
+
+// Make sure the above values are consistent with the hardware.
+// They are all important so we specify them all instead of calculating any of them
+comptime { std.debug.assert(buzzer_sys_clk_hz == audio_levels * audio_pwm_cycle_hz * buzzer_pwm_clk_div); }
 
 /// PWM slice number for GPIO9 (slice = pin / 2 = 9 / 2 = 4).
-const buzzer_pwm_slice: u32 = 4;
+const buzzer_pwm_slice: pwm.Slice = @enumFromInt(4);
+const buzzer_pwm_ch = pwm.Pwm{ .slice_number = @intFromEnum(buzzer_pwm_slice), .channel = .b };
+
+/// Separate PWM slice used for wave timing control
+const audio_timing_slice: pwm.Slice = @enumFromInt(5);
+
+
 
 // Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
 var tone_stop_at_us: u64 = 0; // 0 = no active tone
@@ -30,7 +50,7 @@ var tone_stop_at_us: u64 = 0; // 0 = no active tone
 var out_val: bool = false;
 var is_sounding: bool = false;
 
-const buzzer_pwm_mask: u32 = @as(u32, 1) << @intCast(buzzer_pwm_slice);
+const buzzer_timing_irq_mask: u32 = @as(u32, 1) << @intCast(@intFromEnum(audio_timing_slice));
 
 /// Initialise buzzer hardware.
 /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
@@ -41,19 +61,26 @@ pub fn init() void {
     board.buzzer_enable.put(0);
 
     // Audio pin: hand control to the PWM peripheral
-    //board.buzzer_pwm.set_function(.pwm);
-    board.buzzer_pwm.set_function(.sio);
-    board.buzzer_pwm.set_direction(.out);
-    board.buzzer_pwm.put(0);
+    board.buzzer_pwm.set_function(.pwm);
+
+    buzzer_pwm_slice.set_clk_div(@intCast(buzzer_pwm_clk_div), 0);
+    buzzer_pwm_slice.set_wrap(@intCast(audio_levels));
+
+    buzzer_pwm_ch.set_level(0);
+    // board.buzzer_pwm.set_function(.sio);
+    // board.buzzer_pwm.set_direction(.out);
+    // board.buzzer_pwm.put(0);
 }
 
 pub fn poll() void {
     if (is_sounding) {
         // Interrupt abuse >:(
-        if (PWM.INTR.raw & buzzer_pwm_mask != 0) {
-            PWM.INTR.write_raw(buzzer_pwm_mask);
+        if (PWM.INTR.raw & buzzer_timing_irq_mask != 0) {
+            PWM.INTR.write_raw(buzzer_timing_irq_mask);
             out_val = !out_val;
-            board.buzzer_pwm.put(@intFromBool(out_val));
+            //board.buzzer_pwm.put(@intFromBool(out_val));
+            const level: u16 = if (out_val) 250 else 0;
+            buzzer_pwm_ch.set_level(level);
         }
 
         // Stop buzzer when tone duration expires (non-blocking CART_TONE playback)
@@ -83,10 +110,6 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32) void {
         stop();
         return;
     }
-
-    const pwm = hal.pwm;
-    const sl: pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-    //const ch = pwm.Pwm{ .slice_number = buzzer_pwm_slice, .channel = .b };
 
     // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
     // clock we need to support a pretty wide range with reasonable accuracy.
@@ -127,23 +150,25 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32) void {
     const wrap_int: u32 = @intFromFloat(wrap_ticks - 1.0);
 
     // Then came. The Noise.
-    sl.set_phase_correct(use_centered_mode);
-    sl.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
-    sl.set_wrap(@intCast(wrap_int));
-    //ch.set_level(@intCast(wrap_int / 2)); // 50 % duty cycle → loudest output
-    sl.enable();
+    audio_timing_slice.set_phase_correct(use_centered_mode);
+    audio_timing_slice.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
+    audio_timing_slice.set_wrap(@intCast(wrap_int));
+    audio_timing_slice.enable();
+
+    buzzer_pwm_ch.set_level(0);
+    buzzer_pwm_slice.enable();
 
     is_sounding = true;
-    PWM.INTR.write_raw(~buzzer_pwm_mask);
+    PWM.INTR.write_raw(buzzer_timing_irq_mask);
 
     setEnable(true);
 }
 
 /// Stop PWM output and deassert SPKR_EN.
 pub fn stop() void {
-    const sl: hal.pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-    sl.disable();
     setEnable(false);
+    buzzer_pwm_slice.disable();
+    audio_timing_slice.disable();
     board.buzzer_pwm.put(0);
     out_val = false;
     is_sounding = false;

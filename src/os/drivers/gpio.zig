@@ -172,7 +172,7 @@ pub const buzzer = struct {
     /// Start a continuous tone at `freq_hz`.
     /// Passing 0 is equivalent to calling `stop()`.
     /// The speaker enable pin is asserted automatically.
-    pub fn tone(freq_hz: u32) void {
+    pub fn tone(freq_hz: f32) void {
         if (freq_hz == 0) {
             stop();
             return;
@@ -183,8 +183,8 @@ pub const buzzer = struct {
         const ch = pwm.Pwm{ .slice_number = buzzer_pwm_slice, .channel = .b };
 
         // wrap = tick_rate / freq  (clamped to u16)
-        const tick_hz: u32 = buzzer_sys_clk_hz / @as(u32, buzzer_pwm_clk_div);
-        const wrap: u16 = @intCast(@min(tick_hz / freq_hz, 0xFFFF));
+        const tick_hz: f32 = @as(f32, @floatFromInt(buzzer_sys_clk_hz)) / @as(f32, @floatFromInt(buzzer_pwm_clk_div));
+        const wrap: u16 = @intFromFloat(@min(tick_hz / freq_hz, 0xFFFF));
 
         sl.set_clk_div(buzzer_pwm_clk_div, 0); // integer div, no fraction
         sl.set_wrap(wrap);

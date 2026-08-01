@@ -118,12 +118,14 @@ pub const CartIPCData = extern struct {
     battery_level: u16,
     framebuffers: [2][screen_width][screen_height]Pixel,
     trace_buf: [0x80]u8,
-    tone_freq: u32,
-    tone_duration: u32,
+    tone_freq: f32,
+    tone_duration: f32,
     dirty_rect_x: u16,
     dirty_rect_y: u16,
     dirty_rect_w: u16,
     dirty_rect_h: u16,
+    tone_volume: f32,
+    tone_flags: u32,
 };
 const ipc_data: *volatile CartIPCData = @ptrFromInt(base);
 
@@ -667,6 +669,7 @@ pub inline fn vline(options: StraightLineOptions) void {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
+/// Deprecated, Mostly unsupported on Badge v2. Use Tone2Options and tone2() instead.
 pub const ToneOptions = struct {
     pub const Flags = packed struct(u32) {
         pub const Channel = enum(u2) {
@@ -702,24 +705,81 @@ pub const ToneOptions = struct {
     flags: Flags,
 };
 
-/// Plays a sound tone via the hardware buzzer.
-/// On native: sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer.
-/// Duration is in 60ths of a second (same as badge-v1 convention).
+/// Deprecated, Mostly unsupported on Badge v2. Use tone2() instead.
 pub inline fn tone(options: ToneOptions) void {
+    tone2(.{
+        .frequency = @floatFromInt(options.frequency),
+        .duration = @as(f32, @floatFromInt(options.duration)) * (1.0 / 60.0),
+        .volume = @as(f32, @floatFromInt(options.duration)) * 0.01,
+        .flags = .{
+            .shape = switch (options.flags.channel) {
+                .triangle => .triangle,
+                else => .square,
+            },
+        },
+    });
+}
+
+pub const Tone2Options = struct {
+    // Use this value to stop playing audio
+    pub const stop: Tone2Options = .{ .frequency = 0.0 };
+
+    pub const Flags = packed struct(u32) {
+        pub const Shape = enum(u3) {
+            square,   // ---___---___, flute-ish
+            triangle, // /\/\/\/\, string-ish
+            sawtooth, // |\|\|\|\
+            sine, // u^u^u^
+            major, // Major chord with frequency as the fundamental
+            minor, // Minor chord with frequency as the fundamental
+        };
+
+        /// Type of wave to play
+        shape: Shape = .square,
+        padding: u29 = undefined,
+    };
+
+    /// Frequency of the tone, in Hz. If set to 0.0, audio is stopped.
+    frequency: f32,
+
+    /// Duration in seconds. A duration of exactly -1.0 means infinite.
+    duration: f32 = -1.0,
+
+    /// Volume, 0-1, perceptually linear scale
+    volume: f32 = 1.0,
+
+    /// Wave shape and other parameters
+    flags: Flags = .{},
+};
+
+/// Plays a sound tone via the hardware buzzer.
+/// Cancels any other audio that might be playing.
+/// On native: sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer.
+pub inline fn tone2(options: Tone2Options) void {
     if (is_wasm) {
+        // TODO: Update wasm to handle new float values
+        const adj_duration: u32 = if (options.duration == -1)
+            std.math.maxInt(u32)
+        else @intFromFloat(@round(options.duration * 60.0));
         struct {
-            extern fn tone(frequency: u32, duration: u32, volume: u32, flags: ToneOptions.Flags) void;
-        }.tone(options.frequency, options.duration, options.volume, options.flags);
+            extern fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void;
+        }.tone(
+            @intFromFloat(@round(options.frequency)),
+            adj_duration,
+            @intFromFloat(@round(options.volume * 100.0)),
+            0,
+        );
     } else {
         const CART_TONE: u32 = 0x27000000;
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
         const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
         const FIFO_RDY: u32 = 1 << 1;
 
-        if (options.frequency == 0) return;
 
         ipc_data.tone_freq = options.frequency;
         ipc_data.tone_duration = options.duration;
+        ipc_data.tone_volume = options.volume;
+        ipc_data.tone_flags = @bitCast(options.flags);
 
         while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
         SIO_FIFO_WR.* = CART_TONE;

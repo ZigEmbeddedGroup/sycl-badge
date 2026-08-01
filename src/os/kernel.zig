@@ -327,9 +327,10 @@ pub fn main() !void {
                     const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
                     console.printf("[CART] {s}\r\n", .{buf[0..len]});
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
-                    const freq: u32 = mailbox.shared_data.tone_freq;
-                    const duration_60ths: u32 = mailbox.shared_data.tone_duration;
-                    const duration_ms: u32 = (duration_60ths * 1000) / 60;
+                    const freq: f32 = mailbox.shared_data.tone_freq;
+                    var duration_sec: f32 = mailbox.shared_data.tone_duration;
+                    if (duration_sec == -1.0) { duration_sec = 60 * 60 * 60; } // the number of the beats
+                    const duration_ms: u32 = @intFromFloat(duration_sec * 1000.0 + 0.5);
                     gpio.buzzer.tone(freq);
                     tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or

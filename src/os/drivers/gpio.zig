@@ -3,6 +3,7 @@ const microzig = @import("microzig");
 const hal = microzig.hal;
 const board = microzig.board;
 const timer = @import("timer.zig");
+const audio = @import("audio.zig");
 
 // Re-export microzig types and funcs
 pub const Pin = hal.gpio.Pin;
@@ -130,130 +131,6 @@ pub fn isButtonReleased(pin: Pin) bool {
     return read(pin) == 0; // Active-high: released = 0 (low)
 }
 
-// ============================================================================
-// Buzzer controller for CMT-7525-80-SMT-TR
-//
-// GPIO8 = SPKR_EN  - speaker enable (active-high)
-// GPIO9 = SPKR_A0  - PWM audio output → PWM slice 4, channel B
-//
-// The CMT-7525-80-SMT-TR is a magnetic buzzer with a resonant frequency of
-// ~2500 Hz. It is driven by toggling the A0 line at the desired frequency
-// (50 % duty cycle for maximum volume) while SPKR_EN is held high.
-// ============================================================================
-
-/// System clock in Hz (125 MHz for RP2354B)
-/// TODO: This isn't quite right, the notes come out
-/// somewhere around 400 cents higher than they should
-const buzzer_sys_clk_hz: u32 = 120_000_000;
-
-/// PWM slice number for GPIO9 (slice = pin / 2 = 9 / 2 = 4).
-const buzzer_pwm_slice: u32 = 4;
-
-pub const buzzer = struct {
-    /// Initialise buzzer hardware.
-    /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
-    pub fn init() void {
-        // Enable pin: SIO output, start disabled
-        board.buzzer_enable.set_function(.sio);
-        board.buzzer_enable.set_direction(.out);
-        board.buzzer_enable.put(0);
-
-        // Audio pin: hand control to the PWM peripheral
-        board.buzzer_pwm.set_function(.pwm);
-    }
-
-    /// Enable or disable the speaker amplifier without changing the PWM output.
-    pub fn setEnable(enabled: bool) void {
-        board.buzzer_enable.put(@intFromBool(enabled));
-    }
-
-    /// Start a continuous tone at `freq_hz`.
-    /// Passing 0 is equivalent to calling `stop()`.
-    /// The speaker enable pin is asserted automatically.
-    pub fn tone(freq_hz: f32) void {
-        if (freq_hz == 0) {
-            stop();
-            return;
-        }
-
-        const pwm = hal.pwm;
-        const sl: pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-        const ch = pwm.Pwm{ .slice_number = buzzer_pwm_slice, .channel = .b };
-
-        // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
-        // clock we need to support a pretty wide range with reasonable accuracy.
-        // The possible source clocks are 8.4 fractional divs of the sys clock,
-        // or 0 for a max div of 256
-        //
-        // Max Freq = Clk Rate * 16 / 65536 / N
-        // N = ceil(Clk Rate * 16 / 65536 / Freq)
-        // Ticks = round(Clk Rate * 16 / N / Freq)
-
-        const clk_rate = @as(f32, @floatFromInt(buzzer_sys_clk_hz));
-        var clk_div = @ceil(clk_rate * 16.0 / 65536.0 / freq_hz);
-
-        // Can't divide by less than 1.0
-        clk_div = @max(16.0, clk_div);
-
-        if (clk_div > (1<<13)) {
-            // This frequency is too slow for us to reproduce, and also probably
-            // too slow to hear, so just stop audio.
-            stop();
-            return;
-        }
-
-        var wrap_ticks = clk_rate * 16.0 / clk_div / freq_hz;
-
-        // Centered mode allows another 2x divider on the clock
-        var use_centered_mode = false;
-        if (clk_div > (1<<12)) {
-            clk_div = @ceil(clk_div / 2.0);
-            wrap_ticks = wrap_ticks / 2.0;
-            use_centered_mode = true;
-        }
-        wrap_ticks = @max(1.0, @round(wrap_ticks));
-
-        const clk_div_int: u32 = if (clk_div == 256) 0 else @intFromFloat(clk_div);
-        const wrap_int: u32 = @intFromFloat(wrap_ticks - 1.0);
-
-        // Then came. The Noise.
-        sl.set_phase_correct(use_centered_mode);
-        sl.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
-        sl.set_wrap(@intCast(wrap_int));
-        ch.set_level(@intCast(wrap_int / 2)); // 50 % duty cycle → loudest output
-        sl.enable();
-
-        setEnable(true);
-    }
-
-    /// Stop PWM output and deassert SPKR_EN.
-    pub fn stop() void {
-        const sl: hal.pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-        sl.disable();
-        setEnable(false);
-    }
-
-    /// Blocking beep: play `freq_hz` for `duration_ms` milliseconds, then stop.
-    pub fn beep(freq_hz: u32, duration_ms: u32) void {
-        tone(freq_hz);
-        hal.time.sleep_ms(duration_ms);
-        stop();
-    }
-
-    /// Play a sequence of (frequency, duration_ms) pairs.
-    /// A frequency of 0 inserts a silent pause for the given duration.
-    pub fn melody(notes: []const struct { freq: u32, ms: u32 }) void {
-        for (notes) |note| {
-            if (note.freq == 0) {
-                stop();
-                hal.time.sleep_ms(note.ms);
-            } else {
-                beep(note.freq, note.ms);
-            }
-        }
-    }
-};
-
 /// Bit-bang a WS2812B all-black (zero) frame onto the neopixel data line.
 ///
 /// Transmits 5 pixels × 3 bytes × 8 bits = 120 consecutive "0" code-words
@@ -318,17 +195,12 @@ fn clearNeopixels() linksection(".data") void {
 ///   • Reconfigures all button/joystick pins as pull-up inputs so they are
 ///     readable by the kernel again.
 pub fn resetCartHardware() void {
-    resetCartBuzzer();
+    audio.stop();
     resetCartPWM();
     resetCartPIO();
     resetCartNeopixels();
     resetCartLED();
     initButtons();
-}
-
-/// Step 1: Stop buzzer
-pub fn resetCartBuzzer() void {
-    buzzer.stop();
 }
 
 /// Step 2: Disable all 12 PWM slices (RP2350)

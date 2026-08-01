@@ -8,6 +8,7 @@ const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
 const gpio = @import("drivers/gpio.zig");
+const audio = @import("drivers/audio.zig");
 const dma = @import("drivers/dma.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
@@ -75,9 +76,6 @@ var last_cart_check: u64 = 0;
 // Stop combo: require both START+SELECT held for 500ms before triggering
 const STOP_COMBO_HOLD_US: u64 = 500_000;
 var stop_combo_held_since: u64 = 0; // 0 = not currently held
-
-// Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
-var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
 // Button diagnostic logging: print raw button state every BTN_DIAG_US microseconds
 // while a cart is running.  Uses timer.micros() so it fires at a wall-clock rate
@@ -148,11 +146,7 @@ pub fn main() !void {
         // Poll USB frequently for console
         usb.poll();
 
-        // Stop buzzer when tone duration expires (non-blocking CART_TONE playback)
-        if (tone_stop_at_us != 0 and timer.micros() >= tone_stop_at_us) {
-            gpio.buzzer.stop();
-            tone_stop_at_us = 0;
-        }
+        audio.poll();
 
         // Process console input
         console.processInput();
@@ -183,7 +177,7 @@ pub fn main() !void {
                     console.println("[STOP] 2: stopDMA");
                     lcd.stopDMA();
                     console.println("[STOP] 3a: resetCartBuzzer");
-                    gpio.resetCartBuzzer();
+                    audio.stop();
                     console.println("[STOP] 3b: resetCartPWM");
                     gpio.resetCartPWM();
                     console.println("[STOP] 3c: resetCartPIO");
@@ -328,11 +322,8 @@ pub fn main() !void {
                     console.printf("[CART] {s}\r\n", .{buf[0..len]});
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
                     const freq: f32 = mailbox.shared_data.tone_freq;
-                    var duration_sec: f32 = mailbox.shared_data.tone_duration;
-                    if (duration_sec == -1.0) { duration_sec = 60 * 60 * 60; } // the number of the beats
-                    const duration_ms: u32 = @intFromFloat(duration_sec * 1000.0 + 0.5);
-                    gpio.buzzer.tone(freq);
-                    tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
+                    const duration_sec: f32 = mailbox.shared_data.tone_duration;
+                    audio.tone(freq, duration_sec);
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {

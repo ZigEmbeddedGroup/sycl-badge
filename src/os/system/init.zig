@@ -5,6 +5,7 @@ const microzig = @import("microzig");
 
 // Driver imports
 const gpio = @import("../drivers/gpio.zig");
+const audio = @import("../drivers/audio.zig");
 const usb = @import("../drivers/usb.zig");
 const timer = @import("../drivers/timer.zig");
 const lcd = @import("../drivers/lcd.zig");
@@ -122,7 +123,7 @@ pub fn init(config: InitConfig) !void {
     gpio.initButtons();
 
     // 4. Initialize buzzer (GPIO 8/9 for CMT-7525-80 magnetic buzzer)
-    gpio.buzzer.init();
+    audio.init();
 
     // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.

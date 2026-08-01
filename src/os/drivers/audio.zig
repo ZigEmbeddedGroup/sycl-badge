@@ -49,6 +49,8 @@ var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
 var out_val: bool = false;
 var is_sounding: bool = false;
+var level_min: u16 = 0;
+var level_max: u16 = 0;
 
 const buzzer_timing_irq_mask: u32 = @as(u32, 1) << @intCast(@intFromEnum(audio_timing_slice));
 
@@ -79,7 +81,7 @@ pub fn poll() void {
             PWM.INTR.write_raw(buzzer_timing_irq_mask);
             out_val = !out_val;
             //board.buzzer_pwm.put(@intFromBool(out_val));
-            const level: u16 = if (out_val) 250 else 0;
+            const level: u16 = if (out_val) level_max else level_min;
             buzzer_pwm_ch.set_level(level);
         }
 
@@ -99,17 +101,33 @@ fn setEnable(enabled: bool) void {
 /// Start a continuous tone at `freq_hz`.
 /// Passing 0 is equivalent to calling `stop()`.
 /// The speaker enable pin is asserted automatically.
-pub fn tone(freq_hz: f32, in_duration_sec: f32) void {
+pub fn tone(freq_hz: f32, in_duration_sec: f32, volume: f32) void {
     const duration_sec = if (in_duration_sec == -1.0)
             60 * 60 * 60 // the number of the beats
         else @max(0.0, in_duration_sec);
     const duration_us: u64 = @intFromFloat(duration_sec * 1000000.0 + 0.5);
     tone_stop_at_us = timer.micros() + duration_us;
 
-    if (freq_hz == 0 or duration_sec <= 0.0) {
+    if (freq_hz == 0 or duration_sec <= 0.0 or volume <= 0) {
         stop();
         return;
     }
+
+    // Adjust the volume on a log scale for perceptual linearity
+    const min_amplitude = 1.0 / @as(comptime_float, audio_levels);
+    const exp_range = @log(min_amplitude);
+    const vol_adjust_exp = exp_range * (1.0 - volume);
+    const vol_amplitude = @exp(vol_adjust_exp);
+
+    const midpoint = @as(f32, @floatFromInt(audio_levels)) / 2;
+    const amplitude = midpoint * vol_amplitude; // exp scale is more accurate but sq works for now.
+
+    // Square wave
+    // Use round and floor to allow amplitudes with an odd number of divisions
+    const min_f: f32 = @max(0.0, @min(@round(midpoint - amplitude), audio_levels));
+    const max_f: f32 = @max(0.0, @min(@floor(midpoint + amplitude), audio_levels));
+    level_min = @as(u16, @intFromFloat(min_f));
+    level_max = @as(u16, @intFromFloat(max_f));
 
     // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
     // clock we need to support a pretty wide range with reasonable accuracy.
@@ -155,7 +173,7 @@ pub fn tone(freq_hz: f32, in_duration_sec: f32) void {
     audio_timing_slice.set_wrap(@intCast(wrap_int));
     audio_timing_slice.enable();
 
-    buzzer_pwm_ch.set_level(0);
+    buzzer_pwm_ch.set_level(level_min);
     buzzer_pwm_slice.enable();
 
     is_sounding = true;

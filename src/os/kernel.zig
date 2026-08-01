@@ -323,7 +323,8 @@ pub fn main() !void {
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
                     const freq: f32 = mailbox.shared_data.tone_freq;
                     const duration_sec: f32 = mailbox.shared_data.tone_duration;
-                    audio.tone(freq, duration_sec);
+                    const volume = mailbox.shared_data.tone_volume;
+                    audio.tone(freq, duration_sec, volume);
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {

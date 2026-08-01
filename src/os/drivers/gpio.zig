@@ -142,11 +142,9 @@ pub fn isButtonReleased(pin: Pin) bool {
 // ============================================================================
 
 /// System clock in Hz (125 MHz for RP2354B)
-const buzzer_sys_clk_hz: u32 = 125_000_000;
-
-/// Integer pre-divider applied to the system clock before the PWM counter.
-/// 125 MHz / 4 = 31.25 MHz PWM tick rate.
-const buzzer_pwm_clk_div: u8 = 4;
+/// TODO: This isn't quite right, the notes come out
+/// somewhere around 400 cents higher than they should
+const buzzer_sys_clk_hz: u32 = 120_000_000;
 
 /// PWM slice number for GPIO9 (slice = pin / 2 = 9 / 2 = 4).
 const buzzer_pwm_slice: u32 = 4;
@@ -182,13 +180,47 @@ pub const buzzer = struct {
         const sl: pwm.Slice = @enumFromInt(buzzer_pwm_slice);
         const ch = pwm.Pwm{ .slice_number = buzzer_pwm_slice, .channel = .b };
 
-        // wrap = tick_rate / freq  (clamped to u16)
-        const tick_hz: f32 = @as(f32, @floatFromInt(buzzer_sys_clk_hz)) / @as(f32, @floatFromInt(buzzer_pwm_clk_div));
-        const wrap: u16 = @intFromFloat(@min(tick_hz / freq_hz, 0xFFFF));
+        // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
+        // clock we need to support a pretty wide range with reasonable accuracy.
+        // The possible source clocks are 8.4 fractional divs of the sys clock,
+        // or 0 for a max div of 256
+        //
+        // Max Freq = Clk Rate * 16 / 65536 / N
+        // N = ceil(Clk Rate * 16 / 65536 / Freq)
+        // Ticks = round(Clk Rate * 16 / N / Freq)
 
-        sl.set_clk_div(buzzer_pwm_clk_div, 0); // integer div, no fraction
-        sl.set_wrap(wrap);
-        ch.set_level(wrap / 2); // 50 % duty cycle → loudest output
+        const clk_rate = @as(f32, @floatFromInt(buzzer_sys_clk_hz));
+        var clk_div = @ceil(clk_rate * 16.0 / 65536.0 / freq_hz);
+
+        // Can't divide by less than 1.0
+        clk_div = @max(16.0, clk_div);
+
+        if (clk_div > (1<<13)) {
+            // This frequency is too slow for us to reproduce, and also probably
+            // too slow to hear, so just stop audio.
+            stop();
+            return;
+        }
+
+        var wrap_ticks = clk_rate * 16.0 / clk_div / freq_hz;
+
+        // Centered mode allows another 2x divider on the clock
+        var use_centered_mode = false;
+        if (clk_div > (1<<12)) {
+            clk_div = @ceil(clk_div / 2.0);
+            wrap_ticks = wrap_ticks / 2.0;
+            use_centered_mode = true;
+        }
+        wrap_ticks = @max(1.0, @round(wrap_ticks));
+
+        const clk_div_int: u32 = if (clk_div == 256) 0 else @intFromFloat(clk_div);
+        const wrap_int: u32 = @intFromFloat(wrap_ticks - 1.0);
+
+        // Then came. The Noise.
+        sl.set_phase_correct(use_centered_mode);
+        sl.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
+        sl.set_wrap(@intCast(wrap_int));
+        ch.set_level(@intCast(wrap_int / 2)); // 50 % duty cycle → loudest output
         sl.enable();
 
         setEnable(true);

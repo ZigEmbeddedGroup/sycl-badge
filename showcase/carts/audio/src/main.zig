@@ -38,16 +38,32 @@ const names: [c_maj.len][:0]const u8 = .{
     "B4",
     "C4",
 };
+const freqs = blk: {
+    var fq: [c_maj.len]f32 = undefined;
+    for (&fq, c_maj) |*f, note| {
+        f.* = freqFromMidi(note);
+    }
+    break :blk fq;
+};
 
-var note_id: u32 = 0;
-var frame_num: u32 = 0;
+var note_id: u32 = names.len;
 var global_frame_num: u32 = 0;
 
-export fn start() void {
+const micros_per_note: u64 = 500_000; // 0.5 second per note
+var change_time: u64 = 0;
+var last_abs_time: u64 = 0;
 
+export fn start() void {
+    change_time = cart.microsSinceBoot() + micros_per_note;
 }
 
 export fn update() void {
+    const abs_time = cart.microsSinceBoot();
+    defer last_abs_time = abs_time;
+
+    const delta_sec: f32 = @as(f32, @floatFromInt(abs_time - last_abs_time)) * 0.000_001;
+    _ = delta_sec;
+
     if (global_frame_num < 2) {
         cart.rect(.{
             .x = 0,
@@ -61,38 +77,29 @@ export fn update() void {
         //cart.trace("[frame]");
     }
 
-    var text: [:0]const u8 = undefined;
-    if (note_id >= c_maj.len) {
-        //cart.tone2(.stop);
-        text = "";
-        frame_num += 1;
-        if (frame_num >= 10) {
-            note_id = 0;
-            frame_num = 0;
-        }
-    } else {
-        const freq = 440.0; //freqFromMidi(c_maj[note_id]);
-        text = names[note_id];
-        if (frame_num == 0) {
-            _ = freq;
-            // cart.tone2(.{
-            //     .frequency = freq,
-            //     .volume = 1.0,
-            // });
-            cart.tone(.{
-                .frequency = 440,
-                .duration = 60,
-                .volume = 100,
-                .flags = .{ .channel = .pulse1 },
-            });
+    if (abs_time >= change_time) {
+        while (abs_time >= change_time) {
+            change_time += micros_per_note;
+            if (note_id >= c_maj.len) {
+                note_id = 0;
+            } else {
+                note_id += 1;
+            }
         }
 
-        frame_num += 1;
-        if (frame_num >= 10) {
-            note_id += 1;
-            frame_num = 0;
+        if (note_id >= c_maj.len) {
+            cart.tone2(.stop);
+        } else {
+            cart.tone2(.{
+                .frequency = freqs[note_id],
+                .volume = 1.0,
+            });
         }
     }
+
+    const text = if (note_id >= c_maj.len)
+        ""
+    else names[note_id];
 
     // Clear the center of the screen with a white rect
     cart.rect(.{

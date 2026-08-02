@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = ["sycl-cart", "examples/flappy", "xtask"]
+
+# Carts are cross-compiled artifacts: they are `no_std` and get their
+# `#[panic_handler]` only on wasm and Arm targets. Building one for the host
+# therefore fails, so plain `cargo build` / `cargo test` / `cargo clippy` at the
+# workspace root skip them. Build a cart with `cargo xtask build`, or with
+# `-p <cart> --target wasm32-unknown-unknown`.
+default-members = ["sycl-cart", "xtask"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ZigEmbeddedGroup/sycl-badge"
+
+# Carts are size-constrained: the simulator warns above 64 KiB of wasm, and the
+# badge's UF2 loader caps a cart image at ~160 KiB (src/os/loader/loader.zig:228).
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Keep dev builds usable in the simulator too (they are just bigger).
+[profile.dev]
+panic = "abort"

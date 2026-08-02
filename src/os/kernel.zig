@@ -8,6 +8,7 @@ const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
 const gpio = @import("drivers/gpio.zig");
+const audio = @import("drivers/audio.zig");
 const dma = @import("drivers/dma.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
@@ -75,9 +76,6 @@ var last_cart_check: u64 = 0;
 // Stop combo: require both START+SELECT held for 500ms before triggering
 const STOP_COMBO_HOLD_US: u64 = 500_000;
 var stop_combo_held_since: u64 = 0; // 0 = not currently held
-
-// Buzzer tone playback: kernel plays tones requested via CART_TONE (non-blocking)
-var tone_stop_at_us: u64 = 0; // 0 = no active tone
 
 // Button diagnostic logging: print raw button state every BTN_DIAG_US microseconds
 // while a cart is running.  Uses timer.micros() so it fires at a wall-clock rate
@@ -148,11 +146,7 @@ pub fn main() !void {
         // Poll USB frequently for console
         usb.poll();
 
-        // Stop buzzer when tone duration expires (non-blocking CART_TONE playback)
-        if (tone_stop_at_us != 0 and timer.micros() >= tone_stop_at_us) {
-            gpio.buzzer.stop();
-            tone_stop_at_us = 0;
-        }
+        audio.poll();
 
         // Process console input
         console.processInput();
@@ -183,7 +177,7 @@ pub fn main() !void {
                     console.println("[STOP] 2: stopDMA");
                     lcd.stopDMA();
                     console.println("[STOP] 3a: resetCartBuzzer");
-                    gpio.resetCartBuzzer();
+                    audio.reset();
                     console.println("[STOP] 3b: resetCartPWM");
                     gpio.resetCartPWM();
                     console.println("[STOP] 3c: resetCartPIO");
@@ -323,15 +317,17 @@ pub fn main() !void {
             // CART_TRACE: cart debug/panic output via cart.trace().
             while (mailbox.tryReceive()) |msg| {
                 if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
-                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.MessageType.CART_TRACE_BUF_SIZE - 1);
-                    const buf: [*]const u8 = @ptrFromInt(mailbox.MessageType.CART_TRACE_BUF);
+                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.shared_data.trace_buf.len - 1);
+                    const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
                     console.printf("[CART] {s}\r\n", .{buf[0..len]});
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
-                    const freq: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_FREQ))).*;
-                    const duration_60ths: u32 = (@as(*const u32, @ptrFromInt(mailbox.MessageType.CART_TONE_DURATION))).*;
-                    const duration_ms: u32 = (duration_60ths * 1000) / 60;
-                    gpio.buzzer.tone(freq);
-                    tone_stop_at_us = timer.micros() + @as(u64, duration_ms) * 1000;
+                    const freq: f32 = mailbox.shared_data.tone_freq;
+                    const duration_sec: f32 = mailbox.shared_data.tone_duration;
+                    const volume = mailbox.shared_data.tone_volume;
+                    audio.tone(freq, duration_sec, volume);
+                } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
+                    const volume = mailbox.shared_data.global_volume;
+                    audio.setGlobalVolume(volume);
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {
@@ -353,10 +349,10 @@ pub fn main() !void {
                     _ = fps_overlay.tick();
                     const fb_ptr: [*]const u8 = @ptrFromInt(fb_base + fb_index * fb_bytes);
                     if (has_dirty_rect) {
-                        const rx: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_X))).*;
-                        const ry: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_Y))).*;
-                        const rw: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_W))).*;
-                        const rh: u16 = (@as(*const u16, @ptrFromInt(mailbox.MessageType.CART_DIRTY_RECT_H))).*;
+                        const rx: u16 = mailbox.shared_data.dirty_rect_x;
+                        const ry: u16 = mailbox.shared_data.dirty_rect_y;
+                        const rw: u16 = mailbox.shared_data.dirty_rect_w;
+                        const rh: u16 = mailbox.shared_data.dirty_rect_h;
 
                         // Fallback to full-frame if rect metadata is invalid.
                         if (rw == 0 or rh == 0 or rx >= 160 or ry >= 128) {

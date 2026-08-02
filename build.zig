@@ -92,6 +92,13 @@ pub fn build(builder: *Build) void {
         .root_source_file = builder.path("showcase/carts/test-letters-cart/main.zig"),
     });
 
+    // Build test numbers cart (counts down through numbers on LCD)
+    add_microzig_cart(builder, &dep, .{
+        .name = "test-numbers-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/test-numbers-cart/main.zig"),
+    });
+
     // Build neopixel-joystick demo cart
     add_microzig_cart(builder, &dep, .{
         .name = "neopixel-joystick",
@@ -158,6 +165,11 @@ pub fn build(builder: *Build) void {
         .name = "raytracer",
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/raytracer/src/main.zig"),
+    });
+    add_os_cart(builder, &dep, .{
+        .name = "audio",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/audio/src/main.zig"),
     });
 
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");

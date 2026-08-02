@@ -331,53 +331,27 @@ impl Flappy {
     }
 
     fn draw_hud(&self, c: &mut Ctx) {
-        let mut buf = [0u8; 12];
-        let n = write_u32(&mut buf, self.score);
-        let x = (WIDTH as i32 - n as i32 * 8) / 2;
-        c.gfx.text(&buf[..n], x + 1, 5, SHADOW);
-        c.gfx.text(&buf[..n], x, 4, TEXT);
+        center_text(c, uformat!(12, "{}", self.score), 4);
 
         match self.phase {
-            Phase::Ready => center_text(c, b"PRESS A", 96),
+            Phase::Ready => center_text(c, "PRESS A", 96),
             Phase::Dead => {
-                center_text(c, b"GAME OVER", 88);
-                let mut best = [0u8; 16];
-                let mut at = 0;
-                for &b in b"BEST " {
-                    best[at] = b;
-                    at += 1;
-                }
-                at += write_u32(&mut best[at..], self.best);
-                center_text(c, &best[..at], 100);
+                center_text(c, "GAME OVER", 88);
+                center_text(c, uformat!(16, "BEST {}", self.best), 100);
             }
             Phase::Playing => {}
         }
     }
 }
 
-fn center_text(c: &mut Ctx, s: &[u8], y: i32) {
-    let x = (WIDTH as i32 - s.len() as i32 * 8) / 2;
+/// Centred text with a drop shadow.
+///
+/// Layout stays in the cart for now — the framework only measures.
+fn center_text(c: &mut Ctx, s: impl AsRef<[u8]>, y: i32) {
+    let s = s.as_ref();
+    let x = (WIDTH as i32 - c.gfx.text_width(s, 1) as i32) / 2;
     c.gfx.text(s, x + 1, y + 1, SHADOW);
     c.gfx.text(s, x, y, TEXT);
-}
-
-/// Decimal digits into `out`, returning how many were written.
-fn write_u32(out: &mut [u8], mut v: u32) -> usize {
-    let mut digits = [0u8; 10];
-    let mut n = 0;
-    loop {
-        digits[n] = b'0' + (v % 10) as u8;
-        v /= 10;
-        n += 1;
-        if v == 0 || n == digits.len() {
-            break;
-        }
-    }
-    let n = n.min(out.len());
-    for i in 0..n {
-        out[i] = digits[n - 1 - i];
-    }
-    n
 }
 
 sycl_cart::cart!(Flappy);

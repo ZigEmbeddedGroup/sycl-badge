@@ -67,6 +67,7 @@ pub mod rng;
 pub mod rt;
 pub mod save;
 pub mod sprite;
+pub mod text;
 
 #[doc(hidden)]
 pub use ufmt;
@@ -80,11 +81,13 @@ pub use rng::Rng;
 pub use rt::{Cart, Ctx};
 pub use save::Save;
 pub use sprite::{Anim, AnimState, BlitFlags, Span, Sprite, SpriteSheet};
+pub use text::TextBuf;
 
 /// Everything you normally want in scope inside a cart.
 pub mod prelude {
     pub use crate::{
-        cart, debug, error, info, sprite, sprite_sheet, warn, Anim, AnimState, BlitFlags, Button,
-        Cart, Color, Ctx, Rect, Sprite, SpriteSheet, Step, ToneLen, Track, HEIGHT, WIDTH,
+        cart, debug, error, info, sprite, sprite_sheet, uformat, warn, Anim, AnimState, BlitFlags,
+        Button, Cart, Color, Ctx, Rect, Sprite, SpriteSheet, Step, TextBuf, ToneLen, Track, HEIGHT,
+        WIDTH,
     };
 }

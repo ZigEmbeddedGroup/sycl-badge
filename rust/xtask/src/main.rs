@@ -169,8 +169,8 @@ fn watch_paths(root: &Path, package: &str) -> Vec<PathBuf> {
     vec![
         root.join("sycl-cart").join("src"),
         root.join("sycl-cart").join("Cargo.toml"),
-        root.join("examples").join(package).join("src"),
-        root.join("examples").join(package).join("Cargo.toml"),
+        root.join("showcase").join(package).join("src"),
+        root.join("showcase").join(package).join("Cargo.toml"),
     ]
 }
 

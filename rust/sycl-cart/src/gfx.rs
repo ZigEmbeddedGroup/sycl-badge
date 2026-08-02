@@ -339,20 +339,39 @@ impl Gfx {
     /// Draw text in the built-in 8x8 font. `\n` starts a new line.
     /// Bytes are treated as Latin-1 (the font covers U+0020..=U+00FF).
     #[inline]
-    pub fn text(&mut self, s: &[u8], x: i32, y: i32, color: Color) {
+    pub fn text(&mut self, s: impl AsRef<[u8]>, x: i32, y: i32, color: Color) {
         self.text_with(s, x, y, 1, color, None);
+    }
+
+    /// Width in pixels that [`Gfx::text`] would occupy, accounting for newlines.
+    ///
+    /// Measurement only: lay text out yourself with it.
+    pub fn text_width(&self, s: impl AsRef<[u8]>, scale: u32) -> u32 {
+        let step = font::WIDTH * scale.max(1);
+        let mut widest = 0;
+        let mut current = 0;
+        for &ch in s.as_ref() {
+            if ch == b'\n' {
+                widest = widest.max(current);
+                current = 0;
+            } else {
+                current += step;
+            }
+        }
+        widest.max(current)
     }
 
     /// Draw text with an integer scale factor and an optional background.
     pub fn text_with(
         &mut self,
-        s: &[u8],
+        s: impl AsRef<[u8]>,
         x: i32,
         y: i32,
         scale: u32,
         color: Color,
         background: Option<Color>,
     ) {
+        let s = s.as_ref();
         let scale = scale.max(1) as i32;
         let step = font::WIDTH as i32 * scale;
         let mut cx = x;

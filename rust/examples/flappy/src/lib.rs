@@ -9,6 +9,7 @@
 #![no_std]
 
 use sycl_cart::audio::notes;
+use sycl_cart::math;
 use sycl_cart::prelude::*;
 use sycl_cart::Track;
 
@@ -198,7 +199,7 @@ impl Flappy {
     fn update_ready(&mut self, c: &mut Ctx) {
         // Idle bob so the screen is not static while waiting.
         self.y =
-            (HEIGHT as f32) / 2.0 - BIRD_H as f32 / 2.0 + sin_approx(c.frame() as f32 * 0.08) * 4.0;
+            (HEIGHT as f32) / 2.0 - BIRD_H as f32 / 2.0 + math::sin(c.frame() as f32 * 0.08) * 4.0;
         self.anim.advance(&FLAP_ANIM);
         if Self::flap_pressed(c) {
             self.phase = Phase::Playing;
@@ -377,18 +378,6 @@ fn write_u32(out: &mut [u8], mut v: u32) -> usize {
         out[i] = digits[n - 1 - i];
     }
     n
-}
-
-/// Cheap sine for the idle bob. `libm` would work, but a Bhaskara-style
-/// approximation avoids the dependency and the code size.
-fn sin_approx(x: f32) -> f32 {
-    use core::f32::consts::{PI, TAU};
-    let mut t = x % TAU;
-    if t < 0.0 {
-        t += TAU;
-    }
-    let (t, sign) = if t > PI { (t - PI, -1.0) } else { (t, 1.0) };
-    sign * (16.0 * t * (PI - t)) / (5.0 * PI * PI - 4.0 * t * (PI - t))
 }
 
 sycl_cart::cart!(Flappy);

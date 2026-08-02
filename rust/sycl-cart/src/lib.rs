@@ -61,6 +61,7 @@ pub mod gfx;
 pub mod input;
 pub mod leds;
 pub mod log;
+pub mod math;
 pub mod platform;
 pub mod rng;
 pub mod rt;

@@ -59,7 +59,7 @@ sycl_cart::cart!(Game);
 ```
 
 `Cargo.toml` needs `crate-type = ["cdylib"]`. See
-[`examples/flappy`](examples/flappy/src/lib.rs) for a complete game — sprites,
+[`showcase/flappy`](showcase/flappy/src/lib.rs) for a complete game — sprites,
 animation, audio, scoring — in one file.
 
 ## How it works
@@ -142,7 +142,7 @@ pixel with opaque pixels above and below. That distinction sets the blit speed:
 Either way transparent margins are never touched and never enlarge the dirty
 rectangle. `Sprite::takes_fast_path()` is `const`, so you can hold the line on
 it: `const _: () = assert!(BIRD.takes_fast_path());` turns art edits that would
-slow the blit down into build failures. `examples/flappy` does exactly that.
+slow the blit down into build failures. `showcase/flappy` does exactly that.
 
 For an asset pipeline that produces pixels some other way, `Sprite::opaque`
 takes column-major pre-encoded data directly.
@@ -173,11 +173,44 @@ the private backbuffer already provides that, and alternating buffers would leav
 each one two frames stale outside the dirty region — forcing every flush to cover
 a two-frame union. One buffer is simpler and correct.
 
+## Text and numbers
+
+`TextBuf<N>` is a fixed-capacity string you can format into, and `uformat!` fills
+one the way `format!` fills a `String` — capacity first:
+
+```rust
+let label = uformat!(16, "BEST {}", self.best);
+c.gfx.text(&label, x, y, Color::WHITE);
+```
+
+Simple cases need no macro:
+
+```rust
+let mut b = TextBuf::<16>::new();
+b.push_str("BEST ");
+b.push_u32(self.best);
+```
+
+`Gfx::text` takes `impl AsRef<[u8]>`, so string literals, byte literals and
+`TextBuf` all work without conversion. Overflow truncates and sets
+`TextBuf::truncated()` rather than panicking.
+
+Two limits inherited from `ufmt`:
+
+* **Positional arguments only.** `uformat!(8, "{score}")` does not compile —
+  write `uformat!(8, "{}", score)`. Implicit capture would need our own proc
+  macro. (Field access like `{self.score}` is not valid in `std`'s `format!`
+  either, only plain identifiers are.)
+* **No floats.** Wrap them: `uformat!(16, "vy={}", text::fx(self.vy, 2))`.
+
+For layout, `Gfx::text_width(s, scale)` measures; positioning is the cart's job.
+There is no alignment API yet.
+
 ## Logging
 
 ```rust
 info!("score {}", self.score);
-debug!("vy={}", sycl_cart::log::fx(self.vy, 2));
+debug!("vy={}", sycl_cart::text::fx(self.vy, 2));
 ```
 
 Levels cascade through cargo features (`log-error` ⊂ `log-warn` ⊂ `log-info` ⊂
@@ -186,7 +219,7 @@ Levels cascade through cargo features (`log-error` ⊂ `log-warn` ⊂ `log-info`
 are still type-checked, so disabled logging cannot rot.
 
 Formatting uses [`ufmt`], not `core::fmt`, which would cost 10–20 KiB of a
-~160 KiB cart budget. `ufmt` has no float support, so use `log::fx` for those.
+~160 KiB cart budget. `ufmt` has no float support, so use `text::fx` for those.
 
 Keep the rate low. On the badge the kernel drains the message FIFO once per loop
 iteration, so several traces in one frame may be coalesced or lost, and each one
@@ -242,12 +275,14 @@ because the linker rounds the first segment up, but don't copy the value.
 sycl-cart/          the framework
   src/platform/     wasm.rs, badge.rs, host.rs (for tests), ipc.rs (shared layout)
   src/gfx.rs        backbuffer, drawing, dirty tracking, volatile flush
-  src/sprite.rs     sprites, sheets, ascii_sprite, animation
+  src/sprite.rs     sprites, sheets, sprite!/sprite_sheet!, animation
+  src/text.rs       TextBuf, uformat!, fixed-point floats
+  src/math.rs       sin, cos, sqrt and friends that core lacks
   src/audio.rs      tone primitive + sequencer
   src/log.rs        ufmt-based logging, compiled out when disabled
   src/rt.rs         Cart trait, Ctx, cart! macro, panic handler
   src/font.rs       generated — see tools/gen_font.py
-examples/flappy/    a complete game
+showcase/flappy/    a complete game
 xtask/              build, and the watch server the simulator expects
 tools/              gen_font.py, sim_check.mjs
 ```

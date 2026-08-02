@@ -196,46 +196,9 @@ fn overlay(ctx: &mut Ctx) {
     use crate::color::Color;
 
     let area = ctx.gfx.dirty().map_or(0, |r| r.area());
-    let mut line = [0u8; 24];
-    let mut at = 0;
-    push_bytes(&mut line, &mut at, b"f");
-    push_u32(&mut line, &mut at, ctx.frame);
-    push_bytes(&mut line, &mut at, b" px");
-    push_u32(&mut line, &mut at, area);
-
+    let line = crate::uformat!(24, "f{} px{}", ctx.frame, area);
     ctx.gfx
-        .text_with(&line[..at], 1, 1, 1, Color::WHITE, Some(Color::BLACK));
-}
-
-#[cfg(feature = "debug-overlay")]
-fn push_bytes(out: &mut [u8], at: &mut usize, s: &[u8]) {
-    for &b in s {
-        if *at < out.len() {
-            out[*at] = b;
-            *at += 1;
-        }
-    }
-}
-
-#[cfg(feature = "debug-overlay")]
-fn push_u32(out: &mut [u8], at: &mut usize, mut v: u32) {
-    let mut digits = [0u8; 10];
-    let mut n = 0;
-    loop {
-        digits[n] = b'0' + (v % 10) as u8;
-        v /= 10;
-        n += 1;
-        if v == 0 {
-            break;
-        }
-    }
-    while n > 0 {
-        n -= 1;
-        if *at < out.len() {
-            out[*at] = digits[n];
-            *at += 1;
-        }
-    }
+        .text_with(&line, 1, 1, 1, Color::WHITE, Some(Color::BLACK));
 }
 
 /// Declare your cart type as the program entry point.

@@ -127,6 +127,8 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32) void {
         return;
     }
 
+    beginStopDma();
+
     tone_volume = volume;
     updateSquareWaveLevels();
 
@@ -168,6 +170,8 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32) void {
     audio_timing_slice.set_phase_correct(use_centered_mode);
     audio_timing_slice.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
     audio_timing_slice.set_wrap(@intCast(wrap_int));
+
+    finishStopDma();
 
     // Configure DMA ch1 to update the duty cycle
     // for pin 9 every time the timing slice wraps,
@@ -215,13 +219,21 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32) void {
     setEnable(true);
 }
 
+fn beginStopDma() void {
+    DMA.CHAN_ABORT.write(.{ .CHAN_ABORT = 0b10 });
+}
+
+fn finishStopDma() void {
+    while (DMA.CH1_CTRL_TRIG.read().BUSY != 0) {}
+}
+
 /// Stop PWM output and deassert SPKR_EN.
 pub fn stop() void {
     setEnable(false);
+    beginStopDma();
     buzzer_pwm_slice.disable();
     audio_timing_slice.disable();
     board.buzzer_pwm.put(0);
-    DMA.CH1_CTRL_TRIG.modify(.{ .EN = 0 });
     sound_type = .off;
 }
 

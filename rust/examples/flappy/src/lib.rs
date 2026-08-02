@@ -10,7 +10,7 @@
 
 use sycl_cart::audio::notes;
 use sycl_cart::prelude::*;
-use sycl_cart::{ascii_sprite, Track};
+use sycl_cart::Track;
 
 // ── Tuning ──────────────────────────────────────────────────────────────────
 
@@ -26,8 +26,6 @@ const PIPE_SPACING: i32 = 62;
 const PIPE_COUNT: usize = 3;
 
 const BIRD_X: i32 = 40;
-const BIRD_W: i32 = 9;
-const BIRD_H: i32 = 7;
 
 // ── Palette ─────────────────────────────────────────────────────────────────
 
@@ -39,64 +37,62 @@ const PIPE_DARK: Color = Color::hex(0x2c_7c_2c);
 const TEXT: Color = Color::WHITE;
 const SHADOW: Color = Color::hex(0x1c_38_50);
 
-/// Blit key: any color works as long as it is not used in the art.
-const KEY: Color = Color::MAGENTA;
+// ── Art ─────────────────────────────────────────────────────────────────────
+//
+// Dimensions, transposition, pixel encoding and per-column opacity are all
+// worked out at compile time. `.` is transparent because it is not in the
+// palette.
 
-const PAL: [(u8, Color); 4] = [
-    (b'Y', Color::hex(0xf8_d8_28)), // body
-    (b'O', Color::hex(0xe0_78_10)), // beak
-    (b'k', Color::hex(0x30_20_10)), // eye
-    (b'w', Color::WHITE),           // wing highlight
-];
-
-// Three wing positions, stored as one sheet: 9x7 each, tile-contiguous.
-#[rustfmt::skip]
-static BIRD_FRAMES: [u16; (BIRD_W * BIRD_H * 3) as usize] = {
-    // `ascii_sprite` transposes to the column-major layout the framebuffer
-    // wants, and encodes to the target's pixel format, all at compile time.
-    const UP: [u16; 63] = ascii_sprite(&[
-        "..YYYY...",
-        ".YYYYYYk.",
-        "YwwYYYYYO",
-        "YwwwYYYOO",
-        "YwwYYYYYO",
-        ".YYYYYYk.",
-        "..YYYY...",
-    ], &PAL, KEY);
-    const MID: [u16; 63] = ascii_sprite(&[
-        "..YYYY...",
-        ".YYYYYYk.",
-        "YYYYYYYYO",
-        "wwwYYYYOO",
-        "YYYYYYYYO",
-        ".YYYYYYk.",
-        "..YYYY...",
-    ], &PAL, KEY);
-    const DOWN: [u16; 63] = ascii_sprite(&[
-        "..YYYY...",
-        ".YYYYYYk.",
-        "YYYYYYYYO",
-        "YYYYYYYOO",
-        "YwwYYYYYO",
-        ".YwwYYYk.",
-        "..YwYY...",
-    ], &PAL, KEY);
-
-    let mut out = [KEY.0; 63 * 3];
-    let mut i = 0;
-    while i < 63 {
-        out[i] = UP[i];
-        out[63 + i] = MID[i];
-        out[126 + i] = DOWN[i];
-        i += 1;
-    }
-    out
-};
-
-static BIRD_SHEET: SpriteSheet =
-    SpriteSheet::new(&BIRD_FRAMES, BIRD_W as u16, BIRD_H as u16, 3, Some(KEY));
+sprite_sheet! {
+    /// Three wing positions.
+    const BIRD;
+    palette: {
+        'Y' => Color::hex(0xf8_d8_28), // body
+        'O' => Color::hex(0xe0_78_10), // beak
+        'k' => Color::hex(0x30_20_10), // eye
+        'w' => Color::WHITE,           // wing highlight
+    },
+    frames: [
+        [
+            "..YYYY...",
+            ".YYYYYYk.",
+            "YwwYYYYYO",
+            "YwwwYYYOO",
+            "YwwYYYYYO",
+            ".YYYYYYk.",
+            "..YYYY...",
+        ],
+        [
+            "..YYYY...",
+            ".YYYYYYk.",
+            "YYYYYYYYO",
+            "wwwYYYYOO",
+            "YYYYYYYYO",
+            ".YYYYYYk.",
+            "..YYYY...",
+        ],
+        [
+            "..YYYY...",
+            ".YYYYYYk.",
+            "YYYYYYYYO",
+            "YYYYYYYOO",
+            "YwwYYYYYO",
+            ".YwwYYYk.",
+            "..YwYY...",
+        ],
+    ],
+}
 
 static FLAP_ANIM: Anim = Anim::new(0, 3, 3, true);
+
+// The art has no interior holes, so every blit is a contiguous copy per column
+// with no per-pixel transparency test. Compile-time check, so art edits that
+// would slow the blit down cannot pass unnoticed.
+const _: () = assert!(BIRD.takes_fast_path());
+
+// Single-sourced from the art above rather than restated.
+const BIRD_W: i32 = BIRD.tile_w() as i32;
+const BIRD_H: i32 = BIRD.tile_h() as i32;
 
 // ── Audio ───────────────────────────────────────────────────────────────────
 
@@ -328,7 +324,7 @@ impl Flappy {
         } else {
             BlitFlags::NONE
         };
-        g.blit_with(&BIRD_SHEET.tile(tile), BIRD_X, self.y as i32, flags);
+        g.blit_with(&BIRD.tile(tile), BIRD_X, self.y as i32, flags);
 
         self.draw_hud(c);
     }

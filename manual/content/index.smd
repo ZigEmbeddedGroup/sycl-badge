@@ -1,0 +1,53 @@
+---
+.title = "Table of contents",
+.date = .date("1990-01-01T00:00:00"),
+.layout = "index.shtml",
+---
+
+# Acknowledgements
+
+The hard work of updating the Badge from V1 to V2 was largely done as a capstone
+project at the University of British Columbia. The team comprised of:
+
+- [Ivan Cheung](https://www.linkedin.com/in/ivan-cheung-0a9e/)
+- [Vanessa Chu](https://www.linkedin.com/in/vanessac3/)
+- [Katie Goncalves](https://www.linkedin.com/in/katie-goncalves/)
+- [Sarah Oskuei](https://www.linkedin.com/in/sarah-oskuei/)
+- [Eric Tannant](https://www.linkedin.com/in/eric-tannant/)
+
+The design for this manual is based off [The Proportional
+Web](https://owickstrom.github.io/the-proportional-web/) by [Oskar
+Wickström](https://wickstrom.tech)
+
+# Introduction
+
+Congratulations, you're the owner of a brand new SYCL Badge V2. With any luck,
+you're currently at Tables Day, hanging out with your friends during [Software
+You Can Love 2026](https://softwareyoucanlove.ca).
+
+The Badge is a constrained, programmable device for you to write, share, and run
+programs called "carts". The custom OS  allows for multiple carts to be
+installed, executing only one at a time. There exist several means for carts to
+interact with the outside world, including but not limited to: buttons, a nav
+stick, an LCD screen, and five RGB LEDs. Carts can be loaded from your personal
+computer onto the Badge through USB. 
+
+This second version of the Badge largely came about due to part sourcing issues.
+Modernizing components fixed this issue, reduced costs, and improved
+performance. The most notable upgrade was changing the MCU to an RP2354. It has
+a hardware USB bootloader, which allows users to recover from a bricked state if
+they decide to author their own OS. The hardware upgrades include:
+
+## Hardware Improvments over V1
+
+| Feature   | V1 | V2 |
+|-----------|----|----|
+| MCU | ATSAMD51J19 | RP2354B |
+| CPU Count | 1 | 2 |
+| CPU Frequency | 120 MHz | 155 MHz |
+| CPU Core | Cortex M3 | Cortex M33/RISC-V |
+| Flash | 512 KB | 4 MB |
+| RAM | 192 KB | 520 KB |
+| Battery | 3.7V LiPo | 3x AAAs |
+
+\* RISC-V cores are not utilized in the Badge V2 at the time of writing.

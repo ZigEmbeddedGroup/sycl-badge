@@ -1,0 +1,9 @@
+<extend template="base.shtml">
+<head id="head">
+</head>
+<body id="body">
+  <img class="front-page" src="$site.asset('badge-sides.svg').link()">
+  <h1>Table of Contents</h1>
+  <div :html="$page.toc()"></div>
+  <div :html="$page.content()"></div>
+</body>

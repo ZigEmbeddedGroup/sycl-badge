@@ -159,6 +159,11 @@ pub fn build(builder: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = builder.path("showcase/carts/raytracer/src/main.zig"),
     });
+    add_os_cart(builder, &dep, .{
+        .name = "audio",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("showcase/carts/audio/src/main.zig"),
+    });
 
     const font_export_step = builder.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = builder.addExecutable(.{

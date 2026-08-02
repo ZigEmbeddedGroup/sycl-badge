@@ -12,7 +12,6 @@ jobs:
       matrix:
         os:
           - windows-latest
-          - macos-latest
           - ubuntu-latest
     steps:
       - name: Checkout

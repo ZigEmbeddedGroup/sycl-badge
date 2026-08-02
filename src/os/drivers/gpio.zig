@@ -3,6 +3,7 @@ const microzig = @import("microzig");
 const hal = microzig.hal;
 const board = microzig.board;
 const timer = @import("timer.zig");
+const audio = @import("audio.zig");
 
 // Re-export microzig types and funcs
 pub const Pin = hal.gpio.Pin;
@@ -130,98 +131,6 @@ pub fn isButtonReleased(pin: Pin) bool {
     return read(pin) == 0; // Active-high: released = 0 (low)
 }
 
-// ============================================================================
-// Buzzer controller for CMT-7525-80-SMT-TR
-//
-// GPIO8 = SPKR_EN  - speaker enable (active-high)
-// GPIO9 = SPKR_A0  - PWM audio output → PWM slice 4, channel B
-//
-// The CMT-7525-80-SMT-TR is a magnetic buzzer with a resonant frequency of
-// ~2500 Hz. It is driven by toggling the A0 line at the desired frequency
-// (50 % duty cycle for maximum volume) while SPKR_EN is held high.
-// ============================================================================
-
-/// System clock in Hz (125 MHz for RP2354B)
-const buzzer_sys_clk_hz: u32 = 125_000_000;
-
-/// Integer pre-divider applied to the system clock before the PWM counter.
-/// 125 MHz / 4 = 31.25 MHz PWM tick rate.
-const buzzer_pwm_clk_div: u8 = 4;
-
-/// PWM slice number for GPIO9 (slice = pin / 2 = 9 / 2 = 4).
-const buzzer_pwm_slice: u32 = 4;
-
-pub const buzzer = struct {
-    /// Initialise buzzer hardware.
-    /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
-    pub fn init() void {
-        // Enable pin: SIO output, start disabled
-        board.buzzer_enable.set_function(.sio);
-        board.buzzer_enable.set_direction(.out);
-        board.buzzer_enable.put(0);
-
-        // Audio pin: hand control to the PWM peripheral
-        board.buzzer_pwm.set_function(.pwm);
-    }
-
-    /// Enable or disable the speaker amplifier without changing the PWM output.
-    pub fn setEnable(enabled: bool) void {
-        board.buzzer_enable.put(@intFromBool(enabled));
-    }
-
-    /// Start a continuous tone at `freq_hz`.
-    /// Passing 0 is equivalent to calling `stop()`.
-    /// The speaker enable pin is asserted automatically.
-    pub fn tone(freq_hz: u32) void {
-        if (freq_hz == 0) {
-            stop();
-            return;
-        }
-
-        const pwm = hal.pwm;
-        const sl: pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-        const ch = pwm.Pwm{ .slice_number = buzzer_pwm_slice, .channel = .b };
-
-        // wrap = tick_rate / freq  (clamped to u16)
-        const tick_hz: u32 = buzzer_sys_clk_hz / @as(u32, buzzer_pwm_clk_div);
-        const wrap: u16 = @intCast(@min(tick_hz / freq_hz, 0xFFFF));
-
-        sl.set_clk_div(buzzer_pwm_clk_div, 0); // integer div, no fraction
-        sl.set_wrap(wrap);
-        ch.set_level(wrap / 2); // 50 % duty cycle → loudest output
-        sl.enable();
-
-        setEnable(true);
-    }
-
-    /// Stop PWM output and deassert SPKR_EN.
-    pub fn stop() void {
-        const sl: hal.pwm.Slice = @enumFromInt(buzzer_pwm_slice);
-        sl.disable();
-        setEnable(false);
-    }
-
-    /// Blocking beep: play `freq_hz` for `duration_ms` milliseconds, then stop.
-    pub fn beep(freq_hz: u32, duration_ms: u32) void {
-        tone(freq_hz);
-        hal.time.sleep_ms(duration_ms);
-        stop();
-    }
-
-    /// Play a sequence of (frequency, duration_ms) pairs.
-    /// A frequency of 0 inserts a silent pause for the given duration.
-    pub fn melody(notes: []const struct { freq: u32, ms: u32 }) void {
-        for (notes) |note| {
-            if (note.freq == 0) {
-                stop();
-                hal.time.sleep_ms(note.ms);
-            } else {
-                beep(note.freq, note.ms);
-            }
-        }
-    }
-};
-
 /// Bit-bang a WS2812B all-black (zero) frame onto the neopixel data line.
 ///
 /// Transmits 5 pixels × 3 bytes × 8 bits = 120 consecutive "0" code-words
@@ -286,17 +195,12 @@ fn clearNeopixels() linksection(".data") void {
 ///   • Reconfigures all button/joystick pins as pull-up inputs so they are
 ///     readable by the kernel again.
 pub fn resetCartHardware() void {
-    resetCartBuzzer();
+    audio.reset();
     resetCartPWM();
     resetCartPIO();
     resetCartNeopixels();
     resetCartLED();
     initButtons();
-}
-
-/// Step 1: Stop buzzer
-pub fn resetCartBuzzer() void {
-    buzzer.stop();
 }
 
 /// Step 2: Disable all 12 PWM slices (RP2350)

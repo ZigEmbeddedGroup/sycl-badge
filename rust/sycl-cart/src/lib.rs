@@ -78,12 +78,12 @@ pub use leds::Leds;
 pub use rng::Rng;
 pub use rt::{Cart, Ctx};
 pub use save::Save;
-pub use sprite::{ascii_sprite, Anim, AnimState, BlitFlags, Sprite, SpriteSheet};
+pub use sprite::{Anim, AnimState, BlitFlags, Span, Sprite, SpriteSheet};
 
 /// Everything you normally want in scope inside a cart.
 pub mod prelude {
     pub use crate::{
-        cart, debug, error, info, warn, Anim, AnimState, BlitFlags, Button, Cart, Color, Ctx, Rect,
-        Sprite, SpriteSheet, Step, ToneLen, Track, HEIGHT, WIDTH,
+        cart, debug, error, info, sprite, sprite_sheet, warn, Anim, AnimState, BlitFlags, Button,
+        Cart, Color, Ctx, Rect, Sprite, SpriteSheet, Step, ToneLen, Track, HEIGHT, WIDTH,
     };
 }

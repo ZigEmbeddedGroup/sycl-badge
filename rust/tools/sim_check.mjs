@@ -129,6 +129,24 @@ let solid = true;
 for (let x = 0; x < WIDTH; x++) if (pixel(x, groundRow) !== groundColor) solid = false;
 check(solid, "ground is a solid stripe", `row ${groundRow} = rgb565 ${decode(groundColor).join(",")}`);
 
+// Sprite transparency, end to end. The bird's palette contains no value that
+// encodes to 0, so the framework's transparency stand-in is 0x0000 — and nothing
+// in this cart draws pure black. Any black pixel therefore means a transparent
+// sprite pixel leaked through the blit.
+let leaked = 0;
+for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === 0) leaked++;
+check(leaked === 0, "sprite transparency does not leak the key colour", `${leaked} black pixels`);
+
+// And the sprite is actually on screen, so the check above isn't vacuous.
+const BIRD_BODY = (() => {
+  // 0xf8d828 -> rgb565 (31, 54, 5), stored byte-swapped.
+  const rgb = (31 << 11) | (54 << 5) | 5;
+  return ((rgb & 0xff) << 8) | (rgb >> 8);
+})();
+let bodyPixels = 0;
+for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === BIRD_BODY) bodyPixels++;
+check(bodyPixels > 10, "the bird sprite is drawn", `${bodyPixels} body pixels`);
+
 console.log("\nservices:");
 check(unexpected.length === 0, "does not call the host drawing imports", unexpected.map(([n]) => n).join(", "));
 check(tones.length > 0, "played audio", `${tones.length} tone calls`);

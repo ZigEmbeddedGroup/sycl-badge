@@ -93,11 +93,59 @@ strided by 256 bytes. Consequences:
 
 * `vline` is a `fill`. `hline` touches one pixel per stride. That is the
   opposite of most engines — prefer vertical spans and `fill_rect` in hot code.
-* Sprites are stored **column-major and pre-encoded**, so an unflipped opaque
-  blit is one `copy_from_slice` per column. `ascii_sprite` does the transpose and
-  the pixel encoding at compile time.
-* `flip_y` is a reversed copy within a column and `flip_x` is a reversed column
-  order, so both flips are nearly free.
+* Sprites are stored column-major and pre-encoded too, so a blit is one
+  `copy_from_slice` per column. `flip_y` is a reversed copy within a column and
+  `flip_x` a reversed column order, so both flips are nearly free.
+
+### Sprites
+
+Declare art and the layout details stay inside the framework — no dimensions to
+restate, no array lengths, no pixel order to know about:
+
+```rust
+sprite_sheet! {
+    /// Three wing positions.
+    const BIRD;
+    palette: {
+        'Y' => Color::hex(0xf8d828),
+        'k' => Color::hex(0x302010),
+    },
+    frames: [
+        [
+            "..YYYY...",
+            ".YYYYYYk.",
+            "..YYYY...",
+        ],
+        [ /* ... */ ],
+    ],
+}
+
+const BIRD_H: i32 = BIRD.tile_h() as i32;   // single-sourced from the art
+c.gfx.blit(&BIRD.tile(frame), x, y);
+```
+
+Any character absent from the palette — `.` by convention — is transparent.
+Mismatched row lengths, differing frame sizes and non-ASCII palette characters
+are all compile-time errors, and the transparency stand-in colour is chosen
+automatically so it cannot collide with the palette.
+
+Alongside the pixels, the encoder records **the vertical extent of the opaque
+pixels in each column**, and whether any column has a *hole* — a transparent
+pixel with opaque pixels above and below. That distinction sets the blit speed:
+
+* **No holes** — the usual case, however much transparency surrounds the
+  silhouette — means each column is one contiguous run, so the blit is a
+  `copy_from_slice` per column with no per-pixel test at all.
+* **Holes** send only the affected columns down a per-pixel loop, still bounded
+  to that column's span.
+
+Either way transparent margins are never touched and never enlarge the dirty
+rectangle. `Sprite::takes_fast_path()` is `const`, so you can hold the line on
+it: `const _: () = assert!(BIRD.takes_fast_path());` turns art edits that would
+slow the blit down into build failures. `examples/flappy` does exactly that.
+
+For an asset pipeline that produces pixels some other way, `Sprite::opaque`
+takes column-major pre-encoded data directly.
 
 ### Colors
 

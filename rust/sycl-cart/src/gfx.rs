@@ -237,49 +237,102 @@ impl Gfx {
     }
 
     /// Draw a sprite, optionally flipped.
+    ///
+    /// Work is bounded to each column's opaque span, so transparent margins cost
+    /// nothing and do not enlarge the dirty rectangle. A sprite with no interior
+    /// holes — which is most art, however much transparency surrounds it — needs
+    /// no per-pixel transparency test, so each column becomes one contiguous
+    /// copy. See [`crate::sprite`].
     pub fn blit_with(&mut self, sprite: &Sprite, x: i32, y: i32, flags: BlitFlags) {
         let (sw, sh) = (sprite.w as usize, sprite.h as usize);
         let Some(r) = clip(x, y, sw as u32, sh as u32) else {
             return;
         };
-        self.mark_dirty(x, y, sw as u32, sh as u32);
 
         // Offsets into the sprite corresponding to the clipped screen rect.
         let skip_x = (r.x as i32 - x) as usize;
         let skip_y = (r.y as i32 - y) as usize;
         let cols = r.w as usize;
         let rows = r.h as usize;
-
-        // Fast path: opaque, unflipped. One contiguous copy per column.
-        if sprite.key.is_none() && !flags.flip_x && !flags.flip_y {
-            for c in 0..cols {
-                let src = (skip_x + c) * sh + skip_y;
-                let dst = (r.x as usize + c) * HEIGHT + r.y as usize;
-                self.buf[dst..dst + rows].copy_from_slice(&sprite.data[src..src + rows]);
-            }
-            return;
-        }
-
         let key = sprite.key.map(|k| k.0);
+
+        // Union of what actually got written, which is tighter than the sprite's
+        // bounding box whenever the art has transparent edges.
+        let mut min_x = usize::MAX;
+        let mut max_x = 0usize;
+        let mut min_y = usize::MAX;
+        let mut max_y = 0usize;
+
         for c in 0..cols {
             let sc = if flags.flip_x {
                 sw - 1 - (skip_x + c)
             } else {
                 skip_x + c
             };
-            let dst_base = (r.x as usize + c) * HEIGHT;
-            for row in 0..rows {
-                let sr = if flags.flip_y {
-                    sh - 1 - (skip_y + row)
-                } else {
-                    skip_y + row
-                };
-                let px = sprite.data[sc * sh + sr];
-                if Some(px) == key {
-                    continue;
-                }
-                self.buf[dst_base + r.y as usize + row] = px;
+
+            let span = sprite.span(sc);
+            if span.len == 0 {
+                continue;
             }
+            let (start, len) = (span.start as usize, span.len as usize);
+
+            // The span, expressed in draw order rather than source order.
+            let draw_start = if flags.flip_y {
+                sh - start - len
+            } else {
+                start
+            };
+
+            // Intersect it with the rows that survived clipping.
+            let lo = draw_start.max(skip_y);
+            let hi = (draw_start + len).min(skip_y + rows);
+            if lo >= hi {
+                continue;
+            }
+
+            let n = hi - lo;
+            let dst = (r.x as usize + c) * HEIGHT + r.y as usize + (lo - skip_y);
+            let src_col = sc * sh;
+
+            match (key, flags.flip_y) {
+                // Contiguous in both, so a straight copy.
+                (None, false) => {
+                    self.buf[dst..dst + n]
+                        .copy_from_slice(&sprite.data[src_col + lo..src_col + lo + n]);
+                }
+                // Contiguous but reversed; still no per-pixel test.
+                (None, true) => {
+                    for i in 0..n {
+                        self.buf[dst + i] = sprite.data[src_col + (sh - 1 - (lo + i))];
+                    }
+                }
+                // Only columns with holes get here, and only across their span.
+                (Some(k), flip_y) => {
+                    for i in 0..n {
+                        let sr = if flip_y { sh - 1 - (lo + i) } else { lo + i };
+                        let px = sprite.data[src_col + sr];
+                        if px != k {
+                            self.buf[dst + i] = px;
+                        }
+                    }
+                }
+            }
+
+            let dx = r.x as usize + c;
+            let dy = r.y as usize + (lo - skip_y);
+            min_x = min_x.min(dx);
+            max_x = max_x.max(dx);
+            min_y = min_y.min(dy);
+            max_y = max_y.max(dy + n - 1);
+        }
+
+        if min_x <= max_x {
+            self.mark_dirty(
+                min_x as i32,
+                min_y as i32,
+                (max_x - min_x + 1) as u32,
+                (max_y - min_y + 1) as u32,
+            );
         }
     }
 

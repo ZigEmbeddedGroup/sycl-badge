@@ -31,7 +31,9 @@ const env = {
   tone: () => {},
   read_flash: () => 0,
   write_flash_page: () => {},
-  rand: () => (Math.random() * 0x100000000) >>> 0,
+  // Fixed, so the same frame number is the same picture every run. Without this
+  // the cart's RNG differs per run and two renders cannot be compared.
+  rand: () => 0x5eed_1234,
   trace: () => {},
 };
 

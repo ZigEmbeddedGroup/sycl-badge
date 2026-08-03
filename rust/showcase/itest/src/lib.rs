@@ -434,7 +434,7 @@ impl ITest {
         let sclera_lit = FG;
         let sclera_shade = FG.mix(COMMENT, 0.30);
         let lid_shadow = COMMENT.mix(BG, 0.30);
-        let lash = BG.mix(Color::BLACK, 0.45);
+        let lash = BG.mix(Color::BLACK, 0.75);
         let iris_body = if alarmed { RED } else { CYAN };
         let iris_fibre = if alarmed { ORANGE } else { PURPLE };
         let limbus = iris_fibre.mix(BG, 0.55);
@@ -513,6 +513,29 @@ impl ITest {
             // lash line above reads as the lid edge.
             fill_span(c, x, top, (top + 2).min(bot), lid_shadow);
             fill_span(c, x, top - 1, top, lash);
+        }
+
+        // Lashes: three strokes per side on the outer third only. Near the apex
+        // the lid normal points straight up, and lashes drawn there stand on end
+        // like antennae; out by the corners the fan is what the eye reads as a
+        // fringe. Swept flatter than the true normal, and started inside the lid
+        // band so they attach rather than float.
+        for &(dx, len) in &[(-28, 3), (-22, 4), (-16, 4), (16, 4), (22, 4), (28, 3)] {
+            let (topf, _) = lid_span(dx, widen, closed);
+            let (nx, ny) = lid_normal(dx, widen);
+            let x0 = EYE_CX + dx;
+            let y0 = topf as i32 - LID_T + 1;
+            // Shortened as the lid closes: the lashes rotate toward the viewer
+            // and foreshorten, and it keeps them from standing up out of a shut
+            // eye during a blink.
+            let reach = len as f32 * (1.0 - closed);
+            c.gfx.line(
+                x0,
+                y0,
+                x0 + (nx * 1.7 * reach) as i32,
+                y0 + (ny * reach) as i32,
+                lash,
+            );
         }
 
         // Catchlight last: a reflection off the cornea, so nothing occludes it.
@@ -630,6 +653,19 @@ fn lid_span(dx: i32, widen: f32, closed: f32) -> (f32, f32) {
     // A blink is mostly the upper lid: it travels four times as far as the lower.
     let span = bot - top;
     (top + closed * span * 0.8, bot - closed * span * 0.2)
+}
+
+/// Outward normal of the upper lid arc at a horizontal offset from centre.
+///
+/// The arc is part of a circle, so the normal is just the direction away from
+/// that circle's centre: straight up at the apex, swinging out toward 45 degrees
+/// by the corners, which is how a real fringe fans.
+fn lid_normal(dx: i32, widen: f32) -> (f32, f32) {
+    let w = OPEN_W as f32;
+    let up = LID_UP * widen;
+    let r = (w * w + up * up) / (2.0 * up);
+    let dxf = dx as f32;
+    (dxf / r, -math::sqrt((r * r - dxf * dxf).max(0.0)) / r)
 }
 
 /// One column of colour, clipped to `y0..y1`.

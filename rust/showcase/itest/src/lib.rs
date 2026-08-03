@@ -81,6 +81,11 @@ const EYE_R: f32 = 30.0;
 const MAX_SIN_X: f32 = 0.55;
 const MAX_SIN_Y: f32 = 0.30;
 
+/// Lid thickness. It follows the almond outward rather than being an ellipse
+/// behind it, so the band stays even all the way round and tapers to nothing at
+/// the canthi -- which is where the lids actually meet.
+const LID_T: i32 = 3;
+
 const IRIS_R: f32 = 12.0;
 const PUPIL_R: f32 = 4.2;
 /// Pupils dilate under threat, so the stare gets a wider one.
@@ -92,21 +97,20 @@ const PUPIL_R_ALARMED: f32 = 6.8;
 // iris has to foreshorten, which no fixed sprite can do.
 //
 // The one sprite is the catchlight -- the corneal reflection of the light in the
-// room. It is fixed in screen space, because the lamp does not move when the eye
-// does, so it slides across the iris as the eye turns. That single detail sells
-// the sphere more than anything else here.
+// room. It tracks the corneal bulge, which follows the gaze at less than the
+// iris's own travel, so it drifts across the iris as the eye turns rather than
+// being glued to it. That detail sells the sphere more than anything else here.
 
 sprite! {
     /// Corneal catchlight.
     const GLINT;
     palette: {
-        'w' => FG,
-        'd' => Color::hex(0xcf_cf_c8),
+        'w' => Color::WHITE,
     },
     art: [
         ".ww.",
-        "wwwd",
-        ".dd.",
+        "wwww",
+        ".ww.",
     ],
 }
 
@@ -215,6 +219,9 @@ struct ITest {
 const FLASH_FRAMES: u16 = 5;
 const BLINK_FRAMES: u16 = 10;
 const STARE_FRAMES: u16 = 50;
+/// Rows the scan sweep travels, then how long until it starts again.
+const SCAN_TRAVEL: i32 = 19;
+const SCAN_PERIOD: i32 = 96;
 const INTRO_FRAMES: u16 = 130;
 
 impl Cart for ITest {
@@ -329,7 +336,7 @@ impl ITest {
     fn animate(&mut self, c: &mut Ctx) {
         self.flash = self.flash.saturating_sub(1);
         self.stare = self.stare.saturating_sub(1);
-        self.scan = (self.scan + 1) % (LID_UP as i32 + LID_DN as i32 + 24);
+        self.scan = (self.scan + 1) % SCAN_PERIOD;
 
         if self.stare > 0 {
             // Locked on. No wandering, no blinking.
@@ -367,6 +374,15 @@ impl ITest {
         let speed = 0.45;
         self.gaze.0 = math::lerp(self.gaze.0, self.target.0, speed);
         self.gaze.1 = math::lerp(self.gaze.1, self.target.1, speed);
+    }
+
+    /// Row the scan sweep is currently on, if it is sweeping at all.
+    ///
+    /// Confined to the middle of the opening: out near the canthi the almond is
+    /// only a pixel or two tall, and a line clipped to that reads as a stray dot
+    /// rather than a sweep.
+    fn scan_y(&self) -> Option<i32> {
+        (self.scan < SCAN_TRAVEL).then_some(EYE_CY - SCAN_TRAVEL / 2 + self.scan)
     }
 
     /// 0.0 fully open, 1.0 fully shut.
@@ -416,23 +432,14 @@ impl ITest {
         let closed = self.lid_closed();
 
         let sclera_lit = FG;
-        let sclera_shade = FG.mix(COMMENT, 0.42);
+        let sclera_shade = FG.mix(COMMENT, 0.30);
         let lid_shadow = COMMENT.mix(BG, 0.30);
         let lash = BG.mix(Color::BLACK, 0.45);
         let iris_body = if alarmed { RED } else { CYAN };
         let iris_fibre = if alarmed { ORANGE } else { PURPLE };
         let limbus = iris_fibre.mix(BG, 0.55);
         let collarette = iris_body.mix(FG, 0.30);
-
-        // Lid skin around the opening, so the eye sits in a socket rather than
-        // floating on the background.
-        c.gfx.fill_ellipse(
-            EYE_CX,
-            EYE_CY,
-            (OPEN_W + 8) as u32,
-            (LID_UP as u32) + 9,
-            CURRENT,
-        );
+        let scan = CYAN.mix(FG, 0.62);
 
         // Rotate the eyeball. Travel follows the sine of the angle; the iris
         // foreshortens by the cosine, which is sqrt(1 - sin^2).
@@ -463,19 +470,18 @@ impl ITest {
                 continue;
             }
 
-            // Sclera, shaded toward the corners where the lids overhang it.
+            // Lid first, so the sclera paints over its inner edge and the two
+            // meet without a seam. Offsetting the almond outward keeps the band
+            // even all the way round, and it tapers to nothing at the canthi,
+            // which is where the lids actually meet.
+            fill_span(c, x, top - LID_T, bot + LID_T, CURRENT);
+
+            // Sclera, shading gradually toward the corners where the lids
+            // overhang it. A hard step here reads as a change of material rather
+            // than a shadow, and leaves a visible seam.
             let edge = dx.abs() as f32 / OPEN_W as f32;
-            fill_span(
-                c,
-                x,
-                top,
-                bot,
-                if edge > 0.64 {
-                    sclera_shade
-                } else {
-                    sclera_lit
-                },
-            );
+            let shade = ((edge - 0.55) / 0.45).clamp(0.0, 1.0);
+            fill_span(c, x, top, bot, sclera_lit.mix(sclera_shade, shade));
 
             // Limbal ring, iris with radial fibres, collarette, pupil.
             ellipse_span(c, x, icx, icy, irx, iry, limbus, top, bot);
@@ -494,34 +500,34 @@ impl ITest {
             ellipse_span(c, x, icx, icy, prx + 1.3, pry + 1.3, collarette, top, bot);
             ellipse_span(c, x, icx, icy, prx, pry, Color::BLACK, top, bot);
 
+            // Scan sweep, clipped to this column's opening. Drawn per column
+            // rather than as one `hline` because the almond narrows toward the
+            // corners and a straight line of fixed width pokes past the lids.
+            if let Some(sy) = self.scan_y() {
+                if sy >= top && sy < bot {
+                    fill_span(c, x, sy, sy + 1, scan);
+                }
+            }
+
             // The upper lid casts a shadow on whatever is beneath it, and the
             // lash line above reads as the lid edge.
             fill_span(c, x, top, (top + 2).min(bot), lid_shadow);
             fill_span(c, x, top - 1, top, lash);
         }
 
-        // Catchlight last: it is a reflection off the cornea, so nothing occludes
-        // it, and it stays put while the iris slides underneath.
-        let gx = EYE_CX - 10;
-        let gy = EYE_CY - 6;
+        // Catchlight last: a reflection off the cornea, so nothing occludes it.
+        // It tracks the corneal bulge, which follows the gaze at a fraction of
+        // the iris's travel, so it drifts across the iris as the eye turns
+        // instead of being glued to it.
+        // Tracks at 0.8 of the iris's travel, and sits close enough to the iris
+        // centre to stay on it across the whole gaze range. On the white sclera a
+        // white glint is invisible -- which is true of real eyes too, but it
+        // would read here as the highlight blinking out.
+        let gx = EYE_CX - 6 + (sx * EYE_R * 0.8) as i32;
+        let gy = EYE_CY - 6 + (sy * EYE_R * 0.8) as i32;
         let (t, b) = lid_span(gx - EYE_CX, widen, closed);
         if (gy as f32) > t + 1.0 && ((gy + GLINT.h() as i32) as f32) < b {
             c.gfx.blit(&GLINT, gx, gy);
-        }
-
-        // A scan sweep across the eye. `hline` is the slow direction, but one
-        // line a frame is nothing.
-        let scan_y = EYE_CY - LID_UP as i32 - 12 + self.scan;
-        let (t, b) = lid_span(0, widen, closed);
-        if (scan_y as f32) > t && (scan_y as f32) < b {
-            let reach = 1.0 - (scan_y - EYE_CY).abs() as f32 / (LID_UP + LID_DN);
-            let width = (OPEN_W as f32 * 2.0 * reach.clamp(0.0, 1.0)) as u32;
-            c.gfx.hline(
-                EYE_CX - width as i32 / 2,
-                scan_y,
-                width,
-                CYAN.mix(sclera_lit, 0.5),
-            );
         }
     }
 

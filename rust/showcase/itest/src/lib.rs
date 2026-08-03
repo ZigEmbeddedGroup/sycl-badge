@@ -518,7 +518,7 @@ impl ITest {
         // Lashes: three per side on the outer third only. Near the apex the lid
         // normal points straight up, and lashes drawn there stand on end like
         // antennae; out by the corners the fan is what reads as a fringe.
-        for &(dx, len) in &[(-29, 6), (-23, 8), (-17, 7), (17, 7), (23, 8), (29, 6)] {
+        for &(dx, len) in &[(-29, 9), (-23, 11), (-17, 10), (17, 10), (23, 11), (29, 9)] {
             let (topf, _) = lid_span(dx, widen, closed);
             // Shortened as the lid closes: the lashes rotate toward the viewer
             // and foreshorten, and it keeps them from standing up out of a shut
@@ -653,7 +653,7 @@ fn lid_span(dx: i32, widen: f32, closed: f32) -> (f32, f32) {
 }
 
 /// How sharply a lash bends toward vertical per pixel of length.
-const LASH_CURL: f32 = 0.10;
+const LASH_CURL: f32 = 0.17;
 /// Lashes lie back rather than standing up, so they start flatter than the true
 /// lid normal.
 const LASH_SWEEP: f32 = 2.8;

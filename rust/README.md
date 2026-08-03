@@ -23,6 +23,7 @@ cargo xtask watch -p itest         # a different cart
 cargo test                         # host tests for the portable code
 cargo clippy --all-targets         # lints
 node tools/sim_check.mjs target/cart.wasm flappy   # headless: renders? audio? memory sane?
+node tools/shot.mjs target/cart.wasm 200 /tmp/a.png 5   # render a frame to a PNG
 ```
 
 The last one instantiates a cart exactly as the browser does and asserts on the
@@ -30,6 +31,10 @@ things a normal build cannot catch — memory imported, stack clear of the
 framebuffer, pixels actually written, audio encoded for the badge's buzzer. The
 optional second argument selects extra per-cart checks, and for `itest` it drives
 every input through to completion.
+
+`shot.mjs` writes the framebuffer out as a PNG at whole-pixel scale, which is the
+quickest way to inspect pixel-level detail — a seam between two fills, a stray
+pixel outside a clip — without a browser scaling it first.
 
 Carts are `no_std` cross-compiled artifacts and cannot build for the host, so
 they are excluded from the workspace's `default-members`. Root-level `cargo

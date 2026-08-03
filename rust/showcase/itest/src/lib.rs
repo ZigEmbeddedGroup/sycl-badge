@@ -515,10 +515,22 @@ impl ITest {
             fill_span(c, x, top - 1, top, lash);
         }
 
-        // Lashes: three per side on the outer third only. Near the apex the lid
-        // normal points straight up, and lashes drawn there stand on end like
-        // antennae; out by the corners the fan is what reads as a fringe.
-        for &(dx, len) in &[(-29, 9), (-23, 11), (-17, 10), (17, 10), (23, 11), (29, 9)] {
+        // Lashes: a graded fringe, shortest at the apex and longest in the outer
+        // third, which is how a real one is distributed. The lid normal is nearly
+        // vertical at the apex, so those lashes stand close to upright -- correct
+        // for a front-on view, and short enough not to read as antennae.
+        for &(dx, len) in &[
+            (-29, 9),
+            (-23, 11),
+            (-17, 10),
+            (-11, 7),
+            (-5, 5),
+            (5, 5),
+            (11, 7),
+            (17, 10),
+            (23, 11),
+            (29, 9),
+        ] {
             let (topf, _) = lid_span(dx, widen, closed);
             // Shortened as the lid closes: the lashes rotate toward the viewer
             // and foreshorten, and it keeps them from standing up out of a shut

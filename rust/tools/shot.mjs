@@ -1,6 +1,8 @@
 // Render a cart's framebuffer to a PNG, headlessly.
 //
-//   node rust/tools/shot.mjs [cart.wasm] [frames] [out.png] [scale]
+//   node rust/tools/shot.mjs [cart.wasm] [frames] [out.png] [scale] [x,y,w,h]
+//
+// The last argument crops, which is how you inspect a few pixels closely.
 //
 // Useful for looking at pixel-level detail without a browser in the way: the
 // output is exactly what the simulator would composite, at whole-pixel scale.
@@ -17,6 +19,10 @@ const cartPath = process.argv[2] ?? new URL("../target/cart.wasm", import.meta.u
 const frames = Number(process.argv[3] ?? 200);
 const outPath = process.argv[4] ?? "/tmp/cart.png";
 const scale = Number(process.argv[5] ?? 4);
+const crop = process.argv[6]
+  ? process.argv[6].split(",").map(Number)
+  : [0, 0, WIDTH, HEIGHT];
+const [cx, cy, cw, ch] = crop;
 
 const memory = new WebAssembly.Memory({ initial: 64, maximum: 64 });
 const env = {
@@ -59,14 +65,14 @@ const rgb = (x, y) => {
   return [(r5 << 3) | (r5 >> 2), (g6 << 2) | (g6 >> 4), (b5 << 3) | (b5 >> 2)];
 };
 
-const outW = WIDTH * scale;
-const outH = HEIGHT * scale;
+const outW = cw * scale;
+const outH = ch * scale;
 const raw = Buffer.alloc((outW * 3 + 1) * outH);
 let at = 0;
 for (let y = 0; y < outH; y++) {
   raw[at++] = 0; // filter: none
   for (let x = 0; x < outW; x++) {
-    const [r, g, b] = rgb((x / scale) | 0, (y / scale) | 0);
+    const [r, g, b] = rgb(cx + ((x / scale) | 0), cy + ((y / scale) | 0));
     raw[at++] = r;
     raw[at++] = g;
     raw[at++] = b;
@@ -115,4 +121,6 @@ writeFileSync(
   ]),
 );
 
-console.log(`${outPath}  ${outW}x${outH}  (${frames} frames, ${scale}x)`);
+console.log(
+  `${outPath}  ${outW}x${outH}  (${frames} frames, ${scale}x, crop ${crop.join(",")})`,
+);

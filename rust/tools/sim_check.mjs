@@ -161,28 +161,27 @@ if (kind === "itest") {
   for (let f = 0; f < 240; f++) {
     // Height of the opening at the centre column, and at 80% of the way out.
     for (const [dx, key] of [[0, "hCentre"], [27, "hOuter"]]) {
-      let lo = Infinity;
-      let hi = -Infinity;
-      for (let y = Y0; y < Y1; y++) {
-        if (isEye(pixel(EYE_CX + dx, y))) {
-          lo = Math.min(lo, y);
-          hi = Math.max(hi, y);
-        }
-      }
-      if (hi >= lo && hi - lo + 1 > (itest[key] ?? 0)) {
+      // Walk outward from the eye's centre while the pixel still belongs to the
+      // opening. The lid band terminates the run, so anything drawn beyond it --
+      // lashes, brackets, HUD -- cannot inflate the measurement. Taking the
+      // whole column's extent instead was fragile: longer lashes reaching into
+      // this column made the lids look like they barely tapered at all.
+      const x = EYE_CX + dx;
+      let lo = EYE_CY;
+      let hi = EYE_CY;
+      if (!isEye(pixel(x, EYE_CY))) continue;
+      while (lo > Y0 && isEye(pixel(x, lo - 1))) lo--;
+      while (hi < Y1 - 1 && isEye(pixel(x, hi + 1))) hi++;
+      if (hi - lo + 1 > (itest[key] ?? 0)) {
         itest[key] = hi - lo + 1;
         if (dx === 0) itest.midY = (lo + hi) / 2;
       }
     }
     // Width of the opening.
+    // Width: columns whose opening is open at the eye's vertical centre.
     let cols = 0;
     for (let x = X0; x < X1; x++) {
-      for (let y = Y0; y < Y1; y++) {
-        if (isEye(pixel(x, y))) {
-          cols++;
-          break;
-        }
-      }
+      if (isEye(pixel(x, EYE_CY))) cols++;
     }
     itest.width = Math.max(itest.width ?? 0, cols);
 

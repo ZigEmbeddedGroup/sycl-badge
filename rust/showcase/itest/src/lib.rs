@@ -515,26 +515,23 @@ impl ITest {
             fill_span(c, x, top - 1, top, lash);
         }
 
-        // Lashes: three strokes per side on the outer third only. Near the apex
-        // the lid normal points straight up, and lashes drawn there stand on end
-        // like antennae; out by the corners the fan is what the eye reads as a
-        // fringe. Swept flatter than the true normal, and started inside the lid
-        // band so they attach rather than float.
-        for &(dx, len) in &[(-28, 3), (-22, 4), (-16, 4), (16, 4), (22, 4), (28, 3)] {
+        // Lashes: three per side on the outer third only. Near the apex the lid
+        // normal points straight up, and lashes drawn there stand on end like
+        // antennae; out by the corners the fan is what reads as a fringe.
+        for &(dx, len) in &[(-29, 6), (-23, 8), (-17, 7), (17, 7), (23, 8), (29, 6)] {
             let (topf, _) = lid_span(dx, widen, closed);
-            let (nx, ny) = lid_normal(dx, widen);
-            let x0 = EYE_CX + dx;
-            let y0 = topf as i32 - LID_T + 1;
             // Shortened as the lid closes: the lashes rotate toward the viewer
             // and foreshorten, and it keeps them from standing up out of a shut
             // eye during a blink.
-            let reach = len as f32 * (1.0 - closed);
-            c.gfx.line(
-                x0,
-                y0,
-                x0 + (nx * 1.7 * reach) as i32,
-                y0 + (ny * reach) as i32,
+            let steps = (len as f32 * (1.0 - closed)) as u32;
+            draw_lash(
+                c,
+                EYE_CX + dx,
+                topf as i32 - LID_T + 1,
+                lid_normal(dx, widen),
+                steps,
                 lash,
+                lash.mix(BG, 0.3),
             );
         }
 
@@ -653,6 +650,56 @@ fn lid_span(dx: i32, widen: f32, closed: f32) -> (f32, f32) {
     // A blink is mostly the upper lid: it travels four times as far as the lower.
     let span = bot - top;
     (top + closed * span * 0.8, bot - closed * span * 0.2)
+}
+
+/// How sharply a lash bends toward vertical per pixel of length.
+const LASH_CURL: f32 = 0.10;
+/// Lashes lie back rather than standing up, so they start flatter than the true
+/// lid normal.
+const LASH_SWEEP: f32 = 2.8;
+
+fn normalize((x, y): (f32, f32)) -> (f32, f32) {
+    let m = math::hypot(x, y);
+    if m <= 0.0 {
+        (0.0, -1.0)
+    } else {
+        (x / m, y / m)
+    }
+}
+
+/// Walk a curled lash outward from the lid edge.
+///
+/// A lash leaves the lid along its normal and curls away from the eyeball, so the
+/// tip is markedly more upright than the root. Rotating the direction toward
+/// vertical at every step produces that hook; a straight line reads as a bristle.
+/// The outer third is drawn dimmer, which at one pixel wide is the only way to
+/// suggest a taper.
+fn draw_lash(
+    c: &mut Ctx,
+    x0: i32,
+    y0: i32,
+    normal: (f32, f32),
+    steps: u32,
+    root: Color,
+    tip: Color,
+) {
+    let mut dir = normalize((normal.0 * LASH_SWEEP, normal.1));
+    let mut x = x0 as f32;
+    let mut y = y0 as f32;
+    for i in 0..steps {
+        c.gfx.pixel(
+            x as i32,
+            y as i32,
+            if i * 3 >= steps * 2 { tip } else { root },
+        );
+        x += dir.0 * 0.85;
+        y += dir.1 * 0.85;
+        // Bend toward straight up.
+        dir = normalize((
+            dir.0 * (1.0 - LASH_CURL),
+            dir.1 * (1.0 - LASH_CURL) - LASH_CURL,
+        ));
+    }
 }
 
 /// Outward normal of the upper lid arc at a horizontal offset from centre.

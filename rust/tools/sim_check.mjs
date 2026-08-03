@@ -136,23 +136,88 @@ const idle = (n) => {
 
 // Drive the cart. Each kind gets input that actually exercises it; unknown carts
 // just get a periodic button so something happens.
-const itest = { white: 0, red: 0, completed: false, keyLeaks: 0, rim: 0, iris: 0 };
+const itest = { white: 0, red: 0, completed: false, sclera: 0, iris: 0, pupil: 0 };
 let FRAMES = 260;
 
 if (kind === "itest") {
   idle(140); // past the intro
 
-  // The eye should be on screen before any input.
-  const PURPLE = enc(0xbd93f9);
-  const CYAN = enc(0x8be9fd);
+  // Measure the eye over a stretch of frames, taking the widest opening seen so
+  // a blink cannot skew it.
+  const BG = enc(0x282a36);
+  const SOCKET = enc(0x44475a);
+  const isEye = (px) => px !== BG && px !== SOCKET;
+  const EYE_CX = 80;
+  const EYE_CY = 50;
+  // Restrict to the eye's own region: the HUD text, pips and corner brackets are
+  // also "not background", and counting them made the opening look square.
+  const X0 = 41;
+  const X1 = 120;
+  const Y0 = 14;
+  const Y1 = 72;
+
+  // Long enough to cover several fixations, since the gaze holds for up to two
+  // seconds at a time.
+  for (let f = 0; f < 240; f++) {
+    // Height of the opening at the centre column, and at 80% of the way out.
+    for (const [dx, key] of [[0, "hCentre"], [27, "hOuter"]]) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let y = Y0; y < Y1; y++) {
+        if (isEye(pixel(EYE_CX + dx, y))) {
+          lo = Math.min(lo, y);
+          hi = Math.max(hi, y);
+        }
+      }
+      if (hi >= lo && hi - lo + 1 > (itest[key] ?? 0)) {
+        itest[key] = hi - lo + 1;
+        if (dx === 0) itest.midY = (lo + hi) / 2;
+      }
+    }
+    // Width of the opening.
+    let cols = 0;
+    for (let x = X0; x < X1; x++) {
+      for (let y = Y0; y < Y1; y++) {
+        if (isEye(pixel(x, y))) {
+          cols++;
+          break;
+        }
+      }
+    }
+    itest.width = Math.max(itest.width ?? 0, cols);
+
+    // Iris horizontal extent, to observe foreshortening as the eye rotates.
+    let ilo = Infinity;
+    let ihi = -Infinity;
+    const CYAN = enc(0x8be9fd);
+    const PURPLE = enc(0xbd93f9);
+    for (let x = X0; x < X1; x++) {
+      for (let y = Y0; y < Y1; y++) {
+        const px = pixel(x, y);
+        if (px === CYAN || px === PURPLE) {
+          ilo = Math.min(ilo, x);
+          ihi = Math.max(ihi, x);
+          break;
+        }
+      }
+    }
+    if (ihi >= ilo) {
+      const w = ihi - ilo + 1;
+      itest.irisMax = Math.max(itest.irisMax ?? 0, w);
+      itest.irisMin = Math.min(itest.irisMin ?? 999, w);
+    }
+    idle(1);
+  }
+
+  // Layer census on the final frame.
+  const FGC = enc(0xf8f8f2);
+  const CYANC = enc(0x8be9fd);
   for (let x = 0; x < WIDTH; x++) {
     for (let y = 0; y < HEIGHT; y++) {
       const px = pixel(x, y);
-      if (px === PURPLE) itest.rim++;
-      if (px === CYAN) itest.iris++;
-      // The iris palette contains black, so the framework's transparency
-      // stand-in is 1. Seeing it anywhere means a transparent pixel leaked.
-      if (px === 1) itest.keyLeaks++;
+      if (px === FGC) itest.sclera++;
+      if (px === CYANC) itest.iris++;
+      if (px === 0) itest.pupil++;
     }
   }
 
@@ -242,9 +307,42 @@ if (kind === "flappy") {
 
 if (kind === "itest") {
   console.log("\nitest:");
-  check(itest.rim > 200, "eye rim is drawn", `${itest.rim} purple pixels`);
-  check(itest.iris > 40, "iris sprite is drawn", `${itest.iris} cyan pixels`);
-  check(itest.keyLeaks === 0, "iris transparency does not leak the key colour", `${itest.keyLeaks} leaked`);
+  check(itest.sclera > 300, "sclera is drawn", `${itest.sclera} px`);
+  check(itest.iris > 40, "iris is drawn", `${itest.iris} px`);
+  check(itest.pupil > 15, "pupil is drawn", `${itest.pupil} px`);
+
+  // Proportions: a real palpebral fissure is roughly 2.7x wider than tall.
+  const aspect = itest.width / itest.hCentre;
+  check(
+    aspect > 2.2 && aspect < 3.2,
+    "opening is proportioned like an eye, not a circle",
+    `${itest.width}x${itest.hCentre} = ${aspect.toFixed(2)}:1`,
+  );
+
+  // The upper lid arcs higher than the lower drops, so the opening's vertical
+  // midpoint sits above the eye's centre.
+  check(itest.midY < 50, "widest point sits above centre", `mid y ${itest.midY} vs centre 50`);
+
+  // Almond, not ellipse. At 80% of the half-width an ellipse would still be 60%
+  // of its centre height; two circular arcs come in much lower than that, which
+  // is what gives the pointed corners.
+  const taper = itest.hOuter / itest.hCentre;
+  check(
+    taper < 0.55,
+    "lids taper to pointed corners rather than bulging like an ellipse",
+    `${(taper * 100).toFixed(0)}% of centre height at 80% out (ellipse would be 60%)`,
+  );
+
+  // Reported, not asserted: the gaze is random, so how far the eye happens to
+  // rotate during the sample varies run to run.
+  // Reported rather than asserted: how far the eye happens to rotate during the
+  // sample is random. 21 px is the unforeshortened iris body; anything less is
+  // the cosine of the rotation angle showing up.
+  console.log(
+    `       iris body ${itest.irisMin}-${itest.irisMax} px wide across the sample ` +
+      `(21 = facing you, less = rotated away and foreshortened)`,
+  );
+
   check(itest.white === 9, "exactly nine correct answers flashed white", `${itest.white} white flashes`);
   check(itest.red > 0, "wrong answers flashed red", `${itest.red} red flashes`);
   check(itest.completed, "walked through every input to completion");

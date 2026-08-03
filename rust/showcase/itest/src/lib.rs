@@ -33,89 +33,84 @@ const COMMENT: Color = Color::hex(0x62_72_a4);
 const CYAN: Color = Color::hex(0x8b_e9_fd);
 const GREEN: Color = Color::hex(0x50_fa_7b);
 const PINK: Color = Color::hex(0xff_79_c6);
+const ORANGE: Color = Color::hex(0xff_b8_6c);
 const PURPLE: Color = Color::hex(0xbd_93_f9);
 const RED: Color = Color::hex(0xff_55_55);
 const YELLOW: Color = Color::hex(0xf1_fa_8c);
 
 // ── Layout ──────────────────────────────────────────────────────────────────
 
-const EYE_CX: i32 = 80;
-const EYE_CY: i32 = 46;
-const SCLERA_RX: u32 = 34;
-const SCLERA_RY: u32 = 21;
-const RIM: u32 = 3;
-
-/// How far the iris centre may stray from the middle, in pixels.
-const GAZE_X: f32 = 17.0;
-const GAZE_Y: f32 = 7.0;
-
 const PROMPT_Y: i32 = 88;
 const DOTS_Y: i32 = 106;
 const STATUS_Y: i32 = 118;
 
+// ── Eye geometry ────────────────────────────────────────────────────────────
+//
+// Proportions follow a real eye rather than a cartoon one.
+//
+// The opening between the lids -- the palpebral fissure -- is roughly 2.7 times
+// wider than it is tall, and it is an almond, not an ellipse: each lid is a
+// circular arc through the two corners, which is what gives the pointed canthi.
+// Its widest point sits slightly above centre, because the upper lid arcs higher
+// than the lower one drops.
+//
+// The iris is deliberately *taller* than the opening, so the lids clip the top
+// and bottom of it. A fully visible iris is most of why a drawn eye reads as a
+// cartoon; a relaxed human eye always has some of it covered.
+//
+// Most importantly the eyeball is a sphere that rotates. The iris rides on its
+// surface, so as it turns away from the viewer two things happen at once: the
+// pupil's travel goes with the *sine* of the rotation, and the iris foreshortens
+// by the cosine, narrowing into an ellipse. Sliding a fixed-size disc across a
+// flat backdrop is the thing that looks wrong.
+
+const EYE_CX: i32 = 80;
+const EYE_CY: i32 = 50;
+
+/// Half-width of the opening.
+const OPEN_W: i32 = 34;
+/// How far the upper lid arcs above centre, and the lower lid drops below it.
+const LID_UP: f32 = 14.0;
+const LID_DN: f32 = 11.0;
+
+/// Eyeball radius. Sets both how far the pupil travels and how much it
+/// foreshortens on the way, because both fall out of the same rotation.
+const EYE_R: f32 = 30.0;
+/// Largest sine of rotation per axis: about 33 degrees across and 17 up or down,
+/// which is roughly where a real eye stops and the head takes over.
+const MAX_SIN_X: f32 = 0.55;
+const MAX_SIN_Y: f32 = 0.30;
+
+const IRIS_R: f32 = 12.0;
+const PUPIL_R: f32 = 4.2;
+/// Pupils dilate under threat, so the stare gets a wider one.
+const PUPIL_R_ALARMED: f32 = 6.8;
+
 // ── Art ─────────────────────────────────────────────────────────────────────
 //
-// The sclera and eyelids are drawn with ellipses and rectangles, because they
-// have to move every frame. Only the iris is a sprite: it is the detailed part,
-// and blitting it at an offset is what makes the gaze smooth.
+// The eye is drawn rather than blitted: it changes shape every frame, and the
+// iris has to foreshorten, which no fixed sprite can do.
 //
-// Frame 0 is the calm iris, frame 1 the alarmed one it wears while staring you
-// down after a wrong answer.
+// The one sprite is the catchlight -- the corneal reflection of the light in the
+// room. It is fixed in screen space, because the lamp does not move when the eye
+// does, so it slides across the iris as the eye turns. That single detail sells
+// the sphere more than anything else here.
 
-sprite_sheet! {
-    /// Calm iris, then alarmed iris.
-    const IRIS;
+sprite! {
+    /// Corneal catchlight.
+    const GLINT;
     palette: {
-        'c' => CYAN,
-        'p' => PURPLE,
-        'k' => Color::BLACK,
         'w' => FG,
-        'r' => RED,
-        'o' => Color::hex(0xff_b8_6c), // Dracula orange
+        'd' => Color::hex(0xcf_cf_c8),
     },
-    frames: [
-        [
-            ".......c.......",
-            "....ccccccc....",
-            "...ccpppppcc...",
-            "..ccpppppppcc..",
-            ".ccppwwkkkppcc.",
-            "ccppwwkkkkkppcc",
-            "ccpppkkkkkkppcc",
-            "ccpppkkkkkkppcc",
-            "ccpppkkkkkkppcc",
-            "ccpppkkkkkkppcc",
-            ".ccpppkkkkppcc.",
-            "..ccpppppppcc..",
-            "...ccpppppcc...",
-            "....ccccccc....",
-            ".......c.......",
-        ],
-        [
-            ".......r.......",
-            "....rrrrrrr....",
-            "...rrooooorr...",
-            "..rrooooooorr..",
-            ".rrookkkkkoorr.",
-            "rrookkkkkkkoorr",
-            "rrookkkkkkkoorr",
-            "rrookkkkkkkoorr",
-            "rrookkkkkkkoorr",
-            "rrookkkkkkkoorr",
-            ".rrookkkkkoorr.",
-            "..rrooooooorr..",
-            "...rrooooorr...",
-            "....rrrrrrr....",
-            ".......r.......",
-        ],
+    art: [
+        ".ww.",
+        "wwwd",
+        ".dd.",
     ],
 }
 
-// Transparent corners only, no interior holes, so every blit is a contiguous
-// copy per column.
-const _: () = assert!(IRIS.takes_fast_path());
-
-const IRIS_HALF: i32 = IRIS.tile_w() as i32 / 2;
+const _: () = assert!(GLINT.takes_fast_path());
 
 // ── Audio ───────────────────────────────────────────────────────────────────
 
@@ -330,11 +325,11 @@ impl ITest {
         self.flash_color = color;
     }
 
-    /// Gaze, blinking and the scan line, all independent of the test logic.
+    /// Gaze, blinking and the scan sweep, all independent of the test logic.
     fn animate(&mut self, c: &mut Ctx) {
         self.flash = self.flash.saturating_sub(1);
         self.stare = self.stare.saturating_sub(1);
-        self.scan = (self.scan + 1) % (SCLERA_RY as i32 * 2 + 24);
+        self.scan = (self.scan + 1) % (LID_UP as i32 + LID_DN as i32 + 24);
 
         if self.stare > 0 {
             // Locked on. No wandering, no blinking.
@@ -345,8 +340,13 @@ impl ITest {
             self.gaze_timer = self.gaze_timer.saturating_sub(1);
             if self.gaze_timer == 0 {
                 self.target = (c.rng.unit() * 2.0 - 1.0, c.rng.unit() * 2.0 - 1.0);
-                // Hold a new direction for between a third of a second and two.
+                // Fixate for between a third of a second and two.
                 self.gaze_timer = 20 + c.rng.below(100) as u16;
+            } else {
+                // Microsaccades: a fixating eye is never still, it drifts by a
+                // fraction of a degree and twitches back.
+                self.target.0 = (self.target.0 + (c.rng.unit() - 0.5) * 0.03).clamp(-1.0, 1.0);
+                self.target.1 = (self.target.1 + (c.rng.unit() - 0.5) * 0.03).clamp(-1.0, 1.0);
             }
 
             if self.blink > 0 {
@@ -355,13 +355,16 @@ impl ITest {
                 self.blink_timer = self.blink_timer.saturating_sub(1);
                 if self.blink_timer == 0 {
                     self.blink = BLINK_FRAMES;
-                    self.blink_timer = 90 + c.rng.below(180) as u16;
+                    // Humans blink every two to ten seconds.
+                    self.blink_timer = 120 + c.rng.below(420) as u16;
                 }
             }
         }
 
-        // Ease toward the target so the eye never snaps.
-        let speed = if self.stare > 0 { 0.22 } else { 0.06 };
+        // Eyes move in saccades: a ballistic jump of 30-80ms, then a hold. They
+        // do not glide, and easing slowly is what makes a drawn eye look like a
+        // puppet, so this is deliberately fast.
+        let speed = 0.45;
         self.gaze.0 = math::lerp(self.gaze.0, self.target.0, speed);
         self.gaze.1 = math::lerp(self.gaze.1, self.target.1, speed);
     }
@@ -396,7 +399,7 @@ impl ITest {
         };
         c.gfx.clear(bg);
 
-        self.draw_eye(c, bg);
+        self.draw_eye(c);
         self.draw_brackets(c);
 
         match self.phase {
@@ -406,50 +409,118 @@ impl ITest {
         }
     }
 
-    fn draw_eye(&self, c: &mut Ctx, bg: Color) {
-        let g = &mut c.gfx;
-
-        // Rim, then sclera inside it.
-        let rim = if self.stare > 0 { RED } else { PURPLE };
-        g.fill_ellipse(EYE_CX, EYE_CY, SCLERA_RX + RIM, SCLERA_RY + RIM, rim);
-        g.fill_ellipse(EYE_CX, EYE_CY, SCLERA_RX, SCLERA_RY, CURRENT);
-
-        // Iris, offset by the gaze.
-        let ix = EYE_CX + (self.gaze.0 * GAZE_X) as i32 - IRIS_HALF;
-        let iy = EYE_CY + (self.gaze.1 * GAZE_Y) as i32 - IRIS_HALF;
-        let frame = if self.stare > 0 { 1 } else { 0 };
-        g.blit(&IRIS.tile(frame), ix, iy);
-
-        // Eyelids: two rectangles closing over the eye from top and bottom.
+    fn draw_eye(&self, c: &mut Ctx) {
+        let alarmed = self.stare > 0;
+        // Startled eyes widen; threatened pupils dilate.
+        let widen = if alarmed { 1.16 } else { 1.0 };
         let closed = self.lid_closed();
-        if closed > 0.0 {
-            let reach = (closed * (SCLERA_RY + RIM) as f32) as i32;
-            if reach > 0 {
-                let span = (SCLERA_RX + RIM) * 2 + 1;
-                let left = EYE_CX - (SCLERA_RX + RIM) as i32;
-                let top = EYE_CY - (SCLERA_RY + RIM) as i32;
-                g.fill_rect(left, top, span, reach as u32, bg);
-                g.fill_rect(
-                    left,
-                    EYE_CY + (SCLERA_RY + RIM) as i32 - reach,
-                    span,
-                    reach as u32,
-                    bg,
-                );
+
+        let sclera_lit = FG;
+        let sclera_shade = FG.mix(COMMENT, 0.42);
+        let lid_shadow = COMMENT.mix(BG, 0.30);
+        let lash = BG.mix(Color::BLACK, 0.45);
+        let iris_body = if alarmed { RED } else { CYAN };
+        let iris_fibre = if alarmed { ORANGE } else { PURPLE };
+        let limbus = iris_fibre.mix(BG, 0.55);
+        let collarette = iris_body.mix(FG, 0.30);
+
+        // Lid skin around the opening, so the eye sits in a socket rather than
+        // floating on the background.
+        c.gfx.fill_ellipse(
+            EYE_CX,
+            EYE_CY,
+            (OPEN_W + 8) as u32,
+            (LID_UP as u32) + 9,
+            CURRENT,
+        );
+
+        // Rotate the eyeball. Travel follows the sine of the angle; the iris
+        // foreshortens by the cosine, which is sqrt(1 - sin^2).
+        let sx = self.gaze.0 * MAX_SIN_X;
+        let sy = self.gaze.1 * MAX_SIN_Y;
+        let icx = EYE_CX as f32 + sx * EYE_R;
+        let icy = EYE_CY as f32 + sy * EYE_R;
+        let squash_x = math::sqrt(1.0 - sx * sx);
+        let squash_y = math::sqrt(1.0 - sy * sy);
+        let irx = IRIS_R * squash_x;
+        let iry = IRIS_R * squash_y;
+        let pupil = if alarmed { PUPIL_R_ALARMED } else { PUPIL_R };
+        let prx = pupil * squash_x;
+        let pry = pupil * squash_y;
+
+        // One pass per column: every layer is a contiguous vertical fill, which
+        // is the cheap direction here, and clipping the iris to the lid span
+        // falls out for free.
+        for dx in -OPEN_W..=OPEN_W {
+            let x = EYE_CX + dx;
+            if x < 0 || x >= WIDTH as i32 {
+                continue;
             }
+            let (topf, botf) = lid_span(dx, widen, closed);
+            let top = topf as i32;
+            let bot = botf as i32;
+            if bot <= top {
+                continue;
+            }
+
+            // Sclera, shaded toward the corners where the lids overhang it.
+            let edge = dx.abs() as f32 / OPEN_W as f32;
+            fill_span(
+                c,
+                x,
+                top,
+                bot,
+                if edge > 0.64 {
+                    sclera_shade
+                } else {
+                    sclera_lit
+                },
+            );
+
+            // Limbal ring, iris with radial fibres, collarette, pupil.
+            ellipse_span(c, x, icx, icy, irx, iry, limbus, top, bot);
+            let fibre = (x - icx as i32).rem_euclid(3) == 0;
+            ellipse_span(
+                c,
+                x,
+                icx,
+                icy,
+                irx - 1.5,
+                iry - 1.5,
+                if fibre { iris_fibre } else { iris_body },
+                top,
+                bot,
+            );
+            ellipse_span(c, x, icx, icy, prx + 1.3, pry + 1.3, collarette, top, bot);
+            ellipse_span(c, x, icx, icy, prx, pry, Color::BLACK, top, bot);
+
+            // The upper lid casts a shadow on whatever is beneath it, and the
+            // lash line above reads as the lid edge.
+            fill_span(c, x, top, (top + 2).min(bot), lid_shadow);
+            fill_span(c, x, top - 1, top, lash);
         }
 
-        // A single scan line sweeping down the eye. Cheap and unmistakably
-        // cyberpunk. `hline` is the slow direction here, but one line is nothing.
-        let scan_y = EYE_CY - (SCLERA_RY as i32 + 12) + self.scan;
-        if (scan_y - EYE_CY).abs() < SCLERA_RY as i32 {
-            let t = 1.0 - (scan_y - EYE_CY).abs() as f32 / SCLERA_RY as f32;
-            let width = (SCLERA_RX as f32 * 2.0 * t) as u32;
-            g.hline(
+        // Catchlight last: it is a reflection off the cornea, so nothing occludes
+        // it, and it stays put while the iris slides underneath.
+        let gx = EYE_CX - 10;
+        let gy = EYE_CY - 6;
+        let (t, b) = lid_span(gx - EYE_CX, widen, closed);
+        if (gy as f32) > t + 1.0 && ((gy + GLINT.h() as i32) as f32) < b {
+            c.gfx.blit(&GLINT, gx, gy);
+        }
+
+        // A scan sweep across the eye. `hline` is the slow direction, but one
+        // line a frame is nothing.
+        let scan_y = EYE_CY - LID_UP as i32 - 12 + self.scan;
+        let (t, b) = lid_span(0, widen, closed);
+        if (scan_y as f32) > t && (scan_y as f32) < b {
+            let reach = 1.0 - (scan_y - EYE_CY).abs() as f32 / (LID_UP + LID_DN);
+            let width = (OPEN_W as f32 * 2.0 * reach.clamp(0.0, 1.0)) as u32;
+            c.gfx.hline(
                 EYE_CX - width as i32 / 2,
                 scan_y,
                 width,
-                CYAN.mix(CURRENT, 0.55),
+                CYAN.mix(sclera_lit, 0.5),
             );
         }
     }
@@ -457,8 +528,8 @@ impl ITest {
     /// HUD corner brackets around the eye.
     fn draw_brackets(&self, c: &mut Ctx) {
         let g = &mut c.gfx;
-        let (l, r) = (EYE_CX - 52, EYE_CX + 52);
-        let (t, b) = (EYE_CY - 31, EYE_CY + 31);
+        let (l, r) = (EYE_CX - 50, EYE_CX + 50);
+        let (t, b) = (EYE_CY - 28, EYE_CY + 26);
         let len = 9;
         for &(x, dx) in &[(l, 1i32), (r, -1i32)] {
             for &(y, dy) in &[(t, 1i32), (b, -1i32)] {
@@ -533,6 +604,64 @@ impl ITest {
             }
         }
     }
+}
+
+/// Top and bottom of the opening at a horizontal offset from centre.
+///
+/// Each lid is a circular arc through both corners and its own apex, which is
+/// what produces an almond with pointed canthi. An ellipse would bulge at the
+/// corners and read as a cartoon.
+fn lid_span(dx: i32, widen: f32, closed: f32) -> (f32, f32) {
+    let w = OPEN_W as f32;
+    let dxf = dx as f32;
+    // Circle through (-w, 0), (0, apex), (w, 0).
+    let arc = |apex: f32| {
+        let r = (w * w + apex * apex) / (2.0 * apex);
+        math::sqrt((r * r - dxf * dxf).max(0.0)) - (r - apex)
+    };
+    let top = EYE_CY as f32 - arc(LID_UP * widen);
+    let bot = EYE_CY as f32 + arc(LID_DN * widen);
+    // A blink is mostly the upper lid: it travels four times as far as the lower.
+    let span = bot - top;
+    (top + closed * span * 0.8, bot - closed * span * 0.2)
+}
+
+/// One column of colour, clipped to `y0..y1`.
+fn fill_span(c: &mut Ctx, x: i32, y0: i32, y1: i32, color: Color) {
+    if y1 > y0 {
+        c.gfx.vline(x, y0, (y1 - y0) as u32, color);
+    }
+}
+
+/// The slice of an ellipse that falls in column `x`, clipped to the lid span.
+#[allow(clippy::too_many_arguments)]
+fn ellipse_span(
+    c: &mut Ctx,
+    x: i32,
+    ecx: f32,
+    ecy: f32,
+    erx: f32,
+    ery: f32,
+    color: Color,
+    top: i32,
+    bot: i32,
+) {
+    if erx <= 0.0 || ery <= 0.0 {
+        return;
+    }
+    let d = x as f32 - ecx;
+    if d.abs() >= erx {
+        return;
+    }
+    let t = d / erx;
+    let half = ery * math::sqrt(1.0 - t * t);
+    fill_span(
+        c,
+        x,
+        ((ecy - half) as i32).max(top),
+        ((ecy + half) as i32).min(bot),
+        color,
+    );
 }
 
 fn any_press(c: &Ctx) -> bool {

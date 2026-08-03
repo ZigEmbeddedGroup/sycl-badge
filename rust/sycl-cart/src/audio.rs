@@ -388,35 +388,65 @@ fn clamp01(v: f32) -> f32 {
     v.clamp(0.0, 1.0)
 }
 
-/// Equal-tempered pitches, A4 = 440 Hz.
-///
-/// The badge's buzzer peaks near 2700 Hz, so the higher octaves here are the
-/// ones that will actually be audible on hardware.
 pub mod notes {
+    //! Equal-tempered pitches, A4 = 440 Hz. `S` means sharp, so `DS6` is D#6.
+    //!
+    //! The badge's buzzer peaks near 2700 Hz and rolls off steeply either side,
+    //! so octaves 6 and 7 are the ones that will actually carry on hardware.
+    //! Anything below roughly 1 kHz will be quiet however good it sounds in the
+    //! simulator. Raw Hz works too — these are only a convenience.
+
     pub const C4: f32 = 261.63;
+    pub const CS4: f32 = 277.18;
     pub const D4: f32 = 293.66;
+    pub const DS4: f32 = 311.13;
     pub const E4: f32 = 329.63;
     pub const F4: f32 = 349.23;
+    pub const FS4: f32 = 369.99;
     pub const G4: f32 = 392.00;
+    pub const GS4: f32 = 415.30;
     pub const A4: f32 = 440.00;
+    pub const AS4: f32 = 466.16;
     pub const B4: f32 = 493.88;
+
     pub const C5: f32 = 523.25;
+    pub const CS5: f32 = 554.37;
     pub const D5: f32 = 587.33;
+    pub const DS5: f32 = 622.25;
     pub const E5: f32 = 659.25;
     pub const F5: f32 = 698.46;
+    pub const FS5: f32 = 739.99;
     pub const G5: f32 = 783.99;
+    pub const GS5: f32 = 830.61;
     pub const A5: f32 = 880.00;
+    pub const AS5: f32 = 932.33;
     pub const B5: f32 = 987.77;
+
     pub const C6: f32 = 1046.50;
+    pub const CS6: f32 = 1108.73;
     pub const D6: f32 = 1174.66;
+    pub const DS6: f32 = 1244.51;
     pub const E6: f32 = 1318.51;
     pub const F6: f32 = 1396.91;
+    pub const FS6: f32 = 1479.98;
     pub const G6: f32 = 1567.98;
+    pub const GS6: f32 = 1661.22;
     pub const A6: f32 = 1760.00;
+    pub const AS6: f32 = 1864.66;
     pub const B6: f32 = 1975.53;
+
     pub const C7: f32 = 2093.00;
+    pub const CS7: f32 = 2217.46;
+    pub const D7: f32 = 2349.32;
+    pub const DS7: f32 = 2489.02;
     pub const E7: f32 = 2637.02;
+    pub const F7: f32 = 2793.83;
+    pub const FS7: f32 = 2959.96;
     pub const G7: f32 = 3135.96;
+    pub const GS7: f32 = 3322.44;
+    pub const A7: f32 = 3520.00;
+    pub const AS7: f32 = 3729.31;
+    pub const B7: f32 = 3951.07;
 }
 
 #[cfg(test)]

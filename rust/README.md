@@ -24,6 +24,7 @@ cargo test                         # host tests for the portable code
 cargo clippy --all-targets         # lints
 node tools/sim_check.mjs target/cart.wasm flappy   # headless: renders? audio? memory sane?
 node tools/shot.mjs target/cart.wasm 200 /tmp/a.png 5   # render a frame to a PNG
+node tools/shot.mjs target/cart.wasm 200 /tmp/a.png 14 40,22,80,34   # ...cropped
 ```
 
 The last one instantiates a cart exactly as the browser does and asserts on the
@@ -34,7 +35,9 @@ every input through to completion.
 
 `shot.mjs` writes the framebuffer out as a PNG at whole-pixel scale, which is the
 quickest way to inspect pixel-level detail — a seam between two fills, a stray
-pixel outside a clip — without a browser scaling it first.
+pixel outside a clip — without a browser scaling it first. The trailing
+`x,y,w,h` crops. It stubs `env.rand` with a fixed value so the same frame number
+is the same picture every run, which is what makes two renders comparable.
 
 Carts are `no_std` cross-compiled artifacts and cannot build for the host, so
 they are excluded from the workspace's `default-members`. Root-level `cargo

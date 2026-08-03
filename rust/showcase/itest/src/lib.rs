@@ -41,13 +41,13 @@ const YELLOW: Color = Color::hex(0xf1_fa_8c);
 
 const EYE_CX: i32 = 80;
 const EYE_CY: i32 = 46;
-const SCLERA_RX: u32 = 44;
-const SCLERA_RY: u32 = 26;
+const SCLERA_RX: u32 = 34;
+const SCLERA_RY: u32 = 21;
 const RIM: u32 = 3;
 
 /// How far the iris centre may stray from the middle, in pixels.
-const GAZE_X: f32 = 24.0;
-const GAZE_Y: f32 = 11.0;
+const GAZE_X: f32 = 17.0;
+const GAZE_Y: f32 = 7.0;
 
 const PROMPT_Y: i32 = 88;
 const DOTS_Y: i32 = 106;
@@ -457,8 +457,8 @@ impl ITest {
     /// HUD corner brackets around the eye.
     fn draw_brackets(&self, c: &mut Ctx) {
         let g = &mut c.gfx;
-        let (l, r) = (EYE_CX - 66, EYE_CX + 66);
-        let (t, b) = (EYE_CY - 38, EYE_CY + 38);
+        let (l, r) = (EYE_CX - 52, EYE_CX + 52);
+        let (t, b) = (EYE_CY - 31, EYE_CY + 31);
         let len = 9;
         for &(x, dx) in &[(l, 1i32), (r, -1i32)] {
             for &(y, dy) in &[(t, 1i32), (b, -1i32)] {

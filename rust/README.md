@@ -19,11 +19,17 @@ Other commands:
 
 ```bash
 cargo xtask build                  # one-shot build to target/cart.wasm
-cargo xtask build -p mycart        # a different package
+cargo xtask watch -p itest         # a different cart
 cargo test                         # host tests for the portable code
 cargo clippy --all-targets         # lints
-node tools/sim_check.mjs           # headless check: renders? audio? memory sane?
+node tools/sim_check.mjs target/cart.wasm flappy   # headless: renders? audio? memory sane?
 ```
+
+The last one instantiates a cart exactly as the browser does and asserts on the
+things a normal build cannot catch — memory imported, stack clear of the
+framebuffer, pixels actually written, audio encoded for the badge's buzzer. The
+optional second argument selects extra per-cart checks, and for `itest` it drives
+every input through to completion.
 
 Carts are `no_std` cross-compiled artifacts and cannot build for the host, so
 they are excluded from the workspace's `default-members`. Root-level `cargo
@@ -58,9 +64,14 @@ impl Cart for Game {
 sycl_cart::cart!(Game);
 ```
 
-`Cargo.toml` needs `crate-type = ["cdylib"]`. See
-[`showcase/flappy`](showcase/flappy/src/lib.rs) for a complete game — sprites,
-animation, audio, scoring — in one file.
+`Cargo.toml` needs `crate-type = ["cdylib"]`. Two complete carts to read:
+
+* [`showcase/flappy`](showcase/flappy/src/lib.rs) — a game, in one file: sprite
+  sheet, animation, collision, scoring, sound effects.
+* [`showcase/itest`](showcase/itest/src/lib.rs) — an interactive hardware test
+  that walks you through all nine inputs while a cyberpunk eye watches you.
+  Ellipse drawing, colour mixing, a shuffled prompt sequence and a looping
+  chiptune track.
 
 ## How it works
 
@@ -96,6 +107,8 @@ strided by 256 bytes. Consequences:
 * Sprites are stored column-major and pre-encoded too, so a blit is one
   `copy_from_slice` per column. `flip_y` is a reversed copy within a column and
   `flip_x` a reversed column order, so both flips are nearly free.
+* `fill_ellipse` is unusually cheap: each column's vertical extent is a single
+  contiguous `fill`, so a circle costs about what its bounding rectangle would.
 
 ### Sprites
 
@@ -154,6 +167,9 @@ target's byte order: byte-swapped RGB565 in the simulator, byte-swapped BGR565 o
 the badge (whose bytes go straight to the ST7735 over SPI). Literals and sprite
 data are converted at compile time, so no drawing path converts anything per
 pixel. The raw `u16` is therefore not portable — never persist it.
+
+`Color::mix(other, t)` blends at runtime, for flashes and fades. It decodes and
+re-encodes, so hoist it out of per-pixel loops.
 
 ### Platform matrix
 
@@ -245,6 +261,9 @@ static SFX_FLAP: Track = Track::once(&[Step::at(notes::G6, 2, 0.55)]);
 c.audio.play_sfx(&SFX_FLAP);
 ```
 
+`audio::notes` covers C4 to B7 chromatically, `S` meaning sharp — `DS6` is D#6.
+Octaves 6 and 7 are the ones that carry on the buzzer.
+
 Two hardware caveats we do not paper over: pitch is currently about 400 cents
 sharp on real hardware (`src/os/drivers/audio.zig:23`), and the buzzer's response
 peaks near 2700 Hz and rolls off steeply either side, so low notes will be quiet
@@ -283,6 +302,7 @@ sycl-cart/          the framework
   src/rt.rs         Cart trait, Ctx, cart! macro, panic handler
   src/font.rs       generated — see tools/gen_font.py
 showcase/flappy/    a complete game
+showcase/itest/     interactive hardware test
 xtask/              build, and the watch server the simulator expects
 tools/              gen_font.py, sim_check.mjs
 ```

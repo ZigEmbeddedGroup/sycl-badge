@@ -20,6 +20,8 @@ const FB_END = ADDR_FRAMEBUFFER + WIDTH * HEIGHT * 2;
 const CONTROLS = { start: 1, select: 2, a: 4, b: 8, click: 16, up: 32, down: 64, left: 128, right: 256 };
 
 const cartPath = process.argv[2] ?? new URL("../target/cart.wasm", import.meta.url).pathname;
+// Optional: selects the cart-specific behaviour checks at the bottom.
+const kind = process.argv[3] ?? "";
 const bytes = readFileSync(cartPath);
 
 let failures = 0;
@@ -109,43 +111,87 @@ const decode = (v) => {
   return [(rgb >> 11) & 0x1f, (rgb >> 5) & 0x3f, rgb & 0x1f];
 };
 
-// A flap every 25 frames is roughly neutral buoyancy for this cart's tuning, so
-// the bird survives long enough to pass a pipe and score.
-const FRAMES = 260;
-for (let f = 0; f < FRAMES; f++) {
-  view.setUint16(ADDR_CONTROLS, f % 25 === 0 ? CONTROLS.a : 0, true);
-  exports.update();
+/// Encode a 0xRRGGBB literal the way the simulator's framebuffer stores it.
+const enc = (hex) => {
+  const r = ((hex >> 16) & 255) >> 3;
+  const g = ((hex >> 8) & 255) >> 2;
+  const b = (hex & 255) >> 3;
+  const v = (r << 11) | (g << 5) | b;
+  return ((v & 0xff) << 8) | (v >> 8);
+};
+
+const press = (mask, hold = 1, release = 6) => {
+  view.setUint16(ADDR_CONTROLS, mask, true);
+  for (let i = 0; i < hold; i++) exports.update();
+  const sample = pixel(0, 0);
+  view.setUint16(ADDR_CONTROLS, 0, true);
+  for (let i = 0; i < release; i++) exports.update();
+  return sample;
+};
+
+const idle = (n) => {
+  view.setUint16(ADDR_CONTROLS, 0, true);
+  for (let i = 0; i < n; i++) exports.update();
+};
+
+// Drive the cart. Each kind gets input that actually exercises it; unknown carts
+// just get a periodic button so something happens.
+const itest = { white: 0, red: 0, completed: false, keyLeaks: 0, rim: 0, iris: 0 };
+let FRAMES = 260;
+
+if (kind === "itest") {
+  idle(140); // past the intro
+
+  // The eye should be on screen before any input.
+  const PURPLE = enc(0xbd93f9);
+  const CYAN = enc(0x8be9fd);
+  for (let x = 0; x < WIDTH; x++) {
+    for (let y = 0; y < HEIGHT; y++) {
+      const px = pixel(x, y);
+      if (px === PURPLE) itest.rim++;
+      if (px === CYAN) itest.iris++;
+      // The iris palette contains black, so the framework's transparency
+      // stand-in is 1. Seeing it anywhere means a transparent pixel leaked.
+      if (px === 1) itest.keyLeaks++;
+    }
+  }
+
+  // The prompt order is shuffled, so press buttons in turn like a player would.
+  const BUTTONS = Object.values(CONTROLS);
+  const FG = enc(0xf8f8f2);
+  const RED = enc(0xff5555);
+  const GREEN = enc(0x50fa7b);
+  outer: for (let round = 0; round < 24 && !itest.completed; round++) {
+    for (const mask of BUTTONS) {
+      const flash = press(mask);
+      if (flash === FG) itest.white++;
+      else if (flash === RED) itest.red++;
+
+      // Completion shows all nine pips filled green: 9 pips x 8px = 72 pixels on
+      // that row. Eight pips is 64, so the threshold has to sit above that or we
+      // stop a step early.
+      let greens = 0;
+      for (let x = 0; x < WIDTH; x++) if (pixel(x, 108) === GREEN) greens++;
+      if (greens >= 70) {
+        itest.completed = true;
+        break outer;
+      }
+    }
+  }
+  FRAMES = 0;
+} else {
+  // flappy: a flap every 25 frames is roughly neutral buoyancy for its tuning,
+  // so the bird survives long enough to pass a pipe and score.
+  for (let f = 0; f < FRAMES; f++) {
+    view.setUint16(ADDR_CONTROLS, f % 25 === 0 ? CONTROLS.a : 0, true);
+    exports.update();
+  }
 }
 
 const distinct = new Set();
 for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) distinct.add(pixel(x, y));
 check(distinct.size >= 4, "renders several distinct colors", `${distinct.size} distinct`);
 check(!distinct.has((POISON << 8) | POISON), "every pixel was written at least once");
-
-// Ground band should be a solid horizontal stripe near the bottom.
-const groundRow = HEIGHT - 4;
-const groundColor = pixel(0, groundRow);
-let solid = true;
-for (let x = 0; x < WIDTH; x++) if (pixel(x, groundRow) !== groundColor) solid = false;
-check(solid, "ground is a solid stripe", `row ${groundRow} = rgb565 ${decode(groundColor).join(",")}`);
-
-// Sprite transparency, end to end. The bird's palette contains no value that
-// encodes to 0, so the framework's transparency stand-in is 0x0000 — and nothing
-// in this cart draws pure black. Any black pixel therefore means a transparent
-// sprite pixel leaked through the blit.
-let leaked = 0;
-for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === 0) leaked++;
-check(leaked === 0, "sprite transparency does not leak the key colour", `${leaked} black pixels`);
-
-// And the sprite is actually on screen, so the check above isn't vacuous.
-const BIRD_BODY = (() => {
-  // 0xf8d828 -> rgb565 (31, 54, 5), stored byte-swapped.
-  const rgb = (31 << 11) | (54 << 5) | 5;
-  return ((rgb & 0xff) << 8) | (rgb >> 8);
-})();
-let bodyPixels = 0;
-for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === BIRD_BODY) bodyPixels++;
-check(bodyPixels > 10, "the bird sprite is drawn", `${bodyPixels} body pixels`);
 
 console.log("\nservices:");
 check(unexpected.length === 0, "does not call the host drawing imports", unexpected.map(([n]) => n).join(", "));
@@ -166,10 +212,48 @@ if (tones.length) {
 check(traces.length > 0, "emitted trace output", `${traces.length} messages`);
 for (const t of traces.slice(0, 6)) console.log(`       trace: ${t}`);
 
+if (kind === "flappy") {
+  console.log("\nflappy:");
+  // Ground band should be a solid horizontal stripe near the bottom.
+  const groundRow = HEIGHT - 4;
+  const groundColor = pixel(0, groundRow);
+  let solid = true;
+  for (let x = 0; x < WIDTH; x++) if (pixel(x, groundRow) !== groundColor) solid = false;
+  check(solid, "ground is a solid stripe", `row ${groundRow} = rgb565 ${decode(groundColor).join(",")}`);
+
+  // Sprite transparency, end to end. The bird's palette contains no value that
+  // encodes to 0, so the framework's transparency stand-in is 0x0000 — and nothing
+  // in this cart draws pure black. Any black pixel therefore means a transparent
+  // sprite pixel leaked through the blit.
+  let leaked = 0;
+  for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === 0) leaked++;
+  check(leaked === 0, "sprite transparency does not leak the key colour", `${leaked} black pixels`);
+
+  // And the sprite is actually on screen, so the check above isn't vacuous.
+  const BIRD_BODY = (() => {
+    // 0xf8d828 -> rgb565 (31, 54, 5), stored byte-swapped.
+    const rgb = (31 << 11) | (54 << 5) | 5;
+    return ((rgb & 0xff) << 8) | (rgb >> 8);
+  })();
+  let bodyPixels = 0;
+  for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) if (pixel(x, y) === BIRD_BODY) bodyPixels++;
+  check(bodyPixels > 10, "the bird sprite is drawn", `${bodyPixels} body pixels`);
+}
+
+if (kind === "itest") {
+  console.log("\nitest:");
+  check(itest.rim > 200, "eye rim is drawn", `${itest.rim} purple pixels`);
+  check(itest.iris > 40, "iris sprite is drawn", `${itest.iris} cyan pixels`);
+  check(itest.keyLeaks === 0, "iris transparency does not leak the key colour", `${itest.keyLeaks} leaked`);
+  check(itest.white === 9, "exactly nine correct answers flashed white", `${itest.white} white flashes`);
+  check(itest.red > 0, "wrong answers flashed red", `${itest.red} red flashes`);
+  check(itest.completed, "walked through every input to completion");
+}
+
 // ── Picture, for eyeballing ──────────────────────────────────────────────────
 
 const RAMP = " .:-=+*#%@";
-console.log("\nframe after " + FRAMES + " updates:");
+console.log("\nfinal frame:");
 for (let y = 0; y < HEIGHT; y += 4) {
   let row = "      ";
   for (let x = 0; x < WIDTH; x += 2) {

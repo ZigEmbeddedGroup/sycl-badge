@@ -42,6 +42,19 @@ impl Color {
         platform::decode565(self.0)
     }
 
+    /// Blend toward `other`, with `t` clamped to `0.0..=1.0`.
+    ///
+    /// Runs at runtime (unlike the constructors) because it decodes, mixes and
+    /// re-encodes. Cheap enough for a per-frame flash or fade, but do not put it
+    /// in a per-pixel loop — pre-compute the colour and reuse it.
+    pub fn mix(self, other: Color, t: f32) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let (r0, g0, b0) = self.components();
+        let (r1, g1, b1) = other.components();
+        let blend = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t + 0.5) as u8;
+        Color::new(blend(r0, r1), blend(g0, g1), blend(b0, b1))
+    }
+
     pub const BLACK: Color = Color::new(0, 0, 0);
     pub const WHITE: Color = Color::new(31, 63, 31);
     pub const RED: Color = Color::new(31, 0, 0);

@@ -27,6 +27,7 @@
 
 use crate::color::Color;
 use crate::font;
+use crate::math;
 use crate::platform;
 use crate::sprite::{BlitFlags, Sprite};
 
@@ -193,6 +194,39 @@ impl Gfx {
             self.buf[cx * HEIGHT + y0] = color.0;
         }
         self.mark_dirty(x, y, len, 1);
+    }
+
+    /// Filled ellipse centred on `(cx, cy)`.
+    ///
+    /// Cheap in this layout: each column's vertical extent is one contiguous
+    /// `fill`, so a circle costs about the same as the rectangle bounding it.
+    pub fn fill_ellipse(&mut self, cx: i32, cy: i32, rx: u32, ry: u32, color: Color) {
+        if rx == 0 || ry == 0 {
+            return;
+        }
+        let (rxf, ryf) = (rx as f32, ry as f32);
+        let rxi = rx as i32;
+        for dx in -rxi..=rxi {
+            let x = cx + dx;
+            if x < 0 || x >= WIDTH as i32 {
+                continue;
+            }
+            let t = dx as f32 / rxf;
+            let half = (ryf * math::sqrt(1.0 - t * t)) as i32;
+            let y0 = (cy - half).max(0);
+            let y1 = (cy + half + 1).min(HEIGHT as i32);
+            if y0 < y1 {
+                let base = x as usize * HEIGHT;
+                self.buf[base + y0 as usize..base + y1 as usize].fill(color.0);
+            }
+        }
+        self.mark_dirty(cx - rxi, cy - ry as i32, 2 * rx + 1, 2 * ry + 1);
+    }
+
+    /// Filled circle. See [`Gfx::fill_ellipse`].
+    #[inline]
+    pub fn fill_circle(&mut self, cx: i32, cy: i32, r: u32, color: Color) {
+        self.fill_ellipse(cx, cy, r, r, color);
     }
 
     /// Bresenham line.

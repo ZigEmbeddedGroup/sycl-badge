@@ -152,6 +152,8 @@ pub fn main() !void {
 
         audio.poll();
 
+        fps_overlay.poll();
+
         // Process console input
         console.processInput();
 

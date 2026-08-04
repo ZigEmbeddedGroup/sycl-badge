@@ -13005,10 +13005,6 @@
 		(uuid "4aab1ac6-d4bb-4fbc-8684-47f6d60f7783")
 	)
 	(no_connect
-		(at 346.71 166.37)
-		(uuid "4e51c52b-f510-41d4-991f-b5643831ca95")
-	)
-	(no_connect
 		(at 152.4 35.56)
 		(uuid "4fbaeec8-df45-4a55-a39a-485a4e3fe60e")
 	)
@@ -13041,6 +13037,10 @@
 		(uuid "a538d9fb-ddbf-42cd-8d6a-b6158b63d1b4")
 	)
 	(no_connect
+		(at 346.71 166.37)
+		(uuid "c86b5523-39bf-4b21-b4cd-ed75bc3dde1d")
+	)
+	(no_connect
 		(at 270.51 217.17)
 		(uuid "ce82c014-4cfb-459d-a331-f70ba67720e0")
 	)
@@ -13051,6 +13051,10 @@
 	(no_connect
 		(at 92.71 133.35)
 		(uuid "dccc4019-b44d-408e-b622-905b27b3553a")
+	)
+	(no_connect
+		(at 349.25 166.37)
+		(uuid "ded075f1-1968-4b9d-99fd-80b12159fe1c")
 	)
 	(no_connect
 		(at 341.63 166.37)
@@ -17660,16 +17664,6 @@
 	)
 	(wire
 		(pts
-			(xy 349.25 157.48) (xy 349.25 166.37)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f1c6a7a0-be0c-49d2-abfe-3c4d39f7120f")
-	)
-	(wire
-		(pts
 			(xy 369.57 41.91) (xy 354.33 41.91)
 		)
 		(stroke
@@ -19016,7 +19010,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "01da1494-bf18-4401-82d6-78551c8082e9")
-		(property "Reference" "R36"
+		(property "Reference" "R21"
 			(at 147.32 184.404 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19120,7 +19114,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R36")
+					(reference "R21")
 					(unit 1)
 				)
 			)
@@ -19139,7 +19133,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "02236eaf-c2b5-433c-951a-5aeac9305ac6")
-		(property "Reference" "#PWR031"
+		(property "Reference" "#PWR074"
 			(at 359.41 104.14 0)
 			(hide yes)
 			(show_name no)
@@ -19199,7 +19193,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR031")
+					(reference "#PWR074")
 					(unit 1)
 				)
 			)
@@ -19217,7 +19211,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "03315822-ca71-4b1d-8879-7a3760685899")
-		(property "Reference" "TP1"
+		(property "Reference" "TP3"
 			(at 264.16 76.7079 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19320,7 +19314,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP1")
+					(reference "TP3")
 					(unit 1)
 				)
 			)
@@ -19337,7 +19331,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "035f4159-0d8d-475d-b41f-2677d9732b71")
-		(property "Reference" "SW3"
+		(property "Reference" "SW1"
 			(at 232.41 210.566 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19466,7 +19460,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "SW3")
+					(reference "SW1")
 					(unit 1)
 				)
 			)
@@ -19483,7 +19477,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "04ecbcc8-824f-4124-be55-d7b7b7be03cd")
-		(property "Reference" "R1"
+		(property "Reference" "R37"
 			(at 353.314 39.624 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19578,7 +19572,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R1")
+					(reference "R37")
 					(unit 1)
 				)
 			)
@@ -19596,7 +19590,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0974b4e2-a4b5-47db-bf33-5e9ce040d4ab")
-		(property "Reference" "#PWR03"
+		(property "Reference" "#PWR065"
 			(at 288.29 44.45 0)
 			(hide yes)
 			(show_name no)
@@ -19656,7 +19650,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR03")
+					(reference "#PWR065")
 					(unit 1)
 				)
 			)
@@ -19675,7 +19669,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "09b1f8c5-85e6-4c33-b770-3b1c87436f83")
-		(property "Reference" "#PWR039"
+		(property "Reference" "#PWR023"
 			(at 114.3 127 0)
 			(hide yes)
 			(show_name no)
@@ -19735,7 +19729,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR039")
+					(reference "#PWR023")
 					(unit 1)
 				)
 			)
@@ -19851,7 +19845,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0acdb118-7d92-4819-a4be-9182f06b7ce3")
-		(property "Reference" "#PWR066"
+		(property "Reference" "#PWR09"
 			(at 36.83 74.93 0)
 			(hide yes)
 			(show_name no)
@@ -19911,7 +19905,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR066")
+					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -19928,7 +19922,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0b61d083-761d-4c51-bd34-d1ce907481af")
-		(property "Reference" "#P+020"
+		(property "Reference" "#P+017"
 			(at 201.93 252.73 0)
 			(hide yes)
 			(show_name no)
@@ -19988,7 +19982,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+020")
+					(reference "#P+017")
 					(unit 1)
 				)
 			)
@@ -20007,7 +20001,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0b77aa5c-94cb-40d8-817f-5aaa600a0d17")
-		(property "Reference" "#PWR050"
+		(property "Reference" "#PWR051"
 			(at 223.52 163.83 0)
 			(hide yes)
 			(show_name no)
@@ -20067,7 +20061,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR050")
+					(reference "#PWR051")
 					(unit 1)
 				)
 			)
@@ -20084,7 +20078,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0c1a81d2-34e6-48c7-8e69-9e091cfcb457")
-		(property "Reference" "#P+07"
+		(property "Reference" "#P+08"
 			(at 83.82 57.15 0)
 			(hide yes)
 			(show_name no)
@@ -20144,7 +20138,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+07")
+					(reference "#P+08")
 					(unit 1)
 				)
 			)
@@ -20161,7 +20155,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0d717d5a-1f13-4dbe-ac10-014896cf46dc")
-		(property "Reference" "R7"
+		(property "Reference" "R35"
 			(at 320.04 99.06 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20288,7 +20282,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R7")
+					(reference "R35")
 					(unit 1)
 				)
 			)
@@ -20305,7 +20299,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0d8ebc6c-0ac7-40f4-ad4d-b631c639e8da")
-		(property "Reference" "R9"
+		(property "Reference" "R15"
 			(at 114.3 115.57 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20432,7 +20426,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R9")
+					(reference "R15")
 					(unit 1)
 				)
 			)
@@ -20450,7 +20444,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "0f68b6b5-c01b-42d8-a1b4-01b4dd9bbcd9")
-		(property "Reference" "TP18"
+		(property "Reference" "TP8"
 			(at 281.94 100.8379 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20553,7 +20547,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP18")
+					(reference "TP8")
 					(unit 1)
 				)
 			)
@@ -20570,7 +20564,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "10832df4-171f-402b-b946-ee2dfd17041b")
-		(property "Reference" "R18"
+		(property "Reference" "R10"
 			(at 92.075 190.5 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20697,7 +20691,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R18")
+					(reference "R10")
 					(unit 1)
 				)
 			)
@@ -20714,7 +20708,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "11d72eab-0621-40ef-b741-f33d4c1e9b86")
-		(property "Reference" "C6"
+		(property "Reference" "C10"
 			(at 106.68 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20843,7 +20837,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C6")
+					(reference "C10")
 					(unit 1)
 				)
 			)
@@ -20860,7 +20854,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1278485e-0b25-46a2-80d6-f20bd6f22258")
-		(property "Reference" "D3"
+		(property "Reference" "D5"
 			(at 120.65 29.21 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21006,7 +21000,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D3")
+					(reference "D5")
 					(unit 1)
 				)
 			)
@@ -21025,7 +21019,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "12fc2e62-ea46-46ef-9e67-b70a10f8d35d")
-		(property "Reference" "J1"
+		(property "Reference" "J5"
 			(at 180.848 21.844 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21167,7 +21161,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "J1")
+					(reference "J5")
 					(unit 1)
 				)
 			)
@@ -21185,7 +21179,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1313b27b-8188-4b86-9200-f654c7a2b6d2")
-		(property "Reference" "J4"
+		(property "Reference" "J3"
 			(at 135.89 195.072 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21293,7 +21287,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "J4")
+					(reference "J3")
 					(unit 1)
 				)
 			)
@@ -21310,7 +21304,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "132286ca-d758-4cb8-90c7-521785950c58")
-		(property "Reference" "R13"
+		(property "Reference" "R31"
 			(at 247.65 160.02 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21405,7 +21399,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R13")
+					(reference "R31")
 					(unit 1)
 				)
 			)
@@ -21424,7 +21418,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1373c827-8daf-4007-8ae3-29a56931b904")
-		(property "Reference" "#PWR010"
+		(property "Reference" "#PWR021"
 			(at 104.14 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -21484,7 +21478,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR010")
+					(reference "#PWR021")
 					(unit 1)
 				)
 			)
@@ -21501,7 +21495,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "13e0b5a6-b144-4be0-8b75-7659b45b84ff")
-		(property "Reference" "#PWR075"
+		(property "Reference" "#PWR027"
 			(at 127 269.24 0)
 			(hide yes)
 			(show_name no)
@@ -21560,7 +21554,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR075")
+					(reference "#PWR027")
 					(unit 1)
 				)
 			)
@@ -21577,7 +21571,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "13f25e69-edad-424b-9bb2-dfb5706e4f11")
-		(property "Reference" "U2"
+		(property "Reference" "U7"
 			(at 379.73 80.645 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21724,7 +21718,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U2")
+					(reference "U7")
 					(unit 1)
 				)
 			)
@@ -21743,7 +21737,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "175b0cb0-cfef-47f6-933a-8953c928cf18")
-		(property "Reference" "#PWR016"
+		(property "Reference" "#PWR018"
 			(at 83.82 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -21803,7 +21797,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR016")
+					(reference "#PWR018")
 					(unit 1)
 				)
 			)
@@ -21820,7 +21814,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "17a6625d-7fba-48be-a824-5d3c0f1da910")
-		(property "Reference" "C32"
+		(property "Reference" "C5"
 			(at 52.07 63.5 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21949,7 +21943,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C32")
+					(reference "C5")
 					(unit 1)
 				)
 			)
@@ -21969,7 +21963,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "17cc98b4-d849-4b0e-b1fc-be70bccc429e")
-		(property "Reference" "#PWR02"
+		(property "Reference" "#PWR047"
 			(at 203.2 63.5 0)
 			(hide yes)
 			(show_name no)
@@ -22029,7 +22023,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR02")
+					(reference "#PWR047")
 					(unit 1)
 				)
 			)
@@ -22048,7 +22042,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "180e6e7e-92b2-4de7-b1b6-ba93f40ec4bf")
-		(property "Reference" "#PWR062"
+		(property "Reference" "#PWR075"
 			(at 381 229.87 0)
 			(hide yes)
 			(show_name no)
@@ -22108,7 +22102,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR062")
+					(reference "#PWR075")
 					(unit 1)
 				)
 			)
@@ -22127,7 +22121,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "18d86443-c987-4897-97d1-6d95bddbf0e7")
-		(property "Reference" "#PWR06"
+		(property "Reference" "#PWR084"
 			(at 406.4 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -22187,7 +22181,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR06")
+					(reference "#PWR084")
 					(unit 1)
 				)
 			)
@@ -22205,7 +22199,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "195d7db8-16ec-433d-9f47-c43b71f4d920")
-		(property "Reference" "U5"
+		(property "Reference" "U3"
 			(at 41.275 184.15 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22344,7 +22338,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U5")
+					(reference "U3")
 					(unit 1)
 				)
 			)
@@ -22361,7 +22355,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1979882e-a3ca-4bf4-b4fc-5992a97d85bd")
-		(property "Reference" "R25"
+		(property "Reference" "R6"
 			(at 62.865 210.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22488,7 +22482,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R25")
+					(reference "R6")
 					(unit 1)
 				)
 			)
@@ -22506,7 +22500,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1e0a1770-8b5f-4259-b5e1-8fa298bd9d4d")
-		(property "Reference" "U9"
+		(property "Reference" "U4"
 			(at 54.61 252.73 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22611,7 +22605,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U9")
+					(reference "U4")
 					(unit 1)
 				)
 			)
@@ -22629,7 +22623,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1e1fa9a4-921e-4979-a00e-7b13f648320c")
-		(property "Reference" "#PWR077"
+		(property "Reference" "#PWR054"
 			(at 243.84 200.66 0)
 			(hide yes)
 			(show_name no)
@@ -22689,7 +22683,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR077")
+					(reference "#PWR054")
 					(unit 1)
 				)
 			)
@@ -22706,7 +22700,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1e4899ed-115b-46d6-be75-1357171b1a83")
-		(property "Reference" "R40"
+		(property "Reference" "R19"
 			(at 134.62 262.89 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22833,7 +22827,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R40")
+					(reference "R19")
 					(unit 1)
 				)
 			)
@@ -22850,7 +22844,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "1fe81031-4c72-4fd8-969b-cce3c84e7ac4")
-		(property "Reference" "C5"
+		(property "Reference" "C8"
 			(at 86.36 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22979,7 +22973,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C5")
+					(reference "C8")
 					(unit 1)
 				)
 			)
@@ -22998,7 +22992,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "21f0e45c-90e1-466e-aa2b-4105143737b2")
-		(property "Reference" "#PWR019"
+		(property "Reference" "#PWR036"
 			(at 144.78 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -23058,7 +23052,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR019")
+					(reference "#PWR036")
 					(unit 1)
 				)
 			)
@@ -23075,7 +23069,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "231672c4-cb00-4856-9992-8a35050e4db3")
-		(property "Reference" "R22"
+		(property "Reference" "R2"
 			(at 24.765 210.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23202,7 +23196,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R22")
+					(reference "R2")
 					(unit 1)
 				)
 			)
@@ -23219,7 +23213,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "23aa2e93-80b8-41f8-8b5e-962747f0b379")
-		(property "Reference" "C42"
+		(property "Reference" "C39"
 			(at 379.476 172.212 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23316,7 +23310,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C42")
+					(reference "C39")
 					(unit 1)
 				)
 			)
@@ -23333,7 +23327,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "24a43262-1ddf-4170-b1e2-dd291445f932")
-		(property "Reference" "R42"
+		(property "Reference" "R25"
 			(at 154.94 111.76 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23460,7 +23454,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R42")
+					(reference "R25")
 					(unit 1)
 				)
 			)
@@ -23478,7 +23472,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "2537a7df-e2ec-40b7-b608-a5b6e06ce259")
-		(property "Reference" "TP14"
+		(property "Reference" "TP2"
 			(at 247.65 97.0279 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23581,7 +23575,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP14")
+					(reference "TP2")
 					(unit 1)
 				)
 			)
@@ -23598,7 +23592,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "258ab319-01d3-4e85-a18d-b9c392559a6c")
-		(property "Reference" "R28"
+		(property "Reference" "R26"
 			(at 193.04 146.05 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23725,7 +23719,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R28")
+					(reference "R26")
 					(unit 1)
 				)
 			)
@@ -23742,7 +23736,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "25bcb22d-ed39-479c-8d67-a8ddf6c0613d")
-		(property "Reference" "C9"
+		(property "Reference" "C34"
 			(at 353.06 91.694 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23871,7 +23865,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C9")
+					(reference "C34")
 					(unit 1)
 				)
 			)
@@ -23889,7 +23883,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "25e154f1-125c-4cc6-ad76-bb3410ae98ae")
-		(property "Reference" "#PWR025"
+		(property "Reference" "#PWR031"
 			(at 139.7 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -23950,7 +23944,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR025")
+					(reference "#PWR031")
 					(unit 1)
 				)
 			)
@@ -23967,7 +23961,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "26111ce5-9099-4df6-b36e-f8b16222bb1b")
-		(property "Reference" "#P+015"
+		(property "Reference" "#P+018"
 			(at 208.28 252.73 0)
 			(hide yes)
 			(show_name no)
@@ -24027,7 +24021,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+015")
+					(reference "#P+018")
 					(unit 1)
 				)
 			)
@@ -24144,7 +24138,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "27de12e7-713c-432a-9c5b-fb00fda1e20a")
-		(property "Reference" "R23"
+		(property "Reference" "R3"
 			(at 29.845 210.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24271,7 +24265,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R23")
+					(reference "R3")
 					(unit 1)
 				)
 			)
@@ -24289,7 +24283,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "29f73c81-1460-43cd-b91d-1cfe4e7ea933")
-		(property "Reference" "#PWR027"
+		(property "Reference" "#PWR070"
 			(at 313.69 96.52 0)
 			(hide yes)
 			(show_name no)
@@ -24348,7 +24342,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR027")
+					(reference "#PWR070")
 					(unit 1)
 				)
 			)
@@ -24366,7 +24360,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2a4fe6b1-ad61-4f0d-a3dd-cb8998b6eb37")
-		(property "Reference" "Q2"
+		(property "Reference" "Q1"
 			(at 199.39 178.3206 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24472,7 +24466,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "Q2")
+					(reference "Q1")
 					(unit 1)
 				)
 			)
@@ -24490,7 +24484,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2abc4c45-cde1-4d79-862c-7a3e5516d1eb")
-		(property "Reference" "C35"
+		(property "Reference" "C11"
 			(at 114.3 260.3499 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24587,7 +24581,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C35")
+					(reference "C11")
 					(unit 1)
 				)
 			)
@@ -24604,7 +24598,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "2c66c5cd-c36b-472a-8ddb-32cc31cebee8")
-		(property "Reference" "C7"
+		(property "Reference" "C12"
 			(at 127 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24733,7 +24727,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C7")
+					(reference "C12")
 					(unit 1)
 				)
 			)
@@ -24750,7 +24744,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "2dd93b2b-8b56-4055-85d7-08aa8e9abfd1")
-		(property "Reference" "#PWR063"
+		(property "Reference" "#PWR043"
 			(at 181.229 203.2 0)
 			(hide yes)
 			(show_name no)
@@ -24809,7 +24803,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR063")
+					(reference "#PWR043")
 					(unit 1)
 				)
 			)
@@ -24826,7 +24820,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "2e045081-f4bd-48ec-b9c6-a265268e3410")
-		(property "Reference" "R6"
+		(property "Reference" "R36"
 			(at 339.09 90.17 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24953,7 +24947,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R6")
+					(reference "R36")
 					(unit 1)
 				)
 			)
@@ -24971,7 +24965,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "2f7073f8-1744-4549-9096-142206a3686d")
-		(property "Reference" "#PWR04"
+		(property "Reference" "#PWR068"
 			(at 300.99 44.45 0)
 			(hide yes)
 			(show_name no)
@@ -25031,7 +25025,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR04")
+					(reference "#PWR068")
 					(unit 1)
 				)
 			)
@@ -25048,7 +25042,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "2f96b1ea-9699-4c61-9212-1af1c80d5d0d")
-		(property "Reference" "R8"
+		(property "Reference" "R14"
 			(at 109.22 115.57 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25175,7 +25169,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R8")
+					(reference "R14")
 					(unit 1)
 				)
 			)
@@ -25192,7 +25186,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "303f7766-0a9a-4a8d-acc9-7daa8ce9af4e")
-		(property "Reference" "D5"
+		(property "Reference" "D8"
 			(at 330.2 95.25 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25319,7 +25313,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D5")
+					(reference "D8")
 					(unit 1)
 				)
 			)
@@ -25337,7 +25331,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "30a97f4e-69df-487b-9328-efed37a1f94d")
-		(property "Reference" "U7"
+		(property "Reference" "U2"
 			(at 36.83 54.61 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25447,7 +25441,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U7")
+					(reference "U2")
 					(unit 1)
 				)
 			)
@@ -25464,7 +25458,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "354fb67e-b284-48b2-a6d7-45511a65ed74")
-		(property "Reference" "R21"
+		(property "Reference" "R1"
 			(at 19.685 210.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25591,7 +25585,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R21")
+					(reference "R1")
 					(unit 1)
 				)
 			)
@@ -25773,7 +25767,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "362b3ed7-1cd8-4e81-a7d2-cdde75c45b3f")
-		(property "Reference" "#PWR073"
+		(property "Reference" "#PWR038"
 			(at 149.86 109.22 0)
 			(hide yes)
 			(show_name no)
@@ -25833,7 +25827,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR073")
+					(reference "#PWR038")
 					(unit 1)
 				)
 			)
@@ -25851,7 +25845,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "38624064-4297-471b-8233-efdbc562cf12")
-		(property "Reference" "TP13"
+		(property "Reference" "TP1"
 			(at 247.65 85.5979 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25954,7 +25948,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP13")
+					(reference "TP1")
 					(unit 1)
 				)
 			)
@@ -25971,7 +25965,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "38a71770-1728-4626-82b7-eba44144e128")
-		(property "Reference" "C8"
+		(property "Reference" "C14"
 			(at 147.32 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26100,7 +26094,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C8")
+					(reference "C14")
 					(unit 1)
 				)
 			)
@@ -26118,7 +26112,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "398cf839-bc64-4bff-b5f7-cef90f350d78")
-		(property "Reference" "C26"
+		(property "Reference" "C19"
 			(at 227.33 175.2599 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26215,7 +26209,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C26")
+					(reference "C19")
 					(unit 1)
 				)
 			)
@@ -26232,7 +26226,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "39e81f32-562f-4f13-a8b6-6ec7b9b46488")
-		(property "Reference" "R33"
+		(property "Reference" "R30"
 			(at 246.126 200.406 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26327,7 +26321,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R33")
+					(reference "R30")
 					(unit 1)
 				)
 			)
@@ -26345,7 +26339,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3a3fd794-610d-4fb8-a4ea-10603b95de26")
-		(property "Reference" "#PWR084"
+		(property "Reference" "#PWR032"
 			(at 137.16 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -26406,7 +26400,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR084")
+					(reference "#PWR032")
 					(unit 1)
 				)
 			)
@@ -26423,7 +26417,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3a97b378-e734-4433-9053-bed68957ab2b")
-		(property "Reference" "C16"
+		(property "Reference" "C27"
 			(at 306.578 137.414 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26520,7 +26514,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C16")
+					(reference "C27")
 					(unit 1)
 				)
 			)
@@ -26537,7 +26531,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3b242790-fbdf-4b81-be7b-960580265ff3")
-		(property "Reference" "U4"
+		(property "Reference" "U5"
 			(at 140.97 147.32 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26655,7 +26649,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U4")
+					(reference "U5")
 					(unit 1)
 				)
 			)
@@ -26672,7 +26666,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3b4c85bb-e4e9-400f-bbd3-9609e7e093b0")
-		(property "Reference" "#PWR072"
+		(property "Reference" "#PWR046"
 			(at 201.93 274.32 0)
 			(hide yes)
 			(show_name no)
@@ -26731,7 +26725,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR072")
+					(reference "#PWR046")
 					(unit 1)
 				)
 			)
@@ -26748,7 +26742,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3bd3274c-6b71-4220-a0d7-772ce1f3cb84")
-		(property "Reference" "R30"
+		(property "Reference" "R41"
 			(at 393.446 175.006 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26834,6 +26828,36 @@
 				)
 			)
 		)
+		(property "Manufacturer" ""
+			(at 391.16 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" ""
+			(at 391.16 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Package" ""
+			(at 391.16 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "d8bf1df9-8c90-440e-94e9-8fadf5e1fce4")
 		)
@@ -26843,7 +26867,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R30")
+					(reference "R41")
 					(unit 1)
 				)
 			)
@@ -26860,7 +26884,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3cf27789-9443-4e06-a41e-ee2de9a45567")
-		(property "Reference" "C1"
+		(property "Reference" "C24"
 			(at 276.86 27.178 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26955,7 +26979,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C1")
+					(reference "C24")
 					(unit 1)
 				)
 			)
@@ -26972,7 +26996,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "3d6641e9-f1b0-497f-8dfd-b9f87be6f8d2")
-		(property "Reference" "C30"
+		(property "Reference" "C15"
 			(at 183.769 191.77 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27101,7 +27125,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C30")
+					(reference "C15")
 					(unit 1)
 				)
 			)
@@ -27118,7 +27142,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "41b6c575-6fa3-4164-9164-f10f8515f467")
-		(property "Reference" "R5"
+		(property "Reference" "R38"
 			(at 364.49 87.63 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27245,7 +27269,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R5")
+					(reference "R38")
 					(unit 1)
 				)
 			)
@@ -27263,7 +27287,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "41c86ddf-0027-41ab-b985-8d783e3aa5f4")
-		(property "Reference" "#PWR052"
+		(property "Reference" "#PWR057"
 			(at 259.08 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -27323,7 +27347,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR052")
+					(reference "#PWR057")
 					(unit 1)
 				)
 			)
@@ -27342,7 +27366,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4216663d-83cc-4456-bc98-f24633c5fec5")
-		(property "Reference" "#PWR065"
+		(property "Reference" "#PWR041"
 			(at 176.53 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -27402,85 +27426,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR065")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_name "GND_1")
-		(lib_id "power:GND")
-		(at 349.25 157.48 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "4331963d-c120-493e-940d-82304f4d6117")
-		(property "Reference" "#PWR055"
-			(at 349.25 151.13 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 349.25 153.67 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 349.25 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 349.25 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 349.25 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "27b17369-5243-461a-999f-f6697fea1763")
-		)
-		(instances
-			(project "SYCL Badge 2024"
-				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR055")
+					(reference "#PWR041")
 					(unit 1)
 				)
 			)
@@ -27497,7 +27443,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "44cfc5f5-4d9e-4144-954e-33cb6f86a775")
-		(property "Reference" "R16"
+		(property "Reference" "R8"
 			(at 81.915 190.5 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27624,7 +27570,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R16")
+					(reference "R8")
 					(unit 1)
 				)
 			)
@@ -27741,7 +27687,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "486955c1-7c1b-4e86-8254-5275c3581680")
-		(property "Reference" "C20"
+		(property "Reference" "C31"
 			(at 340.106 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27838,7 +27784,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C20")
+					(reference "C31")
 					(unit 1)
 				)
 			)
@@ -27855,7 +27801,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "48a8879c-df2c-49e3-9474-b2ab6ef78264")
-		(property "Reference" "C18"
+		(property "Reference" "C29"
 			(at 323.596 137.414 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27952,7 +27898,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C18")
+					(reference "C29")
 					(unit 1)
 				)
 			)
@@ -28071,7 +28017,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "495d55f9-5762-45b3-bf64-1581ab7e2e7e")
-		(property "Reference" "#PWR013"
+		(property "Reference" "#PWR060"
 			(at 267.97 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -28131,7 +28077,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR013")
+					(reference "#PWR060")
 					(unit 1)
 				)
 			)
@@ -28149,7 +28095,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4b3c1e75-b7e0-4461-a912-490819137cbe")
-		(property "Reference" "#PWR034"
+		(property "Reference" "#PWR02"
 			(at 25.4 107.95 0)
 			(hide yes)
 			(show_name no)
@@ -28208,7 +28154,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR034")
+					(reference "#PWR02")
 					(unit 1)
 				)
 			)
@@ -28225,7 +28171,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "4d3cfbeb-4341-488e-8011-79f333aba164")
-		(property "Reference" "R41"
+		(property "Reference" "R20"
 			(at 149.86 111.76 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28352,7 +28298,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R41")
+					(reference "R20")
 					(unit 1)
 				)
 			)
@@ -28369,7 +28315,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "4def2348-6b42-4d7e-ac02-bad560bfb8d2")
-		(property "Reference" "C38"
+		(property "Reference" "C1"
 			(at 17.526 63.5 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28498,7 +28444,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C38")
+					(reference "C1")
 					(unit 1)
 				)
 			)
@@ -28516,7 +28462,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "4e91d120-87da-4f85-822a-37ea8e3b8eaa")
-		(property "Reference" "#PWR060"
+		(property "Reference" "#PWR079"
 			(at 391.16 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -28576,7 +28522,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR060")
+					(reference "#PWR079")
 					(unit 1)
 				)
 			)
@@ -28594,7 +28540,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4f0a8b96-422a-4acf-86f2-e01ba6956a1d")
-		(property "Reference" "#PWR040"
+		(property "Reference" "#PWR04"
 			(at 33.02 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -28653,7 +28599,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR040")
+					(reference "#PWR04")
 					(unit 1)
 				)
 			)
@@ -28671,7 +28617,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "509ce73e-0bcb-4ace-a040-53db3cc283ba")
-		(property "Reference" "C27"
+		(property "Reference" "C20"
 			(at 238.76 175.2599 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28768,7 +28714,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C27")
+					(reference "C20")
 					(unit 1)
 				)
 			)
@@ -28785,7 +28731,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "511e7375-0d26-40da-81b4-e5861978ad20")
-		(property "Reference" "#P+01"
+		(property "Reference" "#P+05"
 			(at 63.5 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -28845,7 +28791,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+01")
+					(reference "#P+05")
 					(unit 1)
 				)
 			)
@@ -28862,7 +28808,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "5269a960-d2b8-47c2-810c-d3b031f7ea4a")
-		(property "Reference" "C28"
+		(property "Reference" "C36"
 			(at 374.904 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28959,7 +28905,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C28")
+					(reference "C36")
 					(unit 1)
 				)
 			)
@@ -28976,7 +28922,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "52a7b797-ccb9-45a5-8c28-01c7179213a6")
-		(property "Reference" "D4"
+		(property "Reference" "D6"
 			(at 140.97 29.21 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29122,7 +29068,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D4")
+					(reference "D6")
 					(unit 1)
 				)
 			)
@@ -29140,7 +29086,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "52e09fbe-765f-494e-ad07-55f315442a00")
-		(property "Reference" "#+3V08"
+		(property "Reference" "#+3V03"
 			(at 181.229 186.69 0)
 			(hide yes)
 			(show_name no)
@@ -29200,7 +29146,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V08")
+					(reference "#+3V03")
 					(unit 1)
 				)
 			)
@@ -29217,7 +29163,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "53a21674-31a6-49db-8e07-3353ab98578c")
-		(property "Reference" "#P+022"
+		(property "Reference" "#P+013"
 			(at 127 240.03 0)
 			(hide yes)
 			(show_name no)
@@ -29277,7 +29223,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+022")
+					(reference "#P+013")
 					(unit 1)
 				)
 			)
@@ -29294,7 +29240,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "53ea1eaf-b4a3-4e47-8ca1-62ae47d99f85")
-		(property "Reference" "C11"
+		(property "Reference" "C2"
 			(at 27.94 106.68 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29423,7 +29369,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C11")
+					(reference "C2")
 					(unit 1)
 				)
 			)
@@ -29441,7 +29387,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5505a892-a461-48d5-aceb-e43addeec4f4")
-		(property "Reference" "#PWR053"
+		(property "Reference" "#PWR081"
 			(at 398.78 192.913 0)
 			(hide yes)
 			(show_name no)
@@ -29500,7 +29446,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR053")
+					(reference "#PWR081")
 					(unit 1)
 				)
 			)
@@ -29517,7 +29463,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "555e4f8f-46cc-4ad8-b994-951a6ad9084d")
-		(property "Reference" "J3"
+		(property "Reference" "J2"
 			(at 133.985 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29616,7 +29562,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "J3")
+					(reference "J2")
 					(unit 1)
 				)
 			)
@@ -29634,7 +29580,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "55b1ee69-7d24-47ac-85db-c296b62b9b41")
-		(property "Reference" "C13"
+		(property "Reference" "C21"
 			(at 259.08 138.4299 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29731,7 +29677,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C13")
+					(reference "C21")
 					(unit 1)
 				)
 			)
@@ -29749,7 +29695,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "58bf9314-c763-4a1f-8d51-9280cec75aa7")
-		(property "Reference" "H1"
+		(property "Reference" "H2"
 			(at 264.16 266.7 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29828,7 +29774,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "H1")
+					(reference "H2")
 					(unit 1)
 				)
 			)
@@ -29845,7 +29791,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "59643862-0365-486f-b3bf-2ff2fc133775")
-		(property "Reference" "C19"
+		(property "Reference" "C30"
 			(at 332.74 137.414 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29942,7 +29888,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C19")
+					(reference "C30")
 					(unit 1)
 				)
 			)
@@ -29960,7 +29906,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "597a9613-35cc-4322-80ee-467d5ddfa242")
-		(property "Reference" "#PWR021"
+		(property "Reference" "#PWR040"
 			(at 175.26 78.74 0)
 			(hide yes)
 			(show_name no)
@@ -30020,7 +29966,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR021")
+					(reference "#PWR040")
 					(unit 1)
 				)
 			)
@@ -30037,7 +29983,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "5c20d868-41fa-4936-9db7-05e4132d689d")
-		(property "Reference" "C37"
+		(property "Reference" "C3"
 			(at 27.432 269.24 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30134,7 +30080,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C37")
+					(reference "C3")
 					(unit 1)
 				)
 			)
@@ -30153,7 +30099,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5e5a55c2-0d91-4d9a-ad2e-efafdb9450cc")
-		(property "Reference" "#PWR038"
+		(property "Reference" "#PWR08"
 			(at 35.56 118.11 0)
 			(hide yes)
 			(show_name no)
@@ -30213,7 +30159,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR038")
+					(reference "#PWR08")
 					(unit 1)
 				)
 			)
@@ -30231,7 +30177,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5f3f2735-3220-43f2-b69d-a7c77c20709f")
-		(property "Reference" "J2"
+		(property "Reference" "J1"
 			(at 77.47 95.25 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30371,7 +30317,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "J2")
+					(reference "J1")
 					(unit 1)
 				)
 			)
@@ -30388,7 +30334,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "602a6cfd-148e-4b68-9d94-7f96f003d584")
-		(property "Reference" "C31"
+		(property "Reference" "C17"
 			(at 207.01 192.024 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30515,7 +30461,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C31")
+					(reference "C17")
 					(unit 1)
 				)
 			)
@@ -30533,7 +30479,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "606b806e-40cf-4ced-8518-f05b4d27298c")
-		(property "Reference" "J5"
+		(property "Reference" "J4"
 			(at 135.89 215.138 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30641,7 +30587,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "J5")
+					(reference "J4")
 					(unit 1)
 				)
 			)
@@ -30659,7 +30605,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "618ba67e-6d80-4a75-8db3-11a0b125a17a")
-		(property "Reference" "#PWR054"
+		(property "Reference" "#PWR014"
 			(at 73.025 193.04 0)
 			(hide yes)
 			(show_name no)
@@ -30718,7 +30664,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR054")
+					(reference "#PWR014")
 					(unit 1)
 				)
 			)
@@ -30735,7 +30681,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "63db1bf8-07f1-41de-9b81-16450c9f281e")
-		(property "Reference" "#+3V02"
+		(property "Reference" "#+3V08"
 			(at 406.4 30.48 0)
 			(hide yes)
 			(show_name no)
@@ -30795,7 +30741,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V02")
+					(reference "#+3V08")
 					(unit 1)
 				)
 			)
@@ -30813,7 +30759,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "63f5f9c5-fa0e-43ce-986a-60d62e6e9192")
-		(property "Reference" "SW1"
+		(property "Reference" "SW2"
 			(at 351.79 81.28 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30946,7 +30892,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "SW1")
+					(reference "SW2")
 					(unit 1)
 				)
 			)
@@ -30965,7 +30911,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "65c785ec-8412-4903-9815-9ff9b0ed8f1b")
-		(property "Reference" "#PWR068"
+		(property "Reference" "#PWR052"
 			(at 223.52 193.04 0)
 			(hide yes)
 			(show_name no)
@@ -31025,7 +30971,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR068")
+					(reference "#PWR052")
 					(unit 1)
 				)
 			)
@@ -31044,7 +30990,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "676a842c-80e8-40c7-bde0-ccdd4a8f79bc")
-		(property "Reference" "#PWR026"
+		(property "Reference" "#PWR073"
 			(at 346.71 96.52 0)
 			(hide yes)
 			(show_name no)
@@ -31104,7 +31050,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR026")
+					(reference "#PWR073")
 					(unit 1)
 				)
 			)
@@ -31122,7 +31068,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "6951cbba-1d14-429a-84cd-29e65ab3c904")
-		(property "Reference" "H3"
+		(property "Reference" "H1"
 			(at 233.68 267.97 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31221,7 +31167,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "H3")
+					(reference "H1")
 					(unit 1)
 				)
 			)
@@ -31238,7 +31184,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6c03f274-11d6-4c17-a179-3aeae4511535")
-		(property "Reference" "#P+02"
+		(property "Reference" "#P+07"
 			(at 83.82 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -31298,7 +31244,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+02")
+					(reference "#P+07")
 					(unit 1)
 				)
 			)
@@ -31461,7 +31407,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6d4113e3-192c-42ba-94a3-b44c5bee8c0e")
-		(property "Reference" "R29"
+		(property "Reference" "R28"
 			(at 201.93 146.05 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31588,7 +31534,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R29")
+					(reference "R28")
 					(unit 1)
 				)
 			)
@@ -31606,7 +31552,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6d93bdab-8b95-4507-a83a-c15f1763a8c2")
-		(property "Reference" "#PWR035"
+		(property "Reference" "#PWR07"
 			(at 35.56 107.95 0)
 			(hide yes)
 			(show_name no)
@@ -31665,7 +31611,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR035")
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
@@ -31682,7 +31628,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6df8e81d-a110-4a1f-b36a-179ed7d31992")
-		(property "Reference" "#P+018"
+		(property "Reference" "#P+02"
 			(at 24.13 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -31742,7 +31688,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+018")
+					(reference "#P+02")
 					(unit 1)
 				)
 			)
@@ -31760,7 +31706,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6e22c13b-617f-4790-ac3f-f6d940ab9353")
-		(property "Reference" "#PWR085"
+		(property "Reference" "#PWR030"
 			(at 138.43 115.57 0)
 			(hide yes)
 			(show_name no)
@@ -31821,7 +31767,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR085")
+					(reference "#PWR030")
 					(unit 1)
 				)
 			)
@@ -31838,7 +31784,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "6e3e4688-6a24-4b25-81b6-21ecefc9461b")
-		(property "Reference" "#P+010"
+		(property "Reference" "#P+015"
 			(at 144.78 57.15 0)
 			(hide yes)
 			(show_name no)
@@ -31898,7 +31844,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+010")
+					(reference "#P+015")
 					(unit 1)
 				)
 			)
@@ -31915,7 +31861,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "70f08a84-c764-4d9c-b159-565c5e676ac9")
-		(property "Reference" "#P+05"
+		(property "Reference" "#P+014"
 			(at 144.78 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -31975,7 +31921,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+05")
+					(reference "#P+014")
 					(unit 1)
 				)
 			)
@@ -32139,7 +32085,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "72602450-e2da-4c50-b82e-5d9d20d2e798")
-		(property "Reference" "#P+021"
+		(property "Reference" "#P+016"
 			(at 182.88 229.87 0)
 			(hide yes)
 			(show_name no)
@@ -32199,7 +32145,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+021")
+					(reference "#P+016")
 					(unit 1)
 				)
 			)
@@ -32216,7 +32162,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "72f6099d-2177-4705-8f32-c010874ee2c6")
-		(property "Reference" "C24"
+		(property "Reference" "C6"
 			(at 64.77 146.05 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32345,7 +32291,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C24")
+					(reference "C6")
 					(unit 1)
 				)
 			)
@@ -32527,7 +32473,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "74b2f6a4-d483-4bd6-9d82-e4c09d10e4fe")
-		(property "Reference" "#PWR020"
+		(property "Reference" "#PWR044"
 			(at 196.85 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -32587,7 +32533,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR020")
+					(reference "#PWR044")
 					(unit 1)
 				)
 			)
@@ -32604,7 +32550,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "751f0270-68c4-4658-996f-eff94278c1fa")
-		(property "Reference" "R12"
+		(property "Reference" "R7"
 			(at 75.946 147.32 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32731,7 +32677,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R12")
+					(reference "R7")
 					(unit 1)
 				)
 			)
@@ -32749,7 +32695,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "76199382-d0fd-477c-b9e7-12205e73824c")
-		(property "Reference" "C15"
+		(property "Reference" "C26"
 			(at 281.94 138.4299 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32846,7 +32792,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C15")
+					(reference "C26")
 					(unit 1)
 				)
 			)
@@ -32865,7 +32811,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "781497df-3d41-4f74-a65d-720da6915b2d")
-		(property "Reference" "#PWR08"
+		(property "Reference" "#PWR011"
 			(at 63.5 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -32925,7 +32871,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR08")
+					(reference "#PWR011")
 					(unit 1)
 				)
 			)
@@ -32942,7 +32888,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "786c1876-f36e-4d8d-909e-237b3c7609ff")
-		(property "Reference" "#PWR046"
+		(property "Reference" "#PWR037"
 			(at 148.59 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -33001,7 +32947,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR046")
+					(reference "#PWR037")
 					(unit 1)
 				)
 			)
@@ -33018,7 +32964,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "791c36c1-2973-458a-97f8-1bf4969ecb75")
-		(property "Reference" "#P+03"
+		(property "Reference" "#P+09"
 			(at 104.14 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -33078,7 +33024,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+03")
+					(reference "#P+09")
 					(unit 1)
 				)
 			)
@@ -33097,7 +33043,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7bd54a2e-d2ee-496a-97cd-13948acce97d")
-		(property "Reference" "#PWR079"
+		(property "Reference" "#PWR019"
 			(at 90.17 280.67 0)
 			(hide yes)
 			(show_name no)
@@ -33157,7 +33103,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR079")
+					(reference "#PWR019")
 					(unit 1)
 				)
 			)
@@ -33174,7 +33120,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7cda7545-53c3-4ee2-9b8c-d392f3225b8f")
-		(property "Reference" "#P+09"
+		(property "Reference" "#P+012"
 			(at 124.46 57.15 0)
 			(hide yes)
 			(show_name no)
@@ -33234,7 +33180,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+09")
+					(reference "#P+012")
 					(unit 1)
 				)
 			)
@@ -33251,7 +33197,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7d9763af-89bb-45bd-b16c-6e5e4263f5be")
-		(property "Reference" "#PWR071"
+		(property "Reference" "#PWR033"
 			(at 140.97 200.66 0)
 			(hide yes)
 			(show_name no)
@@ -33310,7 +33256,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR071")
+					(reference "#PWR033")
 					(unit 1)
 				)
 			)
@@ -33329,7 +33275,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7df347e7-f455-4622-9917-35b5a362c320")
-		(property "Reference" "#PWR036"
+		(property "Reference" "#PWR071"
 			(at 322.58 110.49 0)
 			(hide yes)
 			(show_name no)
@@ -33389,7 +33335,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR036")
+					(reference "#PWR071")
 					(unit 1)
 				)
 			)
@@ -33409,7 +33355,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "809f4a15-bd1d-4087-83ad-6897e0f8ee97")
-		(property "Reference" "#PWR05"
+		(property "Reference" "#PWR050"
 			(at 220.98 50.8 0)
 			(hide yes)
 			(show_name no)
@@ -33469,7 +33415,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR05")
+					(reference "#PWR050")
 					(unit 1)
 				)
 			)
@@ -33487,7 +33433,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "80a9476f-e374-4fd5-9bc3-5b7f6cea29da")
-		(property "Reference" "#PWR082"
+		(property "Reference" "#PWR064"
 			(at 279.4 101.6 0)
 			(hide yes)
 			(show_name no)
@@ -33547,7 +33493,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR082")
+					(reference "#PWR064")
 					(unit 1)
 				)
 			)
@@ -33565,7 +33511,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "80ab30b4-5294-48b7-9f91-cd7ecd0367dd")
-		(property "Reference" "#PWR041"
+		(property "Reference" "#PWR066"
 			(at 289.56 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -33625,7 +33571,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR041")
+					(reference "#PWR066")
 					(unit 1)
 				)
 			)
@@ -33642,7 +33588,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "80c13a7e-2a04-4e83-8110-23e42d786827")
-		(property "Reference" "#P+011"
+		(property "Reference" "#P+019"
 			(at 261.62 83.82 0)
 			(hide yes)
 			(show_name no)
@@ -33702,7 +33648,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+011")
+					(reference "#P+019")
 					(unit 1)
 				)
 			)
@@ -33719,7 +33665,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "81ce5d55-d014-40cf-acf8-74b0a075f7a2")
-		(property "Reference" "#PWR074"
+		(property "Reference" "#PWR042"
 			(at 180.34 269.24 0)
 			(hide yes)
 			(show_name no)
@@ -33778,7 +33724,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR074")
+					(reference "#PWR042")
 					(unit 1)
 				)
 			)
@@ -33795,7 +33741,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "86118e5a-f863-4b59-9754-508810fdc0ef")
-		(property "Reference" "#PWR033"
+		(property "Reference" "#PWR020"
 			(at 97.79 106.68 0)
 			(hide yes)
 			(show_name no)
@@ -33854,7 +33800,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR033")
+					(reference "#PWR020")
 					(unit 1)
 				)
 			)
@@ -33872,7 +33818,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "88020a26-a507-4ef2-a264-bdee72b9fd54")
-		(property "Reference" "R3"
+		(property "Reference" "R29"
 			(at 223.012 48.26 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33969,7 +33915,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R3")
+					(reference "R29")
 					(unit 1)
 				)
 			)
@@ -33986,7 +33932,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8869f7f8-9055-4840-8a42-523f6fcf54c9")
-		(property "Reference" "Q1"
+		(property "Reference" "Q2"
 			(at 327.66 78.74 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -34118,7 +34064,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "Q1")
+					(reference "Q2")
 					(unit 1)
 				)
 			)
@@ -34137,7 +34083,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "892b7c49-6a45-4029-8704-1832a2eac73c")
-		(property "Reference" "#PWR056"
+		(property "Reference" "#PWR080"
 			(at 394.97 209.55 0)
 			(hide yes)
 			(show_name no)
@@ -34197,7 +34143,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR056")
+					(reference "#PWR080")
 					(unit 1)
 				)
 			)
@@ -34215,7 +34161,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "8a0059b1-9c08-454b-a7a4-6b20c66a9ce3")
-		(property "Reference" "TP4"
+		(property "Reference" "TP7"
 			(at 281.94 86.8679 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -34318,7 +34264,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP4")
+					(reference "TP7")
 					(unit 1)
 				)
 			)
@@ -34336,7 +34282,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "8a32654b-88ef-4c4e-ba4d-262112caf98c")
-		(property "Reference" "TP3"
+		(property "Reference" "TP4"
 			(at 264.16 86.8679 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -34439,7 +34385,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP3")
+					(reference "TP4")
 					(unit 1)
 				)
 			)
@@ -34457,7 +34403,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8a73aa5f-657d-481a-955e-d1caf8e775f1")
-		(property "Reference" "#PWR014"
+		(property "Reference" "#PWR062"
 			(at 279.4 87.63 0)
 			(hide yes)
 			(show_name no)
@@ -34517,7 +34463,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR014")
+					(reference "#PWR062")
 					(unit 1)
 				)
 			)
@@ -34535,7 +34481,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "8d49e479-bfdd-42a3-a1da-d9fc0515952f")
-		(property "Reference" "H2"
+		(property "Reference" "H4"
 			(at 287.02 266.7 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -34614,7 +34560,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "H2")
+					(reference "H4")
 					(unit 1)
 				)
 			)
@@ -34632,7 +34578,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8edea06f-c29c-4964-815f-8621165aaf84")
-		(property "Reference" "#PWR043"
+		(property "Reference" "#PWR016"
 			(at 77.47 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -34692,7 +34638,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR043")
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)
@@ -34709,7 +34655,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8f3fa5ff-b20d-4e55-b8d1-27c50ae5e565")
-		(property "Reference" "#+3V09"
+		(property "Reference" "#+3V05"
 			(at 354.33 27.94 0)
 			(hide yes)
 			(show_name no)
@@ -34769,7 +34715,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V09")
+					(reference "#+3V05")
 					(unit 1)
 				)
 			)
@@ -34786,7 +34732,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8fb12c52-3c96-4a48-8deb-66e214ecf952")
-		(property "Reference" "D6"
+		(property "Reference" "D7"
 			(at 181.229 154.432 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -34915,7 +34861,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D6")
+					(reference "D7")
 					(unit 1)
 				)
 			)
@@ -34933,7 +34879,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "90d7aa1f-a3b0-4f20-913e-8e450ae61389")
-		(property "Reference" "TP19"
+		(property "Reference" "TP5"
 			(at 264.16 100.8379 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35036,7 +34982,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP19")
+					(reference "TP5")
 					(unit 1)
 				)
 			)
@@ -35053,7 +34999,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "92b85961-03ca-44b2-9cfd-9b7c241a8ac4")
-		(property "Reference" "R17"
+		(property "Reference" "R9"
 			(at 86.995 190.5 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35180,7 +35126,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R17")
+					(reference "R9")
 					(unit 1)
 				)
 			)
@@ -35275,7 +35221,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "94ac78b6-ec65-4549-978d-fdab4d22e927")
-		(property "Reference" "#PWR059"
+		(property "Reference" "#PWR078"
 			(at 391.16 165.1 0)
 			(hide yes)
 			(show_name no)
@@ -35335,7 +35281,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR059")
+					(reference "#PWR078")
 					(unit 1)
 				)
 			)
@@ -35551,7 +35497,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9986e1a8-9b86-405e-afc8-196fb0b2750b")
-		(property "Reference" "#PWR018"
+		(property "Reference" "#PWR026"
 			(at 124.46 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -35611,7 +35557,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR018")
+					(reference "#PWR026")
 					(unit 1)
 				)
 			)
@@ -35628,7 +35574,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "99a50ae5-ebeb-49b6-a74d-70a1ce48d6b0")
-		(property "Reference" "C29"
+		(property "Reference" "C37"
 			(at 385.572 217.17 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35755,7 +35701,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C29")
+					(reference "C37")
 					(unit 1)
 				)
 			)
@@ -35772,7 +35718,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9bf17ed3-b0fb-407c-8345-db501b11ce22")
-		(property "Reference" "R37"
+		(property "Reference" "R24"
 			(at 147.066 214.376 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35876,7 +35822,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R37")
+					(reference "R24")
 					(unit 1)
 				)
 			)
@@ -35893,7 +35839,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9bfed2f0-452e-4ad6-b81d-2afde104bab0")
-		(property "Reference" "R32"
+		(property "Reference" "R22"
 			(at 147.32 194.056 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35997,7 +35943,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R32")
+					(reference "R22")
 					(unit 1)
 				)
 			)
@@ -36174,7 +36120,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9e26a04a-ad14-4c2c-8098-3829a1c62449")
-		(property "Reference" "#PWR030"
+		(property "Reference" "#PWR072"
 			(at 341.63 104.14 0)
 			(hide yes)
 			(show_name no)
@@ -36234,7 +36180,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR030")
+					(reference "#PWR072")
 					(unit 1)
 				)
 			)
@@ -36252,7 +36198,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9e99bd36-6278-4607-969e-b45bd91da477")
-		(property "Reference" "#PWR080"
+		(property "Reference" "#PWR024"
 			(at 118.11 252.73 0)
 			(hide yes)
 			(show_name no)
@@ -36312,7 +36258,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR080")
+					(reference "#PWR024")
 					(unit 1)
 				)
 			)
@@ -36329,7 +36275,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9fc780f5-3d87-44c8-91dd-d40b38fffc8a")
-		(property "Reference" "R11"
+		(property "Reference" "R17"
 			(at 124.46 115.57 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36456,7 +36402,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R11")
+					(reference "R17")
 					(unit 1)
 				)
 			)
@@ -36473,7 +36419,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a0011ce0-be07-4177-979f-af2a78604039")
-		(property "Reference" "R39"
+		(property "Reference" "R18"
 			(at 134.62 242.57 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36600,7 +36546,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R39")
+					(reference "R18")
 					(unit 1)
 				)
 			)
@@ -36618,7 +36564,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a0db492a-99f0-44c3-8fa2-3ab4c7cdfd1a")
-		(property "Reference" "C25"
+		(property "Reference" "C22"
 			(at 262.89 165.0999 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36715,7 +36661,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C25")
+					(reference "C22")
 					(unit 1)
 				)
 			)
@@ -36734,7 +36680,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a15f1947-7966-4bfe-a747-b490b7b97ef5")
-		(property "Reference" "#PWR076"
+		(property "Reference" "#PWR049"
 			(at 214.63 36.83 0)
 			(hide yes)
 			(show_name no)
@@ -36794,7 +36740,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR076")
+					(reference "#PWR049")
 					(unit 1)
 				)
 			)
@@ -36811,7 +36757,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a1672570-0f8f-44d8-a808-214be60c4096")
-		(property "Reference" "R14"
+		(property "Reference" "R32"
 			(at 263.652 185.674 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36906,7 +36852,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R14")
+					(reference "R32")
 					(unit 1)
 				)
 			)
@@ -36924,7 +36870,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a2187a98-5882-4be6-bf9b-547bb9694433")
-		(property "Reference" "#PWR023"
+		(property "Reference" "#PWR063"
 			(at 279.4 87.63 0)
 			(hide yes)
 			(show_name no)
@@ -36984,7 +36930,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR023")
+					(reference "#PWR063")
 					(unit 1)
 				)
 			)
@@ -37002,7 +36948,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "a3375e81-fee7-4ae6-8834-0379db3f53b9")
-		(property "Reference" "TP2"
+		(property "Reference" "TP6"
 			(at 281.94 76.7079 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37105,7 +37051,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "TP2")
+					(reference "TP6")
 					(unit 1)
 				)
 			)
@@ -37122,7 +37068,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a3eedfe8-c9ed-4124-8f8c-f54a9e724efa")
-		(property "Reference" "#PWR069"
+		(property "Reference" "#PWR034"
 			(at 140.97 220.98 0)
 			(hide yes)
 			(show_name no)
@@ -37181,7 +37127,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR069")
+					(reference "#PWR034")
 					(unit 1)
 				)
 			)
@@ -37198,7 +37144,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b01ad8f0-0415-44a8-ae2a-057c5ad94092")
-		(property "Reference" "C3"
+		(property "Reference" "C25"
 			(at 276.86 47.244 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37293,7 +37239,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C3")
+					(reference "C25")
 					(unit 1)
 				)
 			)
@@ -37310,7 +37256,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b0ca8667-e27b-4cf8-9bf3-e02fa1def4ce")
-		(property "Reference" "R15"
+		(property "Reference" "R33"
 			(at 263.652 188.214 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37405,7 +37351,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R15")
+					(reference "R33")
 					(unit 1)
 				)
 			)
@@ -37422,7 +37368,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b38c5475-93ec-4c56-ba0d-5db86339292d")
-		(property "Reference" "R2"
+		(property "Reference" "R34"
 			(at 311.15 40.894 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37517,7 +37463,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R2")
+					(reference "R34")
 					(unit 1)
 				)
 			)
@@ -37534,7 +37480,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b3af1c05-ce6f-4e38-8b53-3540a675e26e")
-		(property "Reference" "C33"
+		(property "Reference" "C18"
 			(at 208.788 259.334 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37631,7 +37577,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C33")
+					(reference "C18")
 					(unit 1)
 				)
 			)
@@ -37648,7 +37594,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b4ce2abf-d6a2-4414-b2f7-08a5aa566452")
-		(property "Reference" "D2"
+		(property "Reference" "D4"
 			(at 100.33 29.21 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37794,7 +37740,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D2")
+					(reference "D4")
 					(unit 1)
 				)
 			)
@@ -37811,7 +37757,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b53e4573-8733-4795-8d96-04aa4086d2c5")
-		(property "Reference" "#PWR064"
+		(property "Reference" "#PWR045"
 			(at 196.85 208.28 0)
 			(hide yes)
 			(show_name no)
@@ -37870,7 +37816,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR064")
+					(reference "#PWR045")
 					(unit 1)
 				)
 			)
@@ -38346,7 +38292,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b63bc27b-3711-4ff7-aa0d-b9a8ed0f89ce")
-		(property "Reference" "#PWR070"
+		(property "Reference" "#PWR048"
 			(at 208.28 274.32 0)
 			(hide yes)
 			(show_name no)
@@ -38405,7 +38351,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR070")
+					(reference "#PWR048")
 					(unit 1)
 				)
 			)
@@ -38422,7 +38368,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b72c69e6-15b7-49e5-911b-c5401bb3749f")
-		(property "Reference" "C10"
+		(property "Reference" "C41"
 			(at 405.13 93.98 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38551,7 +38497,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C10")
+					(reference "C41")
 					(unit 1)
 				)
 			)
@@ -38570,7 +38516,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b7c1cb95-769a-41ab-9501-dca55d64c74f")
-		(property "Reference" "#PWR032"
+		(property "Reference" "#PWR083"
 			(at 402.59 107.95 0)
 			(hide yes)
 			(show_name no)
@@ -38630,7 +38576,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR032")
+					(reference "#PWR083")
 					(unit 1)
 				)
 			)
@@ -38647,7 +38593,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "b889a0c0-7310-4090-af94-ca06bde3aeb8")
-		(property "Reference" "#PWR022"
+		(property "Reference" "#PWR058"
 			(at 261.62 87.63 0)
 			(hide yes)
 			(show_name no)
@@ -38707,7 +38653,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR022")
+					(reference "#PWR058")
 					(unit 1)
 				)
 			)
@@ -38725,7 +38671,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b979a672-c0b7-4b6e-9a23-4f69c763214a")
-		(property "Reference" "U3"
+		(property "Reference" "U1"
 			(at 34.6711 131.572 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38877,7 +38823,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U3")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -39015,6 +38961,16 @@
 				)
 			)
 		)
+		(property "Manufacturer" ""
+			(at 107.315 213.36 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "594e25b9-4772-4a93-af7d-8a0517b14d5a")
 		)
@@ -39043,7 +38999,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bbd37791-9c9d-4a60-bfd6-d53905e874d8")
-		(property "Reference" "#PWR049"
+		(property "Reference" "#PWR028"
 			(at 133.35 170.18 0)
 			(hide yes)
 			(show_name no)
@@ -39103,7 +39059,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR049")
+					(reference "#PWR028")
 					(unit 1)
 				)
 			)
@@ -39122,7 +39078,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bc6dcf89-d6af-4637-8cb7-b8118e20ca32")
-		(property "Reference" "#PWR078"
+		(property "Reference" "#PWR015"
 			(at 74.93 280.67 0)
 			(hide yes)
 			(show_name no)
@@ -39182,7 +39138,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR078")
+					(reference "#PWR015")
 					(unit 1)
 				)
 			)
@@ -39200,7 +39156,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "befb3490-2d8c-4cef-bc21-a0aaa5ac2878")
-		(property "Reference" "SW2"
+		(property "Reference" "SW3"
 			(at 400.05 172.5929 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39329,7 +39285,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "SW2")
+					(reference "SW3")
 					(unit 1)
 				)
 			)
@@ -39346,7 +39302,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "bf5f042d-cfd7-4fd1-9486-77933e1e8c4a")
-		(property "Reference" "R26"
+		(property "Reference" "R39"
 			(at 388.874 213.106 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39441,7 +39397,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R26")
+					(reference "R39")
 					(unit 1)
 				)
 			)
@@ -39459,7 +39415,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bfecbb6b-63b4-442b-a97d-4c2d5278fcc1")
-		(property "Reference" "#PWR058"
+		(property "Reference" "#PWR010"
 			(at 57.785 223.52 0)
 			(hide yes)
 			(show_name no)
@@ -39518,7 +39474,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR058")
+					(reference "#PWR010")
 					(unit 1)
 				)
 			)
@@ -39535,7 +39491,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "bff40b5c-6a33-4218-b968-a6af61d00bdb")
-		(property "Reference" "U1"
+		(property "Reference" "U8"
 			(at 372.11 29.21 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39682,7 +39638,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "U1")
+					(reference "U8")
 					(unit 1)
 				)
 			)
@@ -39700,7 +39656,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c20ca093-500a-432c-b3ad-865d7b1c7d5b")
-		(property "Reference" "#PWR024"
+		(property "Reference" "#PWR069"
 			(at 313.69 85.09 0)
 			(hide yes)
 			(show_name no)
@@ -39759,7 +39715,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR024")
+					(reference "#PWR069")
 					(unit 1)
 				)
 			)
@@ -39776,7 +39732,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "c549032c-e374-44de-b602-b2a5a6464573")
-		(property "Reference" "R34"
+		(property "Reference" "R11"
 			(at 92.71 255.27 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39903,7 +39859,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R34")
+					(reference "R11")
 					(unit 1)
 				)
 			)
@@ -39921,7 +39877,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "c725605e-172f-4b2a-a068-bccbb0296516")
-		(property "Reference" "#+3V05"
+		(property "Reference" "#+3V04"
 			(at 196.85 170.18 0)
 			(hide yes)
 			(show_name no)
@@ -39981,7 +39937,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V05")
+					(reference "#+3V04")
 					(unit 1)
 				)
 			)
@@ -39999,7 +39955,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "c7c3e1ac-9784-446a-9558-26f0d6f381eb")
-		(property "Reference" "#PWR01"
+		(property "Reference" "#PWR039"
 			(at 175.26 15.24 0)
 			(hide yes)
 			(show_name no)
@@ -40059,7 +40015,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR01")
+					(reference "#PWR039")
 					(unit 1)
 				)
 			)
@@ -40078,7 +40034,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c9268069-0937-414d-85c7-4d7a261a4c24")
-		(property "Reference" "#PWR017"
+		(property "Reference" "#PWR022"
 			(at 104.14 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -40138,7 +40094,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR017")
+					(reference "#PWR022")
 					(unit 1)
 				)
 			)
@@ -40155,7 +40111,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "ca284c85-c571-4de0-aa9f-cdaf4f7f129f")
-		(property "Reference" "R31"
+		(property "Reference" "R4"
 			(at 49.784 38.1 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40282,7 +40238,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R31")
+					(reference "R4")
 					(unit 1)
 				)
 			)
@@ -40299,7 +40255,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "cb9d0594-1fc4-4345-9de5-4c713191d0b5")
-		(property "Reference" "Dd1"
+		(property "Reference" "D2"
 			(at 80.01 29.21 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40445,7 +40401,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "Dd1")
+					(reference "D2")
 					(unit 1)
 				)
 			)
@@ -40462,7 +40418,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "cd21ee15-b835-4619-ba68-76c2d1d3d0fb")
-		(property "Reference" "R24"
+		(property "Reference" "R5"
 			(at 57.785 210.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40589,7 +40545,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R24")
+					(reference "R5")
 					(unit 1)
 				)
 			)
@@ -40608,7 +40564,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ced2d76c-21fd-47e1-b5d7-0085fa6107c5")
-		(property "Reference" "#PWR047"
+		(property "Reference" "#PWR05"
 			(at 33.02 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -40668,7 +40624,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR047")
+					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -40685,7 +40641,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "cf4caf25-3073-449a-abcc-0029a5785b40")
-		(property "Reference" "#PWR051"
+		(property "Reference" "#PWR053"
 			(at 234.95 173.99 0)
 			(hide yes)
 			(show_name no)
@@ -40745,7 +40701,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR051")
+					(reference "#PWR053")
 					(unit 1)
 				)
 			)
@@ -40762,7 +40718,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "cfaa4c80-c61e-44f6-9332-b5bde5d4d78a")
-		(property "Reference" "C36"
+		(property "Reference" "C9"
 			(at 101.6 256.54 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40891,7 +40847,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C36")
+					(reference "C9")
 					(unit 1)
 				)
 			)
@@ -40908,7 +40864,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "d0af8f88-9ed0-4a03-8cd5-25bb8ac0b28e")
-		(property "Reference" "C2"
+		(property "Reference" "C42"
 			(at 401.32 37.846 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41037,7 +40993,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C2")
+					(reference "C42")
 					(unit 1)
 				)
 			)
@@ -41055,7 +41011,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d35d863f-4f41-4e21-81db-b644124882d6")
-		(property "Reference" "L2"
+		(property "Reference" "L1"
 			(at 67.31 242.57 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41152,7 +41108,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "L2")
+					(reference "L1")
 					(unit 1)
 				)
 			)
@@ -41170,7 +41126,7 @@
 		(dnp yes)
 		(fields_autoplaced yes)
 		(uuid "d67114f9-84fa-44bf-a91c-2bf8cc7e0804")
-		(property "Reference" "H4"
+		(property "Reference" "H3"
 			(at 264.16 276.86 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41249,7 +41205,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "H4")
+					(reference "H3")
 					(unit 1)
 				)
 			)
@@ -41266,7 +41222,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "d6dbd2c5-e877-40be-84cb-891cac50b6e6")
-		(property "Reference" "D8"
+		(property "Reference" "D3"
 			(at 83.82 252.73 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41393,7 +41349,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "D8")
+					(reference "D3")
 					(unit 1)
 				)
 			)
@@ -41558,7 +41514,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "d8d35cfc-f106-4b8f-ac05-a6b4159e7a19")
-		(property "Reference" "#+3V03"
+		(property "Reference" "#+3V07"
 			(at 402.59 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -41618,7 +41574,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V03")
+					(reference "#+3V07")
 					(unit 1)
 				)
 			)
@@ -41637,7 +41593,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d8e159da-23e6-4ff9-a718-817f52a0a50d")
-		(property "Reference" "#PWR048"
+		(property "Reference" "#PWR013"
 			(at 67.31 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -41697,7 +41653,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR048")
+					(reference "#PWR013")
 					(unit 1)
 				)
 			)
@@ -41714,7 +41670,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "da37b207-044b-4d77-987b-253bab4b0457")
-		(property "Reference" "C40"
+		(property "Reference" "C38"
 			(at 383.54 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41811,7 +41767,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C40")
+					(reference "C38")
 					(unit 1)
 				)
 			)
@@ -41828,7 +41784,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "dcdd9fc0-b2a5-4ee1-96b3-34efb72a5310")
-		(property "Reference" "C39"
+		(property "Reference" "C16"
 			(at 196.85 259.334 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41957,7 +41913,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C39")
+					(reference "C16")
 					(unit 1)
 				)
 			)
@@ -41974,7 +41930,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "dd76f729-9cbd-47d4-b28d-7a15b65a635c")
-		(property "Reference" "#P+04"
+		(property "Reference" "#P+011"
 			(at 124.46 22.86 0)
 			(hide yes)
 			(show_name no)
@@ -42034,7 +41990,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+04")
+					(reference "#P+011")
 					(unit 1)
 				)
 			)
@@ -42051,7 +42007,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "ddb4d158-bbef-4117-bf14-9e97cbd7c8a1")
-		(property "Reference" "#P+019"
+		(property "Reference" "#P+03"
 			(at 49.53 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -42111,7 +42067,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+019")
+					(reference "#P+03")
 					(unit 1)
 				)
 			)
@@ -42130,7 +42086,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ddfcc442-e82c-41cf-a381-79b065b3a154")
-		(property "Reference" "#PWR081"
+		(property "Reference" "#PWR06"
 			(at 34.29 281.94 0)
 			(hide yes)
 			(show_name no)
@@ -42190,7 +42146,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR081")
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -42207,7 +42163,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "df196b18-ff0b-4a9b-b512-318c76eaf102")
-		(property "Reference" "#P+08"
+		(property "Reference" "#P+010"
 			(at 104.14 57.15 0)
 			(hide yes)
 			(show_name no)
@@ -42267,7 +42223,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+08")
+					(reference "#P+010")
 					(unit 1)
 				)
 			)
@@ -42286,7 +42242,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "df52d5ad-3c53-415b-a2ae-974b9fe36edb")
-		(property "Reference" "#PWR042"
+		(property "Reference" "#PWR067"
 			(at 298.45 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -42346,7 +42302,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR042")
+					(reference "#PWR067")
 					(unit 1)
 				)
 			)
@@ -42363,7 +42319,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "df5dbb0c-0a1f-4fe7-b508-4f5c3a13d268")
-		(property "Reference" "R35"
+		(property "Reference" "R12"
 			(at 92.71 266.7 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42490,7 +42446,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R35")
+					(reference "R12")
 					(unit 1)
 				)
 			)
@@ -42507,7 +42463,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "dffd917d-d743-4767-8f19-09a49b1da1f8")
-		(property "Reference" "#P+012"
+		(property "Reference" "#P+020"
 			(at 370.84 76.2 0)
 			(hide yes)
 			(show_name no)
@@ -42567,7 +42523,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+012")
+					(reference "#P+020")
 					(unit 1)
 				)
 			)
@@ -42586,7 +42542,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e30c777f-dc4e-4377-b856-d17dd23afa48")
-		(property "Reference" "#PWR028"
+		(property "Reference" "#PWR076"
 			(at 383.54 100.33 0)
 			(hide yes)
 			(show_name no)
@@ -42646,7 +42602,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR028")
+					(reference "#PWR076")
 					(unit 1)
 				)
 			)
@@ -42663,7 +42619,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e3224973-ab43-4fb6-a9c6-56cfa67b858f")
-		(property "Reference" "R38"
+		(property "Reference" "R23"
 			(at 147.32 204.978 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42767,7 +42723,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R38")
+					(reference "R23")
 					(unit 1)
 				)
 			)
@@ -42785,7 +42741,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e6f5819e-321e-4ed4-918e-4af6ec05508a")
-		(property "Reference" "#PWR083"
+		(property "Reference" "#PWR055"
 			(at 243.84 226.06 0)
 			(hide yes)
 			(show_name no)
@@ -42844,7 +42800,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR083")
+					(reference "#PWR055")
 					(unit 1)
 				)
 			)
@@ -42861,7 +42817,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e726285e-c8c3-4736-8d05-ef4fa00261cd")
-		(property "Reference" "C34"
+		(property "Reference" "C13"
 			(at 139.7 102.87 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42958,7 +42914,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C34")
+					(reference "C13")
 					(unit 1)
 				)
 			)
@@ -42975,7 +42931,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e87d0543-f9f4-45e3-9b99-ce5e6eaab6aa")
-		(property "Reference" "R19"
+		(property "Reference" "R13"
 			(at 97.155 190.5 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43102,7 +43058,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R19")
+					(reference "R13")
 					(unit 1)
 				)
 			)
@@ -43119,7 +43075,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e87d9277-0aeb-440e-aa95-1bf0aa20d2cd")
-		(property "Reference" "R20"
+		(property "Reference" "R40"
 			(at 394.716 165.1 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43246,7 +43202,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R20")
+					(reference "R40")
 					(unit 1)
 				)
 			)
@@ -43263,7 +43219,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e8bc0627-bfd3-4132-a6b6-2a2d0f1959d7")
-		(property "Reference" "C41"
+		(property "Reference" "C40"
 			(at 392.43 136.906 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43360,7 +43316,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C41")
+					(reference "C40")
 					(unit 1)
 				)
 			)
@@ -43377,7 +43333,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "eb93898f-a3d5-421d-a043-bde57d20145c")
-		(property "Reference" "#+3V01"
+		(property "Reference" "#+3V06"
 			(at 400.05 24.13 0)
 			(hide yes)
 			(show_name no)
@@ -43437,7 +43393,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V01")
+					(reference "#+3V06")
 					(unit 1)
 				)
 			)
@@ -43456,7 +43412,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "eb9943e9-340c-456d-8faa-8ceb42c6c718")
-		(property "Reference" "#PWR037"
+		(property "Reference" "#PWR03"
 			(at 25.4 118.11 0)
 			(hide yes)
 			(show_name no)
@@ -43516,7 +43472,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR037")
+					(reference "#PWR03")
 					(unit 1)
 				)
 			)
@@ -43533,7 +43489,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "ec26126d-893c-419b-9ddd-5b3006d80a67")
-		(property "Reference" "C23"
+		(property "Reference" "C35"
 			(at 365.506 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43630,7 +43586,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C23")
+					(reference "C35")
 					(unit 1)
 				)
 			)
@@ -43794,7 +43750,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f00cde3a-2851-4061-8b7d-60e6664aee0a")
-		(property "Reference" "#P+016"
+		(property "Reference" "#P+01"
 			(at 16.51 262.89 0)
 			(hide yes)
 			(show_name no)
@@ -43854,7 +43810,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+016")
+					(reference "#P+01")
 					(unit 1)
 				)
 			)
@@ -43872,7 +43828,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f0622cd2-edb9-4d09-8c7f-90a205eddc8e")
-		(property "Reference" "C14"
+		(property "Reference" "C23"
 			(at 270.51 138.4299 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43969,7 +43925,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C14")
+					(reference "C23")
 					(unit 1)
 				)
 			)
@@ -43986,7 +43942,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f0812cf4-d1f3-4490-b368-8f21de8fb5d0")
-		(property "Reference" "#+3V04"
+		(property "Reference" "#+3V01"
 			(at 64.135 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -44046,7 +44002,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V04")
+					(reference "#+3V01")
 					(unit 1)
 				)
 			)
@@ -44064,7 +44020,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f0d1fce3-d96f-4c43-8f80-2cda86588e2c")
-		(property "Reference" "L1"
+		(property "Reference" "L2"
 			(at 245.11 175.2599 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44172,7 +44128,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "L1")
+					(reference "L2")
 					(unit 1)
 				)
 			)
@@ -44191,7 +44147,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f1306cfd-ac0c-4ddd-816d-33b7f775e3bf")
-		(property "Reference" "#PWR045"
+		(property "Reference" "#PWR077"
 			(at 387.35 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -44251,7 +44207,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR045")
+					(reference "#PWR077")
 					(unit 1)
 				)
 			)
@@ -44270,7 +44226,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f168395d-436b-4f97-a211-dce897dc265d")
-		(property "Reference" "#PWR07"
+		(property "Reference" "#PWR082"
 			(at 400.05 53.34 0)
 			(hide yes)
 			(show_name no)
@@ -44330,7 +44286,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR07")
+					(reference "#PWR082")
 					(unit 1)
 				)
 			)
@@ -44349,7 +44305,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f245a003-0b77-430c-b19f-cf2163661047")
-		(property "Reference" "#PWR09"
+		(property "Reference" "#PWR017"
 			(at 83.82 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -44409,7 +44365,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR09")
+					(reference "#PWR017")
 					(unit 1)
 				)
 			)
@@ -44504,7 +44460,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f368e66b-b708-41a1-9be0-296b787b0ae4")
-		(property "Reference" "C21"
+		(property "Reference" "C32"
 			(at 347.98 137.16 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44601,7 +44557,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C21")
+					(reference "C32")
 					(unit 1)
 				)
 			)
@@ -44619,7 +44575,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f3c33e04-b0a0-4802-b902-96b52a20212b")
-		(property "Reference" "#PWR057"
+		(property "Reference" "#PWR01"
 			(at 22.225 223.52 0)
 			(hide yes)
 			(show_name no)
@@ -44678,7 +44634,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR057")
+					(reference "#PWR01")
 					(unit 1)
 				)
 			)
@@ -44697,7 +44653,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f4b693a8-bc64-4ba6-92b3-3863044bb105")
-		(property "Reference" "#PWR011"
+		(property "Reference" "#PWR025"
 			(at 124.46 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -44757,7 +44713,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR011")
+					(reference "#PWR025")
 					(unit 1)
 				)
 			)
@@ -44874,7 +44830,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f512e021-5584-463b-8fe9-90664ea2b5af")
-		(property "Reference" "C4"
+		(property "Reference" "C7"
 			(at 66.04 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45003,7 +44959,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C4")
+					(reference "C7")
 					(unit 1)
 				)
 			)
@@ -45020,7 +44976,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f6a2f3f0-f6d6-440b-b05a-bc29fb0f9002")
-		(property "Reference" "#+3V06"
+		(property "Reference" "#+3V02"
 			(at 73.025 194.31 0)
 			(hide yes)
 			(show_name no)
@@ -45080,7 +45036,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#+3V06")
+					(reference "#+3V02")
 					(unit 1)
 				)
 			)
@@ -45099,7 +45055,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f7eb58cc-2d74-48d3-99cd-44f0b94928f1")
-		(property "Reference" "#PWR015"
+		(property "Reference" "#PWR012"
 			(at 63.5 73.66 0)
 			(hide yes)
 			(show_name no)
@@ -45159,7 +45115,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR015")
+					(reference "#PWR012")
 					(unit 1)
 				)
 			)
@@ -45178,7 +45134,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f8dac959-5967-42b4-a42c-e67d1ce42859")
-		(property "Reference" "#PWR044"
+		(property "Reference" "#PWR056"
 			(at 255.27 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -45238,7 +45194,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR044")
+					(reference "#PWR056")
 					(unit 1)
 				)
 			)
@@ -45256,7 +45212,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f913dcbf-8a57-4e54-b01d-0767db7c5d70")
-		(property "Reference" "#PWR067"
+		(property "Reference" "#PWR059"
 			(at 261.62 101.6 0)
 			(hide yes)
 			(show_name no)
@@ -45316,7 +45272,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR067")
+					(reference "#PWR059")
 					(unit 1)
 				)
 			)
@@ -45333,7 +45289,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f96a6728-088c-4842-b254-99c96030d35a")
-		(property "Reference" "C22"
+		(property "Reference" "C33"
 			(at 357.378 136.906 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45430,7 +45386,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C22")
+					(reference "C33")
 					(unit 1)
 				)
 			)
@@ -45447,7 +45403,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "fb0d5493-28f5-44e0-857b-6ead92da177f")
-		(property "Reference" "C17"
+		(property "Reference" "C28"
 			(at 314.452 137.414 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45544,7 +45500,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C17")
+					(reference "C28")
 					(unit 1)
 				)
 			)
@@ -45561,7 +45517,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "fbf19cb5-059e-4a1b-b25f-bc316af8b06b")
-		(property "Reference" "C12"
+		(property "Reference" "C4"
 			(at 38.1 106.68 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45690,7 +45646,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "C12")
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -45707,7 +45663,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "fcd8fcb1-b3a4-46d4-952c-490cee4fe902")
-		(property "Reference" "#P+017"
+		(property "Reference" "#P+04"
 			(at 54.61 247.65 0)
 			(hide yes)
 			(show_name no)
@@ -45767,7 +45723,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#P+017")
+					(reference "#P+04")
 					(unit 1)
 				)
 			)
@@ -45786,7 +45742,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "fcdcf15d-865e-44cc-9f09-fc70748f432d")
-		(property "Reference" "#PWR012"
+		(property "Reference" "#PWR035"
 			(at 144.78 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -45846,7 +45802,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "#PWR012")
+					(reference "#PWR035")
 					(unit 1)
 				)
 			)
@@ -45863,7 +45819,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "fd4e88fe-f562-47cc-8650-019dd9dda006")
-		(property "Reference" "R10"
+		(property "Reference" "R16"
 			(at 119.38 115.57 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45990,7 +45946,7 @@
 		(instances
 			(project "SYCL Badge 2024"
 				(path "/270f9e40-8c49-4ca4-8093-db6f728721f5"
-					(reference "R10")
+					(reference "R16")
 					(unit 1)
 				)
 			)

@@ -38,7 +38,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # this should match the `pages` option in your adapter-static options
-          path: "simulator/dist/"
+          path: "manual/public/"
 
   deploy:
     if: github.ref == 'refs/heads/main'

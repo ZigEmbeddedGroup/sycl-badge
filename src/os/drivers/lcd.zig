@@ -79,8 +79,6 @@ var spi_instance: spi.SPI = undefined;
 var spi_instance_num: u1 = 0;
 var spi_baudrate: u32 = 62_500_000; // Fixed baudrate for LCD (max for RP2350 SPI is 62.5 MHz)
 
-/// Framebuffer for DMA transfers (160x128 pixels, RGB565 = 2 bytes per pixel)
-var framebuffer: [width * height * 2]u8 align(4) = undefined;
 var dma_enabled: bool = false;
 var dma_active: bool = false;
 
@@ -219,8 +217,6 @@ pub fn init(pin_config: Pins, config: Config) !void {
     dma_enabled = config.use_dma;
     if (dma_enabled) {
         dma.init();
-        // Clear framebuffer to black
-        @memset(&framebuffer, 0);
     }
 
     // Hardware reset sequence
@@ -627,34 +623,6 @@ pub fn writeCartBufferRect(buffer: []const u8, x: u16, y: u16, w: u16, h: u16) v
     writeCommandWithData(.MADCTL, &.{0x60});
 }
 
-/// Write RGB565 framebuffer to display
-/// Copies to internal buffer and triggers DMA transfer
-pub fn writeFramebuffer(source_fb: []const Color16) void {
-    if (source_fb.len != width * height) {
-        return; // Invalid framebuffer size
-    }
-
-    if (dma_enabled) {
-        // Convert Color16 to bytes and copy to DMA framebuffer
-        for (source_fb, 0..) |pixel, i| {
-            const bytes = pixel.toBytes();
-            framebuffer[i * 2] = bytes[0];
-            framebuffer[i * 2 + 1] = bytes[1];
-        }
-        // Trigger DMA transfer
-        present();
-    } else {
-        // Fallback: write pixel by pixel (it's slow)
-        setWindow(0, 0, width - 1, height - 1);
-        for (source_fb) |pixel| {
-            const data = pixel.toBytes();
-            writeData(&data);
-        }
-    }
-
-    pins.cs.put(1); // Deselect
-}
-
 /// Test Functions
 pub fn testPattern() void {
     // Draw color bars
@@ -752,31 +720,6 @@ pub fn drawImg(x: u16, y: u16, w: u16, h: u16, img_data: []const u8) void {
 
 // DMA Functions
 
-/// Get pointer to internal framebuffer for dir access
-/// Fastest way to draw - write dir to framebuffer then call present()
-pub fn getFramebuffer() *[width * height * 2]u8 {
-    return &framebuffer;
-}
-
-/// Trigger DMA transfer of framebuffer to LCD
-/// Call after drawing to framebuffer to update screen
-pub fn present() void {
-    if (!dma_enabled) return;
-
-    if (!dma_active) {
-        // Set up LCD for DMA streaming and init DMA
-        setWindowForDMA(0, 0, width - 1, height - 1);
-        dma.initLCD(spi_instance_num, &framebuffer);
-        dma_active = true;
-    } else {
-        // Wait for prev transfer to complete
-        vsync();
-    }
-
-    // Start/restart DMA transfer (CS stays low, DC stays high)
-    dma.startLCD();
-}
-
 pub fn vsync() void {
     if (!dma_enabled or !dma_active) return;
 
@@ -804,81 +747,24 @@ pub fn isBusy() bool {
 }
 
 /// Fast fill screen with single color
+var clear_bytes: [2]u8 align(2) = undefined;
 pub fn clearScreen(color: Color16) void {
     if (dma_enabled) {
-        const bytes = color.toBytes();
-        // Fill framebuffer with color
-        var i: usize = 0;
-        while (i < framebuffer.len) : (i += 2) {
-            framebuffer[i] = bytes[0];
-            framebuffer[i + 1] = bytes[1];
+        if (!dma_active) {
+            // Set up LCD for DMA streaming and init DMA
+            setWindowForDMA(0, 0, width - 1, height - 1);
+            dma.initLCD(spi_instance_num);
+            dma_active = true;
+        } else {
+            // Wait for prev transfer to complete
+            vsync();
         }
-        present();
-        vsync();
+
+        clear_bytes = color.toBytes();
+
+        // Start/restart DMA transfer (CS stays low, DC stays high)
+        dma.startLCDPattern(&clear_bytes, 1, width * height * 2);
     } else {
         fillScreen(color);
-    }
-}
-
-/// Fast pixel write to framebuffer (no bounds checking for speed)
-/// Only use when x, y are within bounds
-pub inline fn setPixelUnsafe(x: u16, y: u16, color: Color16) void {
-    const offset = (y * width + x) * 2;
-    const bytes = color.toBytes();
-    framebuffer[offset] = bytes[0];
-    framebuffer[offset + 1] = bytes[1];
-}
-
-/// Safe pixel write to framebuffer with bounds checking
-pub fn setPixel(x: u16, y: u16, color: Color16) void {
-    if (x >= width or y >= height) return;
-    setPixelUnsafe(x, y, color);
-}
-
-/// Horizontal line
-pub fn setHLine(x: u16, y: u16, w: u16, color: Color16) void {
-    if (y >= height or x >= width) return;
-    const actual_w = @min(w, width - x);
-    const bytes = color.toBytes();
-    const start_offset = (y * width + x) * 2;
-
-    var i: usize = 0;
-    while (i < actual_w) : (i += 1) {
-        const offset = start_offset + i * 2;
-        framebuffer[offset] = bytes[0];
-        framebuffer[offset + 1] = bytes[1];
-    }
-}
-
-/// Vertical line
-pub fn setVLine(x: u16, y: u16, h: u16, color: Color16) void {
-    if (x >= width or y >= height) return;
-    const actual_h = @min(h, height - y);
-    const bytes = color.toBytes();
-
-    var row: usize = 0;
-    while (row < actual_h) : (row += 1) {
-        const offset = ((y + row) * width + x) * 2;
-        framebuffer[offset] = bytes[0];
-        framebuffer[offset + 1] = bytes[1];
-    }
-}
-
-pub fn setRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
-    if (x >= width or y >= height) return;
-
-    const actual_w = @min(w, width - x);
-    const actual_h = @min(h, height - y);
-    const bytes = color.toBytes();
-
-    var row: usize = 0;
-    while (row < actual_h) : (row += 1) {
-        const row_offset = ((y + row) * width + x) * 2;
-        var col: usize = 0;
-        while (col < actual_w) : (col += 1) {
-            const offset = row_offset + col * 2;
-            framebuffer[offset] = bytes[0];
-            framebuffer[offset + 1] = bytes[1];
-        }
     }
 }

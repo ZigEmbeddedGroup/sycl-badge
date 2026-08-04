@@ -13,8 +13,6 @@ const SPI1 = peripherals.SPI1;
 const LCD_CHANNEL: u4 = 0;
 
 // Stored LCD DMA config for resetting between transfers
-var lcd_framebuffer_addr: u32 = 0;
-var lcd_framebuffer_len: u28 = 0;
 var lcd_spi_dr_addr: u32 = 0;
 
 /// Init DMA ctrl (already init by boot ROM)
@@ -23,7 +21,6 @@ pub fn init() void {}
 /// Config DMA ch0 for LCD SPI transfer
 pub fn initLCD(
     spi_instance_num: u1,
-    framebuffer: []const u8,
 ) void {
     // (SPI0 base = 0x40080000, SSPDR offset = 0x08 → 0x40080008)
     const spi_dr_addr: u32 = switch (spi_instance_num) {
@@ -38,8 +35,6 @@ pub fn initLCD(
     }
 
     // Store config for resetting between transfers
-    lcd_framebuffer_addr = @intFromPtr(framebuffer.ptr);
-    lcd_framebuffer_len = @intCast(framebuffer.len);
     lcd_spi_dr_addr = spi_dr_addr;
 
     // spi0_tx = 0x18 (24), spi1_tx = 0x1a (26)
@@ -54,14 +49,8 @@ pub fn initLCD(
     // Wait to become idle
     while (DMA.CH0_CTRL_TRIG.read().BUSY != 0) {}
 
-    // Set source addr
-    DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = lcd_framebuffer_addr });
-
     // Set dest addr
     DMA.CH0_WRITE_ADDR.write(.{ .CH0_WRITE_ADDR = spi_dr_addr });
-
-    // Set transfer count
-    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = lcd_framebuffer_len, .MODE = .NORMAL });
 
     // Config ctrl reg
     // INCR_READ_REV (bit 5) and INCR_WRITE_REV (bit 7)
@@ -88,7 +77,10 @@ pub fn initLCD(
 }
 
 /// Start DMA transfer
-pub fn startLCD() void {
+pub fn startLCD(framebuffer: []const u8) void {
+    const lcd_framebuffer_addr: u32 = @intFromPtr(framebuffer.ptr);
+    const lcd_framebuffer_len: u32 = @intCast(framebuffer.len);
+
     // Reset read addr for this transfer
     DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = lcd_framebuffer_addr });
 
@@ -96,7 +88,32 @@ pub fn startLCD() void {
     DMA.CH0_TRANS_COUNT.write(.{ .COUNT = lcd_framebuffer_len, .MODE = .NORMAL });
 
     // Start transfer
-    DMA.CH0_CTRL_TRIG.modify(.{ .EN = 1 });
+    DMA.CH0_CTRL_TRIG.modify(.{ .INCR_READ = 1, .RING_SIZE = .RING_NONE, .EN = 1 });
+}
+
+/// Start DMA transfer for a repeating pattern
+/// For example, a clear is a repeating pattern of two bytes.
+/// low_bits is the number of bits which change in the address.
+/// Note that this means the pattern must be properly aligned.
+/// A value of 0 for low_bits will copy a single byte, which
+/// can be useful for writing zero.
+/// The pattern data must live for at least as long as the DMA
+/// transfer.
+pub fn startLCDPattern(data: [*]const u8, low_bits: u32, total_bytes: u32) void {
+    // Reset read addr for this transfer
+    DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = @intFromPtr(data) });
+
+    // Reset transfer count
+    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = @intCast(total_bytes), .MODE = .NORMAL });
+
+    // Start transfer
+    if (low_bits == 0) {
+        DMA.CH0_CTRL_TRIG.modify(.{ .INCR_READ = 0, .RING_SIZE = .RING_NONE, .EN = 1 });
+    } else {
+        const RingType = @TypeOf(DMA.CH0_CTRL_TRIG.read().RING_SIZE);
+        const ring_size: RingType = @enumFromInt(low_bits);
+        DMA.CH0_CTRL_TRIG.modify(.{ .INCR_READ = 1, .RING_SIZE = ring_size, .EN = 1 });
+    }
 }
 
 /// Stop DMA transfer
@@ -137,24 +154,5 @@ pub fn abortCartChannels() void {
     var timeout: u32 = 10_000;
     while ((DMA_CHAN_ABORT.* & cart_channel_mask) != 0 and timeout > 0) : (timeout -= 1) {
         microzig.cpu.nop();
-    }
-}
-
-/// Reconfig DMA with new framebuffer pointer and len
-pub fn updateLCD(framebuffer: []const u8) void {
-    const was_busy = DMA.CH0_CTRL_TRIG.read().BUSY != 0;
-
-    if (was_busy) {
-        stopLCD();
-    }
-
-    // Update source addr and count
-    lcd_framebuffer_addr = @intFromPtr(framebuffer.ptr);
-    lcd_framebuffer_len = @intCast(framebuffer.len);
-    DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = lcd_framebuffer_addr });
-    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = lcd_framebuffer_len, .MODE = .NORMAL });
-
-    if (was_busy) {
-        startLCD();
     }
 }

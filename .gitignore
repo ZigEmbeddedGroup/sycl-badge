@@ -2,6 +2,7 @@
 zig-out/
 .DS_Store
 .gdbinit
+zig-pkg
 
 kicad/#auto_saved_files#
 kicad/~SYCL Badge 2024.kicad_pcb.lck

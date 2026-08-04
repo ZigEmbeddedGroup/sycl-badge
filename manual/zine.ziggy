@@ -1,7 +1,8 @@
 .zine_version = "0.12.0",
 .site = .simple(.{
     .title = "SYCL Badge V2: User Manual",
-    .host_url = "https://example.com",
+    .host_url = "https://zigembeddedgroup.github.io",
+    .url_path_prefix = "sycl-badge",
     .content_dir_path = "content",
     .layouts_dir_path = "layouts",
     .assets_dir_path = "assets",

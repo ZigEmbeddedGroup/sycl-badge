@@ -23,7 +23,8 @@ Wickström](https://wickstrom.tech)
 
 Congratulations, you're the owner of a brand new SYCL Badge V2. With any luck,
 you're currently at Tables Day, hanging out with your friends during [Software
-You Can Love 2026](https://softwareyoucanlove.ca).
+You Can Love 2026](https://softwareyoucanlove.ca). If you don't have a badge
+there is a [simulator](/simulator) that runs in the browser.
 
 The Badge is a constrained, programmable device for you to write, share, and run
 programs called "carts". The custom OS  allows for multiple carts to be

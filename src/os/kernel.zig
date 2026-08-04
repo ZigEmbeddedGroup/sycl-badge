@@ -113,6 +113,10 @@ var cart_name_lengths: [MAX_CARTS]usize = undefined;
 var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
 
+pub const microzig_options: microzig.Options = .{
+    .interrupts = @import("interrupts.zig").interrupts,
+};
+
 pub fn main() !void {
     // Initialize all drivers and kernel systems
     try init.init(.{

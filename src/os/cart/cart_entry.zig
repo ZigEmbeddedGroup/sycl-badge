@@ -66,7 +66,7 @@ pub fn init() void {
 pub fn main() noreturn {
     // Carts use a polling model (buttons from IPC + present handshake), so
     // mask interrupts on Core 1 to avoid unexpected IRQ vectors in user carts.
-    microzig.cpu.interrupt.disable_interrupts();
+    microzig.interrupt.disable_interrupts();
 
     start();
     while (true) {

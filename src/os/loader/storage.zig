@@ -1,8 +1,10 @@
 /// FAT12-based cart storage in the romfs flash region
 const std = @import("std");
 const rom = @import("../drivers/rom.zig");
-const interrupts = @import("../system/interrupts.zig");
 const debug_log = @import("../debug_log.zig");
+
+const microzig = @import("microzig");
+const interrupt = microzig.interrupt;
 
 extern const __romfs_start__: u8;
 extern const __romfs_end__: u8;
@@ -72,9 +74,8 @@ pub fn wipeStorage() void {
     const erase_len = (size + (FLASH_ERASE_BLOCK - 1)) & ~@as(usize, FLASH_ERASE_BLOCK - 1);
     const flash_offset = base - XIP_BASE;
 
-    const irq_was_enabled = interrupts.areEnabled();
-    interrupts.disableInterrupts();
-    defer if (irq_was_enabled) interrupts.enableInterrupts();
+    const cs = interrupt.enter_critical_section();
+    defer cs.leave();
 
     rom.flash_exit_xip();
     rom.flash_range_erase(flash_offset, erase_len, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);
@@ -400,9 +401,8 @@ fn flushPending() linksection(".ram_text") void {
     const _flush_slice = std.fmt.bufPrint(_msg[0..], "flushPending: flash_offset=0x{x}, size={d}\r\n", .{ flash_offset, FLASH_ERASE_BLOCK }) catch "";
     if (_flush_slice.len != 0) debug_log.record(_flush_slice);
 
-    const irq_was_enabled = interrupts.areEnabled();
-    interrupts.disableInterrupts();
-    defer if (irq_was_enabled) interrupts.enableInterrupts();
+    const cs = interrupt.enter_critical_section();
+    defer cs.leave();
 
     rom.flash_exit_xip();
     rom.flash_range_erase(flash_offset, FLASH_ERASE_BLOCK, FLASH_ERASE_BLOCK, FLASH_ERASE_CMD);

@@ -10,6 +10,7 @@ const lcd = @import("drivers/lcd.zig");
 const gpio = @import("drivers/gpio.zig");
 const audio = @import("drivers/audio.zig");
 const dma = @import("drivers/dma.zig");
+const rev = @import("drivers/rev.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const fps_overlay = @import("system/fps_overlay.zig");
@@ -533,6 +534,17 @@ fn refreshCartDisplay() void {
 
     if (cart_count == 0) {
         lcd.drawString(0, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
+    }
+
+    // Always show the hardware revision in the bottom right corner
+    var rev_buf: [16]u8 = undefined;
+    const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{d}", .{rev.rev}) catch "rev error";
+    const gray: lcd.Color16 = .rgb(0x10, 0x10, 0x10);
+    lcd.drawString(@intCast(lcd.width - 8*rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
+
+    if (rev.debug or rev.rev == rev.unknown) {
+        const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
+        lcd.drawString(@intCast(lcd.width - 8*adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
     }
 }
 

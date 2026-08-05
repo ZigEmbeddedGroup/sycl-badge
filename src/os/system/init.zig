@@ -14,6 +14,7 @@ const lcd = @import("../drivers/lcd.zig");
 const rom = @import("../drivers/rom.zig");
 const loader = @import("../loader/loader.zig");
 const debug_log = @import("../debug_log.zig");
+const rev = @import("../drivers/rev.zig");
 
 // System imports
 const console = @import("console.zig");
@@ -115,6 +116,10 @@ pub fn init(config: InitConfig) !void {
     clearOnBoot();
     // Copy RAM-resident flash helpers before any flash writes.
     copyRamTextSection();
+
+    // 0. Detect board revision
+    rev.init();
+
     // 1. Initialize GPIO subsystem
     gpio.init();
 

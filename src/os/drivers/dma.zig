@@ -12,16 +12,13 @@ const SPI1 = peripherals.SPI1;
 // Ch0 is used for LCD DMA transfers
 const LCD_CHANNEL: u4 = 0;
 
-// Stored LCD DMA config for resetting between transfers
-var lcd_spi_dr_addr: u32 = 0;
+var SPI_SSPDMACR: *volatile @TypeOf(SPI0.SSPDMACR) = undefined;
 
 /// Init DMA ctrl (already init by boot ROM)
 pub fn init() void {}
 
 /// Config DMA ch0 for LCD SPI transfer
-pub fn initLCD(
-    spi_instance_num: u1,
-) void {
+pub fn initLCD(spi_instance_num: u1) void {
     // (SPI0 base = 0x40080000, SSPDR offset = 0x08 → 0x40080008)
     const spi_dr_addr: u32 = switch (spi_instance_num) {
         0 => @intFromPtr(&SPI0.SSPDR),
@@ -29,13 +26,10 @@ pub fn initLCD(
     };
 
     // Enable TX DMA on SPI peripheral via SSPDMACR reg
-    switch (spi_instance_num) {
-        0 => SPI0.SSPDMACR.modify(.{ .TXDMAE = 1 }),
-        1 => SPI1.SSPDMACR.modify(.{ .TXDMAE = 1 }),
-    }
-
-    // Store config for resetting between transfers
-    lcd_spi_dr_addr = spi_dr_addr;
+    SPI_SSPDMACR = switch (spi_instance_num) {
+        0 => &SPI0.SSPDMACR,
+        1 => &SPI1.SSPDMACR,
+    };
 
     // spi0_tx = 0x18 (24), spi1_tx = 0x1a (26)
     const treq: @TypeOf(DMA.CH0_CTRL_TRIG.read().TREQ_SEL) = switch (spi_instance_num) {
@@ -56,8 +50,8 @@ pub fn initLCD(
     // INCR_READ_REV (bit 5) and INCR_WRITE_REV (bit 7)
     DMA.CH0_CTRL_TRIG.write(.{
         .EN = 0, // Don't start yet
-        .HIGH_PRIORITY = 1,
-        .DATA_SIZE = .size_8, // Byte transfers (SPI is in 8-bit mode)
+        .HIGH_PRIORITY = 0,
+        .DATA_SIZE = .size_16, // 16-bit transfers (SPI is in 16-bit mode for DMA)
         .INCR_READ = 1, // Increment read addr
         .INCR_READ_REV = 0, // Normal fwd increment
         .INCR_WRITE = 0,
@@ -66,7 +60,7 @@ pub fn initLCD(
         .RING_SEL = 0,
         .CHAIN_TO = LCD_CHANNEL, // No chaining
         .TREQ_SEL = treq, // SPI TX DREQ
-        .IRQ_QUIET = 1, // No interrupts
+        .IRQ_QUIET = 0,
         .BSWAP = 0,
         .SNIFF_EN = 0,
         .BUSY = 0,
@@ -74,10 +68,26 @@ pub fn initLCD(
         .READ_ERROR = 0,
         .AHB_ERROR = 0,
     });
+
+    DMA.INTE0.write_raw(DMA.INTE0.raw | 0b1);
+    DMA.INTS0.write_raw(0b1);
+}
+
+pub fn set_DMA_enabled(enabled: bool) void {
+    SPI_SSPDMACR.modify(.{ .TXDMAE = @intFromBool(enabled) });
 }
 
 /// Start DMA transfer
-pub fn startLCD(framebuffer: []const u8) void {
+pub fn startLCD(framebuffer: []const u16) void {
+    if (isLCDbusy()) {
+        microzig.board.led_pin.put(1);
+    }
+
+    std.mem.doNotOptimizeAway(framebuffer);
+
+    // Check that the interrupt is clear
+    DMA.INTS0.write_raw(0b1);
+
     const lcd_framebuffer_addr: u32 = @intFromPtr(framebuffer.ptr);
     const lcd_framebuffer_len: u32 = @intCast(framebuffer.len);
 
@@ -85,7 +95,7 @@ pub fn startLCD(framebuffer: []const u8) void {
     DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = lcd_framebuffer_addr });
 
     // Reset transfer count
-    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = lcd_framebuffer_len, .MODE = .NORMAL });
+    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = @intCast(lcd_framebuffer_len), .MODE = .NORMAL });
 
     // Start transfer
     DMA.CH0_CTRL_TRIG.modify(.{ .INCR_READ = 1, .RING_SIZE = .RING_NONE, .EN = 1 });
@@ -99,15 +109,24 @@ pub fn startLCD(framebuffer: []const u8) void {
 /// can be useful for writing zero.
 /// The pattern data must live for at least as long as the DMA
 /// transfer.
-pub fn startLCDPattern(data: [*]const u8, low_bits: u32, total_bytes: u32) void {
+pub fn startLCDPattern(data: [*]const u16, low_bits: u32, total_words: u32) void {
+    if (isLCDbusy()) {
+        microzig.board.led_pin.put(1);
+    }
+
+    std.mem.doNotOptimizeAway(data);
+
+    // Check that the interrupt is clear
+    DMA.INTS0.write_raw(0b1);
+
     // Reset read addr for this transfer
     DMA.CH0_READ_ADDR.write(.{ .CH0_READ_ADDR = @intFromPtr(data) });
 
     // Reset transfer count
-    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = @intCast(total_bytes), .MODE = .NORMAL });
+    DMA.CH0_TRANS_COUNT.write(.{ .COUNT = @intCast(total_words), .MODE = .NORMAL });
 
     // Start transfer
-    if (low_bits == 0) {
+    if (low_bits < 2) {
         DMA.CH0_CTRL_TRIG.modify(.{ .INCR_READ = 0, .RING_SIZE = .RING_NONE, .EN = 1 });
     } else {
         const RingType = @TypeOf(DMA.CH0_CTRL_TRIG.read().RING_SIZE);

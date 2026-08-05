@@ -48,11 +48,11 @@ pub const NeopixelColor = extern struct { g: u8, r: u8, b: u8 };
 /// RGB565, high color
 pub const DisplayColor = packed struct(u16) {
     /// 0-31
-    b: u5,
+    r: u5,
     /// 0-63
     g: u6,
     /// 0-31
-    r: u5,
+    b: u5,
 
     pub const Optional = enum(i32) {
         none = -1,
@@ -76,13 +76,7 @@ pub const Pixel = extern struct {
             // WASM/simulator: standard RGB565 big-endian (matches old behavior)
             return .{ .bits = @byteSwap(@as(u16, @bitCast(color))) };
         } else {
-            // Native: Our ST7735S LCD expects BGR565 big-endian byte order
-            // over SPI, i.e. [BBBBB_GGG, ggg_RRRRR]. Construct a BGR565
-            // value (R and B swapped compared to standard RGB565) and then
-            // byte-swap it so the bytes sit in memory in the correct SPI
-            // transmission order.
-            const bgr: u16 = (@as(u16, color.b) << 11) | (@as(u16, color.g) << 5) | @as(u16, color.r);
-            return .{ .bits = @byteSwap(bgr) };
+            return @bitCast(color);
         }
     }
 
@@ -90,12 +84,7 @@ pub const Pixel = extern struct {
         if (is_wasm) {
             return @bitCast(@byteSwap(pixel.bits));
         } else {
-            const bgr = @byteSwap(pixel.bits);
-            return .{
-                .r = @truncate(bgr),
-                .g = @truncate(bgr >> 5),
-                .b = @truncate(bgr >> 11),
-            };
+            return @bitCast(pixel);
         }
     }
 
@@ -159,14 +148,14 @@ pub const light_level: *volatile u12 = @ptrCast(&ipc_data.light_level);
 pub const neopixels: *volatile [5]NeopixelColor = &ipc_data.neopixels;
 pub const red_led: *volatile bool = &ipc_data.red_led;
 pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
-const framebuffer0: *volatile [screen_width][screen_height]Pixel = &ipc_data.framebuffers[0];
-const framebuffer1: *volatile [screen_width][screen_height]Pixel = &ipc_data.framebuffers[1];
-pub var framebuffer: *volatile [screen_width][screen_height]Pixel = framebuffer0;
+const framebuffer0: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[0]);
+const framebuffer1: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[1]);
+pub var framebuffer: *[screen_width][screen_height]Pixel = framebuffer0;
 var draw_buffer_index: u1 = 0;
 var has_in_flight_frame: bool = false;
 var present_timeout_events: u32 = 0;
 
-const present_wait_spin_limit: u32 = 8_000_000;
+const present_wait_time_limit: u32 = 500_000; // 0.5 seconds
 
 var dirty_any: bool = false;
 var dirty_min_x: u16 = 0;
@@ -951,12 +940,12 @@ pub inline fn present() void {
     }
 
     if (has_in_flight_frame) {
-        var spins: u32 = 0;
+        const spin_start_time = microsSinceBoot();
         while (has_in_flight_frame) {
             while (SIO_FIFO_ST.* & FIFO_VLD == 0) {
                 asm volatile ("nop");
-                spins +%= 1;
-                if (spins >= present_wait_spin_limit) {
+                const now = microsSinceBoot();
+                if (now - spin_start_time >= present_wait_time_limit) {
                     // Stop waiting rather than deadlocking Core 1 forever.
                     present_timeout_events +%= 1;
                     // Keep trace volume low: log only occasionally.
@@ -990,12 +979,17 @@ pub inline fn present() void {
         payload |= 0x2;
     }
 
+    // Framebuffer is non-volatile to preserve hot loop perf.
+    // Make sure it was eventually written though, so the OS
+    // can see it.
+    std.mem.doNotOptimizeAway(framebuffer);
+
     const ready_v2: u32 = (@as(u32, FRAMEBUFFER_READY_V2) << 24) | payload;
-    var ready_spins: u32 = 0;
+    const spin_start_time = microsSinceBoot();
     while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
         asm volatile ("nop");
-        ready_spins +%= 1;
-        if (ready_spins >= present_wait_spin_limit) {
+        const now = microsSinceBoot();
+        if (now - spin_start_time >= present_wait_time_limit) {
             present_timeout_events +%= 1;
             if ((present_timeout_events & 0x3f) == 0x01) {
                 trace("[PRESENT] timeout waiting FIFO_RDY");

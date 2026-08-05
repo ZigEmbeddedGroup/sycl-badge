@@ -117,6 +117,16 @@ pub const microzig_options: microzig.Options = .{
     .interrupts = @import("interrupts.zig").interrupts,
 };
 
+var ready_fb_state: enum {
+    not_ready,
+    ready_rect,
+    ready_whole,
+    transferring,
+    draw_debug,
+} = .not_ready;
+var ready_framebuffer: []const u16 = undefined;
+var ready_fb_dirty_rect: [4]u16 = undefined;
+
 pub fn main() !void {
     // Initialize all drivers and kernel systems
     try init.init(.{
@@ -341,8 +351,6 @@ pub fn main() !void {
                     const btn = button_poller.read();
                     ipc_controls.* = @as(u16, @as(u9, @bitCast(btn))); // u9 zero-extends to u16
 
-                    const fb_bytes: usize = 160 * 128 * 2;
-                    const fb_base: usize = 0x20020020;
                     const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                         @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
                     else
@@ -352,8 +360,9 @@ pub fn main() !void {
                         (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
 
                     // Flush selected shared-RAM framebuffer.
-                    _ = fps_overlay.tick();
-                    const fb_ptr: [*]const u8 = @ptrFromInt(fb_base + fb_index * fb_bytes);
+                    fps_overlay.tick();
+                    ready_framebuffer = @volatileCast(@ptrCast(&mailbox.shared_data.framebuffers[fb_index]));
+                    ready_fb_state = .ready_whole;
                     if (has_dirty_rect) {
                         const rx: u16 = mailbox.shared_data.dirty_rect_x;
                         const ry: u16 = mailbox.shared_data.dirty_rect_y;
@@ -361,22 +370,49 @@ pub fn main() !void {
                         const rh: u16 = mailbox.shared_data.dirty_rect_h;
 
                         // Fallback to full-frame if rect metadata is invalid.
-                        if (rw == 0 or rh == 0 or rx >= 160 or ry >= 128) {
-                            lcd.writeCartBuffer(fb_ptr[0..fb_bytes]);
-                        } else {
-                            lcd.writeCartBufferRect(fb_ptr[0..fb_bytes], rx, ry, rw, rh);
+                        if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
+                            ready_fb_dirty_rect = .{ rx, ry, rw, rh };
+                            ready_fb_state = .ready_rect;
                         }
                     } else if (!is_v2) {
                         // Legacy carts always imply full-frame updates.
-                        lcd.writeCartBuffer(fb_ptr[0..fb_bytes]);
                     } else {
                         // No visual change this frame: skip LCD transfer.
+                        ready_fb_state = .transferring;
                     }
-                    fps_overlay.render();
-
-                    mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
                 }
                 // Other messages (e.g. CART_FINISHED) handled by loader state machine.
+            }
+
+            // Dispatch async LCD work
+            if (!lcd.isBusy()) {
+                find_lcd_work: switch (ready_fb_state) {
+                    .not_ready => {
+                    },
+                    .ready_rect => {
+                        const rect = ready_fb_dirty_rect;
+                        lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
+                        ready_fb_state = .transferring;
+                    },
+                    .ready_whole => {
+                        lcd.writeCartBuffer(ready_framebuffer);
+                        ready_fb_state = .transferring;
+                    },
+                    .transferring => {
+                        // Transfer finished, the frame buffer is safe for the app to write
+                        //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                        ready_fb_state = .draw_debug;
+                        continue :find_lcd_work .draw_debug;
+                    },
+                    .draw_debug => {
+                        if (fps_overlay.is_drawing()) {
+                            fps_overlay.submit_lcd_work();
+                        } else {
+                            mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                            ready_fb_state = .not_ready;
+                        }
+                    },
+                }
             }
         }
 
@@ -388,6 +424,8 @@ pub fn main() !void {
             btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
             console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
             lcd.stopDMA();
+            fps_overlay.reset_for_cart();
+            ready_fb_state = .not_ready;
             // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
             gpio.resetCartHardware();
             // Abort any DMA transfers the cart may have left running.

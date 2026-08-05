@@ -15,6 +15,7 @@ const pwm = hal.pwm;
 const board = microzig.board;
 const PWM = microzig.chip.peripherals.PWM;
 const DMA = microzig.chip.peripherals.DMA;
+const interrupt = microzig.interrupt;
 
 const std = @import("std");
 
@@ -51,6 +52,13 @@ var sound_type: enum {
 } = .off;
 
 var tone_volume: f32 = 0.0;
+
+pub fn interrupt_DMA_0(int_bits: u32) u32 {
+    var handled_bits: u32 = 0;
+    _ = int_bits;
+    _ = &handled_bits;
+    return handled_bits;
+}
 
 // Needs to be aligned for DMA source
 var square_cc_vals: [2]u32 align(8) = undefined;

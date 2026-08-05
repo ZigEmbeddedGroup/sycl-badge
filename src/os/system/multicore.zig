@@ -4,7 +4,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 const cart = @import("../cart.zig");
 const hal = microzig.hal;
-const interrupt = microzig.interrupts;
+const interrupt = microzig.interrupt;
 const peripherals = microzig.chip.peripherals;
 
 const mailbox = @import("../ipc/mailbox.zig");

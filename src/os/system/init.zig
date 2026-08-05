@@ -2,6 +2,8 @@
 /// Centralizes all driver and kernel system initialization
 const std = @import("std");
 const microzig = @import("microzig");
+const interrupt = microzig.interrupt;
+const interrupts = @import("../interrupts.zig");
 
 // Driver imports
 const gpio = @import("../drivers/gpio.zig");
@@ -15,7 +17,6 @@ const debug_log = @import("../debug_log.zig");
 
 // System imports
 const console = @import("console.zig");
-const interrupts = @import("interrupts.zig");
 const multicore = @import("multicore.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
@@ -108,7 +109,8 @@ pub fn init(config: InitConfig) !void {
     const boot_start = timer.micros();
 
     // Disable interrupts early to avoid unhandled IRQ panics during init.
-    interrupts.disableInterrupts();
+    interrupt.disable_interrupts();
+
     // Scrub RAM regions that are not guaranteed to reset on warm boots.
     clearOnBoot();
     // Copy RAM-resident flash helpers before any flash writes.
@@ -152,7 +154,8 @@ pub fn init(config: InitConfig) !void {
     // 9. Enable interrupts now that all drivers are initialized.
     // Flash operations disable interrupts locally around the XIP-off window and restore
     // the previous state on exit, so they are safe to call with interrupts enabled.
-    interrupts.enableInterrupts();
+    interrupts.init();
+    interrupt.enable_interrupts();
 
     // 10. Initialize LCD if configured
     if (config.lcd_pins) |lcd_pins| {

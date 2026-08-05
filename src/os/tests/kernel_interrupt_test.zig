@@ -20,7 +20,6 @@ const board = microzig.board;
 
 const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
-const interrupts = @import("system/interrupts.zig");
 
 const led = board.led_pin;
 

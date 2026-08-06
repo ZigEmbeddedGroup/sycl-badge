@@ -236,7 +236,8 @@ fn isFormatted() bool {
         return false;
     }
     readSector(1, sector_buf[0..]); // fat0 sector
-    const valid = sector_buf[0] == MEDIA_DESCRIPTOR and sector_buf[1] == 0xFF and sector_buf[2] == 0xFF and sector_buf[3] & 0xF == 0xF;
+    // FAT12 sector starts with the media descriptor FAT entry (0xFF8) followed by the end of chain (0xFFF)
+    const valid = sector_buf[0] == MEDIA_DESCRIPTOR and sector_buf[1] == 0xFF and sector_buf[2] == 0xFF;
     return valid;
 }
 
@@ -287,21 +288,22 @@ fn formatVolume() void {
 
     const fat_start = RESERVED_SECTORS;
     const fat_secs = fatSectors();
-    @memset(sector_buf[4..], 0);
+    @memset(sector_buf, 0);
     var fat_index: u8 = 0;
     while (fat_index < NUM_FATS) : (fat_index += 1) {
         var i: u16 = 0;
         while (i < fat_secs) : (i += 1) {
             const lba = fat_start + (@as(u32, fat_index) * fat_secs) + i;
             if (i == 0) {
-                // First sector of FAT has media descriptor
+                // First sector of FAT has media descriptor.
+                // This is FAT12, so the first entry is 0xFF8,
+                // and the second is the End Of Chain value 0xFFF.
                 sector_buf[0] = MEDIA_DESCRIPTOR;
                 sector_buf[1] = 0xFF;
                 sector_buf[2] = 0xFF;
-                sector_buf[3] = 0x0F;
             } else {
                 // Subsequent FAT sectors are all zeros
-                @memset(sector_buf[0..4], 0);
+                @memset(sector_buf[0..3], 0);
             }
             writeSector(lba, sector_buf);
         }

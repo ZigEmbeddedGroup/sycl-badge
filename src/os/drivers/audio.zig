@@ -75,8 +75,14 @@ var sound_type: enum {
     sample,
 } = .off;
 
+const MixState = enum {
+    disabled,
+    running,
+    shutting_down,
+};
+
 var mix_idx: u32 = 0;
-var mix_enabled: bool = false;
+var mix_state: MixState = .disabled;
 
 fn encode_sample(comptime T: type, val: f32) T {
     return switch (T) {
@@ -238,7 +244,7 @@ var ticks: u32 = 0;
 
 pub fn poll() void {
     // Check if a buffer needs mixing
-    if (mix_enabled) {
+    if (mix_state != .disabled) {
         const buffer_bit: u32 = @as(u32, 1) << @intCast(mix_idx + 1);
         if (DMA.INTR.raw & buffer_bit != 0) {
             DMA.INTR.write_raw(buffer_bit);
@@ -250,6 +256,7 @@ pub fn poll() void {
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
             std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);
             if (!more_buffers) {
+                mix_state = .shutting_down;
                 // Turn off the continuation after the mixed buffer
                 switch (mix_idx) {
                     0 => DMA.CH2_CTRL_TRIG.modify(.{ .EN = 0 }),
@@ -260,6 +267,14 @@ pub fn poll() void {
             const end = timer.micros();
             fps_overlay.submit_audio_mix_time(start, end, 1000000 * dma_buf_size / max_sample_rate);
             mix_idx = 1 - mix_idx;
+        }
+
+        if (mix_state == .shutting_down) {
+            const ch1 = DMA.CH1_CTRL_TRIG.read();
+            const ch2 = DMA.CH2_CTRL_TRIG.read();
+            if (ch1.EN == 0 and ch1.BUSY == 0 and ch2.EN == 0 and ch2.BUSY == 0) {
+                stop();
+            }
         }
     }
 }
@@ -302,14 +317,25 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
         return;
     }
 
-    begin_stop_DMA();
+    // When transitioning between two different tones which
+    // both use the mixer, we don't need to stop and start DMA.
+    // We can just leave everything running, and let the mixer
+    // pick up the updated parameters the next time it runs.
+    const sample_sel = flags & 0x7;
+    const needs_dma_reset = switch (sample_sel) {
+        0 => true,
+        else => mix_state != .running,
+    };
+
+    if (needs_dma_reset) {
+        begin_stop_DMA();
+    }
 
     if (volume != tone_volume) {
         tone_volume = volume;
         update_derived_volume();
     }
 
-    const sample_sel = flags & 0x7;
 
     switch (sample_sel) {
         0 => {
@@ -322,19 +348,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
             };
         },
         else => {
-            const sample_freq = @as(comptime_float, audio_levels) * freq_hz;
-            const max_freq = max_sample_rate;
-            if (sample_freq <= max_freq) {
-                period_per_sample = 1.0 / @as(comptime_float, audio_levels);
-                setup_ping_pong_DMA(duration_sec, sample_freq) catch {
-                    stop();
-                    return;
-                };
-            } else {
-                // Too fast, slow it down!
-                period_per_sample = freq_hz / max_freq;
-                setup_ping_pong_DMA(duration_sec, max_freq) catch unreachable;
-            }
+            period_per_sample = freq_hz / max_sample_rate;
             sound_type = switch (sample_sel) {
                 1 => .triangle,
                 2 => .sawtooth,
@@ -343,6 +357,28 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
                     return;
                 },
             };
+
+            if (duration_sec >= 0) {
+                // This can be large enough that we lose precision.
+                // The following operations are designed to keep as
+                // much precision as possible without using more than
+                // 32 bits.
+                const total_samples_flt = @as(f64, duration_sec) * @as(f64, max_sample_rate);
+                const total_samples_64: u64 = @intFromFloat(total_samples_flt);
+                const total_mixes_64 = (total_samples_64 + dma_buf_size - 1) / dma_buf_size;
+                const final_samples: u32 = @intCast(total_samples_64 % dma_buf_size);
+                // If the number of mixes overflows a u32, that's hundreds of days.
+                // Just call it infinite at that point.
+                mixes_remaining = if (total_mixes_64 > ~@as(u32, 0)) null else @intCast(total_mixes_64);
+                final_mix_samples = if (final_samples == 0) dma_buf_size else final_samples;
+            } else {
+                mixes_remaining = null;
+                final_mix_samples = dma_buf_size;
+            }
+
+            if (needs_dma_reset) {
+                setup_ping_pong_DMA(max_sample_rate) catch unreachable;
+            }
         },
     }
 
@@ -370,6 +406,8 @@ const AudioSample = struct {
 };
 
 fn set_timing_PWM_hz(hz: f32) !void {
+    if (@backingInt(rev.revision) > 0) return; // Only used by rev 0
+
     // A piano ranges from 27.5 Hz to 4186 Hz, so for the square wave generator
     // clock we need to support a pretty wide range with reasonable accuracy.
     // The possible source clocks are 8.4 fractional divs of the sys clock,
@@ -502,31 +540,13 @@ fn dma_params() DMA_Params {
     };
 }
 
-fn setup_ping_pong_DMA(duration_sec: f32, sample_freq: f32) !void {
+fn setup_ping_pong_DMA(sample_freq: f32) !void {
     try set_timing_PWM_hz(sample_freq);
 
     finish_stop_DMA();
 
-    if (duration_sec >= 0) {
-        // This can be large enough that we lose precision.
-        // The following operations are designed to keep as
-        // much precision as possible without using more than
-        // 32 bits.
-        const total_samples_flt = @as(f64, duration_sec) * @as(f64, sample_freq);
-        const total_samples_64: u64 = @intFromFloat(total_samples_flt);
-        const total_mixes_64 = (total_samples_64 + dma_buf_size - 1) / dma_buf_size;
-        const final_samples: u32 = @intCast(total_samples_64 % dma_buf_size);
-        // If the number of mixes overflows a u32, that's hundreds of days.
-        // Just call it infinite at that point.
-        mixes_remaining = if (total_mixes_64 > ~@as(u32, 0)) null else @intCast(total_mixes_64);
-        final_mix_samples = if (final_samples == 0) dma_buf_size else final_samples;
-    } else {
-        mixes_remaining = null;
-        final_mix_samples = dma_buf_size;
-    }
-
     mix_idx = 0;
-    mix_enabled = true;
+    mix_state = .running;
     // For simplicty, don't handle very short audio spurts here.
     _ = mix_buffer(&audio_dma_buf[0]);
     _ = mix_buffer(&audio_dma_buf[1]);
@@ -586,7 +606,7 @@ fn setup_ping_pong_DMA(duration_sec: f32, sample_freq: f32) !void {
 }
 
 fn begin_stop_DMA() void {
-    mix_enabled = false;
+    mix_state = .disabled;
     DMA.CH1_CTRL_TRIG.modify(.{ .EN = 0, .CHAIN_TO = 1 });
     DMA.CH2_CTRL_TRIG.modify(.{ .EN = 0, .CHAIN_TO = 2 });
     DMA.CHAN_ABORT.write(.{ .CHAN_ABORT = 0b110 });

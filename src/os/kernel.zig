@@ -341,10 +341,11 @@ pub fn main() !void {
                     const freq: f32 = mailbox.shared_data.tone_freq;
                     const duration_sec: f32 = mailbox.shared_data.tone_duration;
                     const volume = mailbox.shared_data.tone_volume;
-                    audio.tone(freq, duration_sec, volume);
+                    const flags = mailbox.shared_data.tone_flags;
+                    audio.tone(freq, duration_sec, volume, flags);
                 } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
                     const volume = mailbox.shared_data.global_volume;
-                    audio.setGlobalVolume(volume);
+                    audio.set_global_volume(volume);
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {

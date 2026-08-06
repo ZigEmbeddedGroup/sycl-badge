@@ -17,6 +17,13 @@ var last_frame_us: u64 = 0;
 /// Timestamp (µs) of the most recent poll() call.
 var last_poll_us: u64 = 0;
 
+/// Time spent mixing audio
+var audio_pct_sample_start: u64 = 0;
+var audio_mix_count: u32 = 0;
+var audio_mix_total_us: u32 = 0;
+var audio_mix_max_us: u32 = 0;
+var audio_service_delay_max_us: u32 = 0;
+
 // ── Rolling averages ───────────────────────────────────────────────────────────
 // multi-sample ring buffer so the display doesn't jitter on minor frame-time
 // variations.  Pre-filled with ~30 fps so the counter looks sane on first show.
@@ -51,6 +58,10 @@ fn AveragingBuffer(comptime T: type, comptime window: u32) type {
 var frame_times: AveragingBuffer(u32, 8) = .{};
 var poll_max_history: AveragingBuffer(u32, 32) = .{};
 var poll_max: u32 = 0;
+var audio_mix_times: AveragingBuffer(u32, 8) = .{};
+var audio_percent: AveragingBuffer(f32, 8) = .{};
+var display_max_audio: u32 = 0;
+var display_max_audio_delay: u32 = 0;
 
 // ── Overlay geometry (top-right corner) ──────────────────────────────────────
 // Font: 8×8 pixels per character at size 1.
@@ -148,7 +159,7 @@ pub fn isEnabled() bool {
 }
 
 fn time_delta(from: u64, to: u64) u32 {
-    if (from >= to) return 0;
+    if (from >= to or from == 0) return 0;
 
     const elapsed_u64 = to - from;
     // Clamp to u32; any single frame longer than ~71 minutes maps to max.
@@ -176,6 +187,15 @@ pub fn tick() void {
     update_debug_text();
 }
 
+pub fn submit_audio_mix_time(start: u64, end: u64, req: u64) void {
+    const service_delay: u32 = time_delta(req, start);
+    const mix_time: u32 = time_delta(start, end);
+    audio_mix_count += 1;
+    audio_mix_total_us += mix_time;
+    audio_mix_max_us = @max(audio_mix_max_us, mix_time);
+    audio_service_delay_max_us = @max(audio_service_delay_max_us, service_delay);
+}
+
 pub fn poll() void {
     // Update the poll timer
     const now = timer.micros();
@@ -183,6 +203,28 @@ pub fn poll() void {
         const elapsed = time_delta(last_poll_us, now);
         poll_max = @max(poll_max, elapsed);
     }
+
+    if (audio_pct_sample_start == 0) {
+        audio_pct_sample_start = now;
+    } else if (now - audio_pct_sample_start >= 150_000) {
+        const total_time = time_delta(audio_pct_sample_start, now);
+        const audio_time = audio_mix_total_us;
+        const audio_pct = @as(f32, @floatFromInt(audio_time)) / @as(f32, @floatFromInt(total_time));
+
+        if (audio_time != 0) {
+            audio_percent.submit(audio_pct);
+            audio_mix_times.submit(audio_time / audio_mix_count);
+        }
+        display_max_audio = audio_mix_max_us;
+        display_max_audio_delay = audio_service_delay_max_us;
+
+        audio_mix_total_us = 0;
+        audio_mix_count = 0;
+        audio_mix_max_us = 0;
+        audio_service_delay_max_us = 0;
+        audio_pct_sample_start = now;
+    }
+
     last_poll_us = now;
 }
 
@@ -238,6 +280,23 @@ fn update_debug_text() void {
 
         const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
         add_debug_text(.{ .text = read_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE });
+    }
+
+    // Audio time
+    const audio_avg_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{@as(u32, @intFromFloat(audio_percent.average() * 100))}) catch "!!!!";
+    add_debug_text(.{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = lcd.GREEN });
+
+    const audio_time_str = std.fmt.bufPrint(&buf, "{d:>4}", .{audio_mix_times.average()}) catch "!!!!";
+    add_debug_text(.{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE });
+
+    if (display_max_audio_delay != 0) {
+        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio_delay}) catch "!!!!";
+        add_debug_text(.{ .text = audio_delay_str, .x = 4*font_width, .y = 0, .alignment = .left, .color = lcd.RED });
+    }
+
+    if (display_max_audio != 0) {
+        const audio_max_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio}) catch "!!!!";
+        add_debug_text(.{ .text = audio_max_str, .x = 4*font_width, .y = font_height, .alignment = .left, .color = lcd.RED });
     }
 }
 

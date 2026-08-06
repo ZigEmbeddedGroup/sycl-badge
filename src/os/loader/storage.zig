@@ -48,6 +48,10 @@ var pending_valid: bool = false;
 var pending_dirty: bool = false;
 var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
 
+// These arrays are too large to put on the stack, so we
+// reuse them carefully throughout the functions in this file.
+var sector_bufs: [2][SECTOR_SIZE]u8 = undefined;
+
 pub var formatted_this_boot: bool = false;
 
 pub fn init() void {
@@ -129,7 +133,7 @@ pub fn getStats() StorageStats {
     var used: u16 = 0;
     var cluster: u16 = 2;
     while (cluster < stats.total_clusters + 2) : (cluster += 1) {
-        const entry = fatEntry(cluster);
+        const entry = fatEntry(cluster, &sector_bufs[0], &sector_bufs[1]);
         if (entry != 0) {
             used += 1;
         }
@@ -139,13 +143,13 @@ pub fn getStats() StorageStats {
     stats.free_space_bytes = @as(u32, stats.free_clusters) * SECTORS_PER_CLUSTER * SECTOR_SIZE;
 
     // Count root directory entries
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fat_secs);
     var lba: u32 = root_start;
     var remaining: u16 = root_secs;
     var used_entries: u16 = 0;
     var deleted_entries: u16 = 0;
     var file_count: u16 = 0;
+    const sector_buf = &sector_bufs[0];
 
     while (remaining > 0) : ({
         lba += 1;
@@ -219,30 +223,30 @@ fn dataStartLba() u32 {
 
 fn isFormatted() bool {
     // Use readSector() instead of direct flash access to ensure we see any pending/buffered data
-    var boot: [SECTOR_SIZE]u8 = undefined;
-    readSector(0, boot[0..]);
+    var sector_buf = &sector_bufs[0];
+    readSector(0, sector_buf[0..]); // boot sector
 
-    const signature = readU16(boot[0..], BS_SIGNATURE);
-    const bytes_per_sector = readU16(boot[0..], BS_BYTES_PER_SECTOR);
-    const root_entries = readU16(boot[0..], 17);
-    const fs_type = boot[BS_FS_TYPE .. BS_FS_TYPE + 8];
+    const signature = readU16(sector_buf[0..], BS_SIGNATURE);
+    const bytes_per_sector = readU16(sector_buf[0..], BS_BYTES_PER_SECTOR);
+    const root_entries = readU16(sector_buf[0..], 17);
+    const fs_type = sector_buf[BS_FS_TYPE .. BS_FS_TYPE + 8];
 
     // Check all BPB fields match expected values
     if (signature != 0xAA55 or bytes_per_sector != SECTOR_SIZE or root_entries != ROOT_ENTRIES or !std.mem.eql(u8, fs_type, "FAT12   ")) {
         return false;
     }
-    var fat0: [SECTOR_SIZE]u8 = undefined;
-    readSector(1, fat0[0..]);
-    const valid = fat0[0] == MEDIA_DESCRIPTOR and fat0[1] == 0xFF and fat0[2] == 0xFF and fat0[3] == 0xFF;
+    readSector(1, sector_buf[0..]); // fat0 sector
+    // FAT12 sector starts with the media descriptor FAT entry (0xFF8) followed by the end of chain (0xFFF)
+    const valid = sector_buf[0] == MEDIA_DESCRIPTOR and sector_buf[1] == 0xFF and sector_buf[2] == 0xFF;
     return valid;
 }
 
 /// Check if the stored filesystem size matches current expected size
 fn isSizeCorrect() bool {
-    var boot: [SECTOR_SIZE]u8 = undefined;
-    readSector(0, boot[0..]);
+    var sector_buf = &sector_bufs[0];
+    readSector(0, sector_buf[0..]); // boot sector
 
-    const stored_total = readU16(boot[0..], 19); // Total sectors (16-bit)
+    const stored_total = readU16(sector_buf[0..], 19); // Total sectors (16-bit)
     const expected_total: u16 = @intCast(volumeTotalSectors());
 
     return stored_total == expected_total;
@@ -250,72 +254,73 @@ fn isSizeCorrect() bool {
 
 fn formatVolume() void {
     const volume_sectors = volumeTotalSectors();
-    var boot_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
-    boot_sector[0] = 0xEB;
-    boot_sector[1] = 0x3C;
-    boot_sector[2] = 0x90;
-    @memcpy(boot_sector[3..11], "SYCLBADG");
-    writeU16(boot_sector[0..], BS_BYTES_PER_SECTOR, @intCast(SECTOR_SIZE));
-    boot_sector[13] = SECTORS_PER_CLUSTER;
-    writeU16(boot_sector[0..], 14, RESERVED_SECTORS);
-    boot_sector[16] = NUM_FATS;
-    writeU16(boot_sector[0..], 17, ROOT_ENTRIES);
-    writeU16(boot_sector[0..], 19, @intCast(volume_sectors));
-    boot_sector[21] = MEDIA_DESCRIPTOR;
-    writeU16(boot_sector[0..], 22, fatSectors());
-    writeU16(boot_sector[0..], 24, 32);
-    writeU16(boot_sector[0..], 26, 64);
-    writeU32(boot_sector[0..], 28, 0);
-    writeU32(boot_sector[0..], 32, 0);
-    boot_sector[36] = 0x80;
-    boot_sector[38] = 0x29;
-    writeU32(boot_sector[0..], 39, 0x20260120);
-    @memcpy(boot_sector[43..54], "SYCLBADGE  ");
-    @memcpy(boot_sector[BS_FS_TYPE .. BS_FS_TYPE + 8], "FAT12   ");
-    writeU16(boot_sector[0..], BS_SIGNATURE, 0xAA55);
+    {
+        const boot_sector = &sector_bufs[0];
+        @memset(boot_sector, 0);
 
-    writeSector(0, boot_sector[0..]);
+        boot_sector[0] = 0xEB;
+        boot_sector[1] = 0x3C;
+        boot_sector[2] = 0x90;
+        @memcpy(boot_sector[3..11], "SYCLBADG");
+        writeU16(boot_sector[0..], BS_BYTES_PER_SECTOR, @intCast(SECTOR_SIZE));
+        boot_sector[13] = SECTORS_PER_CLUSTER;
+        writeU16(boot_sector[0..], 14, RESERVED_SECTORS);
+        boot_sector[16] = NUM_FATS;
+        writeU16(boot_sector[0..], 17, ROOT_ENTRIES);
+        writeU16(boot_sector[0..], 19, @intCast(volume_sectors));
+        boot_sector[21] = MEDIA_DESCRIPTOR;
+        writeU16(boot_sector[0..], 22, fatSectors());
+        writeU16(boot_sector[0..], 24, 32);
+        writeU16(boot_sector[0..], 26, 64);
+        writeU32(boot_sector[0..], 28, 0);
+        writeU32(boot_sector[0..], 32, 0);
+        boot_sector[36] = 0x80;
+        boot_sector[38] = 0x29;
+        writeU32(boot_sector[0..], 39, 0x20260120);
+        @memcpy(boot_sector[43..54], "SYCLBADGE  ");
+        @memcpy(boot_sector[BS_FS_TYPE .. BS_FS_TYPE + 8], "FAT12   ");
+        writeU16(boot_sector[0..], BS_SIGNATURE, 0xAA55);
+
+        writeSector(0, boot_sector[0..]);
+    }
+
+    var sector_buf = &sector_bufs[0];
 
     const fat_start = RESERVED_SECTORS;
     const fat_secs = fatSectors();
-    var sector_buf: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
-    sector_buf[0] = MEDIA_DESCRIPTOR;
-    sector_buf[1] = 0xFF;
-    sector_buf[2] = 0xFF;
-    sector_buf[3] = 0xFF;
-
+    @memset(sector_buf, 0);
     var fat_index: u8 = 0;
     while (fat_index < NUM_FATS) : (fat_index += 1) {
         var i: u16 = 0;
         while (i < fat_secs) : (i += 1) {
             const lba = fat_start + (@as(u32, fat_index) * fat_secs) + i;
             if (i == 0) {
-                // First sector of FAT has media descriptor
+                // First sector of FAT has media descriptor.
+                // This is FAT12, so the first entry is 0xFF8,
+                // and the second is the End Of Chain value 0xFFF.
                 sector_buf[0] = MEDIA_DESCRIPTOR;
                 sector_buf[1] = 0xFF;
                 sector_buf[2] = 0xFF;
-                sector_buf[3] = 0x00;
             } else {
                 // Subsequent FAT sectors are all zeros
-                @memset(sector_buf[0..], 0);
+                @memset(sector_buf[0..3], 0);
             }
-            writeSector(lba, sector_buf[0..]);
+            writeSector(lba, sector_buf);
         }
     }
 
     const root_lba = fat_start + (@as(u32, NUM_FATS) * fat_secs);
     const root_secs = rootDirSectors();
     var j: u16 = 0;
-    var zero_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
+    @memset(sector_buf, 0);
     while (j < root_secs) : (j += 1) {
-        writeSector(root_lba + j, zero_sector[0..]);
+        writeSector(root_lba + j, sector_buf);
     }
 
     // Write a volume label entry in the first root directory sector.
-    var label_sector: [SECTOR_SIZE]u8 = [_]u8{0} ** SECTOR_SIZE;
-    @memcpy(label_sector[DIR_NAME .. DIR_NAME + 11], "SYCLBADGE  ");
-    label_sector[DIR_ATTR] = 0x08; // Volume label
-    writeSector(root_lba, label_sector[0..]);
+    @memcpy(sector_buf[DIR_NAME .. DIR_NAME + 11], "SYCLBADGE  ");
+    sector_buf[DIR_ATTR] = 0x08; // Volume label
+    writeSector(root_lba, sector_buf[0..]);
     flushPendingWrites();
 
     // Mark formatted and record debug message
@@ -413,8 +418,8 @@ fn flushPending() linksection(".ram_text") void {
 }
 
 pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
+    var sector_buf = &sector_bufs[0];
+    var prev_sector_buf = &sector_bufs[1];
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
@@ -429,7 +434,9 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
     }) {
         // Copy current sector to prev before reading new one
         if (has_prev_sector) {
-            @memcpy(&prev_sector_buf, &sector_buf);
+            const tmp = prev_sector_buf;
+            prev_sector_buf = sector_buf;
+            sector_buf = tmp;
         }
         readSector(lba, sector_buf[0..]);
         has_prev_sector = true;
@@ -445,7 +452,7 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
             if (attr & 0x10 != 0) continue; // directory
 
             // Read LFN entries
-            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
             const display_name = if (lfn_len > 0)
                 lfn_buf[0..lfn_len]
             else
@@ -460,8 +467,6 @@ pub fn listCarts(callback: *const fn (name: []const u8, size: u32) void) void {
 /// Count carts in storage and optionally get the first cart's info
 /// Returns: number of carts found, fills in first_cart if count == 1
 pub fn countCarts(first_cart: ?*CartInfo) u32 {
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
@@ -471,6 +476,8 @@ pub fn countCarts(first_cart: ?*CartInfo) u32 {
     var has_prev_sector = false;
     var count: u32 = 0;
     var found_first = false;
+    var prev_sector_buf = &sector_bufs[0];
+    var sector_buf = &sector_bufs[1];
 
     while (remaining > 0) : ({
         lba += 1;
@@ -478,7 +485,9 @@ pub fn countCarts(first_cart: ?*CartInfo) u32 {
     }) {
         // Copy current sector to prev before reading new one
         if (has_prev_sector) {
-            @memcpy(&prev_sector_buf, &sector_buf);
+            const tmp = sector_buf;
+            sector_buf = prev_sector_buf;
+            prev_sector_buf = tmp;
         }
         readSector(lba, sector_buf[0..]);
         has_prev_sector = true;
@@ -521,8 +530,6 @@ pub fn countCarts(first_cart: ?*CartInfo) u32 {
 pub fn findCart(name: []const u8) ?CartInfo {
     var target: [12]u8 = undefined;
     const target_len = normalizeName(name, &target);
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
@@ -530,13 +537,17 @@ pub fn findCart(name: []const u8) ?CartInfo {
     var name_buf: [12]u8 = undefined;
     var lfn_buf: [256]u8 = undefined;
     var has_prev_sector = false;
+    var sector_buf = &sector_bufs[0];
+    var prev_sector_buf = &sector_bufs[1];
 
     while (remaining > 0) : ({
         lba += 1;
         remaining -= 1;
     }) {
         if (has_prev_sector) {
-            @memcpy(&prev_sector_buf, &sector_buf);
+            const tmp = sector_buf;
+            sector_buf = prev_sector_buf;
+            prev_sector_buf = tmp;
         }
         readSector(lba, sector_buf[0..]);
         has_prev_sector = true;
@@ -552,7 +563,7 @@ pub fn findCart(name: []const u8) ?CartInfo {
             if (attr & 0x10 != 0) continue;
 
             // Try to read LFN (may span sectors)
-            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
 
             // Check if name matches LFN (not case-sensitive)
             var matches = false;
@@ -593,8 +604,6 @@ pub fn findCart(name: []const u8) ?CartInfo {
 pub fn deleteCart(name: []const u8) bool {
     var target: [12]u8 = undefined;
     const target_len = normalizeName(name, &target);
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    var prev_sector_buf: [SECTOR_SIZE]u8 = undefined;
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fatSectors());
     const root_secs = rootDirSectors();
     var lba: u32 = root_start;
@@ -602,6 +611,8 @@ pub fn deleteCart(name: []const u8) bool {
     var name_buf: [12]u8 = undefined;
     var lfn_buf: [256]u8 = undefined;
     var has_prev_sector = false;
+    var prev_sector_buf = &sector_bufs[0];
+    var sector_buf = &sector_bufs[1];
 
     while (remaining > 0) : ({
         lba += 1;
@@ -609,7 +620,9 @@ pub fn deleteCart(name: []const u8) bool {
     }) {
         // Keep previous sector for cross-sector LFN deletion
         if (has_prev_sector) {
-            @memcpy(&prev_sector_buf, &sector_buf);
+            const tmp = sector_buf;
+            sector_buf = prev_sector_buf;
+            prev_sector_buf = tmp;
         }
         readSector(lba, sector_buf[0..]);
         has_prev_sector = true;
@@ -625,7 +638,7 @@ pub fn deleteCart(name: []const u8) bool {
             if (attr & 0x10 != 0) continue;
 
             // Use multi-sector LFN reading (matches listCarts/findCart)
-            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) &prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
+            const lfn_len = readLfnEntriesMultiSector(if (lba > root_start) prev_sector_buf else null, sector_buf[0..], i, lfn_buf[0..]);
 
             // Check if name matches LFN or SFN
             var matches = false;
@@ -682,8 +695,13 @@ pub fn deleteCart(name: []const u8) bool {
                     }
                 }
 
+                // At this point we no longer need the sector bufs,
+                // reuse them for clearing the FAT chain.
+                sector_buf.* = undefined;
+                prev_sector_buf.* = undefined;
+
                 // Free the FAT chain and flush all writes to flash
-                clearFatChain(start_cluster);
+                clearFatChain(start_cluster, sector_buf, prev_sector_buf);
                 flushPendingWrites();
 
                 // Compact directory to reclaim deleted entry space
@@ -702,7 +720,7 @@ pub fn readCart(cart: CartInfo, dst: []u8) u32 {
     var bytes_left: u32 = cart.size;
     var cluster = cart.start_cluster;
     var dst_offset: usize = 0;
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
+    const sector_buf = &sector_bufs[0];
 
     while (cluster >= 2 and cluster < 0xFFF8 and bytes_left > 0) {
         var sector_index: u8 = 0;
@@ -714,7 +732,7 @@ pub fn readCart(cart: CartInfo, dst: []u8) u32 {
             bytes_left -= @intCast(copy_len);
             dst_offset += copy_len;
         }
-        cluster = fatEntry(cluster);
+        cluster = fatEntry(cluster, sector_buf, &sector_bufs[1]);
     }
     return @intCast(dst_offset);
 }
@@ -723,19 +741,17 @@ fn clusterToLba(cluster: u16) u32 {
     return dataStartLba() + (@as(u32, cluster - 2) * SECTORS_PER_CLUSTER);
 }
 
-fn fatEntry(cluster: u16) u16 {
+fn fatEntry(cluster: u16, sector_buf: *[SECTOR_SIZE]u8, next_buf: *[SECTOR_SIZE]u8) u16 {
     const fat_start = VOLUME_START_LBA + RESERVED_SECTORS;
     const offset = @as(u32, cluster) + (@as(u32, cluster) / 2);
     const lba = fat_start + (offset / SECTOR_SIZE);
     const index = @as(usize, offset % SECTOR_SIZE);
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
     readSector(lba, sector_buf[0..]);
     const b0: u8 = sector_buf[index];
     var b1: u8 = 0;
     if (index + 1 < SECTOR_SIZE) {
         b1 = sector_buf[index + 1];
     } else {
-        var next_buf: [SECTOR_SIZE]u8 = undefined;
         readSector(lba + 1, next_buf[0..]);
         b1 = next_buf[0];
     }
@@ -746,13 +762,11 @@ fn fatEntry(cluster: u16) u16 {
     }
 }
 
-fn setFatEntry(cluster: u16, value: u16) void {
+fn setFatEntry(cluster: u16, value: u16, sector_buf: *[SECTOR_SIZE]u8, next_buf: *[SECTOR_SIZE]u8) void {
     const fat_start = VOLUME_START_LBA + RESERVED_SECTORS;
     const offset = @as(u32, cluster) + (@as(u32, cluster) / 2);
     const base_lba = fat_start + (offset / SECTOR_SIZE);
     const index = @as(usize, offset % SECTOR_SIZE);
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-    var next_buf: [SECTOR_SIZE]u8 = undefined;
     var fat_index: u8 = 0;
     const val = value & 0x0FFF;
     while (fat_index < NUM_FATS) : (fat_index += 1) {
@@ -787,11 +801,11 @@ fn setFatEntry(cluster: u16, value: u16) void {
     }
 }
 
-fn clearFatChain(start: u16) void {
+fn clearFatChain(start: u16, sector_buf_a: *[SECTOR_SIZE]u8, sector_buf_b: *[SECTOR_SIZE]u8) void {
     var cluster = start;
     while (cluster >= 2 and cluster < 0xFFF8) {
-        const next = fatEntry(cluster);
-        setFatEntry(cluster, 0);
+        const next = fatEntry(cluster, sector_buf_a, sector_buf_b);
+        setFatEntry(cluster, 0, sector_buf_a, sector_buf_b);
         cluster = next;
     }
 }
@@ -803,68 +817,56 @@ fn compactRootDirectory() void {
     const root_start = VOLUME_START_LBA + RESERVED_SECTORS + (@as(u32, NUM_FATS) * fat_secs);
     const root_secs = rootDirSectors();
 
-    // Read all root directory sectors into a buffer
-    var all_entries: [ROOT_ENTRIES][DIR_ENTRY_SIZE]u8 = undefined;
-    var sector_buf: [SECTOR_SIZE]u8 = undefined;
-
     var lba: u32 = root_start;
-    var entry_idx: usize = 0;
+    var read_entry_idx: usize = 0;
     var remaining: u16 = root_secs;
 
-    // Read all entries
-    while (remaining > 0) : ({
+    var read_sector = &sector_bufs[0];
+    var write_sector = &sector_bufs[1];
+
+    var write_offset: u32 = 0;
+    var write_sector_index: u32 = 0;
+    // Read all entries, copying to compacted sector
+    read_loop: while (remaining > 0) : ({
         lba += 1;
         remaining -= 1;
     }) {
-        readSector(lba, sector_buf[0..]);
-        var i: usize = 0;
-        while (i < SECTOR_SIZE and entry_idx < ROOT_ENTRIES) : (i += DIR_ENTRY_SIZE) {
-            @memcpy(&all_entries[entry_idx], sector_buf[i .. i + DIR_ENTRY_SIZE]);
-            entry_idx += 1;
+        readSector(lba, read_sector);
+        var read_offset: usize = 0;
+        while (read_offset < SECTOR_SIZE and read_entry_idx < ROOT_ENTRIES) : (read_offset += DIR_ENTRY_SIZE) {
+            const entry = read_sector[read_offset..][0..DIR_ENTRY_SIZE];
+            read_entry_idx += 1;
+    
+            // Stop at end of directory marker
+            if (entry[0] == 0x00) break :read_loop;
+
+            // Skip deleted entries (0xE5) - don't copy them
+            if (entry[0] == 0xE5) continue;
+
+            // Copy valid entry to write position
+            write_sector[write_offset..][0..DIR_ENTRY_SIZE].* = entry.*;
+            write_offset += DIR_ENTRY_SIZE;
+
+            // Flush write sector if full
+            if (write_offset >= SECTOR_SIZE) {
+                writeSector(root_start + write_sector_index, write_sector);
+                write_sector_index += 1;
+                write_offset = 0;
+            }
         }
     }
 
-    // Compact: move all non-deleted entries to the front
-    var write_idx: usize = 0;
-    var read_idx: usize = 0;
+    // Fill the rest with zeroes
+    if (write_sector_index < root_secs) {
+        @memset(write_sector[write_offset..], 0);
+        writeSector(root_start + write_sector_index, write_sector);
+        write_sector_index += 1;
 
-    while (read_idx < ROOT_ENTRIES) : (read_idx += 1) {
-        const entry = all_entries[read_idx][0..];
-
-        // Stop at end of directory marker
-        if (entry[0] == 0x00) break;
-
-        // Skip deleted entries (0xE5) - don't copy them
-        if (entry[0] == 0xE5) continue;
-
-        // Copy valid entry to write position
-        if (write_idx != read_idx) {
-            @memcpy(&all_entries[write_idx], entry);
+        @memset(write_sector[0..write_offset], 0);
+        while (write_sector_index < root_secs) {
+            writeSector(root_start + write_sector_index, write_sector);
+            write_sector_index += 1;
         }
-        write_idx += 1;
-    }
-
-    // Zero out remaining entries and add end-of-directory marker
-    all_entries[write_idx][0] = 0x00; // End marker
-    while (write_idx < ROOT_ENTRIES) : (write_idx += 1) {
-        @memset(&all_entries[write_idx], 0);
-    }
-
-    // Write compacted directory back to flash
-    lba = root_start;
-    entry_idx = 0;
-    remaining = root_secs;
-
-    while (remaining > 0) : ({
-        lba += 1;
-        remaining -= 1;
-    }) {
-        var i: usize = 0;
-        while (i < SECTOR_SIZE and entry_idx < ROOT_ENTRIES) : (i += DIR_ENTRY_SIZE) {
-            @memcpy(sector_buf[i .. i + DIR_ENTRY_SIZE], &all_entries[entry_idx]);
-            entry_idx += 1;
-        }
-        writeSector(lba, sector_buf[0..]);
     }
 }
 

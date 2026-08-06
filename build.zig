@@ -277,6 +277,7 @@ pub fn add_os(
             .file = d.builder.path("src/os/linker.ld"),
             .generate = .none, // Don't generate microzig's default linker script
         },
+        .stack = .{ .symbol_name = "__stack" }, // Exported by linker script
     });
     // Install both ELF and UF2 formats
     mb.install_firmware(fw, .{ .format = .elf });

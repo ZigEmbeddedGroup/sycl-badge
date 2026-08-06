@@ -737,16 +737,16 @@ pub const Tone2Options = struct {
     // Use this value to stop playing audio
     pub const stop: Tone2Options = .{ .frequency = 0.0 };
 
-    pub const Flags = packed struct(u32) {
-        pub const Shape = enum(u3) {
-            square,   // ---___---___, flute-ish
-            triangle, // /\/\/\/\, string-ish
-            sawtooth, // |\|\|\|\
-            sine, // u^u^u^
-            major, // Major chord with frequency as the fundamental
-            minor, // Minor chord with frequency as the fundamental
-        };
+    pub const Shape = enum(u3) {
+        square,   // ---___---___, clarinet-ish
+        triangle, // /\/\/\/\, flute-ish
+        sawtooth, // |\|\|\|\, violin-ish
+        sine, // u^u^u^
+        major, // Major chord with frequency as the fundamental
+        minor, // Minor chord with frequency as the fundamental
+    };
 
+    pub const Flags = packed struct(u32) {
         /// Type of wave to play
         shape: Shape = .square,
         padding: u29 = undefined,

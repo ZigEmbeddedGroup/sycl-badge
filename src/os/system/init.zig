@@ -36,6 +36,7 @@ extern const __scratch_x_region_start__: u8;
 extern const __scratch_x_region_end__: u8;
 extern const __scratch_y_region_start__: u8;
 extern const __scratch_y_region_end__: u8;
+extern const __stack_limit__: u8;
 
 fn clearRange(start: usize, end: usize) void {
     if (end > start) {
@@ -53,6 +54,13 @@ fn readMsp() usize {
 }
 
 fn clearOnBoot() void {
+    // Set the stack limit
+    asm volatile (
+        \\  msr msplim, %[splim]
+        :
+        : [splim] "r" (&__stack_limit__)
+    );
+
     // Clear kernel RAM after .bss (heap/shared_mem/unused).
     clearRange(@intFromPtr(&__bss_end__), @intFromPtr(&__kernel_ram_end__));
 

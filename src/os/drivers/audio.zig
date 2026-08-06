@@ -38,6 +38,8 @@ const audio_levels = 250;
 /// too fast for humans to hear (or for the speaker to even create)
 const audio_pwm_cycle_hz = 500_000;
 
+const max_sample_rate = 44100;
+
 // Make sure the above values are consistent with the hardware.
 // They are all important so we specify them all instead of calculating any of them
 comptime { std.debug.assert(buzzer_sys_clk_hz == audio_levels * audio_pwm_cycle_hz * buzzer_pwm_clk_div); }
@@ -227,8 +229,7 @@ pub fn poll() void {
                 }
             }
             const end = timer.micros();
-            fps_overlay.submit_audio_mix_time(start, end, mix_request_time[mix_idx]);
-            mix_request_time[mix_idx] = 0;
+            fps_overlay.submit_audio_mix_time(start, end, 1000000 * dma_buf_size / max_sample_rate);
             mix_idx = 1 - mix_idx;
         }
     }
@@ -293,7 +294,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
         },
         else => {
             const sample_freq = @as(comptime_float, audio_levels) * freq_hz;
-            const max_freq = 44100.0 / 2.0;
+            const max_freq = max_sample_rate;
             if (sample_freq <= max_freq) {
                 period_per_sample = 1.0 / @as(comptime_float, audio_levels);
                 setup_ping_pong_DMA(duration_sec, sample_freq) catch {

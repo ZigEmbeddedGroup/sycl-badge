@@ -187,13 +187,12 @@ pub fn tick() void {
     update_debug_text();
 }
 
-pub fn submit_audio_mix_time(start: u64, end: u64, req: u64) void {
-    const service_delay: u32 = time_delta(req, start);
+pub fn submit_audio_mix_time(start: u64, end: u64, max_poll_time: u32) void {
     const mix_time: u32 = time_delta(start, end);
     audio_mix_count += 1;
     audio_mix_total_us += mix_time;
     audio_mix_max_us = @max(audio_mix_max_us, mix_time);
-    audio_service_delay_max_us = @max(audio_service_delay_max_us, service_delay);
+    audio_service_delay_max_us = @max(audio_service_delay_max_us, max_poll_time);
 }
 
 pub fn poll() void {
@@ -290,7 +289,7 @@ fn update_debug_text() void {
     add_debug_text(.{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE });
 
     if (display_max_audio_delay != 0) {
-        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio_delay}) catch "!!!!";
+        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{poll_max_max * 100 / display_max_audio_delay}) catch "!!!%";
         add_debug_text(.{ .text = audio_delay_str, .x = 4*font_width, .y = 0, .alignment = .left, .color = lcd.RED });
     }
 

@@ -4,6 +4,7 @@ const microzig = @import("microzig");
 const badge = microzig.board;
 const lcd = @import("../drivers/lcd.zig");
 const timer = @import("../drivers/timer.zig");
+const rev = @import("../drivers/rev.zig");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -222,11 +223,22 @@ fn update_debug_text() void {
 
     const poll_max_avg = poll_max_history.average();
     const pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_avg}) catch "????";
-    add_debug_text(.{ .text = pps_str, .x = lcd.width, .y = 9, .alignment = .right, .color = lcd.MAGENTA });
+    add_debug_text(.{ .text = pps_str, .x = lcd.width, .y = font_height, .alignment = .right, .color = lcd.MAGENTA });
 
     const poll_max_max = poll_max_history.max();
     const max_pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_max}) catch "????";
-    add_debug_text(.{ .text = max_pps_str, .x = @intCast(lcd.width - 1 - (4 * font_width)), .y = 9, .alignment = .right, .color = lcd.RED });
+    add_debug_text(.{ .text = max_pps_str, .x = @intCast(lcd.width - (4 * font_width)), .y = 8, .alignment = .right, .color = lcd.RED });
+
+    if (rev.debug) {
+        // Revision strings
+        const revision = rev.rev;
+        const reading: u32 = rev.raw_reading;
+        const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
+        add_debug_text(.{ .text = rev_str, .x = lcd.width, .y = lcd.height - 2*font_height, .alignment = .right, .color = lcd.WHITE });
+
+        const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
+        add_debug_text(.{ .text = read_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE });
+    }
 }
 
 fn draw_str(str: []const u8, base: [*]lcd.Color16, pitch: usize, fg_color: lcd.Color16, bg_color: lcd.Color16) void {

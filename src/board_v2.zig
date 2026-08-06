@@ -9,6 +9,9 @@ pub const font = @import("font.zig");
 // Crystal oscillator frequency (12 MHz for SYCL Badge V2)
 pub const xosc_freq = 12_000_000;
 
+// Tell microzig we have the 2350b
+pub const has_rp2350b = true;
+
 // ========================================
 // Pin Assignments
 // ========================================
@@ -60,3 +63,8 @@ pub const A5_D13 = led_pin;
 // Buzzer / Speaker (CMT-7525-80-SMT-TR)
 pub const buzzer_enable = gpio.num(8); // SPKR_EN  - speaker enable (active-high)
 pub const buzzer_pwm = gpio.num(9); // SPKR_A0  - PWM audio output (PWM slice 4, channel B)
+
+// Voltage divider for testing hardware revision
+// see drivers/rev.zig for details.
+pub const revision_pin = gpio.num(47);
+pub const revision_adc: hal.adc.Input = .ain7;

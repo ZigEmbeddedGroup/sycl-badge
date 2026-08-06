@@ -813,8 +813,8 @@ pub fn writeCartBufferRect(buffer: []const u16, x: u16, y: u16, w: u16, h: u16) 
     writeCommandWithData(.MADCTL, &.{0x40});
 
     // In this mode, cart x maps to native row and cart y maps to native col (reversed).
-    const col_start: u16 = 127 - y1;
-    const col_end: u16 = 127 - y0;
+    const col_start: u16 = y0;
+    const col_end: u16 = y1;
     const row_start: u16 = x0;
     const row_end: u16 = x1;
 

@@ -19,6 +19,87 @@
     src: url('fonts/Apl385.ttf') format('truetype');
 }
 
+/* === Public Sans (self-hosted, from Google Fonts) === */
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-Latin.woff2') format('woff2');
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-LatinExt.woff2') format('woff2');
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-Vietnamese.woff2') format('woff2');
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-Italic-Latin.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-Italic-LatinExt.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Public Sans';
+    src: url('fonts/public-sans/PublicSans-Italic-Vietnamese.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+    font-family: 'Iosevka Slab';
+    src: url('fonts/iosevka-slab/IosevkaSlab-Regular.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Iosevka Slab';
+    src: url('fonts/iosevka-slab/IosevkaSlab-Bold.woff2') format('woff2');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Iosevka Slab';
+    src: url('fonts/iosevka-slab/IosevkaSlab-Italic.woff2') format('woff2');
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Iosevka Slab';
+    src: url('fonts/iosevka-slab/IosevkaSlab-BoldItalic.woff2') format('woff2');
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+ }
+
 html,
 body,
 div,
@@ -144,8 +225,8 @@ table {
 }
 
 :root {
-  --font-family: "Routed Gothic", serif;
-  --font-family-code: "APL385", monospace;
+  --font-family: "Public Sans", Helvetica, serif;
+  --font-family-code: "Iosevka Slab", monospace;
   --line-height: 1.20rem;
   --border-thickness: 1.5px;
   --text-color: #000;
@@ -153,8 +234,8 @@ table {
   --horizontal-margin: 3ch;
   --body-inner-width: 66ch;
   --body-max-width: calc(var(--body-inner-width) + var(--horizontal-margin) * 2);
-  --font-weight-normal: 450;
-  --font-weight-medium: 600;
+  --font-weight-normal: 300;
+  --font-weight-medium: 400;
   --font-weight-bold: 800;
   font-family: var(--font-family);
   font-optical-sizing: auto;
@@ -185,7 +266,7 @@ h6 {
 }
 
 .header-section-number {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-size: .875rem;
   font-weight: 500;
   font-variant: initial;
@@ -196,7 +277,7 @@ h6 {
 
 body h1,
 h2#toc-title {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-variant: titling-caps;
   font-size: 1.25rem;
   font-weight: 400;
@@ -211,7 +292,7 @@ h1 .header-section-number {
 }
 
 h2 {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-size: 1.25rem;
   font-variant: all-small-caps;
   font-weight: 450;
@@ -286,7 +367,7 @@ blockquote footer > * {
 }
 
 blockquote .author {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-size: 1.125em;
   font-variant: all-small-caps;
   font-weight: 450;
@@ -396,7 +477,7 @@ figcaption {
 }
 
 figcaption .author {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-size: 1.125em;
   font-variant: all-small-caps;
   font-weight: 450;
@@ -663,7 +744,7 @@ header {
 }
 
 header h1 {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-variant: all-small-caps;
   font-size: 3.5rem;
   font-weight: 500;
@@ -687,7 +768,7 @@ header p {
 }
 
 .canonical-name {
-  font-family: "Routed Gothic", serif;
+  font-family: var(--font-family);
   font-size: 1.125em;
   font-variant: all-small-caps;
   font-weight: 450;
@@ -700,4 +781,12 @@ header p {
 .front-page {
     padding-right: 48px;
     padding-left: 48px;
+}
+
+.site-title {
+    font-weight: bold;
+}
+
+.comment {
+    font-style: italic;
 }

@@ -8,8 +8,16 @@
     .assets_dir_path = "assets",
     .static_assets = [
         "Temml.woff2",
-        "fonts/routed-gothic-ttf-v1.0.0/routed-gothic.ttf",
-        "fonts/Apl385.ttf",
+        "fonts/public-sans/PublicSans-Latin.woff2",
+        "fonts/public-sans/PublicSans-LatinExt.woff2",
+        "fonts/public-sans/PublicSans-Vietnamese.woff2",
+        "fonts/public-sans/PublicSans-Italic-Latin.woff2",
+        "fonts/public-sans/PublicSans-Italic-LatinExt.woff2",
+        "fonts/public-sans/PublicSans-Italic-Vietnamese.woff2",
+        "fonts/iosevka-slab/IosevkaSlab-BoldItalic.woff2",
+        "fonts/iosevka-slab/IosevkaSlab-Italic.woff2",
+        "fonts/iosevka-slab/IosevkaSlab-Bold.woff2",
+        "fonts/iosevka-slab/IosevkaSlab-Regular.woff2",
     ],
 }),
 

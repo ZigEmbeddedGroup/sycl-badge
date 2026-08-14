@@ -15,6 +15,8 @@ const rom = @import("../drivers/rom.zig");
 const loader = @import("../loader/loader.zig");
 const debug_log = @import("../debug_log.zig");
 const rev = @import("../drivers/rev.zig");
+const rtt = @import("../drivers/rtt.zig");
+const terry = @import("../system/terry.zig");
 
 // System imports
 const console = @import("console.zig");
@@ -109,6 +111,16 @@ pub const InitConfig = struct {
 
     /// Custom entrypoint for Core 1 (if null, uses default cart.main)
     core1_entrypoint: ?*const fn () void = null,
+
+    /// Amount of time to wait for a Tracy server to connect before running
+    /// any initialization. This will look like a stall if you don't know
+    /// it's coming.
+    early_wait_for_tracy_time: u64 = 0,
+
+    /// Amount of time to wait for a tracy server to connect after initialization
+    /// but before the main loop starts. This will display a nice message on
+    /// the screen telling the user that it's waiting.
+    late_wait_for_tracy_time: u64 = 0,
 };
 
 /// Initialize all drivers and kernel systems
@@ -124,6 +136,13 @@ pub fn init(config: InitConfig) !void {
     clearOnBoot();
     // Copy RAM-resident flash helpers before any flash writes.
     copyRamTextSection();
+
+    // -1. Set up RTT and terry for monitoring initialization
+    rtt.init();
+    if (config.early_wait_for_tracy_time != 0) {
+        const deadline = timer.micros() + config.early_wait_for_tracy_time;
+        _ = terry.client.wait_for_connection(deadline) catch {};
+    }
 
     // 0. Detect board revision
     rev.init();
@@ -180,7 +199,26 @@ pub fn init(config: InitConfig) !void {
         }
     }
 
-    // 11. Initialize Core 1 if chosen (should always be chosen in practice)
+    // 11. Wait for late tracy connection after initialization, with friendly screen message
+    if (config.late_wait_for_tracy_time != 0 and terry.client.is_waiting_for_connection()) {
+        const deadline = timer.micros() + config.late_wait_for_tracy_time;
+        lcd.clearScreen(lcd.BLACK);
+        while (lcd.isBusy() and terry.client.is_waiting_for_connection()) {
+            terry.client.poll();
+        }
+        while (lcd.isBusy()) {}
+        const msg = "Waiting for Tracy";
+        lcd.drawString(@intCast(lcd.width/2 - (msg.len * 4)), lcd.height/2 - 4, msg, lcd.CYAN, lcd.BLACK, 1);
+        if (terry.client.is_waiting_for_connection()) {
+            while (true) {
+                terry.client.poll();
+                if (!terry.client.is_waiting_for_connection()) break;
+                if (timer.millis() > deadline) break;
+            }
+        }
+    }
+
+    // 12. Initialize Core 1 if chosen (should always be chosen in practice)
     if (config.init_core1) {
         if (config.core1_entrypoint) |entrypoint| {
             multicore.initCore1WithEntrypoint(entrypoint);

@@ -144,6 +144,8 @@ pub fn init(config: InitConfig) !void {
         _ = terry.client.wait_for_connection(deadline) catch {};
     }
 
+    const z = terry.core0.zone("Initialize", @src()); defer z.end();
+
     // 0. Detect board revision
     rev.init();
 

@@ -21,6 +21,7 @@ const std = @import("std");
 
 const timer = @import("timer.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
+const terry = @import("../system/terry.zig");
 
 // Aliases for the DMA control registers to avoid triggering DMA start.
 const DMA_CH1_AL1_CTRL: *volatile @TypeOf(DMA.CH1_CTRL_TRIG) = @ptrCast(&DMA.CH1_AL1_CTRL);
@@ -217,6 +218,9 @@ pub fn poll() void {
         const buffer_bit: u32 = @as(u32, 1) << @intCast(mix_idx + 1);
         if (mix_ready & buffer_bit != 0) {
             mix_ready &= ~buffer_bit;
+
+            const z = terry.core0.zone("Audio Mix", @src()); defer z.end();
+
             const start = timer.micros();
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
             std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);

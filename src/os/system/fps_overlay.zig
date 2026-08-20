@@ -5,6 +5,7 @@ const badge = microzig.board;
 const lcd = @import("../drivers/lcd.zig");
 const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
+const terry = @import("terry.zig");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,8 @@ pub fn poll() void {
 pub fn submit_lcd_work() void {
     // Tick the display state machine
     if (curr_debug_text < num_debug_texts) {
+        const z = terry.core0.zone("fps_overlay.submit_lcd_work", @src()); defer z.end();
+
         const curr = &debug_texts[curr_debug_text];
         // Render the text
         draw_str(curr.str[0..curr.len], &debug_img, debug_pitch, curr.fg_color, curr.bg_color);
@@ -248,6 +251,8 @@ fn update_debug_text() void {
     reset_debug_text();
 
     if (!enabled) return;
+
+    const z = terry.core0.zone("fps_overlay.update_debug_text", @src()); defer z.end();
 
     // Yellow text on black.
     // Right-justify the FPS value in 3 characters

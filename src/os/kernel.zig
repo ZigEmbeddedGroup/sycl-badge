@@ -471,6 +471,8 @@ pub fn main() !void {
 
 /// Compute a simple hash of cart list to detect changes
 fn computeCartHash() u32 {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     cart_hash_accumulator = 0;
     storage.listCarts(hashCart);
     return cart_hash_accumulator;
@@ -488,6 +490,8 @@ fn hashCart(name: []const u8, size: u32) void {
 
 /// Refresh the cart list display on LCD
 fn refreshCartDisplay() void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     const backlight_enable_pin = board.BKLT_PWM;
     backlight_enable_pin.set_function(.sio);
     backlight_enable_pin.set_direction(.out);
@@ -583,6 +587,8 @@ fn collectCartName(name: []const u8, size: u32) void {
 /// Run the currently selected cart
 fn runSelectedCart() void {
     if (cursor_index >= cart_count) return;
+
+    const z = terry.core0.fn_zone(@src()); defer z.end();
 
     const name = cart_names[cursor_index][0..cart_name_lengths[cursor_index]];
     console.printf("[BTN] runSelectedCart: loading '{s}'\r\n", .{name});

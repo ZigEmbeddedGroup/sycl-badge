@@ -9,6 +9,7 @@ const timer = @import("timer.zig");
 const dma = @import("dma.zig");
 const board = microzig.board;
 const font = board.font;
+const terry = @import("../system/terry.zig");
 
 /// Display Configuration
 pub const width: u16 = 160;
@@ -61,6 +62,9 @@ pub fn interrupt_DMA_0() callconv(.c) void {
     const flags = DMA.INTS0.raw;
 
     if (flags & 0b1 != 0) {
+        // TODO this causes a double-end, figure out why. Probably missing volatile on some tracy state.
+        //const z = terry.core0.zone_color_cond("INTERRUPT DMA_0 (LCD)", @src(), 0x00FF7F, terry.client.interrupt_trace_enabled); defer z.end();
+
         if (int_running) {
             board.led_pin.put(1);
         }
@@ -135,6 +139,9 @@ fn write_spi_16_no_flush(data: []const u16) void {
 
 fn flush_spi() void {
     const spi_regs = spi_instance.get_regs();
+
+    const z = terry.core0.fn_zone_cond(@src(), spi_regs.SSPSR.read().BSY != 0); defer z.end();
+
     // Drain RX FIFO, then wait for shifting to finish (which may be *after*
     // TX FIFO drains), then drain RX FIFO again
     while (spi_instance.is_readable()) {
@@ -179,6 +186,8 @@ fn sync_resolve_state(wait_for_transfer: bool) void {
 }
 
 fn wait_for_ready() void {
+    const z = terry.core0.fn_zone_cond(@src(), state.*.is_waiting_for_interrupt()); defer z.end();
+
     while (state.*.is_waiting_for_interrupt()) {}
     sync_resolve_state(true); // force synchronous SPI flush
 }
@@ -341,6 +350,8 @@ pub const Config = struct {
 /// Low-level initialization (control pins only)
 /// Use initWithAllPins() for full initialization including SPI and TE pins
 pub fn init(pin_config: Pins, config: Config) !void {
+    const z = terry.core0.zone("lcd.init", @src()); defer z.end();
+
     pins = pin_config;
 
     // Configure GPIO pins
@@ -399,6 +410,8 @@ pub fn init(pin_config: Pins, config: Config) !void {
 }
 
 fn initDisplay() void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     // Software reset
     writeCommand(.SWRESET);
     timer.sleep_ms(50);
@@ -470,6 +483,8 @@ fn initDisplay() void {
 /// Re-initialize display registers (call after cart stops to restore LCD settings)
 /// This performs a quick reinit without full hardware reset for faster recovery
 pub fn reinitDisplay() void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     // Reconfigure critical GPIO pins (cart may have changed them)
     pins.cs.set_function(.sio);
     pins.cs.set_direction(.out);
@@ -572,6 +587,8 @@ pub fn fillScreen(color: Color16) void {
 pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     if (x >= width or y >= height) return;
 
+    const z = terry.core0.fn_zone_cond(@src(), w * h > 16); defer z.end();
+
     const x_clamped = @min(x, width - 1);
     const y_clamped = @min(y, height - 1);
     const w_actual = @min(w, width - x_clamped);
@@ -670,6 +687,8 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
 }
 
 pub fn drawString(x: u16, y: u16, text: []const u8, color: Color16, bg_color: Color16, size: u8) void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     var cursor_x = x;
     for (text) |char| {
         drawChar(cursor_x, y, char, color, bg_color, size);
@@ -685,6 +704,8 @@ pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, 
     if (bottom < 0) return; // Offscreen top
     if (y >= height) return; // Offscreen bottom
     if (w == 0 or h == 0) return; // No Area
+
+    const z = terry.core0.fn_zone(@src()); defer z.end();
 
     var start = data;
     var draw_width = w;
@@ -737,6 +758,8 @@ pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, 
 /// Direct buffer writing (for framebuffer updates)
 pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u16) void {
     if (x >= width or y >= height) return;
+
+    const z = terry.core0.fn_zone(@src()); defer z.end();
 
     const x1 = @min(x + w - 1, width - 1);
     const y1 = @min(y + h - 1, height - 1);

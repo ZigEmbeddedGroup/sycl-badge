@@ -11,12 +11,14 @@ const gpio = @import("drivers/gpio.zig");
 const audio = @import("drivers/audio.zig");
 const dma = @import("drivers/dma.zig");
 const rev = @import("drivers/rev.zig");
+const rtt = @import("drivers/rtt.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const fps_overlay = @import("system/fps_overlay.zig");
 const storage = @import("loader/storage.zig");
 const loader = @import("loader/loader.zig");
 const multicore = @import("system/multicore.zig");
+const terry = @import("system/terry.zig");
 const mailbox = @import("ipc/mailbox.zig");
 
 // Use panic handler from system
@@ -85,6 +87,9 @@ const BTN_DIAG_US: u64 = 2_000_000; // 2 seconds
 var btn_diag_last_us: u64 = 0;
 var btn_diag_cart_was_running: bool = false; // tracks first-run edge
 
+const EARLY_TRACY_WAIT_TIME_US = 0;
+const LATE_TRACY_WAIT_TIME_US = 0; // 60_000_000 * 10; // 10 minutes
+
 // Button state tracking
 var joystick_up_was_pressed: bool = false;
 var joystick_down_was_pressed: bool = false;
@@ -134,6 +139,8 @@ pub fn main() !void {
         .lcd_pins = lcd.createDT018BTFTPins(),
         .lcd_config = lcd.createDT018BTFTConfig(),
         .init_core1 = true,
+        .early_wait_for_tracy_time = EARLY_TRACY_WAIT_TIME_US,
+        .late_wait_for_tracy_time = LATE_TRACY_WAIT_TIME_US,
     });
 
     // Initialize button poller
@@ -162,6 +169,8 @@ pub fn main() !void {
         usb.poll();
 
         audio.poll();
+
+        terry.client.poll();
 
         fps_overlay.poll();
 
@@ -462,6 +471,8 @@ pub fn main() !void {
 
 /// Compute a simple hash of cart list to detect changes
 fn computeCartHash() u32 {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     cart_hash_accumulator = 0;
     storage.listCarts(hashCart);
     return cart_hash_accumulator;
@@ -479,6 +490,8 @@ fn hashCart(name: []const u8, size: u32) void {
 
 /// Refresh the cart list display on LCD
 fn refreshCartDisplay() void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
+
     const backlight_enable_pin = board.BKLT_PWM;
     backlight_enable_pin.set_function(.sio);
     backlight_enable_pin.set_direction(.out);
@@ -574,6 +587,8 @@ fn collectCartName(name: []const u8, size: u32) void {
 /// Run the currently selected cart
 fn runSelectedCart() void {
     if (cursor_index >= cart_count) return;
+
+    const z = terry.core0.fn_zone(@src()); defer z.end();
 
     const name = cart_names[cursor_index][0..cart_name_lengths[cursor_index]];
     console.printf("[BTN] runSelectedCart: loading '{s}'\r\n", .{name});

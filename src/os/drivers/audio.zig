@@ -21,6 +21,7 @@ const std = @import("std");
 
 const timer = @import("timer.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
+const terry = @import("../system/terry.zig");
 
 // Aliases for the DMA control registers to avoid triggering DMA start.
 const DMA_CH1_AL1_CTRL: *volatile @TypeOf(DMA.CH1_CTRL_TRIG) = @ptrCast(&DMA.CH1_AL1_CTRL);
@@ -37,6 +38,8 @@ const audio_levels = 250;
 /// Speed of the pwm cycle for controlling volume,
 /// too fast for humans to hear (or for the speaker to even create)
 const audio_pwm_cycle_hz = 500_000;
+
+const max_sample_rate = 44100;
 
 // Make sure the above values are consistent with the hardware.
 // They are all important so we specify them all instead of calculating any of them
@@ -215,6 +218,9 @@ pub fn poll() void {
         const buffer_bit: u32 = @as(u32, 1) << @intCast(mix_idx + 1);
         if (mix_ready & buffer_bit != 0) {
             mix_ready &= ~buffer_bit;
+
+            const z = terry.core0.zone("Audio Mix", @src()); defer z.end();
+
             const start = timer.micros();
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
             std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);
@@ -227,8 +233,7 @@ pub fn poll() void {
                 }
             }
             const end = timer.micros();
-            fps_overlay.submit_audio_mix_time(start, end, mix_request_time[mix_idx]);
-            mix_request_time[mix_idx] = 0;
+            fps_overlay.submit_audio_mix_time(start, end, 1000000 * dma_buf_size / max_sample_rate);
             mix_idx = 1 - mix_idx;
         }
     }
@@ -293,7 +298,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
         },
         else => {
             const sample_freq = @as(comptime_float, audio_levels) * freq_hz;
-            const max_freq = 44100.0 / 2.0;
+            const max_freq = max_sample_rate;
             if (sample_freq <= max_freq) {
                 period_per_sample = 1.0 / @as(comptime_float, audio_levels);
                 setup_ping_pong_DMA(duration_sec, sample_freq) catch {

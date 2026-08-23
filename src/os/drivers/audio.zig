@@ -67,13 +67,13 @@ var global_volume: f32 = initial_global_volume;
 var tone_volume: f32 = 1.0;
 var vol_amplitude: f32 = calc_perceptually_linear_amplitude_for_volume(initial_global_volume);
 
-var sound_type: enum {
+var sound_type: terry.core0.TrackedStateMachine(enum {
     off,
     square,
     triangle,
     sawtooth,
     sample,
-} = .off;
+}) = undefined;
 
 const MixState = enum {
     disabled,
@@ -82,7 +82,7 @@ const MixState = enum {
 };
 
 var mix_idx: u32 = 0;
-var mix_state: MixState = .disabled;
+var mix_state: terry.core0.TrackedStateMachine(MixState) = undefined;
 
 fn encode_sample(comptime T: type, val: f32) T {
     return switch (T) {
@@ -144,7 +144,7 @@ fn mix_buffer(buffer: *align(64) [dma_buf_size]u32) bool {
 }
 
 noinline fn mix_buffer_samples(comptime T: type, buffer: []T, samples_to_mix: u32) bool {
-    switch (sound_type) {
+    switch (sound_type.state) {
         .off, .square => {}, // mixer shouldn't be in use
         .sawtooth => mix_audio_sawtooth(T, buffer[0..samples_to_mix]),
         .triangle => mix_audio_triangle(T, buffer[0..samples_to_mix]),
@@ -172,6 +172,9 @@ const square_wave_sample: AudioSample = .{
 /// Initialise buzzer hardware.
 /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
 pub fn init() void {
+    sound_type.register("audio.sound_type", .off, @src());
+    mix_state.register("audio.mix_state", .disabled, @src());
+
     switch (rev.revision) {
         .r0 => {
             // Enable pin: SIO output, start disabled
@@ -225,11 +228,11 @@ pub fn set_global_volume(in_vol: f32) void {
         global_volume = vol;
         update_derived_volume();
 
-        if (sound_type == .square) {
+        if (sound_type.state == .square) {
             update_square_wave_levels();
         }
 
-        if (sound_type != .off) {
+        if (sound_type.state != .off) {
             audio_enable();
         }
     }
@@ -244,7 +247,7 @@ var ticks: u32 = 0;
 
 pub fn poll() void {
     // Check if a buffer needs mixing
-    if (mix_state != .disabled) {
+    if (mix_state.state != .disabled) {
         const buffer_bit: u32 = @as(u32, 1) << @intCast(mix_idx + 1);
         if (DMA.INTR.raw & buffer_bit != 0) {
             DMA.INTR.write_raw(buffer_bit);
@@ -256,7 +259,7 @@ pub fn poll() void {
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
             std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);
             if (!more_buffers) {
-                mix_state = .shutting_down;
+                mix_state.set_state(.shutting_down, @src());
                 // Turn off the continuation after the mixed buffer
                 switch (mix_idx) {
                     0 => DMA.CH2_CTRL_TRIG.modify(.{ .EN = 0 }),
@@ -269,7 +272,7 @@ pub fn poll() void {
             mix_idx = 1 - mix_idx;
         }
 
-        if (mix_state == .shutting_down) {
+        if (mix_state.state == .shutting_down) {
             const ch1 = DMA.CH1_CTRL_TRIG.read();
             const ch2 = DMA.CH2_CTRL_TRIG.read();
             if (ch1.EN == 0 and ch1.BUSY == 0 and ch2.EN == 0 and ch2.BUSY == 0) {
@@ -324,7 +327,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
     const sample_sel = flags & 0x7;
     const needs_dma_reset = switch (sample_sel) {
         0 => true,
-        else => mix_state != .running,
+        else => mix_state.state != .running,
     };
 
     if (needs_dma_reset) {
@@ -349,14 +352,14 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
         },
         else => {
             period_per_sample = freq_hz / max_sample_rate;
-            sound_type = switch (sample_sel) {
-                1 => .triangle,
-                2 => .sawtooth,
+            switch (sample_sel) {
+                1 => sound_type.set_state(.triangle, @src()),
+                2 => sound_type.set_state(.sawtooth, @src()),
                 else => {
                     stop();
                     return;
                 },
-            };
+            }
 
             if (duration_sec >= 0) {
                 // This can be large enough that we lose precision.
@@ -546,7 +549,7 @@ fn setup_ping_pong_DMA(sample_freq: f32) !void {
     finish_stop_DMA();
 
     mix_idx = 0;
-    mix_state = .running;
+    mix_state.set_state(.running, @src());
     // For simplicty, don't handle very short audio spurts here.
     _ = mix_buffer(&audio_dma_buf[0]);
     _ = mix_buffer(&audio_dma_buf[1]);
@@ -606,7 +609,7 @@ fn setup_ping_pong_DMA(sample_freq: f32) !void {
 }
 
 fn begin_stop_DMA() void {
-    mix_state = .disabled;
+    mix_state.set_state(.disabled, @src());
     DMA.CH1_CTRL_TRIG.modify(.{ .EN = 0, .CHAIN_TO = 1 });
     DMA.CH2_CTRL_TRIG.modify(.{ .EN = 0, .CHAIN_TO = 2 });
     DMA.CHAN_ABORT.write(.{ .CHAN_ABORT = 0b110 });
@@ -629,13 +632,13 @@ pub fn stop() void {
             buzzer_pwm_slice.disable();
             audio_timing_slice.disable();
             board.rev0.audio.buzzer_pwm.put(0);
-            sound_type = .off;
         },
         .r1 => {
             board.rev1.audio.sd_mode_n.put(0);
         },
         .unknown => {},
     }
+    sound_type.set_state(.off, @src());
 }
 
 /// Reset the audio module for a new cart

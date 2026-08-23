@@ -666,7 +666,7 @@ fn core0_emit_sm_bulk_end(time: i64) void {
     for (2..num_states) |n| {
         track = track.next.?;
         cursor.write_byte_assume_available(@intCast(@sizeOf(q.TrackedSMUpdatePacket) - 4 - 19));
-        cursor.write_byte_assume_available(if (n + 1 == num_states) 0xF8 else 0xFF);
+        cursor.write_byte_assume_available(if (n + 1 == num_states) 0x48 else 0x4F);
         cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.name))));
         cursor.write_assume_available(&std.mem.toBytes(offset));
     }

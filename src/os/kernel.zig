@@ -64,6 +64,9 @@ const BTN_DIAG_US: u64 = 2_000_000; // 2 seconds
 var btn_diag_last_us: u64 = 0;
 var btn_diag_cart_was_running: bool = false; // tracks first-run edge
 
+const overlay_refresh_period_us: u64 = 30_000;
+var overlay_refresh_deadline: u64 = 0;
+
 const EARLY_TRACY_WAIT_TIME_US = 0;
 const LATE_TRACY_WAIT_TIME_US = 0; // 60_000_000 * 10; // 10 minutes
 
@@ -238,6 +241,16 @@ pub fn main() !void {
                     console.printf("[BTN] A: no cart to run (cart_count={d})\r\n", .{cart_count});
                 }
             }
+
+            const now = timer.micros();
+            if (now > overlay_refresh_deadline) {
+                overlay_refresh_deadline = now + overlay_refresh_period_us;
+                fps_overlay.tick_os();
+            }
+
+            if (fps_overlay.is_drawing() and !lcd.isBusy()) {
+                fps_overlay.submit_lcd_work();
+            }
         } else {
             // Keep ipc_controls updated every iteration so carts always read fresh
             // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
@@ -293,7 +306,7 @@ pub fn main() !void {
                         (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
 
                     // Flush selected shared-RAM framebuffer.
-                    fps_overlay.tick();
+                    fps_overlay.tick_cart();
                     ready_framebuffer = @volatileCast(@ptrCast(&mailbox.shared_data.framebuffers[fb_index]));
                     if (has_dirty_rect) {
                         const rx: u16 = mailbox.shared_data.dirty_rect_x;
@@ -479,6 +492,8 @@ fn refreshCartDisplay() void {
         const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
         lcd.drawString(@intCast(lcd.width - 8*adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
     }
+
+    fps_overlay.redraw();
 }
 
 /// Callback to count carts
@@ -520,6 +535,8 @@ fn runSelectedCart() void {
         multicore.resetCore1();
         timer.sleep_ms(100);
     }
+
+    fps_overlay.reset_for_cart();
 
     // Show loading screen while the UF2 is read from storage and flashed.
     lcd.fillScreen(lcd.BLACK);

@@ -7,6 +7,7 @@ const timer = @import("../drivers/timer.zig");
 const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
 const rom = @import("../drivers/rom.zig");
+const rtt = @import("../drivers/rtt.zig");
 const mailbox = @import("../ipc/mailbox.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
@@ -170,6 +171,10 @@ pub fn printf(comptime fmt: []const u8, args: anytype) void {
 
 /// Print string to console (USB)
 pub fn print(text: []const u8) void {
+    // TODO handle logging from core 1
+    if (microzig.chip.peripherals.SIO.CPUID.raw == 0) {
+        rtt.log_core0(text);
+    }
     _ = usb.send(text);
 }
 

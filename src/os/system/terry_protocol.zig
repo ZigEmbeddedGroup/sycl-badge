@@ -836,6 +836,37 @@ pub const ZoneEndData = extern union {
     }
 };
 
+pub const TrackedSMRegisterPacket = extern struct {
+    ctx: Packet(ThreadContext),
+    begin: Packet(ZoneBegin),
+
+    pub fn set(self: *@This(), name: [*:0]const u8, abs_time: i64, new_state: *const SourceLocationData) []const u8 {
+        self.* = .{
+            .ctx = .{ .ty = .ThreadContext, .data = .{ .thread = @intFromPtr(name) } },
+            // absolute time because we changed thread contexts
+            .begin = .{ .ty = .ZoneBegin, .data = .{ .time = abs_time - ProtocolOffset32Bit, .srcloc = @intFromPtr(new_state) } },
+        };
+        return std.mem.asBytes(self);
+    }
+};
+
+pub const TrackedSMUpdatePacket = extern struct {
+    ctx: Packet(ThreadContext),
+    end: Packet(ZoneEnd),
+    begin: Packet(ZoneBegin16),
+
+    pub fn set(self: *@This(), name: [*:0]const u8, abs_time: i64, new_state: *const SourceLocationData) []const u8 {
+        self.* = .{
+            .ctx = .{ .ty = .ThreadContext, .data = .{ .thread = @intFromPtr(name) } },
+            // absolute time because we changed thread contexts
+            .end = .{ .ty = .ZoneEnd, .data = .{ .time = abs_time - ProtocolOffset32Bit } },
+            .begin = .{ .ty = .ZoneBegin16, .data = .{ .time = 0, .srcloc = @intFromPtr(new_state) } },
+        };
+        return std.mem.asBytes(self);
+    }
+};
+
+
 pub const PayloadType = [Type.NUM_TYPES]type {
     Empty,                                  // zone text
     Empty,                                  // zone name

@@ -18,7 +18,7 @@ fn StringWrap(comptime str: [:0]const u8) type {
     };
 }
 
-inline fn external_string(comptime str: [:0]const u8) [*:0]const u8 {
+pub inline fn external_string(comptime str: [:0]const u8) [*:0]const u8 {
     return &StringWrap(str).bytes;
 }
 
@@ -52,8 +52,8 @@ pub const core0 = struct {
         pub const is_connected = client.is_connected_core0;
         pub const get_connection_id = client.get_connection_id_core0;
 
-        pub fn begin(comptime max_segments: usize) Writer(max_segments) {
-            return .init_with_cs();
+        pub fn begin(comptime max_segments: usize, cs: microzig.interrupt.CriticalSection) Writer(max_segments) {
+            return .init_with_cs(cs);
         }
 
         fn Writer(comptime max_segments: usize) type {
@@ -64,17 +64,13 @@ pub const core0 = struct {
                 num_extents: usize = 0,
                 literal_bytes: usize = 0,
                 reserved_space: usize = 0,
-                cs: microzig.interrupt.CriticalSection,
-                thread_ctx_data: q.Packet(q.ThreadContext) = undefined,
-                has_thread_ctx: bool,
+                has_core0_thread_ctx: bool,
 
-                fn init_with_cs() @This() {
-                    const cs = microzig.interrupt.enter_critical_section();
+                fn init_with_cs(cs: microzig.interrupt.CriticalSection) @This() {
                     return .{
-                        .cs = cs,
                         .start_time_tracy = client.get_time_core0(cs),
                         .ref_time = client.core0_thread_ref_time,
-                        .has_thread_ctx = client.has_core0_thread_context,
+                        .has_core0_thread_ctx = client.has_core0_thread_context,
                     };
                 }
 
@@ -85,12 +81,12 @@ pub const core0 = struct {
                     w.literal_bytes += data.len;
                 }
 
-                pub fn thread_ctx(w: *@This()) void {
-                    if (!w.has_thread_ctx) {
-                        w.thread_ctx_data = .{ .ty = .ThreadContext, .data = .{ .thread = client.core0_thread_id } };
-                        w.add_extent(std.mem.asBytes(&w.thread_ctx_data));
+                pub fn thread_ctx(w: *@This(), thread_ctx_data: *q.Packet(q.ThreadContext)) void {
+                    if (!w.has_core0_thread_ctx) {
+                        thread_ctx_data.* = .{ .ty = .ThreadContext, .data = .{ .thread = client.core0_thread_id() } };
+                        w.add_extent(std.mem.asBytes(thread_ctx_data));
                         w.ref_time = 0;
-                        w.has_thread_ctx = true;
+                        w.has_core0_thread_ctx = true;
                     }
                 }
 
@@ -104,7 +100,7 @@ pub const core0 = struct {
                     return delta;
                 }
 
-                pub fn commit(w: *@This()) void {
+                pub fn commit(w: *@This()) bool {
                     const layout = client.wire_layout(w.literal_bytes);
                     if (client.send.available_space() >= layout.total_bytes + w.reserved_space) {
                         var cursor = client.write_header_assume_available(layout);
@@ -113,15 +109,15 @@ pub const core0 = struct {
                         }
                         cursor.commit();
 
-                        client.has_core0_thread_context = w.has_thread_ctx;
+                        client.has_core0_thread_context = w.has_core0_thread_ctx;
                         client.core0_thread_ref_time = w.ref_time;
+
+                        return true;
                     } else {
                         client.data_overflow(w.start_time_tracy);
-                    }
-                }
 
-                pub fn end(w: *@This()) void {
-                    w.cs.leave();
+                        return false;
+                    }
                 }
             };
         }
@@ -172,8 +168,10 @@ pub const core0 = struct {
     }
 
     noinline fn outline_zone_begin_static(src_loc: *const q.SourceLocationData) u16 {
-        var writer = interface.begin(2);
-        defer writer.end();
+        const cs = microzig.interrupt.enter_critical_section();
+        defer cs.leave();
+
+        var writer = interface.begin(2, cs);
 
         const conn_id = interface.get_connection_id();
 
@@ -181,11 +179,12 @@ pub const core0 = struct {
             client.push_zone(src_loc);
             _ = client.try_resume_data(writer.start_time_tracy);
         } else {
-            writer.thread_ctx();
+            var thread_ctx_data: q.Packet(q.ThreadContext) = undefined;
+            writer.thread_ctx(&thread_ctx_data);
             var begin_data: q.ZoneBeginData = undefined;
             writer.add_extent( begin_data.set( writer.thread_time(), src_loc ) );
             writer.reserved_space = client.reserved_space_for_begin_zone();
-            writer.commit();
+            _ = writer.commit();
 
             client.push_zone(src_loc);
         }
@@ -198,6 +197,7 @@ pub const core0 = struct {
 
         // TODO on-demand check connection ID
         if (!interface.is_connected()) {
+            // TODO Needs CS?
             client.pop_zone();
             return;
         }
@@ -206,23 +206,141 @@ pub const core0 = struct {
     }
 
     noinline fn outline_zone_end() void {
-        var writer = interface.begin(2);
-        defer writer.end();
+        const cs = microzig.interrupt.enter_critical_section();
+        defer cs.leave();
+
+        var writer = interface.begin(2, cs);
 
         if (client.is_buffer_full()) {
             client.pop_zone();
             _ = client.try_resume_data(writer.start_time_tracy);
         } else {
-            writer.thread_ctx();
+            var thread_ctx_data: q.Packet(q.ThreadContext) = undefined;
+            writer.thread_ctx(&thread_ctx_data);
             var end_data: q.ZoneEndData = undefined;
             writer.add_extent( end_data.set( writer.thread_time() ) );
             writer.reserved_space = client.reserved_space_for_end_zone();
-            writer.commit();
+            _ = writer.commit();
 
             client.pop_zone();
         }
     }
+
+    /// A StateMachine which is recorded in Tracy and shown as its own thread
+    /// register() must be called first, to initialize the state machine,
+    /// then set_state() can be called to update the state.
+    pub fn TrackedStateMachine(comptime State: type) type {
+        return struct {
+            state: State,
+            track: client.TrackedSMEntry,
+
+            pub inline fn register(self: *@This(), comptime name: [:0]const u8, comptime initial_state: State, comptime src: std.builtin.SourceLocation) void {
+                self.register_color(name, initial_state, src, 0);
+            }
+
+            pub inline fn register_color(self: *@This(), comptime name: [:0]const u8, comptime initial_state: State, comptime src: std.builtin.SourceLocation, comptime color: u32) void {
+                self.* = .{
+                    .state = initial_state,
+                    .track = .{
+                        .name = external_string(name),
+                        .srcloc = external_source_location(@tagName(initial_state), src, color),
+                    },
+                };
+
+                outline_register(&self.track);
+            }
+
+            pub inline fn set_state(self: *@This(), comptime state: State, comptime src: std.builtin.SourceLocation) void {
+                self.set_state_color(state, src, 0);
+            }
+
+            // TODO: Instead of taking @src() here, generate a bunch of static source locations for all the tag names, and pick
+            // one based on a runtime state value passed here.
+            pub inline fn set_state_color(self: *@This(), comptime state: State, comptime src: std.builtin.SourceLocation, comptime color: u32) void {
+                self.state = state;
+                self.track.srcloc = external_source_location(@tagName(state), src, color);
+
+                if (!interface.is_connected()) return;
+
+                outline_update_state(&self.track);
+            }
+
+        };
+    }
+
+    noinline fn outline_register(track: *client.TrackedSMEntry) void {
+        const cs = microzig.interrupt.enter_critical_section();
+        defer cs.leave();
+
+        if (!interface.is_connected() or client.is_buffer_full()) {
+            client.add_pending_state(track);
+            return;
+        }
+
+        var writer = interface.begin(1, cs);
+
+        var packet: q.TrackedSMRegisterPacket = undefined;
+
+        writer.add_extent( packet.set(track.name, writer.start_time_tracy, track.srcloc) );
+        writer.has_core0_thread_ctx = false;
+
+        writer.reserved_space = client.reserved_space_for_non_zone();
+
+        if (writer.commit()) {
+            @branchHint(.likely);
+            client.add_tracked_state(track);
+        } else {
+            client.add_pending_state(track);
+        }
+    }
+
+    noinline fn outline_add_to_dirty_without_cs(track: *client.TrackedSMEntry) void {
+
+        // Need to check is_in_dirty again because it may have been set between
+        // our first check and when we took the critical section.
+        std.mem.doNotOptimizeAway(track);
+        if (!track.is_in_dirty) {
+            add_to_dirty(track);
+        }
+    }
+
+    noinline fn add_to_dirty(track: *client.TrackedSMEntry) void {
+        std.debug.assert(!track.is_in_dirty);
+        track.is_in_dirty = true;
+        track.next_dirty = client.core0_dirty_list;
+        client.core0_dirty_list = track;
+        client.core0_num_dirty += 1;
+    }
+
+    noinline fn outline_update_state(track: *client.TrackedSMEntry) void {
+        const cs = microzig.interrupt.enter_critical_section();
+        defer cs.leave();
+
+        var writer = interface.begin(1, cs);
+
+        if (client.is_buffer_full()) {
+            _ = client.try_resume_data(writer.start_time_tracy);
+        } else {
+            var packet: q.TrackedSMUpdatePacket = undefined;
+            writer.add_extent( packet.set(track.name, writer.start_time_tracy, track.srcloc) );
+            writer.has_core0_thread_ctx = false; // Clear the thread context
+
+            writer.reserved_space = client.reserved_space_for_non_zone();
+
+            _ = writer.commit();
+        }
+    }
 };
+
+const EnumLiteral = @Type(.enum_literal);
+fn field_slice(str: anytype, start: EnumLiteral, end: EnumLiteral) []const u8 {
+    const Struct = @typeInfo(@TypeOf(str)).pointer.child;
+    comptime { std.debug.assert(@typeInfo(Struct).@"struct".layout == .@"extern"); }
+    const start_offset = @offsetOf(Struct, @tagName(start));
+    const end_offset = @offsetOf(Struct, @tagName(end)) + @sizeOf(@TypeOf(@field(str, @tagName(end))));
+    comptime { std.debug.assert(start_offset <= end_offset); }
+    return std.mem.asBytes(str)[start_offset..end_offset];
+}
 
 pub fn register_parameter_callback(
     comptime Ctx: type,

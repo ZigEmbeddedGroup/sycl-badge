@@ -144,6 +144,10 @@ pub fn reset_for_cart() void {
     reset_debug_text();
 }
 
+pub fn redraw() void {
+    curr_debug_text = 0;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Enable or disable the FPS overlay.
@@ -172,7 +176,7 @@ fn time_delta(from: u64, to: u64) u32 {
 
 /// Update the FPS measurement.  Call once per rendered frame (before render()).
 /// Returns the current smoothed FPS value.
-pub fn tick() void {
+pub fn tick_cart() void {
     const now = timer.micros();
 
     if (last_frame_us != 0) {
@@ -185,7 +189,19 @@ pub fn tick() void {
 
     last_frame_us = now;
 
-    update_debug_text();
+    reset_debug_text();
+
+    if (!enabled) return;
+
+    add_cart_debug_text();
+}
+
+pub fn tick_os() void {
+    reset_debug_text();
+
+    if (!enabled) return;
+
+    add_os_debug_text();
 }
 
 pub fn submit_audio_mix_time(start: u64, end: u64, max_poll_time: u32) void {
@@ -247,12 +263,8 @@ pub fn submit_lcd_work() void {
 /// Call after the frame has been flushed to the display (after
 /// lcd.writeCartBuffer() or lcd.present()), while the SPI bus is idle,
 /// so the overlay renders on top of the cart frame.
-fn update_debug_text() void {
-    reset_debug_text();
-
-    if (!enabled) return;
-
-    const z = terry.core0.zone("fps_overlay.update_debug_text", @src()); defer z.end();
+fn add_cart_debug_text() void {
+    const z = terry.core0.zone("fps_overlay.add_cart_debug_text", @src()); defer z.end();
 
     // Yellow text on black.
     // Right-justify the FPS value in 3 characters
@@ -262,10 +274,34 @@ fn update_debug_text() void {
     const fps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{fps_display}) catch "???";
     add_debug_text(.{ .text = fps_str, .x = lcd.width, .y = 0, .alignment = .right, .color = lcd.YELLOW });
 
+    add_os_debug_text();
+
+    // Audio time
+    const audio_avg_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{@as(u32, @intFromFloat(audio_percent.average() * 100))}) catch "!!!!";
+    add_debug_text(.{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = lcd.GREEN });
+
+    const audio_time_str = std.fmt.bufPrint(&buf, "{d:>4}", .{audio_mix_times.average()}) catch "!!!!";
+    add_debug_text(.{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE });
+
+    if (display_max_audio_delay != 0) {
+        const poll_max_max = poll_max_history.max();
+        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{poll_max_max * 100 / display_max_audio_delay}) catch "!!!%";
+        add_debug_text(.{ .text = audio_delay_str, .x = 4*font_width, .y = 0, .alignment = .left, .color = lcd.RED });
+    }
+
+    if (display_max_audio != 0) {
+        const audio_max_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio}) catch "!!!!";
+        add_debug_text(.{ .text = audio_max_str, .x = 4*font_width, .y = font_height, .alignment = .left, .color = lcd.RED });
+    }
+}
+
+fn add_os_debug_text() void {
     if (poll_max > 0) {
         poll_max_history.submit(poll_max);
         poll_max = 0;
     }
+
+    var buf: [4]u8 = undefined;
 
     const poll_max_avg = poll_max_history.average();
     const pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_avg}) catch "????";
@@ -284,23 +320,6 @@ fn update_debug_text() void {
 
         const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
         add_debug_text(.{ .text = read_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE });
-    }
-
-    // Audio time
-    const audio_avg_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{@as(u32, @intFromFloat(audio_percent.average() * 100))}) catch "!!!!";
-    add_debug_text(.{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = lcd.GREEN });
-
-    const audio_time_str = std.fmt.bufPrint(&buf, "{d:>4}", .{audio_mix_times.average()}) catch "!!!!";
-    add_debug_text(.{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE });
-
-    if (display_max_audio_delay != 0) {
-        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{poll_max_max * 100 / display_max_audio_delay}) catch "!!!%";
-        add_debug_text(.{ .text = audio_delay_str, .x = 4*font_width, .y = 0, .alignment = .left, .color = lcd.RED });
-    }
-
-    if (display_max_audio != 0) {
-        const audio_max_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio}) catch "!!!!";
-        add_debug_text(.{ .text = audio_max_str, .x = 4*font_width, .y = font_height, .alignment = .left, .color = lcd.RED });
     }
 }
 

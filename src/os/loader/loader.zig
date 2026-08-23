@@ -7,6 +7,7 @@ const uf2 = @import("uf2.zig");
 const rom = @import("../drivers/rom.zig");
 const interrupt = microzig.interrupt;
 const debug_log = @import("../debug_log.zig");
+const terry = @import("../system/terry.zig");
 
 /// Linker symbols for cart_xip region
 extern const __cart_xip_start__: u8;
@@ -46,7 +47,7 @@ pub const LoadError = error{
 };
 
 /// Current cart state
-var cart_state: CartState = .none;
+var cart_state: terry.core0.TrackedStateMachine(CartState) = undefined;
 
 /// Loaded cart entry point (Reset_Handler address from vector table)
 var cart_entry_point: u32 = 0;
@@ -131,9 +132,13 @@ fn findVectorTableAddr(start_addr: u32, end_addr: u32) ?u32 {
     return null;
 }
 
+pub fn init() void {
+    cart_state.register("loader.cart_state", .none, @src());
+}
+
 /// Get current cart state
 pub fn getState() CartState {
-    return cart_state;
+    return cart_state.state;
 }
 
 /// Get loaded cart entry point
@@ -143,24 +148,24 @@ pub fn getEntryPoint() u32 {
 
 /// Check if a cart is ready to execute
 pub fn isReady() bool {
-    return cart_state == .ready;
+    return cart_state.state == .ready;
 }
 
 /// Check if a cart is currently running
 pub fn isRunning() bool {
-    return cart_state == .running;
+    return cart_state.state == .running;
 }
 
 /// Mark cart as running (called when Core 1 starts execution)
 pub fn markRunning() void {
-    if (cart_state == .ready) {
-        cart_state = .running;
+    if (cart_state.state == .ready) {
+        cart_state.set_state(.running, @src());
     }
 }
 
 /// Stop the current cart
 pub fn stop() void {
-    cart_state = .none;
+    cart_state.set_state(.none, @src());
     cart_entry_point = 0;
 }
 
@@ -209,14 +214,14 @@ pub fn eraseCartRegion() LoadError!void {
 /// Returns the entry point address on success
 pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
     // If a cart is already running, stop Core 1 before erasing cart_xip.
-    if (cart_state == .running) {
+    if (cart_state.state == .running) {
         const multicore = @import("../system/multicore.zig");
         multicore.haltCore1();
         multicore.resetCore1();
     }
 
-    cart_state = .loading;
-    errdefer cart_state = .error_state;
+    cart_state.set_state(.loading, @src());
+    errdefer cart_state.set_state(.error_state, @src());
 
     // Find the cart in FAT12 storage
     const cart_info = storage.findCart(name) orelse {
@@ -237,7 +242,7 @@ pub fn loadUF2Cart(name: []const u8) LoadError!u32 {
     @memcpy(&loaded_cart_name, &cart_info.short_name);
     loaded_cart_size = cart_info.size;
     cart_entry_point = entry_point;
-    cart_state = .ready;
+    cart_state.set_state(.ready, @src());
     return entry_point;
 }
 

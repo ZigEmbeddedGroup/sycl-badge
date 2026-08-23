@@ -93,9 +93,6 @@ pub const Pixel = extern struct {
     }
 };
 
-/// Button layout must match kernel.zig ButtonPoller.Buttons exactly:
-/// start, select, a, b, click, up, down, left, right (bits 0-8).
-/// Kernel writes u9 to ipc_controls (0x20020004) each frame when cart sends FRAMEBUFFER_READY.
 pub const Controls = packed struct(u16) {
     start: bool,
     select: bool,
@@ -106,7 +103,7 @@ pub const Controls = packed struct(u16) {
     down: bool,
     left: bool,
     right: bool,
-    _: u7,
+    _pad: u7 = 0,
 };
 
 const is_wasm = switch (builtin.target.cpu.arch) {

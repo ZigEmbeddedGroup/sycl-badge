@@ -68,7 +68,12 @@ var last_keep_alive_us: u64 = 0;
 // give the server/host the benefit of the doubt.
 pub const server_timeout_us = 1_000_000;
 
-pub const core0_thread_id = 1;
+// TIDs in Terry are pointers to the static string that names them.
+// So the core0 id here is the address of the descriptive name to
+// be used in the Tracy view.
+const core0_thread_id_ptr = terry.external_string("Core 0 (OS)");
+pub fn core0_thread_id() u32 { return @intFromPtr(core0_thread_id_ptr); }
+
 pub var core0_thread_ref_time: i64 = 0;
 pub var has_core0_thread_context: bool = false;
 
@@ -151,6 +156,30 @@ const core0_max_zones = 64;
 var core0_zones: [core0_max_zones]*const q.SourceLocationData = undefined;
 pub var core0_num_zones: u32 = 0;
 
+pub const TrackedSMEntry = struct {
+    name: [*:0]const u8,
+    srcloc: *const q.SourceLocationData,
+    next: ?*TrackedSMEntry = null,
+};
+
+var core0_tracked_states: ?*TrackedSMEntry = null;
+var core0_num_tracked_states: u32 = 0;
+
+var core0_pending_states: ?*TrackedSMEntry = null;
+var core0_num_pending_states: u32 = 0;
+
+pub fn add_tracked_state(entry: *TrackedSMEntry) void {
+    entry.next = core0_tracked_states;
+    core0_tracked_states = entry;
+    core0_num_tracked_states += 1;
+}
+
+pub fn add_pending_state(entry: *TrackedSMEntry) void {
+    entry.next = core0_pending_states;
+    core0_pending_states = entry;
+    core0_num_pending_states += 1;
+}
+
 pub fn push_zone(srcloc: *const q.SourceLocationData) void {
     if (core0_num_zones < core0_max_zones) {
         core0_zones[core0_num_zones] = srcloc;
@@ -180,7 +209,11 @@ pub fn pop_zone() void {
 /// For 9-93 zones: 2 byte header + 14 + 3 bytes + 2 byte offset + 1 byte matchlen + 1 byte final header + 11 bytes final literal
 /// 9-93: 34 bytes
 /// From there every extra byte adds 85 more depth, extending the match copy by up to 255 more bytes.
-fn compute_bulk_end_max_len(num_zones: u32) usize {
+fn compute_zone_bulk_end_max_len(num_zones: u32) usize {
+    // Tracy has a hard limit for how much data can be decompressed at once. This limit is like 70k zones, but here's an assert just in case.
+    const max_zones = (q.TargetFrameSize - @sizeOf(q.Packet(q.ThreadContext)) - @sizeOf(q.Packet(q.ZoneEnd)) - @sizeOf(q.Packet(q.ZoneBegin16))) / @sizeOf(q.Packet(q.ZoneEnd16)) + 1;
+    std.debug.assert(num_zones <= max_zones);
+
     var starter_literal_size: usize = 0;
 
     starter_literal_size += @sizeOf(q.Packet(q.ThreadContext));
@@ -211,7 +244,7 @@ fn compute_bulk_end_max_len(num_zones: u32) usize {
     return @sizeOf(u32) + total_lz4_size;
 }
 
-fn core0_emit_bulk_end(time: i64) void {
+fn core0_emit_zone_bulk_end(time: i64) void {
     const warning_zone = terry.external_source_location("Data Lost, Too Many Zones!", @src(), 0xcc1100);
 
     const num_zones = core0_num_zones;
@@ -224,7 +257,7 @@ fn core0_emit_bulk_end(time: i64) void {
     var thread_ctx: q.Packet(q.ThreadContext) = undefined;
     const dt = if (emit_thread_context) blk: {
         starter_literal_size += @sizeOf(@TypeOf(thread_ctx));
-        thread_ctx = .{ .ty = .ThreadContext, .data = .{ .thread = core0_thread_id } };
+        thread_ctx = .{ .ty = .ThreadContext, .data = .{ .thread = core0_thread_id() } };
         has_core0_thread_context = true;
         break :blk time;
     } else time - core0_thread_ref_time;
@@ -321,14 +354,6 @@ fn core0_emit_bulk_end(time: i64) void {
     cursor.commit();
 }
 
-pub fn reserved_space_for_begin_zone() usize {
-    return compute_bulk_end_max_len(core0_num_zones + 1);
-}
-
-pub fn reserved_space_for_end_zone() usize {
-    return compute_bulk_end_max_len(@max(1, core0_num_zones) - 1);
-}
-
 /// For a bulk start operation, we have this sequence:
 /// [1 byte ThreadContext + 4 byte threadID] ++ [1 byte ZoneEnd64 tag, 8 bytes timestamp] ++ [1 byte ZoneBegin16, 0x00_00, 4 bytes srcloc, 4 bytes zero] ** N
 ///                                        ^5                                           ^5+9=14                                                        ^14+11=25
@@ -345,7 +370,11 @@ pub fn reserved_space_for_end_zone() usize {
 /// which we can then repeat for 11*N-(max+1) bytes before ending with a literal of the MSB of srcloc and 4 bytes of zero
 /// So our whole sequence is:
 /// For (max+2)+, 2 byte header, 25+4 incompressible, 2 offset, [1 header, 4 srcloc, 2 offset] ** (max+1)-2, [1 header, 4 srcloc, 2 offset, ext matchlen], 1 header, 8 tail
-fn compute_bulk_begin_max_len(num_zones: u32) usize {
+fn compute_zone_bulk_begin_max_len(num_zones: u32) usize {
+    // Tracy has a hard limit for how much data can be decompressed at once. This limit is like 23k zones, but here's an assert just in case.
+    const max_zones = (q.TargetFrameSize - @sizeOf(q.Packet(q.ThreadContext)) - @sizeOf(q.Packet(q.ZoneEnd))) / @sizeOf(q.Packet(q.ZoneBegin16));
+    std.debug.assert(num_zones <= max_zones);
+
     var starter_literal_size: usize = 0;
     starter_literal_size += @sizeOf(q.Packet(q.ThreadContext));
     starter_literal_size += @sizeOf(q.ZoneEndData);
@@ -391,7 +420,7 @@ fn compute_bulk_begin_max_len(num_zones: u32) usize {
     return @sizeOf(u32) + total_lz4_size;
 }
 
-fn core0_emit_bulk_begin(time: i64) void {
+fn core0_emit_zone_bulk_begin(time: i64) void {
     const overflow_zone = terry.external_source_location("Zones Too Deep", @src(), 0x4E3729);
 
     var starter_literal_size: usize = 0;
@@ -404,7 +433,7 @@ fn core0_emit_bulk_begin(time: i64) void {
     var thread_ctx: q.Packet(q.ThreadContext) = undefined;
     const dt = if (emit_thread_context) blk: {
         starter_literal_size += @sizeOf(@TypeOf(thread_ctx));
-        thread_ctx = .{ .ty = .ThreadContext, .data = .{ .thread = core0_thread_id } };
+        thread_ctx = .{ .ty = .ThreadContext, .data = .{ .thread = core0_thread_id() } };
         has_core0_thread_context = true;
         break :blk time;
     } else time - core0_thread_ref_time;
@@ -546,10 +575,332 @@ fn core0_emit_bulk_begin(time: i64) void {
     cursor.commit();
 }
 
+/// To end the state machines, we have this sequence for each state machine:
+/// [1 byte ThreadContext + 4 byte name ptr], [1 byte ZoneEnd tag, 8 bytes timestamp], [1 byte ZoneBegin16 tag, 2 bytes zero, 4 bytes error zone, 4 bytes zero]
+/// Within each packet, the only values that change are the name ptr. Everything else is long enough to satisfy the standard requirements.
+fn compute_sm_bulk_end_len(num_states: u32) usize {
+    if (num_states == 0) return 0; // no packet
+
+    if (num_states == 1) {
+        // just a literal
+        return wire_layout(@sizeOf(q.TrackedSMUpdatePacket)).total_bytes;
+    }
+
+    // Each repeat copies 21 bytes, which means it needs 1 byte of extended matchlen.
+    // The last repeat copies only 12 bytes, so it needs 0 bytes of extended matchlen.
+    // We consider a repeat to include the matchlen from the previous 
+    const starter_literal_len = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const starter_lz4_len = header_size(starter_literal_len) + starter_literal_len + 2; // 2 byte offset
+    const num_repeats = num_states - 2;
+    const single_repeat_lz4_bytes = 1 + 1 + 4 + 2; // extended matchlen + header + name ptr + offset
+    const repeat_lz4_len = num_repeats * single_repeat_lz4_bytes;
+    const tail_literal_len = 8;
+    const tail_lz4_len = header_size(tail_literal_len) + tail_literal_len;
+    const total_lz4_len: u32 = starter_lz4_len + repeat_lz4_len + tail_lz4_len;
+
+    return 4 + total_lz4_len; // 4 byte size plus big data packet
+}
+
+fn core0_emit_sm_bulk_end(time: i64) void {
+    const warning_zone = terry.external_source_location("Data Lost, Too Many Zones!", @src(), 0xcc1100);
+
+    const num_states = core0_num_tracked_states;
+    if (num_states == 0) return; // no packet
+
+    has_core0_thread_context = false;
+
+    if (num_states == 1) {
+        const track = core0_tracked_states.?;
+        // just a literal
+        var packet: q.TrackedSMUpdatePacket = undefined;
+        const bytes = packet.set(track.name, time, warning_zone);
+        const layout = wire_layout(bytes.len);
+        var cursor = write_header_assume_available(layout);
+        cursor.write_assume_available(bytes);
+        cursor.commit();
+
+        return;
+    }
+
+    // Each repeat copies 21 bytes, which means it needs 1 byte of extended matchlen.
+    // The last repeat copies only 12 bytes, so it needs 0 bytes of extended matchlen.
+    // We consider a repeat to include the matchlen from the previous 
+    const starter_literal_len = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const starter_lz4_len = header_size(starter_literal_len) + starter_literal_len + 2; // 2 byte offset
+    const num_repeats = num_states - 2;
+    const single_repeat_lz4_bytes = 1 + 1 + 4 + 2; // extended matchlen + header + name ptr + offset
+    const repeat_lz4_len = num_repeats * single_repeat_lz4_bytes;
+    const tail_literal_len = 8;
+    const tail_lz4_len = header_size(tail_literal_len) + tail_literal_len;
+    const total_lz4_len: u32 = starter_lz4_len + repeat_lz4_len + tail_lz4_len;
+
+    var track = core0_tracked_states.?;
+    var cursor = send.cursor();
+    cursor.write_assume_available(std.mem.asBytes(&total_lz4_len));
+    
+    var packet: q.TrackedSMUpdatePacket = undefined;
+    comptime { std.debug.assert(starter_literal_len >= 15 and starter_literal_len < (15 + 255)); }
+    comptime { std.debug.assert(@sizeOf(q.TrackedSMUpdatePacket) - 4 >= 15 + 4); }
+
+    // First literal header
+    cursor.write_byte_assume_available(if (num_states == 2) 0xF8 else 0xFF);
+    cursor.write_byte_assume_available(@intCast(starter_literal_len - 15));
+    // First literal data, first item and second up to ctx
+    cursor.write_assume_available( packet.set(track.name, time, warning_zone) );
+    track = track.next.?;
+    packet.ctx.data = .{ .thread = @intFromPtr(track.name) };
+    cursor.write_assume_available( std.mem.asBytes(&packet.ctx) );
+    const offset: u16 = @sizeOf(q.TrackedSMUpdatePacket);
+    cursor.write_assume_available( &std.mem.toBytes(offset) );
+
+    for (2..num_states) |n| {
+        track = track.next.?;
+        cursor.write_byte_assume_available( @intCast(@sizeOf(q.TrackedSMUpdatePacket) - 4 - 19) );
+        cursor.write_byte_assume_available( if (n+1 == num_states) 0xF8 else 0xFF );
+        cursor.write_assume_available( &std.mem.toBytes(@as(u32, @intFromPtr(track.name))) );
+        cursor.write_assume_available( &std.mem.toBytes(offset) );
+    }
+
+    cursor.write_byte_assume_available(0x80);
+    cursor.write_assume_available( &std.mem.toBytes(@as(u64, @intFromPtr(warning_zone))) );
+
+    cursor.commit();
+}
+
+/// [1 byte ThreadContext + 4 byte name ptr], [1 byte ZoneBegin tag, 8 bytes timestamp, 4 bytes zone, 4 bytes zero]
+/// The name ptr and zone are uncompressable.
+fn core0_compute_sm_bulk_declare_len() usize {
+    const num_states = core0_num_pending_states;
+    if (num_states == 0) return 0;
+    if (num_states == 1) return wire_layout(@sizeOf(q.TrackedSMRegisterPacket)).total_bytes;
+    
+    const first_literal_size = @sizeOf(q.TrackedSMRegisterPacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const single_repeat_size = 1 + 4 + 2 + 1 + 4 + 2;
+    const last_literal_size = 8;
+
+    const total_lz4_size = header_size(first_literal_size) + first_literal_size + 2 + (single_repeat_size * (num_states - 2)) + header_size(last_literal_size) + last_literal_size;
+
+    return 4 + total_lz4_size;
+}
+
+fn core0_emit_sm_bulk_declare_and_mark_tracked(time: i64) void {
+    const num_states = core0_num_pending_states;
+    if (num_states == 0) return;
+
+    // We are going to invalidate core0 thread context
+    has_core0_thread_context = false;
+
+    // At the end of this function, `track` will be the last pending state.
+    // at that point, we need to clear the pending states and link them
+    // into the tracked list.
+    var track = core0_pending_states.?;
+    defer {
+        std.debug.assert(track.next == null);
+        track.next = core0_tracked_states;
+        core0_tracked_states = core0_pending_states;
+        core0_pending_states = null;
+
+        core0_num_tracked_states += num_states;
+        core0_num_pending_states = 0;
+    }
+
+    if (num_states == 1) {
+        var packet: q.TrackedSMRegisterPacket = undefined;
+        const bytes = packet.set(track.name, time, track.srcloc);
+        const layout = wire_layout(bytes.len);
+        var cursor = write_header_assume_available(layout);
+        cursor.write_assume_available(bytes);
+
+        std.debug.assert(cursor.uncommitted_len() == layout.total_bytes);
+        std.debug.assert(cursor.uncommitted_len() == core0_compute_sm_bulk_declare_len());
+
+        cursor.commit();
+
+        return;
+    }
+
+    const first_literal_size = @sizeOf(q.TrackedSMRegisterPacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const single_repeat_size = 1 + 4 + 2 + 1 + 4 + 2;
+    const last_literal_size = 8;
+
+    const total_lz4_size: u32 = header_size(first_literal_size) + first_literal_size + 2 + (single_repeat_size * (num_states - 2)) + header_size(last_literal_size) + last_literal_size;
+
+    var cursor = send.cursor();
+    cursor.write_assume_available(&std.mem.toBytes(total_lz4_size));
+
+    comptime { std.debug.assert(header_size(first_literal_size) == 2); }
+    cursor.write_byte_assume_available(0xF5);
+    cursor.write_byte_assume_available(@intCast( first_literal_size - 15 ));
+    var packet: q.TrackedSMRegisterPacket = undefined;
+    const bytes = packet.set(track.name, time, track.srcloc);
+    cursor.write_assume_available(bytes);
+
+    track = track.next.?;
+    packet.ctx.data = .{ .thread = @intFromPtr(track.name) };
+    cursor.write_assume_available(std.mem.asBytes(&packet.ctx));
+
+    const offset: u16 = @sizeOf(q.TrackedSMRegisterPacket);
+    cursor.write_assume_available(&std.mem.toBytes(offset));
+
+    for (2..num_states) |_| {
+        cursor.write_byte_assume_available(0x41);
+        cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.srcloc))));
+        cursor.write_assume_available(&std.mem.toBytes(offset));
+        track = track.next.?;
+        cursor.write_byte_assume_available(0x45);
+        cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.name))));
+        cursor.write_assume_available(&std.mem.toBytes(offset));
+    }
+
+    cursor.write_byte_assume_available(0x80);
+    cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(track.srcloc))));
+
+    std.debug.assert(cursor.uncommitted_len() == 4 + total_lz4_size);
+    std.debug.assert(cursor.uncommitted_len() == core0_compute_sm_bulk_declare_len());
+
+    cursor.commit();
+}
+
+/// [1 byte ThreadContext + 4 byte name ptr], [1 byte ZoneEnd tag, 8 bytes timestamp], [1 byte ZoneBegin16 tag, 2 bytes zero, 4 bytes zone, 4 bytes zero]
+/// The name ptr and zone are uncompressable.
+fn core0_compute_sm_bulk_update_len() usize {
+    const num_states = core0_num_pending_states;
+    if (num_states == 0) return 0;
+    if (num_states == 1) return wire_layout(@sizeOf(q.TrackedSMUpdatePacket)).total_bytes;
+
+    const first_literal_size = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const single_repeat_size = 1 + 4 + 2 + 1 + 4 + 2;
+    const last_literal_size = 8;
+
+    const total_lz4_size = header_size(first_literal_size) + first_literal_size + 2 + (single_repeat_size * (num_states - 2)) + header_size(last_literal_size) + last_literal_size;
+
+    return 4 + total_lz4_size;
+
+}
+
+fn core0_emit_sm_bulk_update(time: i64) void {
+    const num_states = core0_num_tracked_states;
+    if (num_states == 0) return;
+
+    // We are going to invalidate core0 thread context
+    has_core0_thread_context = false;
+
+    var track = core0_tracked_states.?;
+    defer { std.debug.assert(track.next == null); }
+
+    if (num_states == 1) {
+        var packet: q.TrackedSMUpdatePacket = undefined;
+        const bytes = packet.set(track.name, time, track.srcloc);
+        const layout = wire_layout(bytes.len);
+        var cursor = write_header_assume_available(layout);
+        cursor.write_assume_available(bytes);
+
+        std.debug.assert(cursor.uncommitted_len() == layout.total_bytes);
+        std.debug.assert(cursor.uncommitted_len() == compute_sm_bulk_end_len(num_states));
+        cursor.commit();
+
+        return;
+    }
+
+    const first_literal_size = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
+    const single_repeat_size = 1 + 4 + 2 + 1 + 4 + 2;
+    const last_literal_size = 8;
+
+    const total_lz4_size: u32 = header_size(first_literal_size) + first_literal_size + 2 + (single_repeat_size * (num_states - 2)) + header_size(last_literal_size) + last_literal_size;
+
+    var cursor = send.cursor();
+    cursor.write_assume_available(&std.mem.toBytes(total_lz4_size));
+
+    comptime { std.debug.assert(header_size(first_literal_size) == 2); }
+    cursor.write_byte_assume_available(0xF8);
+    cursor.write_byte_assume_available(@intCast( first_literal_size - 15 ));
+    var packet: q.TrackedSMUpdatePacket = undefined;
+    const bytes = packet.set(track.name, time, track.srcloc);
+    cursor.write_assume_available(bytes);
+
+    track = track.next.?;
+    packet.ctx.data = .{ .thread = @intFromPtr(track.name) };
+    cursor.write_assume_available(std.mem.asBytes(&packet.ctx));
+
+    const offset: u16 = @sizeOf(q.TrackedSMUpdatePacket);
+    cursor.write_assume_available(&std.mem.toBytes(offset));
+
+    for (2..num_states) |_| {
+        cursor.write_byte_assume_available(0x41);
+        cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.srcloc))));
+        cursor.write_assume_available(&std.mem.toBytes(offset));
+        track = track.next.?;
+        cursor.write_byte_assume_available(0x48);
+        cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.name))));
+        cursor.write_assume_available(&std.mem.toBytes(offset));
+    }
+
+    cursor.write_byte_assume_available(0x80);
+    cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(track.srcloc))));
+
+    std.debug.assert(cursor.uncommitted_len() == total_lz4_size + 4);
+    std.debug.assert(cursor.uncommitted_len() == compute_sm_bulk_end_len(num_states));
+    cursor.commit();
+}
+
+fn core0_compute_bulk_end_len(num_zones: u32, num_sms: u32) usize {
+    return compute_zone_bulk_end_max_len(num_zones) +
+        compute_sm_bulk_end_len(num_sms);
+}
+
+fn core0_emit_bulk_end(time: i64) void {
+    const write_size = core0_compute_bulk_end_len(core0_num_zones, core0_num_tracked_states);
+    std.debug.assert(send.available_space() >= write_size);
+    const start_pos = send.write_offset;
+
+    core0_emit_zone_bulk_end(time);
+    core0_emit_sm_bulk_end(time);
+
+    const end_pos = send.write_offset;
+    const len = if (start_pos <= end_pos) end_pos - start_pos else send.size + end_pos - start_pos;
+    std.debug.assert(len == write_size);
+}
+
+fn core0_compute_bulk_begin_len(num_zones: u32) usize {
+    return compute_zone_bulk_begin_max_len(num_zones) +
+        core0_compute_sm_bulk_update_len() +
+        core0_compute_sm_bulk_declare_len();
+}
+
+fn core0_emit_bulk_begin(time: i64) void {
+    const write_size = core0_compute_bulk_begin_len(core0_num_zones);
+    std.debug.assert(send.available_space() >= write_size);
+    const start_pos = send.write_offset;
+
+    core0_emit_zone_bulk_begin(time);
+    core0_emit_sm_bulk_update(time);
+    core0_emit_sm_bulk_declare_and_mark_tracked(time);
+
+    const end_pos = send.write_offset;
+    const len = if (start_pos <= end_pos) end_pos - start_pos else send.size + end_pos - start_pos;
+    std.debug.assert(len == write_size);
+}
+
+pub inline fn reserved_space_for_begin_zone() usize {
+    return core0_compute_bulk_end_len(core0_num_zones + 1, core0_num_tracked_states);
+}
+
+pub inline fn reserved_space_for_end_zone() usize {
+    return core0_compute_bulk_end_len(@max(1, core0_num_zones) - 1, core0_num_tracked_states);
+}
+
+pub inline fn reserved_space_for_non_zone() usize {
+    return core0_compute_bulk_end_len(core0_num_zones, core0_num_tracked_states);
+}
+
+pub inline fn reserved_space_post_bulk_begin() usize {
+    return core0_compute_bulk_end_len(core0_num_zones, core0_num_pending_states + core0_num_tracked_states);
+}
+
 pub fn available_space_with_reservation() usize {
     const raw_available = send.available_space();
     if (state == .connected) {
-        const reserved_space = compute_bulk_end_max_len(core0_num_zones);
+        const reserved_space = reserved_space_for_non_zone();
         std.debug.assert(raw_available >= reserved_space);
         return raw_available - reserved_space;
     } else {
@@ -557,8 +908,14 @@ pub fn available_space_with_reservation() usize {
     }
 }
 
-
-var time_high: u32 = 0;
+// Set time_high to force absolute times to be 64 bit.
+// This ensures that packet sizes with thread contexts
+// are predictable, which simplifies some of the LZ4
+// packing routines for bulk begin/end.
+// This limit would naturally be hit after about 30
+// seconds, so forcing these to be large doesn't
+// significantly impact our overall bandwidth.
+var time_high: u32 = q.ProtocolOffset32Bit >> 32 + 1;
 var time_last: u32 = 0;
 pub fn get_time_core0(cs: microzig.interrupt.CriticalSection) i64 {
     _ = cs; // Just to make sure the caller has a crit sec
@@ -628,7 +985,7 @@ pub fn is_buffer_full() bool {
 
 pub fn try_resume_data(time: i64) bool {
     const resume_safety_margin = 128;
-    const necessary_bytes = compute_bulk_begin_max_len(core0_num_zones) + resume_safety_margin + compute_bulk_end_max_len(core0_num_zones);
+    const necessary_bytes = core0_compute_bulk_begin_len(core0_num_zones) + resume_safety_margin + reserved_space_post_bulk_begin();
     if (send.available_space() >= necessary_bytes) {
         core0_emit_bulk_begin(time);
         state = .connected;
@@ -708,15 +1065,19 @@ pub fn poll() void {
 
             // Make sure we have enough space for some data and a bulk end before starting
             std.debug.assert(core0_num_zones == 0); // TODO on-demand this might not be true on reconnect, might need special handling
-            if (send.available_space() < 128 + compute_bulk_end_max_len(0)) {
+            if (send.available_space() < 128 + core0_compute_sm_bulk_declare_len() + reserved_space_post_bulk_begin()) {
                 return;
             }
+
+            // Declare any tracked state machines
+            has_core0_thread_context = false;
+            core0_emit_sm_bulk_declare_and_mark_tracked(get_time_core0(undefined));
 
             if (support_on_demand) {
                 @atomicRmw(u16, &atomic_connection_id, .Add, 1, .release);
             }
-            has_core0_thread_context = false;
             @atomicStore(bool, &atomic_is_connected, true, .release);
+
             interrupt_trace_enabled = true;
             last_keep_alive_us = timer.micros();
             log("TERRY: .new_connection => .connected\n");
@@ -757,13 +1118,10 @@ pub fn poll() void {
                     .ServerQueryFrameName => send_string_ptr(query.ptr, .FrameName, .server_query),
                     .ServerQueryFiberName => send_string_ptr(query.ptr, .FiberName, .server_query),
 
-                    .ServerQueryThreadString => {
-                        var thread_name: []const u8 = "Unknown Thread";
-                        if (query.ptr == core0_thread_id) {
-                            thread_name = "Core 0 (OS)";
-                        }
-                        send_string(query.ptr, thread_name, .ThreadName, .server_query);
-                    },
+                    // Normally query.ptr for ServerQueryThreadString would be a TID, but since we don't
+                    // have TIDs, Terry uses pointers to the name string as its the thread identifier.
+                    // Note that this is also used for Tracked State Machine names, which are tracked as if they were threads.
+                    .ServerQueryThreadString => send_string_ptr(query.ptr, .ThreadName, .server_query),
 
                     .ServerQueryExternalName => send_string(query.ptr, "???", .ExternalThreadName, .external_name_pt1), // External name request sends two strings in response
 
@@ -936,6 +1294,19 @@ fn try_send_packet() void {
                 state = .unrecoverable_error;
                 return;
             };
+
+            if (state == .connected) {
+                const space_needed = reserved_space_for_non_zone();
+                while (send.available_space() < space_needed) {
+                    if (timer.micros() > deadline) {
+                        // TODO the output stream is consistent in this state, we might be able to
+                        // recover from this one.
+                        log("TERRY: .send_packet => .unrecoverable_error, timeout in large send\n");
+                        state = .unrecoverable_error;
+                        return;
+                    }
+                }
+            }
         } else {
             // Small packet but we can't send it now, try it next poll.
             // TODO if this happens for too long, risk a blocking send.

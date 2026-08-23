@@ -4,7 +4,7 @@
 .layout = "index.shtml",
 ---
 
-# Acknowledgements
+# [Acknowledgements]($section.id('acknowledgements'))
 
 The hard work of updating the Badge from V1 to V2 was largely done as a capstone
 project at the University of British Columbia. The team comprised of:
@@ -19,7 +19,7 @@ The design for this manual is based off [The Proportional
 Web](https://owickstrom.github.io/the-proportional-web/) by [Oskar
 Wickström](https://wickstrom.tech)
 
-# Introduction
+# [Introduction]($section.id('introduction'))
 
 Congratulations, you're the owner of a brand new SYCL Badge V2. With any luck,
 you're currently at Tables Day, hanging out with your friends during [Software
@@ -39,7 +39,7 @@ performance. The most notable upgrade was changing the MCU to an RP2354. It has
 a hardware USB bootloader, which allows users to recover from a bricked state if
 they decide to author their own OS. The hardware upgrades include:
 
-## Hardware Improvments over V1
+## [Hardware Improvments over V1]($section.id('hardware-improvements-over-v1'))
 
 | Feature   | V1 | V2 |
 |-----------|----|----|
@@ -52,3 +52,76 @@ they decide to author their own OS. The hardware upgrades include:
 | Battery | 3.7V LiPo | 3x AAAs |
 
 \* RISC-V cores are not utilized in the Badge V2 at the time of writing.
+
+# [Building From Source]($section.id('building-from-source'))
+
+Carts are currently written in Zig, but more languages will be supported in the
+future. The Zig version required is currently `0.15.2`. Clone the repository with:
+
+```sh
+git clone https://github.com/ZigEmbeddedGroup/sycl-badge
+```
+
+Then from within the project you may build all the examples (and more) with:
+
+```sh
+zig build
+```
+
+This will take a few moments. It builds all the tools in MicroZig needed to
+generate code, as well as the Badge OS. 
+
+# [Loading Carts]($section.id('loading-carts'))
+
+Once the build is complete you will find a mix of file extensions:
+
+- `elf:` The original container file, not usually useful unless debugging,
+  developing the kernel, or inspecting generated output of the compiler.
+- `uf2:` The file that will be used to load carts onto the Badge. These are
+  transferred over USB using a Mass Storage Class Interface. This will typically
+  be presented to the user as a mounted drive.
+- `wasm:` The same application, but cross-compiled for the browser-based
+  simulator.
+
+We will be using the `uf2` file to upload our cart here. when you plug in and
+turn the power on the badge, most PC operating systems will automatically mount
+the drive. Our drive will be named `SYCL BADGE V2`. To load a particualar cart,
+copy or move the file to the mounted drive. You will see a progess indicator on
+the screen until it is completely transfered. It may be run at this time.
+
+If you are familiar with the Zig build system, and wish to publish your cart as
+a standalone code repository, then using `sycl-badge` as a dependency is
+suggested. If you wish to contribute your application, are unfamiliar with the
+Zig build system, or want to hack on the Badge OS, then it's suggested to fork
+this repository.
+
+# [Flashing the Operating System]($section.id('flashing-the-operating-system'))
+
+For SYCL 2026, the Badge will come with the OS installed. For beta testers or
+those wishing to hack on the kernel, there are two methods to flash the Badge
+with a new kernel. The first is to use the pico debugger that came with the
+badge. See Using the Pico Debugger.
+
+The second is to use a similar process as loading a cart, but instead of the OS
+loading a cart to external flash, you'll be using the RP2350's hardware UF2
+bootloader to install the kernel. Once you have [built from source]($link.ref('building-from-source')) you need to:
+
+1. Plug the badge to your PC using USB.
+2. Facking the back of the Badge, press down on both the `RESET` and `BOOT_SEL`
+   buttons at the same time.
+3. Release the `RESET` button.
+4. Release the `BOOT_SELL` button.
+5. Confirm that the `RASPI` mounted drive shows up. Linux may require manully
+   mounting it.
+6. Copy/move the file `zig-out/firmware/sycl-os-kernel.uf2` to the newly mounted
+   drive.
+
+This will cause the drive to disappear and the Badge will reset, running your
+new OS firmware build.
+
+# [Errata]($section.id('errata'))
+
+## [Revision 0]($section.id('revision-0'))
+
+SWD and UART JST connectors are wired incorrectly, the pins are reverse from
+what they need to be in order to match the cable for the pico debug.

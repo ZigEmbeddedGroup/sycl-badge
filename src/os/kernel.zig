@@ -20,49 +20,26 @@ const loader = @import("loader/loader.zig");
 const multicore = @import("system/multicore.zig");
 const terry = @import("system/terry.zig");
 const mailbox = @import("ipc/mailbox.zig");
+const cart_api = @import("cart/api.zig");
+
+const Controls = cart_api.Controls;
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
 
-// Simple button poller (similar to badge-v1)
-const ButtonPoller = struct {
-    /// All physical buttons on the badge.
-    /// Bits 0-8 mirror the cart API Controls layout (start, select, a, b, click, up, down, left, right)
-    /// so they can be forwarded directly to ipc_controls. Order must match src/os/cart/api.zig Controls.
-    pub const Buttons = packed struct(u9) {
-        start: u1, // GPIO 5 (board.button_start)
-        select: u1, // GPIO 38 (board.button_select)
-        a: u1, // GPIO 6 (board.button_a)
-        b: u1, // GPIO 7 (board.button_b)
-        click: u1, // GPIO 36 (board.joystick_click)
-        up: u1, // GPIO 37
-        down: u1, // GPIO 24
-        left: u1, // GPIO 35
-        right: u1, // GPIO 25
+pub fn read_buttons() Controls {
+    return .{
+        .start = gpio.isButtonPressed(board.button_start),
+        .select = gpio.isButtonPressed(board.button_select),
+        .a = gpio.isButtonPressed(board.button_a),
+        .b = gpio.isButtonPressed(board.button_b),
+        .click = gpio.isButtonPressed(board.joystick_click), // joystick press-in button
+        .up = gpio.isButtonPressed(board.joystick_up),
+        .down = gpio.isButtonPressed(board.joystick_down),
+        .left = gpio.isButtonPressed(board.joystick_left),
+        .right = gpio.isButtonPressed(board.joystick_right),
     };
-
-    pub fn init() ButtonPoller {
-        gpio.initButtons();
-        return ButtonPoller{};
-    }
-
-    pub fn read(self: ButtonPoller) Buttons {
-        _ = self;
-        const start_pressed = gpio.isButtonPressed(board.button_start);
-        const select_pressed = gpio.isButtonPressed(board.button_select);
-        return .{
-            .start = if (start_pressed) 1 else 0,
-            .select = if (select_pressed) 1 else 0,
-            .a = if (gpio.isButtonPressed(board.button_a)) 1 else 0,
-            .b = if (gpio.isButtonPressed(board.button_b)) 1 else 0,
-            .click = if (gpio.isButtonPressed(board.joystick_click)) 1 else 0, // joystick press-in button
-            .up = if (gpio.isButtonPressed(board.joystick_up)) 1 else 0,
-            .down = if (gpio.isButtonPressed(board.joystick_down)) 1 else 0,
-            .left = if (gpio.isButtonPressed(board.joystick_left)) 1 else 0,
-            .right = if (gpio.isButtonPressed(board.joystick_right)) 1 else 0,
-        };
-    }
-};
+}
 
 // Y position for cart list display
 var cart_y_pos: u16 = 2;
@@ -78,7 +55,7 @@ var last_cart_check: u64 = 0;
 
 // Stop combo: require both START+SELECT held for 500ms before triggering
 const STOP_COMBO_HOLD_US: u64 = 500_000;
-var stop_combo_held_since: u64 = 0; // 0 = not currently held
+var stop_combo_deadline: u64 = 0; // 0 = not currently held
 
 // Button diagnostic logging: print raw button state every BTN_DIAG_US microseconds
 // while a cart is running.  Uses timer.micros() so it fires at a wall-clock rate
@@ -91,15 +68,7 @@ const EARLY_TRACY_WAIT_TIME_US = 0;
 const LATE_TRACY_WAIT_TIME_US = 0; // 60_000_000 * 10; // 10 minutes
 
 // Button state tracking
-var joystick_up_was_pressed: bool = false;
-var joystick_down_was_pressed: bool = false;
-var joystick_left_was_pressed: bool = false;
-var joystick_right_was_pressed: bool = false;
-var joystick_click_was_pressed: bool = false;
-var button_a_was_pressed: bool = false;
-var button_b_was_pressed: bool = false;
-var button_select_was_pressed: bool = false;
-var button_start_was_pressed: bool = false;
+var last_buttons: Controls = @bitCast(@as(u16, 0));
 
 // Cursor tracking for cart selection
 var cursor_index: usize = 0; // Which cart is currently selected
@@ -146,18 +115,7 @@ pub fn main() !void {
 
     ready_fb_state.register("kernel.ready_fb_state", .not_ready, @src());
 
-    // Initialize button poller
-    const button_poller = ButtonPoller.init();
-    const initial = button_poller.read();
-    joystick_up_was_pressed = (initial.up == 1);
-    joystick_down_was_pressed = (initial.down == 1);
-    joystick_left_was_pressed = (initial.left == 1);
-    joystick_right_was_pressed = (initial.right == 1);
-    joystick_click_was_pressed = (initial.click == 1);
-    button_a_was_pressed = (initial.a == 1);
-    button_b_was_pressed = (initial.b == 1);
-    button_select_was_pressed = (initial.select == 1);
-    button_start_was_pressed = (initial.start == 1); // start button stops cart and sends back to main menu
+    last_buttons = read_buttons();
 
     // Initial cart display
     refreshCartDisplay();
@@ -188,127 +146,102 @@ pub fn main() !void {
         var cart_running = (cart_state == .running) or (cart_state == .ready);
 
         // Poll buttons
-        const buttons = button_poller.read();
+        const buttons = read_buttons();
+        const changed: Controls = @bitCast(@as(u16, @bitCast(buttons)) ^ @as(u16, @bitCast(last_buttons)));
+        const pressed: Controls = @bitCast(@as(u16, @bitCast(buttons)) & @as(u16, @bitCast(changed)));
+        const released: Controls = @bitCast(~@as(u16, @bitCast(buttons)) & @as(u16, @bitCast(changed)));
+        _ = released; // not currently used
+        defer last_buttons = buttons;
 
         // Start + Select combo stops running cart (prevents accidental exit in carts
         // that use the Start button for their own purposes).
         // Require both held for 250ms to avoid accidental trigger when pressing START alone.
-        const stop_combo = (buttons.start == 1 and buttons.select == 1);
-        if (stop_combo) {
-            if (stop_combo_held_since == 0) {
-                stop_combo_held_since = timer.micros();
+        const stop_combo = (buttons.start and buttons.select);
+        if (cart_running and stop_combo) {
+            if (stop_combo_deadline == 0) {
+                stop_combo_deadline = timer.micros() + STOP_COMBO_HOLD_US;
             }
-            const held_us = timer.micros() -% stop_combo_held_since;
-            if (held_us >= STOP_COMBO_HOLD_US and !button_start_was_pressed) {
-                button_start_was_pressed = true;
+            if (timer.micros() > stop_combo_deadline) {
                 console.printf("[BTN] START+SELECT (STOP) pressed (cart_running={})\r\n", .{cart_running});
-                if (cart_running) {
-                    console.println("[STOP] 1: halting Core 1");
-                    multicore.haltCore1();
-                    console.println("[STOP] 2: stopDMA");
-                    lcd.stopDMA();
-                    console.println("[STOP] 3a: resetCartBuzzer");
-                    audio.reset();
-                    console.println("[STOP] 3b: resetCartPWM");
-                    gpio.resetCartPWM();
-                    console.println("[STOP] 3c: resetCartPIO");
-                    gpio.resetCartPIO();
-                    console.println("[STOP] 3d: resetCartNeopixels");
-                    gpio.resetCartNeopixels();
-                    console.println("[STOP] 3e: resetCartLED");
-                    gpio.resetCartLED();
-                    console.println("[STOP] 3f: initButtons");
-                    gpio.initButtons();
-                    console.println("[STOP] 4: abortCartChannels");
-                    dma.abortCartChannels();
-                    console.println("[STOP] 5: loader.stop");
-                    loader.stop();
-                    console.println("[STOP] 6: resetCore1");
-                    multicore.resetCore1();
-                    // Mark cart as stopped and restore state before reinit
-                    cart_running = false;
-                    display_active = true;
-                    btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
-                    ready_fb_state.set_state(.not_ready, @src());
-                    button_a_was_pressed = (buttons.a == 1);
-                    joystick_up_was_pressed = (buttons.up == 1);
-                    joystick_down_was_pressed = (buttons.down == 1);
-                    button_start_was_pressed = (buttons.start == 1 and buttons.select == 1);
-                    console.println("[STOP] 7: reinitDisplay");
-                    lcd.reinitDisplay();
-                    console.println("[STOP] 8: refreshCartDisplay");
-                    refreshCartDisplay();
-                    last_cart_hash = computeCartHash();
-                    console.println("[STOP] 9: done");
-                }
+                console.println("[STOP] 1: halting Core 1");
+                multicore.haltCore1();
+                console.println("[STOP] 2: stopDMA");
+                lcd.stopDMA();
+                console.println("[STOP] 3a: resetCartBuzzer");
+                audio.reset();
+                console.println("[STOP] 3b: resetCartPWM");
+                gpio.resetCartPWM();
+                console.println("[STOP] 3c: resetCartPIO");
+                gpio.resetCartPIO();
+                console.println("[STOP] 3d: resetCartNeopixels");
+                gpio.resetCartNeopixels();
+                console.println("[STOP] 3e: resetCartLED");
+                gpio.resetCartLED();
+                console.println("[STOP] 3f: initButtons");
+                gpio.initButtons();
+                console.println("[STOP] 4: abortCartChannels");
+                dma.abortCartChannels();
+                console.println("[STOP] 5: loader.stop");
+                loader.stop();
+                console.println("[STOP] 6: resetCore1");
+                multicore.resetCore1();
+                // Mark cart as stopped and restore state before reinit
+                cart_running = false;
+                display_active = true;
+                btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
+                ready_fb_state.set_state(.not_ready, @src());
+                console.println("[STOP] 7: reinitDisplay");
+                lcd.reinitDisplay();
+                console.println("[STOP] 8: refreshCartDisplay");
+                refreshCartDisplay();
+                last_cart_hash = computeCartHash();
+                console.println("[STOP] 9: done");
             }
-        } else if (buttons.start == 0 and buttons.select == 0) {
-            // Only reset combo state when BOTH buttons are released.
-            // Resetting when either is still held would allow a quick
-            // tap of the other button to bypass the 250ms hold requirement.
-            stop_combo_held_since = 0;
-            button_start_was_pressed = false;
+        } else {
+            stop_combo_deadline = 0;
         }
 
         // Joystick click toggles FPS overlay at any time (cart running or not)
-        if (buttons.click == 1 and !joystick_click_was_pressed) {
-            joystick_click_was_pressed = true;
+        if (pressed.click) {
             const new_state = !fps_overlay.isEnabled();
             fps_overlay.setEnabled(new_state);
             console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
-        } else if (buttons.click == 0 and joystick_click_was_pressed) {
-            joystick_click_was_pressed = false;
         }
 
         // Only process navigation buttons when cart is NOT running
         if (!cart_running) {
             // Joystick up - move cursor up through cart list
-            if (buttons.up == 1 and !joystick_up_was_pressed) {
-                joystick_up_was_pressed = true;
+            if (pressed.up) {
                 console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 if (cart_count > 0) {
                     cursor_index = if (cursor_index == 0) cart_count - 1 else cursor_index - 1;
                     refreshCartDisplay();
                 }
-            } else if (buttons.up == 0 and joystick_up_was_pressed) {
-                joystick_up_was_pressed = false;
             }
 
             // Joystick down - move cursor down through cart list
-            if (buttons.down == 1 and !joystick_down_was_pressed) {
-                joystick_down_was_pressed = true;
+            if (pressed.down) {
                 console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 if (cart_count > 0) {
                     cursor_index = (cursor_index + 1) % cart_count;
                     refreshCartDisplay();
                 }
-            } else if (buttons.down == 0 and joystick_down_was_pressed) {
-                joystick_down_was_pressed = false;
             }
 
             // Button A - run the selected cart
-            if (buttons.a == 1 and !button_a_was_pressed) {
-                button_a_was_pressed = true;
+            if (pressed.a) {
                 console.printf("[BTN] A pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
                 if (cart_count > 0 and cursor_index < cart_count) {
                     runSelectedCart();
+                    continue;
                 } else {
                     console.printf("[BTN] A: no cart to run (cart_count={d})\r\n", .{cart_count});
                 }
-            } else if (buttons.a == 0 and button_a_was_pressed) {
-                button_a_was_pressed = false;
             }
         } else {
-            // Reset navigation button states when cart is running to avoid stuck states
-            joystick_up_was_pressed = false;
-            joystick_down_was_pressed = false;
-            button_a_was_pressed = false;
-
             // Keep ipc_controls updated every iteration so carts always read fresh
             // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
-            const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
-            const live_btn = button_poller.read();
-            ipc_controls.* = @as(u16, @as(u9, @bitCast(live_btn)));
+            mailbox.shared_data.controls = buttons;
 
             // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
             // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
@@ -320,27 +253,14 @@ pub fn main() !void {
             }
             if (now_us -% btn_diag_last_us >= BTN_DIAG_US) {
                 btn_diag_last_us = now_us;
-                const start_gpio = gpio.read(board.button_start); // 0=pressed(active-low), 1=released
-                const sel_gpio = gpio.read(board.button_select);
-                const a_gpio = gpio.read(board.button_a);
-                const b_gpio = gpio.read(board.button_b);
-                const up_gpio = gpio.read(board.joystick_up);
-                const dn_gpio = gpio.read(board.joystick_down);
-                const raw_u9: u9 = @bitCast(live_btn);
-                console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={d} SEL={d} A={d} B={d} UP={d} DN={d} | processed: start={} sel={} a={} b={} up={} dn={}\r\n", .{
-                    raw_u9,
-                    start_gpio,
-                    sel_gpio,
-                    a_gpio,
-                    b_gpio,
-                    up_gpio,
-                    dn_gpio,
-                    live_btn.start,
-                    live_btn.select,
-                    live_btn.a,
-                    live_btn.b,
-                    live_btn.up,
-                    live_btn.down,
+                console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={} SEL={} A={} B={} UP={} DN={} \r\n", .{
+                    @as(u16, @bitCast(buttons)),
+                    buttons.start,
+                    buttons.select,
+                    buttons.a,
+                    buttons.b,
+                    buttons.up,
+                    buttons.down,
                 });
             }
 
@@ -364,10 +284,6 @@ pub fn main() !void {
                 } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
                     mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                 {
-                    // Write button state into the IPC block for the cart to read.
-                    const btn = button_poller.read();
-                    ipc_controls.* = @as(u16, @as(u9, @bitCast(btn))); // u9 zero-extends to u16
-
                     const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
                         @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
                     else
@@ -452,11 +368,6 @@ pub fn main() !void {
             display_active = true;
             // Re-sync all button states so any buttons still held when the cart
             // exited are consumed and won't immediately re-trigger menu actions.
-            const cur = button_poller.read();
-            button_a_was_pressed = (cur.a == 1);
-            joystick_up_was_pressed = (cur.up == 1);
-            joystick_down_was_pressed = (cur.down == 1);
-            button_start_was_pressed = (cur.start == 1 and cur.select == 1);
             lcd.reinitDisplay();
             refreshCartDisplay();
             last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
@@ -649,10 +560,7 @@ fn runSelectedCart() void {
     // Write current button state before cart's first frame.
     // Carts read at start of update(); this ensures frame 0 sees real buttons
     // rather than all-zero (which broke metalgear-timer and spaceshooter).
-    const ipc_controls: *volatile u16 = @ptrFromInt(0x20020004);
-    var poller = ButtonPoller.init();
-    const btn = poller.read();
-    ipc_controls.* = @as(u16, @as(u9, @bitCast(btn)));
+    mailbox.shared_data.controls = read_buttons();
 
     // Execute the cart
     console.println("[BTN] calling executeCart...");

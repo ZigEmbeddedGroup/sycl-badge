@@ -221,11 +221,11 @@ pub const channel = struct {
                 c.write_pos = write_offset;
             }
 
-            pub fn get_available(c: *Cursor) usize {
+            pub fn get_available(c: *const Cursor) usize {
                 const read_offset = c.chan.load_read_offset();
 
                 if (read_offset <= c.write_pos) {
-                    return c.chan.size - 1 - (c.write_pos - read_offset);
+                    return c.chan.size + read_offset - c.write_pos - 1;
                 } else {
                     return read_offset - c.write_pos - 1;
                 }
@@ -249,7 +249,14 @@ pub const channel = struct {
                 return false;
             }
 
+            pub fn uncommitted_len(c: *const Cursor) usize {
+                const commit_pos = c.chan.write_offset;
+                return if (commit_pos < c.write_pos) c.write_pos - commit_pos
+                    else c.chan.size + c.write_pos - commit_pos;
+            }
+
             pub fn commit(c: *const Cursor) void {
+                std.debug.assert(c.get_available() >= c.uncommitted_len());
                 std.mem.doNotOptimizeAway(c.chan);
                 std.mem.doNotOptimizeAway(c.chan.buffer);
                 memory_barrier();

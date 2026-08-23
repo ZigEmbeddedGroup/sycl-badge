@@ -710,6 +710,10 @@ fn core0_emit_sm_bulk_declare_and_mark_tracked(time: i64) void {
         const layout = wire_layout(bytes.len);
         var cursor = write_header_assume_available(layout);
         cursor.write_assume_available(bytes);
+
+        std.debug.assert(cursor.uncommitted_len() == layout.total_bytes);
+        std.debug.assert(cursor.uncommitted_len() == core0_compute_sm_bulk_declare_len());
+
         cursor.commit();
 
         return;
@@ -750,6 +754,10 @@ fn core0_emit_sm_bulk_declare_and_mark_tracked(time: i64) void {
 
     cursor.write_byte_assume_available(0x80);
     cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(track.srcloc))));
+
+    std.debug.assert(cursor.uncommitted_len() == 4 + total_lz4_size);
+    std.debug.assert(cursor.uncommitted_len() == core0_compute_sm_bulk_declare_len());
+
     cursor.commit();
 }
 
@@ -786,6 +794,9 @@ fn core0_emit_sm_bulk_update(time: i64) void {
         const layout = wire_layout(bytes.len);
         var cursor = write_header_assume_available(layout);
         cursor.write_assume_available(bytes);
+
+        std.debug.assert(cursor.uncommitted_len() == layout.total_bytes);
+        std.debug.assert(cursor.uncommitted_len() == compute_sm_bulk_end_len(num_states));
         cursor.commit();
 
         return;
@@ -826,6 +837,9 @@ fn core0_emit_sm_bulk_update(time: i64) void {
 
     cursor.write_byte_assume_available(0x80);
     cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(track.srcloc))));
+
+    std.debug.assert(cursor.uncommitted_len() == total_lz4_size + 4);
+    std.debug.assert(cursor.uncommitted_len() == compute_sm_bulk_end_len(num_states));
     cursor.commit();
 }
 
@@ -835,8 +849,16 @@ fn core0_compute_bulk_end_len(num_zones: u32, num_sms: u32) usize {
 }
 
 fn core0_emit_bulk_end(time: i64) void {
+    const write_size = core0_compute_bulk_end_len(core0_num_zones, core0_num_tracked_states);
+    std.debug.assert(send.available_space() >= write_size);
+    const start_pos = send.write_offset;
+
     core0_emit_zone_bulk_end(time);
     core0_emit_sm_bulk_end(time);
+
+    const end_pos = send.write_offset;
+    const len = if (start_pos <= end_pos) end_pos - start_pos else send.size + end_pos - start_pos;
+    std.debug.assert(len == write_size);
 }
 
 fn core0_compute_bulk_begin_len(num_zones: u32) usize {
@@ -846,9 +868,17 @@ fn core0_compute_bulk_begin_len(num_zones: u32) usize {
 }
 
 fn core0_emit_bulk_begin(time: i64) void {
+    const write_size = core0_compute_bulk_begin_len(core0_num_zones);
+    std.debug.assert(send.available_space() >= write_size);
+    const start_pos = send.write_offset;
+
     core0_emit_zone_bulk_begin(time);
     core0_emit_sm_bulk_update(time);
     core0_emit_sm_bulk_declare_and_mark_tracked(time);
+
+    const end_pos = send.write_offset;
+    const len = if (start_pos <= end_pos) end_pos - start_pos else send.size + end_pos - start_pos;
+    std.debug.assert(len == write_size);
 }
 
 pub inline fn reserved_space_for_begin_zone() usize {

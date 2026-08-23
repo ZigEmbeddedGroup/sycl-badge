@@ -107,7 +107,7 @@ loading a cart to external flash, you'll be using the RP2350's hardware UF2
 bootloader to install the kernel. Once you have [built from source]($link.ref('building-from-source')) you need to:
 
 1. Plug the badge to your PC using USB.
-2. Facking the back of the Badge, press down on both the `RESET` and `BOOT_SEL`
+2. Facing the back of the Badge, press down on both the `RESET` and `BOOT_SEL`
    buttons at the same time.
 3. Release the `RESET` button.
 4. Release the `BOOT_SELL` button.

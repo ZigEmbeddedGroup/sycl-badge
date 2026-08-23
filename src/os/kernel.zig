@@ -123,13 +123,14 @@ pub const microzig_options: microzig.Options = .{
     .interrupts = @import("interrupts.zig").interrupts,
 };
 
-var ready_fb_state: enum {
+var ready_fb_state: terry.core0.TrackedStateMachine(enum {
     not_ready,
     ready_rect,
     ready_whole,
     transferring,
     draw_debug,
-} = .not_ready;
+}) = undefined;
+
 var ready_framebuffer: []const u16 = undefined;
 var ready_fb_dirty_rect: [4]u16 = undefined;
 
@@ -142,6 +143,8 @@ pub fn main() !void {
         .early_wait_for_tracy_time = EARLY_TRACY_WAIT_TIME_US,
         .late_wait_for_tracy_time = LATE_TRACY_WAIT_TIME_US,
     });
+
+    ready_fb_state.register("kernel.ready_fb_state", .not_ready, @src());
 
     // Initialize button poller
     const button_poller = ButtonPoller.init();
@@ -162,6 +165,8 @@ pub fn main() !void {
 
     // Auto-start cart if only one is present in storage
     // _ = loader.autoStartSingleCart();
+
+    const z = terry.core0.zone("Kernel Main Loop", @src()); defer z.end();
 
     // Main loop
     while (true) {
@@ -224,6 +229,7 @@ pub fn main() !void {
                     cart_running = false;
                     display_active = true;
                     btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
+                    ready_fb_state.set_state(.not_ready, @src());
                     button_a_was_pressed = (buttons.a == 1);
                     joystick_up_was_pressed = (buttons.up == 1);
                     joystick_down_was_pressed = (buttons.down == 1);
@@ -373,7 +379,6 @@ pub fn main() !void {
                     // Flush selected shared-RAM framebuffer.
                     fps_overlay.tick();
                     ready_framebuffer = @volatileCast(@ptrCast(&mailbox.shared_data.framebuffers[fb_index]));
-                    ready_fb_state = .ready_whole;
                     if (has_dirty_rect) {
                         const rx: u16 = mailbox.shared_data.dirty_rect_x;
                         const ry: u16 = mailbox.shared_data.dirty_rect_y;
@@ -383,13 +388,16 @@ pub fn main() !void {
                         // Fallback to full-frame if rect metadata is invalid.
                         if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
                             ready_fb_dirty_rect = .{ rx, ry, rw, rh };
-                            ready_fb_state = .ready_rect;
+                            ready_fb_state.set_state(.ready_rect, @src());
+                        } else {
+                            ready_fb_state.set_state(.ready_whole, @src());
                         }
                     } else if (!is_v2) {
                         // Legacy carts always imply full-frame updates.
+                        ready_fb_state.set_state(.ready_whole, @src());
                     } else {
                         // No visual change this frame: skip LCD transfer.
-                        ready_fb_state = .transferring;
+                        ready_fb_state.set_state(.transferring, @src());
                     }
                 }
                 // Other messages (e.g. CART_FINISHED) handled by loader state machine.
@@ -397,22 +405,22 @@ pub fn main() !void {
 
             // Dispatch async LCD work
             if (!lcd.isBusy()) {
-                find_lcd_work: switch (ready_fb_state) {
+                find_lcd_work: switch (ready_fb_state.state) {
                     .not_ready => {
                     },
                     .ready_rect => {
                         const rect = ready_fb_dirty_rect;
                         lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
-                        ready_fb_state = .transferring;
+                        ready_fb_state.set_state(.transferring, @src());
                     },
                     .ready_whole => {
                         lcd.writeCartBuffer(ready_framebuffer);
-                        ready_fb_state = .transferring;
+                        ready_fb_state.set_state(.transferring, @src());
                     },
                     .transferring => {
                         // Transfer finished, the frame buffer is safe for the app to write
                         //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                        ready_fb_state = .draw_debug;
+                        ready_fb_state.set_state(.draw_debug, @src());
                         continue :find_lcd_work .draw_debug;
                     },
                     .draw_debug => {
@@ -420,7 +428,7 @@ pub fn main() !void {
                             fps_overlay.submit_lcd_work();
                         } else {
                             mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                            ready_fb_state = .not_ready;
+                            ready_fb_state.set_state(.not_ready, @src());
                         }
                     },
                 }
@@ -436,7 +444,7 @@ pub fn main() !void {
             console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
             lcd.stopDMA();
             fps_overlay.reset_for_cart();
-            ready_fb_state = .not_ready;
+            ready_fb_state.set_state(.not_ready, @src());
             // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
             gpio.resetCartHardware();
             // Abort any DMA transfers the cart may have left running.

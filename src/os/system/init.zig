@@ -229,6 +229,8 @@ pub fn init(config: InitConfig) !void {
         }
     }
 
+    loader.init();
+
     _ = boot_start;
     _ = usb_time;
 }

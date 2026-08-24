@@ -5,6 +5,9 @@
 /// Use UP/DOWN to scale text, and A button to toggle color.
 const std = @import("std");
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const FONT_WIDTH: u32 = cart.font_width;
 const FONT_HEIGHT: u32 = cart.font_height;
@@ -60,12 +63,12 @@ fn reset_scroll() void {
     scroll_y = @as(i32, @intCast(cart.screen_height));
 }
 
-export fn start() void {
+pub fn start() void {
     reset_scroll();
     draw_page();
 }
 
-export fn update() void {
+pub fn update() void {
     const left_pressed = cart.controls.left;
     const right_pressed = cart.controls.right;
     const up_pressed = cart.controls.up;

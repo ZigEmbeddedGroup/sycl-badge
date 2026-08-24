@@ -6,6 +6,10 @@ const Tone = music.Tone;
 const colors = @import("colors.zig");
 const Color = cart.DisplayColor;
 
+comptime {
+    cart.export_start_code();
+}
+
 const arena_half_width_pt: i32 = 100000;
 // NOTE: for 160x128 display
 const arena_half_height_pt: i32 = 80000;
@@ -349,7 +353,7 @@ fn eatTone(blob: *const Blob) void {
     });
 }
 
-export fn start() void {
+pub fn start() void {
     cart.trace("blobs:start");
     initStartMenuMusic();
     cart.trace("blobs:start-done");
@@ -418,7 +422,7 @@ fn clear() void {
     });
 }
 
-export fn update() void {
+pub fn update() void {
     cart.trace("blobs:update");
     cart.trace("blobs:pre-clear");
     clear();

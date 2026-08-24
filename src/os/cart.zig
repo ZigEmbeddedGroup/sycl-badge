@@ -238,6 +238,9 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
 
         microzig.interrupt.disable_interrupts();
 
+        // Enable cycle counter
+        microzig.chip.peripherals.PPB.DWT_CTRL.modify(.{ .CYCCNTENA = 1 });
+
         // Point Core 1's VTOR at the cart's vector table so that any exceptions
         // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
         // TODO set VTOR to some sort of OS fault handler vector table

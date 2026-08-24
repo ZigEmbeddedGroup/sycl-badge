@@ -12,13 +12,18 @@ const DialectricMaterial = material.DialectricMaterial;
 const Material = material.Material;
 const Interval = @import("interval.zig");
 
+const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
+
 var angle: f32 = 0;
 
-export fn start() void {
+pub fn start() void {
     angle = 0;
 }
 
-export fn update() void {
+pub fn update() void {
     angle += 15.0;
     main_program() catch return;
 }

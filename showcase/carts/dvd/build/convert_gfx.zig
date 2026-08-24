@@ -8,8 +8,11 @@ const ConvertFile = struct {
     transparency: bool,
 };
 
-pub fn main() !void {
-    var args = try std.process.argsWithAllocator(allocator);
+var io_mem: std.Io.Threaded = .init_single_threaded;
+const io = io_mem.io();
+
+pub fn main(init: std.process.Init.Minimal) !void {
+    var args = try init.args.iterateAllocator(allocator);
     defer args.deinit();
 
     _ = args.next();
@@ -26,11 +29,11 @@ pub fn main() !void {
         }
     }
 
-    const out_file = try std.fs.cwd().createFile(out_path, .{});
-    defer out_file.close();
+    const out_file = try std.Io.Dir.cwd().createFile(io, out_path, .{});
+    defer out_file.close(io);
 
     var writer_buf: [4096]u8 = undefined;
-    var out_file_writer = out_file.writer(&writer_buf);
+    var out_file_writer = out_file.writer(io, &writer_buf);
     const writer = &out_file_writer.interface;
     try writer.writeAll("const PackedIntSlice = @import(\"packed_int_array\").PackedIntSlice;\n");
     try writer.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
@@ -46,7 +49,7 @@ fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
 
     const read_buffer = try allocator.alloc(u8, 4 * 1024 * 1024);
     defer allocator.free(read_buffer);
-    var image = try Image.fromFilePath(allocator, args.path, read_buffer);
+    var image = try Image.fromFilePath(allocator, io, args.path, read_buffer);
     defer image.deinit(allocator);
 
     var colors: std.ArrayList(Color) = .empty;

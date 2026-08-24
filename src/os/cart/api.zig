@@ -2,6 +2,20 @@ const std = @import("std");
 const builtin = @import("builtin");
 const q = @import("tracy_protocol");
 
+const is_wasm = switch (builtin.target.cpu.arch) {
+    .wasm32, .wasm64 => true,
+    else => false,
+};
+
+const platform = if (is_wasm)
+    @import("platform_wasm.zig")
+else
+    @import("platform_cart_ram.zig");
+
+pub fn export_start_code() void {
+    platform.export_start_code();
+}
+
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Platform Constants                                                        │
@@ -185,11 +199,6 @@ pub const Controls = packed struct(u16) {
     left: bool,
     right: bool,
     _pad: u7 = 0,
-};
-
-const is_wasm = switch (builtin.target.cpu.arch) {
-    .wasm32, .wasm64 => true,
-    else => false,
 };
 
 // Cart IPC block lives at the start of process_ram (0x20020000).

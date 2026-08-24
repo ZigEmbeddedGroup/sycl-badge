@@ -1,6 +1,10 @@
 const cart = @import("cart-api");
 const std = @import("std");
 
+comptime {
+    cart.export_start_code();
+}
+
 const DisplayColor = cart.DisplayColor;
 
 const W = cart.screen_width;
@@ -92,7 +96,7 @@ var last_abs_time: u64 = 0;
 
 var volume: f32 = 1.0;
 
-export fn start() void {
+pub fn start() void {
     change_time = cart.microsSinceBoot() + micros_per_note;
 }
 
@@ -103,7 +107,7 @@ const piano_min_note = 21;
 const piano_max_note = 108;
 const piano_max_fundamental = piano_max_note - 12;
 
-export fn update() void {
+pub fn update() void {
     const abs_time = cart.microsSinceBoot();
     defer last_abs_time = abs_time;
 

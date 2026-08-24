@@ -1,4 +1,7 @@
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const WIDTH: i32 = @intCast(cart.screen_width);
 const HEIGHT: i32 = @intCast(cart.screen_height);
@@ -211,7 +214,7 @@ fn resetGame() void {
     }
 }
 
-export fn start() void {
+pub fn start() void {
     mode = .{ .start_menu = .{} };
 }
 
@@ -554,7 +557,7 @@ fn updateSettingsMode(settings: *Settings) void {
     }
 }
 
-export fn update() void {
+pub fn update() void {
     cart.tone(.{
         .frequency = 2700,
         .duration = 60 * 60 * 60,

@@ -2,7 +2,11 @@ const std = @import("std");
 const cart = @import("cart-api");
 const gfx = @import("gfx");
 
-export fn start() void {
+comptime {
+    cart.export_start_code();
+}
+
+pub fn start() void {
     // Clear garbage bytes from framebuffer at init since the whole screen is not cleared otherwise.
     for (cart.framebuffer) |*col| {
         for (col) |*pos| {
@@ -21,7 +25,7 @@ var odd_frame = false;
 // These things are super bright at full strength.
 const neopixel_brightness = 10.0;
 
-export fn update() void {
+pub fn update() void {
     const color = hsv_to_rgb(.{ .h = dvd_hue, .s = 1, .v = 1 });
     drawDvd(gfx.dvd, @intCast(dvd_x), @intCast(dvd_y), color);
     dvd_hue += 5;

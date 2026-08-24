@@ -77,7 +77,7 @@ invincibility_frames: u8 = 0,
 anim_time: u32 = 0,
 slide_frames: u8 = 0,
 shoot_frames: u8 = 0,
-shots: [16]Shot = [_]Shot{.{}} ** 16,
+shots: [16]Shot = @splat(.{}),
 
 pub fn reset(self: *Player) void {
     self.* = .{};

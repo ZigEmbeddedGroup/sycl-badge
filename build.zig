@@ -181,6 +181,18 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = b.path("showcase/carts/audio/src/main.zig"),
     });
+    add_os_cart(b, &dep, .{
+        .name = "dvd",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("showcase/carts/dvd/src/main.zig"),
+        .custom_builder = &@import("showcase/carts/dvd/build.zig").build_cart,
+    });
+    add_os_cart(b, &dep, .{
+        .name = "zeroman",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("showcase/carts/zeroman/src/main.zig"),
+        .custom_builder = @import("showcase/carts/zeroman/build.zig").build_cart,
+    });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = b.addExecutable(.{
@@ -489,6 +501,7 @@ pub const OsCartOptions = struct {
     name: []const u8,
     optimize: std.builtin.OptimizeMode,
     root_source_file: Build.LazyPath,
+    custom_builder: ?*const fn(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step: *Build.Step) void = null,
 };
 
 pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
@@ -514,7 +527,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .name = options.name,
         .target = badge_v2_target,
         .optimize = options.optimize,
-        .root_source_file = dep.builder.path("src/os/cart/cart_ram_entry.zig"),
+        .root_source_file = options.root_source_file,
         .linker_script = .{
             .file = dep.builder.path("src/cart/cart_ram.ld"),
             .generate = .none,
@@ -525,7 +538,24 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
     // Inject cart and api modules into the entry wrapper
     fw.exe.root_module.addImport("user_cart", user_cart_module);
     fw.exe.root_module.addImport("cart-api", cart_api_module);
-    user_cart_module.addImport("microzig", fw.core_mod);
+
+    const asset_step: ?*Build.Step = if (options.custom_builder) |builder| blk: {
+        // Zig build no longer allows custom/anonymous steps, so we'll mark it as "top-level"
+        // even though it's intermediate.
+        const shared_step = b.allocator.create(Build.Step.TopLevel) catch @panic("oom");
+        shared_step.* = .{
+            .step = .init(.{
+                .name = b.fmt("{s} assets", .{ options.name }),
+                .tag = .top_level,
+                .owner = b,
+            }),
+            .description = "Reusable build node for cart assets",
+        };
+
+        builder(b, fw.exe.root_module, cart_api_module, &shared_step.step);
+
+        break :blk &shared_step.step;
+    } else null;
 
     // Share the board module with cart-api so that font.zig belongs to exactly
     // one module (board). Without this, both board_v2.zig and api.zig would
@@ -547,21 +577,14 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .os_tag = .freestanding,
     });
 
-    const wasm_cart_api_module = b.createModule(.{
-        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
-    });
+    // This is hacky as hell, but necessary since the root module specifies the build target.
+    const wasm_module = b.allocator.create(Build.Module) catch @panic("oom");
+    wasm_module.* = fw.exe.root_module.*;
+    wasm_module.resolved_target = wasm_target;
 
     const wasm = b.addExecutable(.{
         .name = options.name,
-        .root_module = b.createModule(.{
-            .root_source_file = options.root_source_file,
-            .target = wasm_target,
-            .optimize = .ReleaseSmall,
-            .strip = true,
-            .imports = &.{
-                .{ .name = "cart-api", .module = wasm_cart_api_module },
-            },
-        }),
+        .root_module = wasm_module,
     });
     wasm.entry = .disabled;
     wasm.import_memory = true;
@@ -571,6 +594,11 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
     wasm.global_base = 160 * 128 * 2 + 0x1e;
     wasm.rdynamic = true;
     b.installArtifact(wasm);
+
+    if (asset_step) |step| {
+        wasm.step.dependOn(step);
+        fw.exe.step.dependOn(step);
+    }
 }
 
 /// UF2 generation step

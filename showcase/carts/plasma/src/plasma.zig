@@ -2,9 +2,13 @@ const std = @import("std");
 const cart = @import("cart-api");
 const gfx = @import("gfx");
 
-export fn start() void {}
+comptime {
+    cart.export_start_code();
+}
 
-export fn update() void {
+pub fn start() void {}
+
+pub fn update() void {
     updatePlasma();
 }
 

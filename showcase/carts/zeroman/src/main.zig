@@ -2,6 +2,10 @@ const std = @import("std");
 const cart = @import("cart-api");
 const gfx = @import("gfx");
 
+comptime {
+    cart.export_start_code();
+}
+
 const Renderer = @import("Renderer.zig");
 const Rect = Renderer.Rect;
 const Sprite = Renderer.Sprite;
@@ -470,11 +474,11 @@ fn drawRoom(room: Room, room_tex: Renderer.Texture, door1_h: u8, door2_h: u8) vo
     }
 }
 
-pub export fn start() void {
+pub fn start() void {
     game_data.reset();
 }
 
-pub export fn update() void {
+pub fn update() void {
     game_data.tick();
     draw();
 

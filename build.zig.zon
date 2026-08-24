@@ -14,5 +14,9 @@
             .url = "git+https://github.com/ZigEmbeddedGroup/microzig#74a2053c18b6aac4fa047efde30e4a76c08c4a7c",
             .hash = "microzig-0.15.0-D20YSctp1ACsdZCdjN2xvWdgAW9MBx_jZ1l1ya3IU2QM",
         },
+        .zigimg = .{
+            .url = "git+https://github.com/zigimg/zigimg?ref=master#7b98e82621fe302a9edc147df1191f4d1b7ff7a5",
+            .hash = "zigimg-0.1.0-8_eo2qWHFwA-S24SH7x7NplPii0EbIQiUfDrimgA6rzN",
+        },
     },
 }

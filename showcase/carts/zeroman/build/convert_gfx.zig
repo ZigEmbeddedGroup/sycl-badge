@@ -26,32 +26,33 @@ pub fn main() !void {
             out_path = args.next() orelse return error.MissingArg;
         }
     }
-    std.debug.print("{s}\n", .{out_path});
 
     const out_file = try std.fs.cwd().createFile(out_path, .{});
     defer out_file.close();
 
-    const writer = out_file.deprecatedWriter();
+    var writer_buf: [4096]u8 = undefined;
+    var out_file_writer = out_file.writer(&writer_buf);
+    const writer = &out_file_writer.interface;
     try writer.writeAll("const PackedIntSlice = @import(\"packed_int_array\").PackedIntSlice;\n");
     try writer.writeAll("const DisplayColor = @import(\"cart-api\").DisplayColor;\n\n");
 
     for (in_files.items) |in_file| {
         try convert(in_file, writer);
     }
+    try writer.flush();
 }
 
-fn convert(args: ConvertFile, writer: std.fs.File.DeprecatedWriter) !void {
+fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
     const N = 8 / args.bits;
 
-    const read_buffer = try allocator.alloc(u8, 4 * 1024 * 1024);
-    defer allocator.free(read_buffer);
-    var image = try Image.fromFilePath(allocator, args.path, read_buffer);
+    var buffer: [4096]u8 = undefined;
+    var image = try Image.fromFilePath(allocator, args.path, &buffer);
     defer image.deinit(allocator);
 
-    var colors: std.ArrayList(Color) = .{};
+    var colors: std.ArrayList(Color) = .empty;
     defer colors.deinit(allocator);
     if (args.transparency) try colors.append(allocator, .{ .r = 31, .g = 0, .b = 31 });
-    var indices = try std.ArrayList(usize).initCapacity(allocator, image.width * image.height);
+    var indices: std.ArrayList(usize) = try .initCapacity(allocator, image.width * image.height);
     defer indices.deinit(allocator);
     var it = image.iterator();
     while (it.next()) |pixel| {
@@ -63,7 +64,6 @@ fn convert(args: ConvertFile, writer: std.fs.File.DeprecatedWriter) !void {
         const index = try getIndex(&colors, color);
         indices.appendAssumeCapacity(index);
     }
-    std.debug.print("{} colors: {any}\n", .{ colors.items.len, colors.items });
     var packed_data = try allocator.alloc(u8, indices.items.len / N);
     defer allocator.free(packed_data);
     for (packed_data, 0..) |_, i| {

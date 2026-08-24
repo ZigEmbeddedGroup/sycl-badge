@@ -41,7 +41,14 @@ pub fn main(init: std.process.Init.Minimal) !void {
     for (in_files.items) |in_file| {
         try convert(in_file, writer);
     }
-    try writer.flush();
+
+    writer.flush() catch |err| {
+        std.debug.print("Error flushing output: {s}\n", .{@errorName(err)});
+        if (@errorReturnTrace()) |trace| {
+            std.debug.dumpStackTrace(trace.*);
+        }
+        return err;
+    };
 }
 
 fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
@@ -49,7 +56,13 @@ fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
 
     const read_buffer = try allocator.alloc(u8, 4 * 1024 * 1024);
     defer allocator.free(read_buffer);
-    var image = try Image.fromFilePath(allocator, io, args.path, read_buffer);
+    var image = Image.fromFilePath(allocator, io, args.path, read_buffer) catch |err| {
+        std.debug.print("Error loading image from {s}: {s}\n", .{args.path, @errorName(err)});
+        if (@errorReturnTrace()) |trace| {
+            std.debug.dumpStackTrace(trace.*);
+        }
+        return err;
+    };
     defer image.deinit(allocator);
 
     var colors: std.ArrayList(Color) = .empty;
@@ -77,31 +90,42 @@ fn convert(args: ConvertFile, writer: *std.Io.Writer) !void {
         }
     }
 
-    {
-        const name = std.fs.path.stem(args.path);
-        try writer.print("pub const {s} = struct {{\n", .{name});
-
-        try writer.print("    pub const width = {};\n", .{image.width});
-        try writer.print("    pub const height = {};\n", .{image.height});
-
-        try writer.writeAll("    pub const colors = [_]DisplayColor{\n");
-        for (colors.items) |c| {
-            try writer.print("        .{{ .r = {}, .g = {}, .b = {} }},\n", .{ c.r, c.g, c.b });
+    const name = std.fs.path.stem(args.path);
+    write_image_decl(writer, name, &image, colors.items, packed_data, args.bits) catch |err| {
+        std.debug.print("Error writing decl for {s}: {s}\n", .{name, @errorName(err)});
+        if (@errorReturnTrace()) |trace| {
+            std.debug.dumpStackTrace(trace.*);
         }
-        try writer.writeAll("    };\n");
-
-        try writer.print("    pub const indices = PackedIntSlice(u{}).init(@constCast(data[0..]), data.len * {});\n", .{ args.bits, N });
-        try writer.writeAll("    const data = [_]u8{\n");
-        for (packed_data, 0..) |index, i| {
-            if (i % 32 == 0) try writer.writeAll("        ");
-            try writer.print("{}, ", .{index});
-            if ((i + 1) % 32 == 0) try writer.writeAll("\n");
-        }
-        try writer.writeAll("    };\n");
-
-        try writer.writeAll("};\n\n");
-    }
+        return err;
+    };
 }
+
+fn write_image_decl(writer: *std.Io.Writer, name: []const u8, image: *const Image, colors: []const Color, packed_data: []const u8, bits: u4) !void {
+    const N = 8 / bits;
+
+    try writer.print("pub const {s} = struct {{\n", .{name});
+
+    try writer.print("    pub const width = {};\n", .{image.width});
+    try writer.print("    pub const height = {};\n", .{image.height});
+
+    try writer.writeAll("    pub const colors = [_]DisplayColor{\n");
+    for (colors) |c| {
+        try writer.print("        .{{ .r = {}, .g = {}, .b = {} }},\n", .{ c.r, c.g, c.b });
+    }
+    try writer.writeAll("    };\n");
+
+    try writer.print("    pub const indices = PackedIntSlice(u{}).init(@constCast(data[0..]), data.len * {});\n", .{ bits, N });
+    try writer.writeAll("    const data = [_]u8{\n");
+    for (packed_data, 0..) |index, i| {
+        if (i % 32 == 0) try writer.writeAll("        ");
+        try writer.print("{}, ", .{index});
+        if ((i + 1) % 32 == 0) try writer.writeAll("\n");
+    }
+    try writer.writeAll("    };\n");
+
+    try writer.writeAll("};\n\n");
+}
+
 
 pub const Color = packed struct(u16) {
     b: u5,

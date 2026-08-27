@@ -239,17 +239,12 @@ fn sycl_badge_v2_microzig_target(mb: *MicroBuild, builder: *Build) *microzig.Tar
 
 pub const OS = struct {
     exe: *Build.Step.Compile, // the compiled ELF file
-    uf2_output: Build.LazyPath, // the UF2 file made from the ELF file
 
     pub fn install(os: *const OS, b: *Build) void {
         const install_elf = b.addInstallArtifact(os.exe, .{
             .dest_dir = .{ .override = .{ .custom = "firmware" } },
         });
         b.getInstallStep().dependOn(&install_elf.step);
-
-        const uf2_install_path = b.fmt("firmware/{s}.uf2", .{os.exe.name});
-        const install_uf2 = b.addInstallFile(os.uf2_output, uf2_install_path);
-        b.getInstallStep().dependOn(&install_uf2.step);
     }
 };
 
@@ -284,7 +279,7 @@ pub fn add_os(
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 
     const os: *OS = b.allocator.create(OS) catch @panic("OOM");
-    os.* = .{ .exe = fw.artifact, .uf2_output = fw.artifact.getEmittedBin() };
+    os.* = .{ .exe = fw.artifact };
     return os;
 }
 

@@ -104,7 +104,8 @@ badge. See Using the Pico Debugger.
 
 The second is to use a similar process as loading a cart, but instead of the OS
 loading a cart to external flash, you'll be using the RP2350's hardware UF2
-bootloader to install the kernel. Once you have [built from source]($link.ref('building-from-source')) you need to:
+bootloader to install the kernel. Once you have [built from
+source]($link.ref('building-from-source')) you need to:
 
 1. Plug the badge to your PC using USB.
 2. Facing the back of the Badge, press down on both the `RESET` and `BOOT_SEL`
@@ -118,6 +119,103 @@ bootloader to install the kernel. Once you have [built from source]($link.ref('b
 
 This will cause the drive to disappear and the Badge will reset, running your
 new OS firmware build.
+
+# [Building and Running OpenOCD]($section.id('building-and-running-openocd'))
+
+OpenOCD is not required for regular programming of the Badge. It is, however,
+required if one wishes to use the debug probe. At the time of writing, RP2350
+support has not been upstreamed to OpenOCD version available on Debian, so we
+include instructions to build it from source.
+
+```
+git clone https://github.com/raspberrypi/openocd
+```
+
+This section will be filled in later with detailed instructions.
+
+## [Running OpenOCD]($section.id('running-openocd')) 
+
+From within the `openocd` directory:
+
+```
+sudo src/openocd -s tcl -f interface/cmsis-dap.cfg -f target/rp2350.cfg -c "adapter speed 5000"
+```
+
+## [Flashing with the Debug Probe]($section.id('flashing-with-the-debug-probe'))  
+
+Make sure you have `gdb-multiarch` or `arm-none-eabi-gdb` installed, you need
+support for ARM:
+
+```sh
+arm-none-eabi-gdb ./zig-out/firmware/sycl-os
+```
+
+The following command tells GDB to speak with OpenOCD on localhost port 3333
+using the GDB remote serial protocol.
+
+```
+target extended-remote :3333
+```
+
+You should see some logs from OpenOCD, and you can flash the Badge with the
+`load` command. From there you have a regular GDB debug session set up and you
+can begin poking around the program.
+
+Do not use this method to flash carts, it does not currently work. 
+
+## [Real Time Transfer (RTT)]($section.id('rtt'))
+
+RTT provides a method of IO between your Badge's microcontroller with your PC
+over the pico debug probe. It can be used to set up multiplexed streams in
+either direction. It makes use of static buffers, and can be configured to skip,
+trim, or block when there is not enough room in those buffers.
+
+RTT does not require the CPU to halt in order to transfer data. The debug access
+port is able to issue it's own bus transactions separate from the CPU, though
+this does mean the two may contend for memory bandwidth. The Badge is currently
+set up to use RTT for logging and sending profile data to Tracy.
+
+When working on the kernel and using RTT for logging, adding this to your
+`.gdbinit` file is useful for iterating. It connects to OpenOCD on the default
+port, runs the kernel until the RTT control block is initialized, and registers
+it as port 60000 on your localhost.
+
+```
+target extended-remote :3333
+
+define rtt-init
+    set $rtt_addr = &RttControlBlock
+    eval "monitor rtt setup 0x%x 0x40 \"SEGGER RTT\"", $rtt_addr
+    monitor rtt start
+    monitor rtt server start 60000 0
+end
+
+monitor reset halt
+load
+break init.zig:120
+run
+rtt-init
+delete 1
+```
+
+Start off by putting the Badge into the right state with:
+
+```
+gdb ./zig-out/firmware/sycl-os-kernel.elf
+```
+
+Confirm that the control block was found, and that the port has been opened, you
+will see this in both the GDB and OpenOCD logs. Then in a separate terminal run:
+
+```
+nc localhost 60000
+```
+
+Or some other raw port dumping command like `telnet`, and you should see the
+first couple logs. From here you can continue debugging, and you'll find the
+logs show in this session. Note that when you rebuild the kernel, you'll be able
+to reflash the Badge with the `load` command. The RTT session will persist and
+you'll see the printout for when the kernel starts up as you continue to debug.
 
 # [Errata]($section.id('errata'))
 

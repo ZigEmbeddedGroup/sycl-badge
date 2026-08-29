@@ -59,16 +59,16 @@ pub const DisplayColor = packed struct(u16) {
         _,
 
         pub fn from(color: ?DisplayColor) Optional {
-            return if (color) |c| @enumFromInt(@as(u16, @bitCast(c))) else .none;
+            return if (color) |c| @fromBackingInt(@intCast(@as(u16, @bitCast(c)))) else .none;
         }
 
         pub fn unwrap(opt: Optional) ?DisplayColor {
-            return if (opt == .none) null else @bitCast(@as(u16, @truncate(@as(u32, @intCast(@intFromEnum(opt))))));
+            return if (opt == .none) null else @bitCast(@as(u16, @truncate(@as(u32, @intCast(@backingInt(opt))))));
         }
     };
 };
 
-pub const Pixel = extern struct {
+pub const Pixel = packed struct(u16) {
     bits: u16,
 
     pub fn fromColor(color: DisplayColor) Pixel {
@@ -735,7 +735,7 @@ pub const Tone2Options = struct {
     pub const stop: Tone2Options = .{ .frequency = 0.0 };
 
     pub const Shape = enum(u3) {
-        square,   // ---___---___, clarinet-ish
+        square, // ---___---___, clarinet-ish
         triangle, // /\/\/\/\, flute-ish
         sawtooth, // |\|\|\|\, violin-ish
         sine, // u^u^u^
@@ -770,7 +770,8 @@ pub inline fn tone2(options: Tone2Options) void {
         // TODO: Update wasm to handle new float values
         const adj_duration: u32 = if (options.duration == -1)
             std.math.maxInt(u32)
-        else @intFromFloat(@round(options.duration * 60.0));
+        else
+            @intFromFloat(@round(options.duration * 60.0));
         struct {
             extern fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void;
         }.tone(
@@ -784,7 +785,6 @@ pub inline fn tone2(options: Tone2Options) void {
         const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
         const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
         const FIFO_RDY: u32 = 1 << 1;
-
 
         ipc_data.tone_freq = options.frequency;
         ipc_data.tone_duration = options.duration;

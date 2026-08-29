@@ -2,7 +2,6 @@
 const std = @import("std");
 const rom = @import("../drivers/rom.zig");
 const fat = @import("../drivers/fat.zig");
-const interrupts = @import("../system/interrupts.zig");
 const log = std.log.scoped(.storage);
 
 const microzig = @import("microzig");

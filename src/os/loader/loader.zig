@@ -7,7 +7,6 @@ const uf2 = @import("uf2.zig");
 const rom = @import("../drivers/rom.zig");
 const interrupt = microzig.interrupt;
 const terry = @import("../system/terry.zig");
-const interrupts = @import("../system/interrupts.zig");
 const multicore = @import("../system/multicore.zig");
 const log = std.log.scoped(.loader);
 

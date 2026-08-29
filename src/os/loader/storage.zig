@@ -61,7 +61,7 @@ var pending_buf: [FLASH_ERASE_BLOCK]u8 align(4) = undefined;
 
 // These arrays are too large to put on the stack, so we
 // reuse them carefully throughout the functions in this file.
-var sector_bufs: [2][SECTOR_SIZE]u8 = undefined;
+var sector_bufs: [2][SECTOR_SIZE]u8 align(8) = undefined;
 
 pub var formatted_this_boot: bool = false;
 

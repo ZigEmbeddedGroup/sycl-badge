@@ -496,11 +496,11 @@ fn refreshCartDisplay() void {
 
     // Always show the hardware revision in the bottom right corner
     var rev_buf: [16]u8 = undefined;
-    const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{d}", .{rev.rev}) catch "rev error";
+    const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{s}", .{rev.revision.str()}) catch "rev error";
     const gray: lcd.Color16 = .rgb(0x10, 0x10, 0x10);
     lcd.drawString(@intCast(lcd.width - 8 * rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
 
-    if (rev.debug or rev.rev == rev.unknown) {
+    if (rev.debug or rev.revision == .unknown) {
         const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
         lcd.drawString(@intCast(lcd.width - 8 * adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
     }

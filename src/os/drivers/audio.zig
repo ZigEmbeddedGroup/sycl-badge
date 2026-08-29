@@ -22,6 +22,7 @@ const std = @import("std");
 const timer = @import("timer.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
 const terry = @import("../system/terry.zig");
+const rev = @import("rev.zig");
 
 // Aliases for the DMA control registers to avoid triggering DMA start.
 const DMA_CH1_AL1_CTRL: *volatile @TypeOf(DMA.CH1_CTRL_TRIG) = @ptrCast(&DMA.CH1_AL1_CTRL);
@@ -43,14 +44,16 @@ const max_sample_rate = 44100;
 
 // Make sure the above values are consistent with the hardware.
 // They are all important so we specify them all instead of calculating any of them
-comptime { std.debug.assert(buzzer_sys_clk_hz == audio_levels * audio_pwm_cycle_hz * buzzer_pwm_clk_div); }
+comptime {
+    std.debug.assert(buzzer_sys_clk_hz == audio_levels * audio_pwm_cycle_hz * buzzer_pwm_clk_div);
+}
 
 /// PWM slice number for GPIO9 (slice = pin / 2 = 9 / 2 = 4).
-const buzzer_pwm_slice: pwm.Slice = @enumFromInt(4);
-const buzzer_pwm_ch = pwm.Pwm{ .slice_number = @intFromEnum(buzzer_pwm_slice), .channel = .b };
+const buzzer_pwm_slice: pwm.Slice = @fromBackingInt(@intCast(4));
+const buzzer_pwm_ch = pwm.Pwm{ .slice_number = @backingInt(buzzer_pwm_slice), .channel = .b };
 
 /// Separate PWM slice used for wave timing control
-const audio_timing_slice: pwm.Slice = @enumFromInt(5);
+const audio_timing_slice: pwm.Slice = @fromBackingInt(@intCast(5));
 
 /// Global volume setting on reset
 /// 1.0 is quite loud, we might want to reduce this to 0.5 by default
@@ -182,18 +185,26 @@ const square_wave_sample: AudioSample = .{
 /// Initialise buzzer hardware.
 /// SPKR_EN is driven low (muted), the PWM pin is muxed to PWM function.
 pub fn init() void {
-    // Enable pin: SIO output, start disabled
-    board.buzzer_enable.set_function(.sio);
-    board.buzzer_enable.set_direction(.out);
-    board.buzzer_enable.put(0);
+    switch (rev.revision) {
+        .r0 => {
+            // Enable pin: SIO output, start disabled
+            board.rev0.audio.buzzer_enable.set_function(.sio);
+            board.rev0.audio.buzzer_enable.set_direction(.out);
+            board.rev0.audio.buzzer_enable.put(0);
 
-    // Audio pin: hand control to the PWM peripheral
-    board.buzzer_pwm.set_function(.pwm);
+            // Audio pin: hand control to the PWM peripheral
+            board.rev0.audio.buzzer_pwm.set_function(.pwm);
 
-    buzzer_pwm_slice.set_clk_div(@intCast(buzzer_pwm_clk_div), 0);
-    buzzer_pwm_slice.set_wrap(@intCast(audio_levels));
+            buzzer_pwm_slice.set_clk_div(@intCast(buzzer_pwm_clk_div), 0);
+            buzzer_pwm_slice.set_wrap(@intCast(audio_levels));
 
-    buzzer_pwm_ch.set_level(0);
+            buzzer_pwm_ch.set_level(0);
+        },
+        .r1 => {
+            // TODO: I2S audio
+        },
+        .unknown => @panic("Not expected"),
+    }
 }
 
 pub fn set_global_volume(in_vol: f32) void {
@@ -207,7 +218,8 @@ pub fn set_global_volume(in_vol: f32) void {
         }
 
         if (sound_type != .off) {
-            board.buzzer_enable.put(@intFromBool(global_volume != 0.0));
+            // TODO: revision
+            board.rev0.audio.buzzer_enable.put(@intFromBool(global_volume != 0.0));
         }
     }
 }
@@ -219,14 +231,15 @@ pub fn poll() void {
         if (mix_ready & buffer_bit != 0) {
             mix_ready &= ~buffer_bit;
 
-            const z = terry.core0.zone("Audio Mix", @src()); defer z.end();
+            const z = terry.core0.zone("Audio Mix", @src());
+            defer z.end();
 
             const start = timer.micros();
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
             std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);
             if (!more_buffers) {
                 // Turn off the continuation after the mixed buffer
-                switch(mix_idx) {
+                switch (mix_idx) {
                     0 => DMA.CH2_CTRL_TRIG.modify(.{ .EN = 0 }),
                     1 => DMA.CH1_CTRL_TRIG.modify(.{ .EN = 0 }),
                     else => unreachable,
@@ -313,7 +326,10 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
             sound_type = switch (sample_sel) {
                 1 => .triangle,
                 2 => .sawtooth,
-                else => { stop(); return; }
+                else => {
+                    stop();
+                    return;
+                },
             };
         },
     }
@@ -351,7 +367,7 @@ fn set_timing_PWM_hz(hz: f32) !void {
     // Can't divide by less than 1.0
     clk_div = @max(16.0, clk_div);
 
-    if (clk_div > (1<<13)) {
+    if (clk_div > (1 << 13)) {
         // The target frequency is too slow to reproduce
         return error.FrequencyTooSlow;
     }
@@ -360,7 +376,7 @@ fn set_timing_PWM_hz(hz: f32) !void {
 
     // Centered mode allows another 2x divider on the clock
     var use_centered_mode = false;
-    if (clk_div > (1<<12)) {
+    if (clk_div > (1 << 12)) {
         clk_div = @ceil(clk_div / 2.0);
         wrap_ticks = wrap_ticks / 2.0;
         use_centered_mode = true;
@@ -411,10 +427,10 @@ fn setup_audio_sample_DMA(duration_sec: f32, frequency: f32, sample: AudioSample
         .SNIFF_EN = 0,
         .BSWAP = 0,
         .IRQ_QUIET = 1, // No interrupts
-        .TREQ_SEL = @as(TreqEnum, @enumFromInt(@intFromEnum(TreqEnum.pwm_wrap0) + @intFromEnum(audio_timing_slice))),
+        .TREQ_SEL = @as(TreqEnum, @fromBackingInt(@intCast(@backingInt(TreqEnum.pwm_wrap0) + @backingInt(audio_timing_slice)))),
         .CHAIN_TO = 1, // Chain to self, meaning disable
         .RING_SEL = 0, // Wrap reads
-        .RING_SIZE = @as(RingEnum, @enumFromInt(sample.wrap_values_bits + 2)), // Wrap every 2 values / 8 bytes
+        .RING_SIZE = @as(RingEnum, @fromBackingInt(@intCast(sample.wrap_values_bits + 2))), // Wrap every 2 values / 8 bytes
         .INCR_WRITE_REV = 0,
         .INCR_WRITE = 0,
         .INCR_READ_REV = 0,
@@ -479,10 +495,10 @@ fn setup_ping_pong_DMA(duration_sec: f32, sample_freq: f32) !void {
         .SNIFF_EN = 0,
         .BSWAP = 0,
         .IRQ_QUIET = 0,
-        .TREQ_SEL = @as(TreqEnum, @enumFromInt(@intFromEnum(TreqEnum.pwm_wrap0) + @intFromEnum(audio_timing_slice))),
+        .TREQ_SEL = @as(TreqEnum, @fromBackingInt(@intCast(@backingInt(TreqEnum.pwm_wrap0) + @backingInt(audio_timing_slice)))),
         .CHAIN_TO = 1, // Chain ping pong to 1
         .RING_SEL = 0, // Wrap reads
-        .RING_SIZE = @as(RingEnum2, @enumFromInt(log2_dma_buf_size + 2)), // Wrap to restart DMA
+        .RING_SIZE = @as(RingEnum2, @fromBackingInt(@intCast(log2_dma_buf_size + 2))), // Wrap to restart DMA
         .INCR_WRITE_REV = 0,
         .INCR_WRITE = 0,
         .INCR_READ_REV = 0,
@@ -497,10 +513,10 @@ fn setup_ping_pong_DMA(duration_sec: f32, sample_freq: f32) !void {
         .SNIFF_EN = 0,
         .BSWAP = 0,
         .IRQ_QUIET = 0,
-        .TREQ_SEL = @as(TreqEnum, @enumFromInt(@intFromEnum(TreqEnum.pwm_wrap0) + @intFromEnum(audio_timing_slice))),
+        .TREQ_SEL = @as(TreqEnum, @fromBackingInt(@intCast(@backingInt(TreqEnum.pwm_wrap0) + @backingInt(audio_timing_slice)))),
         .CHAIN_TO = 2, // Chain ping pong to 2
         .RING_SEL = 0, // Wrap reads
-        .RING_SIZE = @as(RingEnum1, @enumFromInt(log2_dma_buf_size + 2)), // Wrap to restart DMA
+        .RING_SIZE = @as(RingEnum1, @fromBackingInt(@intCast(log2_dma_buf_size + 2))), // Wrap to restart DMA
         .INCR_WRITE_REV = 0,
         .INCR_WRITE = 0,
         .INCR_READ_REV = 0,
@@ -527,7 +543,8 @@ fn finish_stop_DMA() void {
 
 /// Stop PWM output and deassert SPKR_EN.
 pub fn stop() void {
-    board.buzzer_enable.put(0);
+    // TODO: I2S audio
+    board.rev0.audio.buzzer_enable.put(0);
     begin_stop_DMA();
     buzzer_pwm_slice.disable();
     audio_timing_slice.disable();

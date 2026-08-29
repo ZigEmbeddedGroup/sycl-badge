@@ -315,7 +315,7 @@ fn add_os_debug_text() void {
 
     if (rev.debug) {
         // Revision strings
-        const revision = rev.rev;
+        const revision = rev.revision;
         const reading: u32 = rev.raw_reading;
         const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
         add_debug_text(.{ .text = rev_str, .x = lcd.width, .y = lcd.height - 2 * font_height, .alignment = .right, .color = lcd.WHITE });

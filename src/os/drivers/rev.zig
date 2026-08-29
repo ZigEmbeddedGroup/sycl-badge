@@ -20,19 +20,25 @@ const num_retries: usize = 10;
 pub var debug = false;
 
 /// The hardware revison.
-pub var rev: u32 = unknown;
+pub var revision: Revision = .unknown;
 
-/// r0 has a green board
-pub const r0: u32 = 0;
+pub const Revision = enum {
+    /// r0 has a green board
+    r0,
+    /// r1 has a purple board.
+    /// This revision adds an audio driver chip which
+    /// receives digital level signals.
+    r1,
+    unknown,
 
-/// r1 has a purple board.
-/// This revision adds an audio driver chip which
-/// receives digital level signals.
-pub const r1: u32 = 1;
-
-/// ADC reading failed, unknown version.
-/// Treat as the most recent known version.
-pub const unknown: u32 = 0x7FFF_FFFF;
+    pub fn str(r: Revision) []const u8 {
+        return switch (r) {
+            .r0 => "0",
+            .r1 => "1",
+            .unknown => "<UNKNOWN!!!>",
+        };
+    }
+};
 
 /// The raw ADC value, for debugging purposes
 pub var raw_reading: u12 = 4095;
@@ -47,11 +53,11 @@ pub fn init() void {
         break adc.convert_one_shot_blocking(board.revision_adc) catch continue;
     } else 4095;
     if (raw_reading < r0_max) {
-        rev = r0;
+        revision = .r0;
     } else if (raw_reading < r1_max) {
-        rev = r1;
+        revision = .r1;
     } else {
-        rev = unknown;
+        revision = .unknown;
         debug = true;
     }
 }

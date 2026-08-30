@@ -1,7 +1,7 @@
 /// Terry is a reimplementation of the Tracy 0.14.0 client designed for a
 /// low-memory threadless microcontroller environment with RTT output.
 const terry = @import("terry.zig");
-const q = @import("terry_protocol.zig");
+const q = @import("tracy_protocol.zig");
 
 const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
@@ -74,6 +74,12 @@ const core0_thread_id_ptr = terry.external_string("Core 0 (OS)");
 pub fn core0_thread_id() u32 {
     return @intFromPtr(core0_thread_id_ptr);
 }
+
+// TODO send events to update this thread name to match the name
+// of whatever cart is running.
+const cart_thread_id_ptr = terry.external_string("Core 1 (Cart)");
+fn cart_thread_id() u32 { return @intFromPtr(cart_thread_id_ptr); }
+
 
 pub var core0_thread_ref_time: i64 = 0;
 pub var has_core0_thread_context: bool = false;
@@ -993,9 +999,19 @@ pub fn is_buffer_full() bool {
 }
 
 pub fn try_resume_data(time: i64) bool {
-    const resume_safety_margin = 128;
-    const necessary_bytes = core0_compute_bulk_begin_len(core0_num_zones) + resume_safety_margin + reserved_space_post_bulk_begin();
+    const resume_safety_margin = 1024;
+
+    const necessary_bytes = cart_reserved_size +
+        core0_compute_bulk_begin_len(core0_num_zones) +
+        resume_safety_margin +
+        reserved_space_post_bulk_begin();
+
     if (send.available_space() >= necessary_bytes) {
+        if (cart_reserved_size != 0) {
+            send_core1_assume_available(wire_layout(@sizeOf(q.Packet(q.ThreadContext)) + cart_pending_read_size), cart_pending_read_size);
+            cart_pending_read_size = 0;
+            cart_reserved_size = 0;
+        }
         core0_emit_bulk_begin(time);
         state = .connected;
         return true;
@@ -1016,13 +1032,21 @@ pub fn poll() void {
 
     dispatch: switch (state) {
         .uninitialized => {
+            // Enable cycle counter clock
             microzig.chip.peripherals.PPB.DWT_CTRL.modify(.{ .CYCCNTENA = 1 });
+            microzig.chip.peripherals.PPB.DEMCR.modify(.{ .TRCENA = 1 });
+
             startup_time = get_time_core0(undefined);
+            prepare_for_cart(); // initialize cart ring buffer vars
+
             log("TERRY: .uninitialized => .wait_for_server\n");
             state = .wait_for_server;
             continue :dispatch state;
         },
         .wait_for_server => {
+            if (support_on_demand) {
+                clear_queues();
+            }
             // TODO more robust shibboleth handling is necessary for on-demand,
             // where there might be junk from the previous connection before
             // the shibboleth, which could offset the rtt stream arbitrarily.
@@ -1030,14 +1054,17 @@ pub fn poll() void {
             // clear it if not found.
             var shibboleth: [q.HandshakeShibboleth.len]u8 = undefined;
             if (recv.read_if_available(&shibboleth)) {
+                @branchHint(.unlikely);
+
                 if (std.mem.eql(u8, &shibboleth, q.HandshakeShibboleth)) {
                     log("TERRY: .wait_for_server => .handshake\n");
                     state = .handshake;
+                    continue :dispatch state;
                 } else {
                     log("TERRY: invalid shibboleth! => .terminal\n");
                     state = .terminal;
+                    continue :dispatch state;
                 }
-                continue :dispatch state;
             }
         },
         .handshake => {
@@ -1074,6 +1101,7 @@ pub fn poll() void {
 
             // Make sure we have enough space for some data and a bulk end before starting
             std.debug.assert(core0_num_zones == 0); // TODO on-demand this might not be true on reconnect, might need special handling
+            std.debug.assert(cart_reserved_size == 0);
             if (send.available_space() < 128 + core0_compute_sm_bulk_declare_len() + reserved_space_post_bulk_begin()) {
                 return;
             }
@@ -1087,6 +1115,9 @@ pub fn poll() void {
             }
             @atomicStore(bool, &atomic_is_connected, true, .release);
 
+            // Enable cart recording
+            _ = @atomicRmw(u32, cart_atomic_write_ctrl, .Or, set_connected_mask, .acq_rel);
+
             interrupt_trace_enabled = true;
             last_keep_alive_us = timer.micros();
             log("TERRY: .new_connection => .connected\n");
@@ -1094,16 +1125,27 @@ pub fn poll() void {
             continue :dispatch state;
         },
         .connected => {
+            // First priority: server query responses
             try_send_packet();
             if (state != .connected) {
+                @branchHint(.unlikely);
                 continue :dispatch state;
             }
 
             if (!disconnect_requested) {
+                @branchHint(.likely);
+
                 do_systime();
                 do_syspower();
-                // TODO round-robin to avoid serial queue starvation deadlock?
-                send_core1_queue();
+
+                const cs = microzig.interrupt.enter_critical_section();
+                defer cs.leave();
+
+                // Second priority: Cart queue
+                if (!send_core1_queue()) {
+                    data_overflow(get_time_core0(cs));
+                }
+
                 send_serial_queue();
             } else {
                 clear_queues();
@@ -1117,78 +1159,34 @@ pub fn poll() void {
             while (pending_packet_type == .no_packet and state == .connected) {
                 // TODO maybe put a deadline here to avoid very long polls handling a chatty server
 
-                if (!recv.read_if_available(std.mem.asBytes(&query))) break;
-
-                logf("TERRY: server query: {s}\n", .{@tagName(query.type)});
-
-                switch (query.type) {
-                    .ServerQueryString => send_string_ptr(query.ptr, .StringData, .server_query),
-                    .ServerQueryPlotName => send_string_ptr(query.ptr, .PlotName, .server_query),
-                    .ServerQueryFrameName => send_string_ptr(query.ptr, .FrameName, .server_query),
-                    .ServerQueryFiberName => send_string_ptr(query.ptr, .FiberName, .server_query),
-
-                    // Normally query.ptr for ServerQueryThreadString would be a TID, but since we don't
-                    // have TIDs, Terry uses pointers to the name string as its the thread identifier.
-                    // Note that this is also used for Tracked State Machine names, which are tracked as if they were threads.
-                    .ServerQueryThreadString => send_string_ptr(query.ptr, .ThreadName, .server_query),
-
-                    .ServerQueryExternalName => send_string(query.ptr, "???", .ExternalThreadName, .external_name_pt1), // External name request sends two strings in response
-
-                    .ServerQuerySourceLocation => send_src_loc(query.ptr, .server_query),
-
-                    .ServerQueryCallstackFrame => send_empty(.AckServerQueryNoop, .server_query), // no symbol info
-                    .ServerQuerySymbol => send_empty(.AckServerQueryNoop, .server_query),
-                    .ServerQuerySymbolCode => send_empty(.AckSymbolCodeNotAvailable, .server_query),
-                    .ServerQuerySourceCode => send_empty(.AckSourceCodeNotAvailable, .server_query),
-
-                    // Query data is only used by source code queries, which we don't support.
-                    // So just pretend we're recording it, but we can ignore the data.
-                    .ServerQueryDataTransfer => send_empty(.AckServerQueryNoop, .server_query),
-                    .ServerQueryDataTransferPart => send_empty(.AckServerQueryNoop, .server_query),
-
-                    .ServerQueryParameter => {
-                        const param_idx: u32 = @intCast(query.ptr >> 32);
-                        const param_val: i32 = @bitCast(@as(u32, @truncate(query.ptr)));
-                        if (param_callback_fn) |func| {
-                            func(param_callback_obj, param_idx, param_val);
-                        }
-                        send_empty(.AckServerQueryNoop, .server_query);
-                    },
-
-                    // Disconnect is a handshake.
-                    // Server sends Disconnect, client sends Terminate, server sends Terminate.
-                    // Client can also send Terminate unprompted, which may result in the server
-                    // sending Terminate back.
-                    .ServerQueryDisconnect => {
-                        disconnect_requested = true;
-                        send_empty(.Terminate, .server_query);
-                    },
-                    .ServerQueryTerminate => {
-                        state = .terminating;
-                        continue :dispatch state;
-                    },
-                    _ => {
-                        // TODO any special error handling to do here?
-                        std.debug.assert(false);
-                    },
+                if (!recv.read_if_available(std.mem.asBytes(&query))) {
+                    @branchHint(.likely);
+                    break;
                 }
 
-                try_send_packet();
-                if (state != .connected) {
+                handle_server_query(&query);
+
+                if (state == .terminating) {
                     continue :dispatch state;
                 }
             }
         },
 
         .buffer_full => {
-            clear_queues();
-            const time = get_time_core0(undefined);
-            if (try_resume_data(time)) {
-                continue :dispatch .connected;
+            // Try to send pending core1 data
+            if (send_core1_queue()) {
+                // If that worked, try to resume OS data
+                const time = get_time_core0(undefined);
+                if (try_resume_data(time)) {
+                    continue :dispatch .connected;
+                }
             }
         },
 
         .terminating => {
+            // Disable cart recording
+            _ = @atomicRmw(u32, cart_atomic_write_ctrl, .And, ~set_connected_mask, .acq_rel);
+
             @atomicStore(bool, &atomic_is_connected, false, .release);
             if (support_on_demand) {
                 // TODO the server might send trailing packets before signing off, we need to
@@ -1248,9 +1246,76 @@ pub fn poll() void {
     }
 }
 
-fn try_send_packet() void {
-    if (pending_packet_type == .no_packet) return;
+noinline fn handle_server_query(query: *const q.ServerQueryPacket) void {
+    const z = terry.core0.fn_zone(@src()); defer z.end();
 
+    logf("TERRY: server query: {s}\n", .{@tagName(query.type)});
+
+    switch (query.type) {
+        .ServerQueryString => send_string_ptr(query.ptr, .StringData, .server_query),
+        .ServerQueryPlotName => send_string_ptr(query.ptr, .PlotName, .server_query),
+        .ServerQueryFrameName => send_string_ptr(query.ptr, .FrameName, .server_query),
+        .ServerQueryFiberName => send_string_ptr(query.ptr, .FiberName, .server_query),
+
+        // Normally query.ptr for ServerQueryThreadString would be a TID, but since we don't
+        // have TIDs, Terry uses pointers to the name string as its the thread identifier.
+        // Note that this is also used for Tracked State Machine names, which are tracked as if they were threads.
+        .ServerQueryThreadString => send_string_ptr(query.ptr, .ThreadName, .server_query),
+
+        .ServerQueryExternalName => send_string(query.ptr, "???", .ExternalThreadName, .external_name_pt1), // External name request sends two strings in response
+
+        .ServerQuerySourceLocation => send_src_loc(query.ptr, .server_query),
+
+        .ServerQueryCallstackFrame => send_empty(.AckServerQueryNoop, .server_query), // no symbol info
+        .ServerQuerySymbol => send_empty(.AckServerQueryNoop, .server_query),
+        .ServerQuerySymbolCode => send_empty(.AckSymbolCodeNotAvailable, .server_query),
+        .ServerQuerySourceCode => send_empty(.AckSourceCodeNotAvailable, .server_query),
+
+        // Query data is only used by source code queries, which we don't support.
+        // So just pretend we're recording it, but we can ignore the data.
+        .ServerQueryDataTransfer => send_empty(.AckServerQueryNoop, .server_query),
+        .ServerQueryDataTransferPart => send_empty(.AckServerQueryNoop, .server_query),
+
+        .ServerQueryParameter => {
+            const param_idx: u32 = @intCast(query.ptr >> 32);
+            const param_val: i32 = @bitCast(@as(u32, @truncate(query.ptr)));
+            if (param_callback_fn) |func| {
+                func(param_callback_obj, param_idx, param_val);
+            }
+            send_empty(.AckServerQueryNoop, .server_query);
+        },
+
+        // Disconnect is a handshake.
+        // Server sends Disconnect, client sends Terminate, server sends Terminate.
+        // Client can also send Terminate unprompted, which may result in the server
+        // sending Terminate back.
+        .ServerQueryDisconnect => {
+            disconnect_requested = true;
+            send_empty(.Terminate, .server_query);
+        },
+        .ServerQueryTerminate => {
+            state = .terminating;
+            return;
+        },
+        _ => {
+            // TODO any special error handling to do here?
+            std.debug.assert(false);
+        },
+    }
+
+    try_send_packet();
+}
+
+inline fn try_send_packet() void {
+    if (pending_packet_type == .no_packet) {
+        @branchHint(.likely);
+        return;
+    }
+
+    outline_try_send_packet();
+}
+
+noinline fn outline_try_send_packet() void {
     const ty = tmp_packet_as(q.Type).*;
     const packet_size = q.PacketSize[@backingInt(ty)];
     const data_size = packet_size + tmp_packet_data.len;
@@ -1389,14 +1454,146 @@ fn send_empty(ty: q.Type, pending_ty: PendingPacket) void {
     logf("TERRY: send_empty .{s} => .{s}\n", .{ @tagName(ty), @tagName(pending_packet_type) });
 }
 
+const ipc_data = @import("../ipc/mailbox.zig").shared_data;
+const cart_api = @import("../cart/api.zig");
+const TracyAtomicWriteCtrl = cart_api.TracyAtomicWriteCtrl;
+const cart_ring_size = cart_api.tracy_buffer_size;
+const cart_ring_mask = cart_ring_size-1;
+// Debug: x/[len]xb 0x200340C0
+const cart_ring: *[cart_ring_size]u8 = @volatileCast(&ipc_data.tracy_ring);
+// Debug: watch *(u32*)0x200350C4
+const cart_atomic_write_ctrl: *u32 = @volatileCast(&ipc_data.tracy_write_ctrl);
+// Debug: watch *(u32*)0x200350C0
+const cart_atomic_read_pos: *u32 = @volatileCast(&ipc_data.tracy_read_pos);
+const cart_spinlock: *u32 = @volatileCast(&ipc_data.tracy_spinlock);
+var cart_reserved_size: u32 = 0;
+var cart_pending_read_size: u32 = 0;
+
+const unset_thread_ctx_mask: u32 = blk: {
+    var ctrl: TracyAtomicWriteCtrl = @bitCast(~@as(u32, 0));
+    ctrl.has_thread_ctx = false;
+    break :blk @bitCast(ctrl);
+};
+
+const set_connected_mask: u32 = blk: {
+    var ctrl: TracyAtomicWriteCtrl = @bitCast(@as(u32, 0));
+    ctrl.server_connected = true;
+    break :blk @bitCast(ctrl);
+};
+
 fn clear_queues() void {
-    // TODO once we have multiple threads, this function should
-    // dequeue and throw away any data from other threads,
-    // to prevent them from blocking on a full queue.
+    // Empty the cart queue, discarding all data.
+    //const write_ctrl: TracyAtomicWriteCtrl = @bitCast(@atomicRmw(u32, cart_atomic_write_ctrl, .And, ~set_connected_mask, .acq_rel));
+    const write_ctrl: TracyAtomicWriteCtrl = @bitCast(@atomicLoad(u32, cart_atomic_write_ctrl, .seq_cst));
+    @atomicStore(u32, cart_atomic_read_pos, write_ctrl.write_pos, .release);
+    cart_pending_read_size = 0;
+    cart_reserved_size = 0;
 }
 
-fn send_core1_queue() void {
-    // TODO copy data from the Core 1 queue to the RTT port
+pub fn prepare_for_cart() void {
+    @memset(cart_ring, 0);
+    const initial_write_control: TracyAtomicWriteCtrl = .{
+        .write_pos = 0,
+        .server_connected = is_connected_core0(),
+        .cart_buffer_active = true, // TODO handle cart running out of buffer space
+        .rtt_buffer_active = true, // TODO handle RTT full for cart
+        .has_thread_ctx = false,
+    };
+    @atomicStore(u32, cart_atomic_write_ctrl, @bitCast(initial_write_control), .release);
+    @atomicStore(u32, cart_atomic_read_pos, 0, .seq_cst);
+    cart_api.spin_lock_release(cart_spinlock);
+}
+
+fn send_core1_assume_available(layout: WireLayout, data_len: usize) void {
+    std.debug.assert(layout.data_bytes == @sizeOf(q.Packet(q.ThreadContext)) + data_len);
+
+    var read_pos = @atomicLoad(u32, cart_atomic_read_pos, .unordered); // only this core modifies read_pos
+
+    var cursor = write_header_assume_available(layout);
+    const first_len = @min(data_len, cart_ring_size - read_pos);
+    const thread_ctx = q.packet(.ThreadContext, .{ .thread = cart_thread_id() });
+    cursor.write_assume_available(std.mem.asBytes(&thread_ctx));
+    cursor.write_assume_available(cart_ring[read_pos..read_pos+first_len]);
+    if (first_len < data_len) {
+        cursor.write_assume_available(cart_ring[0..data_len - first_len]);
+    }
+    cursor.commit();
+
+    read_pos = (read_pos + data_len) & cart_ring_mask;
+    @atomicStore(u32, cart_atomic_read_pos, read_pos, .release);
+
+    has_core0_thread_context = false;
+}
+
+fn send_core1_queue() bool {
+    if (cart_reserved_size != 0) {
+        @branchHint(.unlikely);
+
+        std.debug.assert(is_buffer_full());
+
+        if (cart_reserved_size > available_space_with_reservation()) return false;
+
+        const layout = wire_layout(@sizeOf(q.Packet(q.ThreadContext)) + cart_pending_read_size);
+        std.debug.assert(layout.total_bytes == cart_reserved_size);
+
+        send_core1_assume_available(layout, cart_pending_read_size);
+        cart_pending_read_size = 0;
+        cart_reserved_size = 0;
+    }
+
+    // non-atomically estimate the available size, and skip if the buffer isn't full enough
+    // Note for testing atomics: Disable this to get more collisions. Don't forget to enable to_read == 0 check below!
+    const estimated_write_pos = @as(*volatile u32, cart_atomic_write_ctrl).* & 0xFFFF;
+    const read_pos = @atomicLoad(u32, cart_atomic_read_pos, .unordered); // only this core modifies read_pos
+
+    const estimated_to_read = (estimated_write_pos -% read_pos) & cart_ring_mask;
+    const minimum_to_read = cart_ring_size / 4;
+    if (estimated_to_read < minimum_to_read) {
+        @branchHint(.likely);
+        return true;
+    }
+
+    // Once this is observed, it has to be sent as a packet, as we atomically set the thread context
+    // mask meaning that we will insert a thread context. We must now split packets on this boundary.
+    var write_ctrl: TracyAtomicWriteCtrl = undefined;
+    {
+        cart_api.spin_lock_acquire(cart_spinlock);
+        defer cart_api.spin_lock_release(cart_spinlock);
+
+        write_ctrl = @bitCast(@as(*volatile u32, cart_atomic_write_ctrl).*);
+        write_ctrl.has_thread_ctx = false;
+        @as(*volatile u32, cart_atomic_write_ctrl).* = @bitCast(write_ctrl);
+
+        // var write_ctrl_bits: u32 = undefined;
+        // var tmp0: u32 = undefined;
+        // asm volatile (
+        //     \\ 1: ldaex %[value], [%[ptr]]
+        //     \\    bic %[value], %[value], #0x80000000
+        //     \\    strex %[t0], %[value], [%[ptr]]
+        //     \\    cmp %[t0], #0
+        //     \\    bne 1b
+        //     \\    dmb
+        //     : [value] "=&r" (write_ctrl_bits)
+        //     , [t0] "=&r" (tmp0)
+        //     : [ptr] "r" (cart_atomic_write_ctrl)
+        //     : .{ .memory = true }
+        // );
+
+        //const write_ctrl_bits = @atomicRmw(u32, cart_atomic_write_ctrl, .And, unset_thread_ctx_mask, .seq_cst);
+    }
+    //const write_ctrl: TracyAtomicWriteCtrl = @bitCast(write_ctrl_bits);
+    const to_read = (write_ctrl.write_pos -% read_pos) & cart_ring_mask;
+    // if (to_read == 0) return true;
+
+    const layout = wire_layout(@sizeOf(q.Packet(q.ThreadContext)) + to_read);
+    if (layout.total_bytes <= available_space_with_reservation()) {
+        send_core1_assume_available(layout, to_read);
+        return true;
+    } else {
+        cart_pending_read_size = to_read;
+        cart_reserved_size = layout.total_bytes;
+        return false;
+    }
 }
 
 fn send_serial_queue() void {

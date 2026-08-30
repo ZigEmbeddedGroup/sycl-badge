@@ -213,7 +213,7 @@ pub fn init(config: InitConfig) !void {
             while (true) {
                 terry.client.poll();
                 if (!terry.client.is_waiting_for_connection()) break;
-                if (timer.millis() > deadline) break;
+                if (timer.micros() > deadline) break;
             }
         }
     }

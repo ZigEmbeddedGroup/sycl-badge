@@ -72,8 +72,17 @@ pub fn main() noreturn {
     // mask interrupts on Core 1 to avoid unexpected IRQ vectors in user carts.
     microzig.interrupt.disable_interrupts();
 
+    // Enable cycle counter and sync the timer with the other core for tracy
+    microzig.chip.peripherals.PPB.DWT_CTRL.modify(.{ .CYCCNTENA = 1 });
+    cart_api.os_align_cycles();
+
     start();
     while (true) {
+        // Keep the cycle counter accurate
+        // TODO we could record uS times around each cart call,
+        // to handle any large drift.
+        _ = cart_api.cycles();
+
         update();
         // Signal Core 0 that this frame is complete and wait for the
         // LCD flush to finish before starting the next frame.

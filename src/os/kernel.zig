@@ -60,11 +60,11 @@ var cart_y_pos: u16 = 2;
 // Cart display state
 var last_cart_hash: u32 = 0;
 var cart_hash_accumulator: u32 = 0;
-var display_active: bool = true; // Track if we're showing the cart display
+var cart_display_active: bool = true; // Track if we're showing the cart display
 
 // Cart display check interval (in microseconds) - check every 500ms
 const CART_CHECK_INTERVAL: u64 = 500_000;
-var last_cart_check: u64 = 0;
+var next_cart_check: u64 = 0;
 
 // Stop combo: require both START+SELECT held for 500ms before triggering
 const STOP_COMBO_HOLD_US: u64 = 500_000;
@@ -116,7 +116,9 @@ var ready_fb_state: terry.core0.TrackedStateMachine(enum {
 var ready_framebuffer: []const u16 = undefined;
 var ready_fb_dirty_rect: [4]u16 = undefined;
 
-pub fn main() !void {
+// This function uses FP registers. If inlined into microzig_main, it will save FP registers in the preamble
+// before the FP unit is initialized, causing a fault.
+pub noinline fn main() !void {
     // Initialize all drivers and kernel systems
     try init.init(.{
         .lcd_pins = lcd.createDT018BTFTPins(),
@@ -178,38 +180,10 @@ pub fn main() !void {
                 stop_combo_deadline = timer.micros() + STOP_COMBO_HOLD_US;
             }
             if (timer.micros() > stop_combo_deadline) {
-                console.printf("[BTN] START+SELECT (STOP) pressed (cart_running={})\r\n", .{cart_running});
-                console.println("[STOP] 1: halting Core 1");
-                multicore.haltCore1();
-                console.println("[STOP] 2: stopDMA");
-                lcd.stopDMA();
-                console.println("[STOP] 3a: resetCartBuzzer");
-                audio.reset();
-                console.println("[STOP] 3b: resetCartPWM");
-                gpio.resetCartPWM();
-                console.println("[STOP] 3c: resetCartPIO");
-                gpio.resetCartPIO();
-                console.println("[STOP] 3d: resetCartNeopixels");
-                gpio.resetCartNeopixels();
-                console.println("[STOP] 3e: resetCartLED");
-                gpio.resetCartLED();
-                console.println("[STOP] 3f: initButtons");
-                gpio.initButtons();
-                console.println("[STOP] 4: abortCartChannels");
-                dma.abortCartChannels();
-                console.println("[STOP] 5: loader.stop");
-                loader.stop();
-                console.println("[STOP] 6: resetCore1");
-                multicore.resetCore1();
-                // Mark cart as stopped and restore state before reinit
+                @branchHint(.unlikely);
+
+                stop_active_cart();
                 cart_running = false;
-                display_active = true;
-                btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
-                ready_fb_state.set_state(.not_ready, @src());
-                console.println("[STOP] 8: refreshCartDisplay");
-                refreshCartDisplay();
-                last_cart_hash = computeCartHash();
-                console.println("[STOP] 9: done");
             }
         } else {
             stop_combo_deadline = 0;
@@ -224,160 +198,17 @@ pub fn main() !void {
 
         // Only process navigation buttons when cart is NOT running
         if (!cart_running) {
-            // Joystick up - move cursor up through cart list
-            if (pressed.up) {
-                console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
-                if (cart_count > 0) {
-                    cursor_index = if (cursor_index == 0) cart_count - 1 else cursor_index - 1;
-                    refreshCartDisplay();
-                }
-            }
-
-            // Joystick down - move cursor down through cart list
-            if (pressed.down) {
-                console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
-                if (cart_count > 0) {
-                    cursor_index = (cursor_index + 1) % cart_count;
-                    refreshCartDisplay();
-                }
-            }
-
-            // Button A - run the selected cart
-            if (pressed.a) {
-                console.printf("[BTN] A pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
-                if (cart_count > 0 and cursor_index < cart_count) {
-                    runSelectedCart();
-                    continue;
-                } else {
-                    console.printf("[BTN] A: no cart to run (cart_count={d})\r\n", .{cart_count});
-                }
-            }
-
-            const now = timer.micros();
-            if (now > overlay_refresh_deadline) {
-                overlay_refresh_deadline = now + overlay_refresh_period_us;
-                fps_overlay.tick_os();
-            }
-
-            if (fps_overlay.is_drawing() and !lcd.isBusy()) {
-                fps_overlay.submit_lcd_work();
-            }
+            tick_cart_select(pressed);
         } else {
-            // Keep ipc_controls updated every iteration so carts always read fresh
-            // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
-            mailbox.shared_data.controls = buttons;
-
-            // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
-            // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
-            const now_us = timer.micros();
-            if (!btn_diag_cart_was_running) {
-                btn_diag_cart_was_running = true;
-                btn_diag_last_us = now_us;
-                console.println("[BTN-DIAG] cart started - will log button state every 2s");
-            }
-            if (now_us -% btn_diag_last_us >= BTN_DIAG_US) {
-                btn_diag_last_us = now_us;
-                console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={} SEL={} A={} B={} UP={} DN={} \r\n", .{
-                    @as(u16, @bitCast(buttons)),
-                    buttons.start,
-                    buttons.select,
-                    buttons.a,
-                    buttons.b,
-                    buttons.up,
-                    buttons.down,
-                });
-            }
-
-            // Mailbox: process all pending messages (trace, framebuffer sync).
-            // New-API carts send FRAMEBUFFER_READY when they finish a frame.
-            // CART_TRACE: cart debug/panic output via cart.trace().
-            while (mailbox.tryReceive()) |msg| {
-                if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
-                    const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.shared_data.trace_buf.len - 1);
-                    const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
-                    console.printf("[CART] {s}\r\n", .{buf[0..len]});
-                } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
-                    const freq: f32 = mailbox.shared_data.tone_freq;
-                    const duration_sec: f32 = mailbox.shared_data.tone_duration;
-                    const volume = mailbox.shared_data.tone_volume;
-                    const flags = mailbox.shared_data.tone_flags;
-                    audio.tone(freq, duration_sec, volume, flags);
-                } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
-                    const volume = mailbox.shared_data.global_volume;
-                    audio.set_global_volume(volume);
-                } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
-                    mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
-                {
-                    const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
-                        @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
-                    else
-                        0;
-                    const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
-                    const has_dirty_rect: bool = is_v2 and
-                        (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
-
-                    // Flush selected shared-RAM framebuffer.
-                    fps_overlay.tick_cart();
-                    ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[fb_index]));
-                    if (has_dirty_rect) {
-                        const rx: u16 = mailbox.shared_data.dirty_rect_x;
-                        const ry: u16 = mailbox.shared_data.dirty_rect_y;
-                        const rw: u16 = mailbox.shared_data.dirty_rect_w;
-                        const rh: u16 = mailbox.shared_data.dirty_rect_h;
-
-                        // Fallback to full-frame if rect metadata is invalid.
-                        if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
-                            ready_fb_dirty_rect = .{ rx, ry, rw, rh };
-                            ready_fb_state.set_state(.ready_rect, @src());
-                        } else {
-                            ready_fb_state.set_state(.ready_whole, @src());
-                        }
-                    } else if (!is_v2) {
-                        // Legacy carts always imply full-frame updates.
-                        ready_fb_state.set_state(.ready_whole, @src());
-                    } else {
-                        // No visual change this frame: skip LCD transfer.
-                        ready_fb_state.set_state(.transferring, @src());
-                    }
-                }
-                // Other messages (e.g. CART_FINISHED) handled by loader state machine.
-            }
-
-            // Dispatch async LCD work
-            if (!lcd.isBusy()) {
-                find_lcd_work: switch (ready_fb_state.state) {
-                    .not_ready => {},
-                    .ready_rect => {
-                        const rect = ready_fb_dirty_rect;
-                        lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
-                        ready_fb_state.set_state(.transferring, @src());
-                    },
-                    .ready_whole => {
-                        lcd.writeCartBuffer(ready_framebuffer);
-                        ready_fb_state.set_state(.transferring, @src());
-                    },
-                    .transferring => {
-                        // Transfer finished, the frame buffer is safe for the app to write
-                        //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                        ready_fb_state.set_state(.draw_debug, @src());
-                        continue :find_lcd_work .draw_debug;
-                    },
-                    .draw_debug => {
-                        if (fps_overlay.is_drawing()) {
-                            fps_overlay.submit_lcd_work();
-                        } else {
-                            mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                            ready_fb_state.set_state(.not_ready, @src());
-                        }
-                    },
-                }
-            }
+            tick_cart_mailbox(buttons);
         }
 
-        if (cart_running and display_active) {
+        if (cart_running and cart_display_active) {
+            @branchHint(.unlikely);
             // Cart just started running - stop updating display
-            display_active = false;
-        } else if (!cart_running and !display_active) {
+            cart_display_active = false;
+        } else if (!cart_running and !cart_display_active) {
+            @branchHint(.unlikely);
             // Cart stopped naturally (not via stop button) - reset hardware and restore display.
             btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
             console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
@@ -388,7 +219,7 @@ pub fn main() !void {
             gpio.resetCartHardware();
             // Abort any DMA transfers the cart may have left running.
             dma.abortCartChannels();
-            display_active = true;
+            cart_display_active = true;
             // Re-sync all button states so any buttons still held when the cart
             // exited are consumed and won't immediately re-trigger menu actions.
             refreshCartDisplay();
@@ -396,18 +227,239 @@ pub fn main() !void {
         }
 
         // Periodically check if cart list changed (only when display is active)
-        if (display_active) {
+        if (cart_display_active) {
             const now = timer.micros();
-            if (now -% last_cart_check >= CART_CHECK_INTERVAL) {
+            if (now >= next_cart_check) {
+                @branchHint(.unlikely);
+
                 const current_hash = computeCartHash();
                 if (current_hash != last_cart_hash) {
                     refreshCartDisplay();
                     last_cart_hash = current_hash;
                 }
-                last_cart_check = now;
+                next_cart_check = now + CART_CHECK_INTERVAL;
             }
         }
     }
+}
+
+fn tick_cart_select(pressed: Controls) void {
+    // Joystick up - move cursor up through cart list
+    if (pressed.up) {
+        @branchHint(.unlikely);
+        console.printf("[BTN] UP pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
+        if (cart_count > 0) {
+            cursor_index = if (cursor_index == 0) cart_count - 1 else cursor_index - 1;
+            refreshCartDisplay();
+        }
+    }
+
+    // Joystick down - move cursor down through cart list
+    if (pressed.down) {
+        @branchHint(.unlikely);
+        console.printf("[BTN] DOWN pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
+        if (cart_count > 0) {
+            cursor_index = (cursor_index + 1) % cart_count;
+            refreshCartDisplay();
+        }
+    }
+
+    // Button A - run the selected cart
+    if (pressed.a) {
+        @branchHint(.unlikely);
+        console.printf("[BTN] A pressed (cursor={d}, cart_count={d})\r\n", .{ cursor_index, cart_count });
+        if (cart_count > 0 and cursor_index < cart_count) {
+            runSelectedCart();
+            return;
+        } else {
+            console.printf("[BTN] A: no cart to run (cart_count={d})\r\n", .{cart_count});
+        }
+    }
+
+    const now = timer.micros();
+    if (now > overlay_refresh_deadline) {
+        @branchHint(.unlikely);
+        overlay_refresh_deadline = now + overlay_refresh_period_us;
+        fps_overlay.tick_os();
+    }
+
+    if (fps_overlay.is_drawing() and !lcd.isBusy()) {
+        fps_overlay.submit_lcd_work();
+    }
+}
+
+fn tick_cart_mailbox(buttons: Controls) void {
+    // Keep ipc_controls updated every iteration so carts always read fresh
+    // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
+    mailbox.shared_data.controls = buttons;
+
+    // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
+    // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
+    const now_us = timer.micros();
+    if (!btn_diag_cart_was_running) {
+        btn_diag_cart_was_running = true;
+        btn_diag_last_us = now_us;
+        console.println("[BTN-DIAG] cart started - will log button state every 2s");
+    }
+    if (now_us -% btn_diag_last_us >= BTN_DIAG_US) {
+        btn_diag_last_us = now_us;
+        console.printf("[BTN-DIAG] raw_ipc=0x{x:0>3} | gpio(0=pressed): START={} SEL={} A={} B={} UP={} DN={} \r\n", .{
+            @as(u16, @bitCast(buttons)),
+            buttons.start,
+            buttons.select,
+            buttons.a,
+            buttons.b,
+            buttons.up,
+            buttons.down,
+        });
+    }
+
+    // Mailbox: process all pending messages (trace, framebuffer sync).
+    // New-API carts send FRAMEBUFFER_READY when they finish a frame.
+    // CART_TRACE: cart debug/panic output via cart.trace().
+    var sync_time = false;
+    while (mailbox.tryReceive()) |msg| {
+        handle_cart_message(msg, &sync_time);
+    }
+
+    if (sync_time) {
+        sync_cart_time();
+    }
+
+    // Dispatch async LCD work
+    if (!lcd.isBusy()) {
+        find_lcd_work: switch (ready_fb_state.state) {
+            .not_ready => {},
+            .ready_rect => {
+                const rect = ready_fb_dirty_rect;
+                lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
+                ready_fb_state.set_state(.transferring, @src());
+            },
+            .ready_whole => {
+                lcd.writeCartBuffer(ready_framebuffer);
+                ready_fb_state.set_state(.transferring, @src());
+            },
+            .transferring => {
+                // Transfer finished, the frame buffer is safe for the app to write
+                //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                ready_fb_state.set_state(.draw_debug, @src());
+                continue :find_lcd_work .draw_debug;
+            },
+            .draw_debug => {
+                if (fps_overlay.is_drawing()) {
+                    fps_overlay.submit_lcd_work();
+                } else {
+                    mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                    ready_fb_state.set_state(.not_ready, @src());
+                }
+            },
+        }
+    }
+}
+
+fn handle_cart_message(msg: u32, sync_time: *bool) void {
+    if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
+        const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.shared_data.trace_buf.len - 1);
+        const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
+        console.printf("[CART] {s}\r\n", .{buf[0..len]});
+    } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
+        const freq: f32 = mailbox.shared_data.tone_freq;
+        const duration_sec: f32 = mailbox.shared_data.tone_duration;
+        const volume = mailbox.shared_data.tone_volume;
+        const flags = mailbox.shared_data.tone_flags;
+        audio.tone(freq, duration_sec, volume, flags);
+    } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
+        const volume = mailbox.shared_data.global_volume;
+        audio.set_global_volume(volume);
+    } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
+        mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
+    {
+        const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
+            @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
+        else
+            0;
+        const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
+        const has_dirty_rect: bool = is_v2 and
+            (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
+
+        // Flush selected shared-RAM framebuffer.
+        fps_overlay.tick_cart();
+        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[fb_index]));
+        if (has_dirty_rect) {
+            const rx: u16 = mailbox.shared_data.dirty_rect_x;
+            const ry: u16 = mailbox.shared_data.dirty_rect_y;
+            const rw: u16 = mailbox.shared_data.dirty_rect_w;
+            const rh: u16 = mailbox.shared_data.dirty_rect_h;
+
+            // Fallback to full-frame if rect metadata is invalid.
+            if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
+                ready_fb_dirty_rect = .{ rx, ry, rw, rh };
+                ready_fb_state.set_state(.ready_rect, @src());
+            } else {
+                ready_fb_state.set_state(.ready_whole, @src());
+            }
+        } else if (!is_v2) {
+            // Legacy carts always imply full-frame updates.
+            ready_fb_state.set_state(.ready_whole, @src());
+        } else {
+            // No visual change this frame: skip LCD transfer.
+            ready_fb_state.set_state(.transferring, @src());
+        }
+    } else if (msg == mailbox.MessageType.SYNC_TIME_REQ_CLR) {
+        sync_time.* = true;
+    }
+    // Other messages (e.g. CART_FINISHED) handled by loader state machine.
+}
+
+fn stop_active_cart() void {
+    console.println("[BTN] START+SELECT (STOP) pressed");
+    console.println("[STOP] 1: halting Core 1");
+    multicore.haltCore1();
+    console.println("[STOP] 2: stopDMA");
+    lcd.stopDMA();
+    console.println("[STOP] 3a: resetCartBuzzer");
+    audio.reset();
+    console.println("[STOP] 3b: resetCartPWM");
+    gpio.resetCartPWM();
+    console.println("[STOP] 3c: resetCartPIO");
+    gpio.resetCartPIO();
+    console.println("[STOP] 3d: resetCartNeopixels");
+    gpio.resetCartNeopixels();
+    console.println("[STOP] 3e: resetCartLED");
+    gpio.resetCartLED();
+    console.println("[STOP] 3f: initButtons");
+    gpio.initButtons();
+    console.println("[STOP] 4: abortCartChannels");
+    dma.abortCartChannels();
+    console.println("[STOP] 5: loader.stop");
+    loader.stop();
+    console.println("[STOP] 6: resetCore1");
+    multicore.resetCore1();
+    // Mark cart as stopped and restore state before reinit
+    cart_display_active = true;
+    btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
+    ready_fb_state.set_state(.not_ready, @src());
+    console.println("[STOP] 8: refreshCartDisplay");
+    refreshCartDisplay();
+    last_cart_hash = computeCartHash();
+    console.println("[STOP] 9: done");
+}
+
+fn sync_cart_time() void {
+    const cs = microzig.interrupt.enter_critical_section();
+    defer cs.leave();
+
+    mailbox.send(mailbox.MessageType.SYNC_TIME_ACK_CLR);
+
+    const msg = while (true) {
+        if (mailbox.tryReceive()) |msg| break msg;
+    };
+
+    const time: u64 = @bitCast(terry.client.get_time_core0(cs));
+    mailbox.send(@intCast(time >> 32));
+    mailbox.send(@truncate(time));
+
+    std.debug.assert(msg == mailbox.MessageType.SYNC_TIME_REQ_TIME);
 }
 
 /// Compute a simple hash of cart list to detect changes
@@ -587,6 +639,8 @@ fn runSelectedCart() void {
     // Carts read at start of update(); this ensures frame 0 sees real buttons
     // rather than all-zero (which broke metalgear-timer and spaceshooter).
     mailbox.shared_data.controls = read_buttons();
+    @memset(std.mem.asBytes(&mailbox.shared_data.framebuffers), 0);
+    terry.client.prepare_for_cart();
 
     // Execute the cart
     console.println("[BTN] calling executeCart...");
@@ -594,11 +648,11 @@ fn runSelectedCart() void {
         // Cart execution started successfully
         // Mark as running immediately to prevent race conditions
         loader.markRunning();
-        // NOTE: do NOT set display_active = false here. cart_running is still false
+        // NOTE: do NOT set cart_display_active = false here. cart_running is still false
         // in this loop iteration (it was captured before runSelectedCart was called),
-        // so setting display_active = false here causes the !cart_running && !display_active
+        // so setting cart_display_active = false here causes the !cart_running && !cart_display_active
         // branch to fire immediately, redrawing the menu on top of the cart.
-        // The main loop's (cart_running && display_active) check handles this correctly
+        // The main loop's (cart_running && cart_display_active) check handles this correctly
         // on the next iteration once cart_running reflects the new state.
         console.println("[BTN] executeCart succeeded, cart running");
         // Small delay to let Core 1 start and take control of hardware

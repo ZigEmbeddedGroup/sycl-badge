@@ -1,5 +1,5 @@
 pub const client = @import("terry_client.zig");
-const q = @import("terry_protocol.zig");
+const q = @import("tracy_protocol.zig");
 
 const mz_rtt = @import("../drivers/microzig_rtt.zig");
 const rtt = @import("../drivers/rtt.zig");
@@ -139,7 +139,7 @@ pub const core0 = struct {
         return zone_color_cond(name, loc, 0, true);
     }
     pub inline fn zone_color(comptime name: ?[:0]const u8, comptime loc: std.builtin.SourceLocation, comptime color: u32) Zone {
-        return zone_color_cond(external_source_location(name, loc, color), true);
+        return zone_color_cond(name, loc, color, true);
     }
     pub inline fn fn_zone_cond(comptime loc: std.builtin.SourceLocation, active: bool) Zone {
         return zone_color_cond(null, loc, 0, active);

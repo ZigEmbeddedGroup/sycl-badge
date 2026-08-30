@@ -17,6 +17,7 @@ var last_frame_us: u64 = 0;
 
 /// Timestamp (µs) of the most recent poll() call.
 var last_poll_us: u64 = 0;
+var last_xip_sample_cycles: u32 = 0;
 
 /// Time spent mixing audio
 var audio_pct_sample_start: u64 = 0;
@@ -24,6 +25,10 @@ var audio_mix_count: u32 = 0;
 var audio_mix_total_us: u32 = 0;
 var audio_mix_max_us: u32 = 0;
 var audio_service_delay_max_us: u32 = 0;
+
+/// XIP Stats
+var xip_hit_rate: u32 = 0;
+var xip_stall_rate: u32 = 0;
 
 // ── Rolling averages ───────────────────────────────────────────────────────────
 // multi-sample ring buffer so the display doesn't jitter on minor frame-time
@@ -222,6 +227,21 @@ pub fn poll() void {
 
     if (audio_pct_sample_start == 0) {
         audio_pct_sample_start = now;
+
+        {
+            const cs = microzig.interrupt.enter_critical_section();
+            defer cs.leave();
+
+            microzig.chip.peripherals.PPB.DWT_CTRL.modify(.{ .CYCCNTENA = 1 });
+            microzig.chip.peripherals.PPB.DEMCR.modify(.{ .TRCENA = 1 });
+
+            microzig.chip.peripherals.BUSCTRL.PERFSEL0.write(.{ .PERFSEL0 = .xip_main0_stall_downstream });
+            microzig.chip.peripherals.BUSCTRL.PERFSEL1.write(.{ .PERFSEL1 = .xip_main1_stall_downstream });
+            microzig.chip.peripherals.BUSCTRL.PERFCTR_EN.write(.{ .PERFCTR_EN = 1 });
+            last_xip_sample_cycles = microzig.chip.peripherals.PPB.DWT_CYCCNT.raw;
+            microzig.chip.peripherals.BUSCTRL.PERFCTR0.write_raw(0);
+            microzig.chip.peripherals.BUSCTRL.PERFCTR1.write_raw(0);
+        }
     } else if (now - audio_pct_sample_start >= 150_000) {
         const total_time = time_delta(audio_pct_sample_start, now);
         const audio_time = audio_mix_total_us;
@@ -239,6 +259,32 @@ pub fn poll() void {
         audio_mix_max_us = 0;
         audio_service_delay_max_us = 0;
         audio_pct_sample_start = now;
+
+        var xip_hit: u32 = undefined;
+        var xip_acc: u32 = undefined;
+        var xip_stall_0: u32 = undefined;
+        var xip_stall_1: u32 = undefined;
+        var cycles: u32 = undefined;
+        {
+            const cs = microzig.interrupt.enter_critical_section();
+            defer cs.leave();
+
+            xip_hit = microzig.chip.peripherals.XIP_CTRL.CTR_HIT.raw;
+            microzig.chip.peripherals.XIP_CTRL.CTR_HIT.write_raw(0);
+            xip_acc = microzig.chip.peripherals.XIP_CTRL.CTR_ACC.raw;
+            microzig.chip.peripherals.XIP_CTRL.CTR_ACC.write_raw(0);
+
+            xip_stall_0 = microzig.chip.peripherals.BUSCTRL.PERFCTR0.raw;
+            xip_stall_1 = microzig.chip.peripherals.BUSCTRL.PERFCTR1.raw;
+            cycles = microzig.chip.peripherals.PPB.DWT_CYCCNT.raw;
+            microzig.chip.peripherals.BUSCTRL.PERFCTR0.write_raw(0);
+            microzig.chip.peripherals.BUSCTRL.PERFCTR1.write_raw(0);
+        }
+        xip_hit_rate = if (xip_acc == 0) 0 else @intFromFloat(9999.0 * @as(f32, @floatFromInt(xip_hit)) / @as(f32, @floatFromInt(xip_acc)));
+        const delta_cycles = cycles -% last_xip_sample_cycles;
+        xip_stall_rate = if (delta_cycles == 0) 0 else @intFromFloat(9999.0 * @as(f32, @floatFromInt(xip_stall_0 + xip_stall_1)) / @as(f32, @floatFromInt(delta_cycles)));
+
+        last_xip_sample_cycles = cycles;
     }
 
     last_poll_us = now;
@@ -312,6 +358,16 @@ fn add_os_debug_text() void {
     const poll_max_max = poll_max_history.max();
     const max_pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_max}) catch "????";
     add_debug_text(.{ .text = max_pps_str, .x = @intCast(lcd.width - (4 * font_width)), .y = 8, .alignment = .right, .color = lcd.RED });
+
+    if (xip_hit_rate != 0) {
+        const xip_str = std.fmt.bufPrint(&buf, "{d:0>4}", .{xip_hit_rate}) catch "????";
+        add_debug_text(.{ .text = xip_str, .x = lcd.width, .y = 16, .alignment = .right, .color = lcd.GREEN });
+    }
+
+    if (xip_stall_rate != 0) {
+        const xip_str = std.fmt.bufPrint(&buf, "{d:0>4}", .{xip_stall_rate}) catch "????";
+        add_debug_text(.{ .text = xip_str, .x = lcd.width - (4 * font_width), .y = 16, .alignment = .right, .color = lcd.RED });
+    }
 
     if (rev.debug) {
         // Revision strings

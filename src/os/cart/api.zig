@@ -273,7 +273,7 @@ fn resetDirtyRect() void {
     dirty_max_y = 0;
 }
 
-pub inline fn markDirtyRect(x: i32, y: i32, w: i32, h: i32) void {
+pub fn markDirtyRect(x: i32, y: i32, w: i32, h: i32) void {
     if (w <= 0 or h <= 0) return;
 
     const x0 = @max(x, 0);
@@ -337,7 +337,7 @@ fn clipPixel(x: i32, y: i32, pixel: Pixel) void {
 }
 
 /// Copies pixels to the framebuffer.
-pub inline fn blit(options: BlitOptions) void {
+pub fn blit(options: BlitOptions) void {
     if (is_wasm) {
         struct {
             extern fn blit(sprite: [*]const DisplayColor, x: i32, y: i32, width: u32, height: u32, src_x: u32, src_y: u32, stride: u32, flags: BlitOptions.Flags) void;
@@ -408,7 +408,7 @@ pub const LineOptions = struct {
 };
 
 /// Draws a line between two points.
-pub inline fn line(options: LineOptions) void {
+pub fn line(options: LineOptions) void {
     if (is_wasm) {
         struct {
             extern fn line(color: DisplayColor, x1: i32, y1: i32, x2: i32, y2: i32) void;
@@ -459,7 +459,7 @@ pub const OvalOptions = struct {
 };
 
 /// Draws an oval (or circle).
-pub inline fn oval(options: OvalOptions) void {
+pub fn oval(options: OvalOptions) void {
     if (is_wasm) {
         struct {
             extern fn oval(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
@@ -578,7 +578,7 @@ pub const RectOptions = struct {
 };
 
 /// Draws a rectangle.
-pub inline fn rect(options: RectOptions) void {
+pub fn rect(options: RectOptions) linksection(".ramfunc") void {
     if (is_wasm) {
         struct {
             extern fn rect(stroke_color: DisplayColor.Optional, fill_color: DisplayColor.Optional, x: i32, y: i32, width: u32, height: u32) void;
@@ -648,7 +648,7 @@ pub const TextOptions = struct {
 };
 
 /// Draws text using the built-in system font.
-pub inline fn text(options: TextOptions) void {
+pub fn text(options: TextOptions) void {
     if (is_wasm) {
         struct {
             extern fn text(text_color: DisplayColor.Optional, background_color: DisplayColor.Optional, str_ptr: [*]const u8, str_len: usize, x: i32, y: i32, scale: u32) void;
@@ -738,7 +738,7 @@ pub const StraightLineOptions = struct {
 };
 
 /// Draws a horizontal line
-pub inline fn hline(options: StraightLineOptions) void {
+pub fn hline(options: StraightLineOptions) void {
     if (is_wasm) {
         struct {
             extern fn hline(color: DisplayColor, x: i32, y: i32, len: u32) void;
@@ -759,7 +759,7 @@ pub inline fn hline(options: StraightLineOptions) void {
 }
 
 /// Draws a vertical line
-pub inline fn vline(options: StraightLineOptions) void {
+pub fn vline(options: StraightLineOptions) void {
     if (is_wasm) {
         struct {
             extern fn vline(color: DisplayColor, x: i32, y: i32, len: u32) void;
@@ -866,7 +866,7 @@ pub const Tone2Options = struct {
 /// Plays a sound tone via the hardware buzzer.
 /// Cancels any other audio that might be playing.
 /// On native: sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer.
-pub inline fn tone2(options: Tone2Options) void {
+pub fn tone2(options: Tone2Options) void {
     if (is_wasm) {
         // TODO: Update wasm to handle new float values
         const adj_duration: u32 = if (options.duration == -1)
@@ -901,7 +901,7 @@ pub inline fn tone2(options: Tone2Options) void {
 /// Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually
 /// linear scale from about -50dB to 0dB adjustment from the maximum
 /// speaker volume.
-pub inline fn setGlobalVolume(volume: f32) void {
+pub fn setGlobalVolume(volume: f32) void {
     if (is_wasm) {
         // TODO wasm volume
     } else {
@@ -1292,7 +1292,7 @@ noinline fn outline_zone_end(time: i64, record_block: bool) linksection(".ramfun
 
 /// Returns a random number from the RP2350 ring oscillator random bit.
 /// Useful for seeding a faster PRNG.
-pub inline fn rand() u32 {
+pub fn rand() u32 {
     if (is_wasm) {
         return struct {
             extern fn rand() u32;
@@ -1312,7 +1312,7 @@ pub inline fn rand() u32 {
 /// Prints a message to the debug console.
 /// On native: copies string to shared buffer and sends CART_TRACE via FIFO;
 /// kernel prints to UART. Used by Blobs and other carts for panic/debug output.
-pub inline fn trace(x: []const u8) void {
+pub fn trace(x: []const u8) void {
     if (is_wasm) {
         struct {
             extern fn trace(str_ptr: [*]const u8, str_len: usize) void;
@@ -1343,7 +1343,7 @@ pub inline fn trace(x: []const u8) void {
 ///
 /// Call this once per frame (typically at the end of `update()`).
 /// On WASM this is a no-op because the simulator owns the display.
-pub inline fn present() void {
+pub fn present() void {
     if (is_wasm) {
         // Simulator flushes automatically — nothing to do.
         return;

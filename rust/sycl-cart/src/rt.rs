@@ -187,6 +187,29 @@ pub unsafe fn update<C: Cart>(cell: &'static CartCell<C>) {
     }
 }
 
+/// The badge's frame loop. Called by [`crate::cart!`] from the `cortex-m-rt`
+/// entry point; never returns, because there is nothing on Core 1 to return to.
+///
+/// The simulator drives `start`/`update` itself, one call per host frame. On the
+/// badge nobody does, so the cart owns the loop. Pacing comes from `present`,
+/// which blocks until Core 0 finishes DMA'ing the previous frame to the LCD.
+///
+/// # Safety
+///
+/// Must be called exactly once, from the entry point, with `cell` untouched.
+#[cfg(target_arch = "arm")]
+#[doc(hidden)]
+pub unsafe fn badge_main<C: Cart>(cell: &'static CartCell<C>) -> ! {
+    platform::init();
+    // SAFETY: the entry point runs once, after `cortex-m-rt` has copied `.data`
+    // and zeroed `.bss`, so this is the first and only `start`.
+    unsafe { start::<C>(cell) };
+    loop {
+        // SAFETY: `start` ran above, and nothing else touches `cell`.
+        unsafe { update::<C>(cell) };
+    }
+}
+
 /// Frame counter and flushed-pixel count, drawn top-left.
 ///
 /// Flushed pixels is the number worth watching: the OS skips the LCD transfer
@@ -203,8 +226,27 @@ fn overlay(ctx: &mut Ctx) {
 
 /// Declare your cart type as the program entry point.
 ///
-/// Emits the `start` and `update` symbols the simulator calls (and, on the
-/// badge, that the frame loop drives). Use it exactly once, at the crate root.
+/// Use it exactly once, at the crate root of a `#![no_std] #![no_main]` binary.
+/// What it emits depends on the target:
+///
+/// * **Simulator.** The `start` and `update` exports the host calls, once per
+///   frame. The host owns the loop.
+/// * **Badge.** The same two functions, plus a `cortex-m-rt` entry point that
+///   runs `start` and then loops on `update` forever, plus a `HardFault`
+///   handler that traces the faulting address before parking. Core 1 has no
+///   loop of its own, so the cart brings one.
+///
+/// The `HardFault` handler means a cart cannot install its own. That is the
+/// trade for a fault being legible on hardware rather than a silent freeze.
+///
+/// A cart that targets the badge needs `cortex-m-rt` among its own
+/// dependencies, because the attribute macros expand to absolute `::cortex_m_rt`
+/// paths that only resolve in the crate that invokes them:
+///
+/// ```toml
+/// [target.'cfg(target_arch = "arm")'.dependencies]
+/// cortex-m-rt = "0.7"
+/// ```
 #[macro_export]
 macro_rules! cart {
     ($ty:ty) => {
@@ -224,7 +266,33 @@ macro_rules! cart {
             // SAFETY: the platform calls `update` only after `start`.
             unsafe { $crate::rt::update::<$ty>(&__SYCL_CART) }
         }
+
+        // The badge entry point. `cortex-m-rt` puts this in the reset vector,
+        // and the OS reads that vector to launch the cart on Core 1.
+        #[cfg(target_arch = "arm")]
+        #[doc(hidden)]
+        #[cortex_m_rt::entry]
+        fn __sycl_badge_entry() -> ! {
+            // SAFETY: `cortex-m-rt` calls this once, after scatter-init.
+            unsafe { $crate::rt::badge_main::<$ty>(&__SYCL_CART) }
+        }
+
+        // Emitted here rather than in the library so the linker cannot leave it
+        // in an unreferenced archive member and keep the weak default.
+        #[cfg(target_arch = "arm")]
+        #[doc(hidden)]
+        #[cortex_m_rt::exception]
+        unsafe fn HardFault(frame: &cortex_m_rt::ExceptionFrame) -> ! {
+            $crate::rt::on_hard_fault(frame)
+        }
     };
+}
+
+/// Trace the faulting address, then park. Called by [`crate::cart!`].
+#[cfg(target_arch = "arm")]
+#[doc(hidden)]
+pub fn on_hard_fault(frame: &cortex_m_rt::ExceptionFrame) -> ! {
+    platform::report_fault("HardFault", frame.pc(), frame.lr())
 }
 
 /// Report the panic through the trace channel, then stop.

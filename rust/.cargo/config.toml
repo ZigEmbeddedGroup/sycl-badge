@@ -29,5 +29,14 @@ rustflags = [
   "-Clink-arg=--export=__stack_pointer",
 ]
 
+# Badge link flags. `link.x` comes from cortex-m-rt; it pulls in the `memory.x`
+# that `sycl-cart/build.rs` drops on the linker search path, and it places the
+# vector table at ORIGIN(FLASH) where the OS loader scans for it
+# (`findVectorTableAddr` in `src/os/loader/loader.zig`).
+[target.'cfg(target_arch = "arm")']
+rustflags = [
+  "-Clink-arg=-Tlink.x",
+]
+
 [alias]
 xtask = "run --package xtask --release --"

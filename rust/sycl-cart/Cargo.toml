@@ -28,3 +28,6 @@ panic-messages = []
 
 # Draw a frame-timing overlay (update vs present, dirty-rect outline).
 debug-overlay = []
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m-rt = "0.7.6"

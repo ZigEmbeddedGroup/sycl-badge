@@ -20,6 +20,7 @@ Other commands:
 ```bash
 cargo xtask build                  # one-shot build to target/cart.wasm
 cargo xtask watch -p itest         # a different cart
+cargo xtask uf2 -p fill            # build for the badge -> target/fill.uf2
 cargo test                         # host tests for the portable code
 cargo clippy --all-targets         # lints
 node tools/sim_check.mjs target/cart.wasm flappy   # headless: renders? audio? memory sane?
@@ -43,6 +44,37 @@ Carts are `no_std` cross-compiled artifacts and cannot build for the host, so
 they are excluded from the workspace's `default-members`. Root-level `cargo
 build`/`test`/`clippy` cover the framework and tooling; build a cart through
 `xtask` or with `-p <cart> --target wasm32-unknown-unknown`.
+
+## Running on the badge
+
+```bash
+rustup target add thumbv8m.main-none-eabihf
+cargo xtask uf2 -p fill
+# copy target/fill.uf2 onto the badge's USB drive, then reset the badge
+```
+
+The badge's OS reads the `.uf2` off its FAT12 drive, programs the payload into
+the cart_xip flash region and jumps to the reset vector on Core 1
+(`src/os/loader/loader.zig`, then `executeCart` in `src/os/cart.zig`). There is
+no debugger in that loop, so `xtask uf2` re-runs every check the OS makes —
+stack pointer, reset vector, address range — and fails at the desk instead.
+
+[`showcase/fill`](showcase/fill/src/main.rs) is the cart to flash first. It draws
+three labelled colour bands, then solid fills you step through with A and B.
+Every mode names the colour it is drawing, which turns the one bug this port is
+most likely to have — a red/blue swap in the pixel encoding — into something you
+can read off the screen.
+
+A cart that targets the badge needs `cortex-m-rt` among its own dependencies:
+
+```toml
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m-rt = "0.7"
+```
+
+That is not decoration. `cart!` expands to `cortex-m-rt`'s `#[entry]` and
+`#[exception]` attributes, and those generate absolute `::cortex_m_rt` paths
+that only resolve in the crate that invoked the macro.
 
 ## Writing a cart
 
@@ -72,11 +104,16 @@ impl Cart for Game {
 sycl_cart::cart!(Game);
 ```
 
-`Cargo.toml` needs `crate-type = ["cdylib"]`. Two complete carts to read:
+A cart is a `[[bin]]` with `#![no_std]` and `#![no_main]`. It has no `main` of
+its own: the simulator calls the `start` and `update` exports, and on the badge
+`cortex-m-rt` puts a reset vector in front of the same two functions and `cart!`
+supplies the frame loop. Three complete carts to read:
 
-* [`showcase/flappy`](showcase/flappy/src/lib.rs) — a game, in one file: sprite
+* [`showcase/fill`](showcase/fill/src/main.rs) — colour bands and solid fills.
+  The smallest thing worth flashing, and the one that proves the pixel encoding.
+* [`showcase/flappy`](showcase/flappy/src/main.rs) — a game, in one file: sprite
   sheet, animation, collision, scoring, sound effects.
-* [`showcase/itest`](showcase/itest/src/lib.rs) — an interactive hardware test
+* [`showcase/itest`](showcase/itest/src/main.rs) — an interactive hardware test
   that walks you through all nine inputs while a cyberpunk eye watches you.
   Ellipse drawing, colour mixing, a shuffled prompt sequence and a looping
   chiptune track.
@@ -191,6 +228,7 @@ re-encodes, so hoist it out of per-pixel loops.
 | pixel encoding | byte-swapped RGB565 | BGR565 |
 | present | host composites after `update` | dirty rect + SIO FIFO handshake |
 | trace / tone / rand | `env` imports | shared IPC block + FIFO messages |
+| frame loop | the host calls `update` | `cortex-m-rt` entry, `present` paces it |
 | panic | trap → simulator blue screen | trace, then park |
 | save data | 4 MiB host buffer | not implemented on v2 |
 
@@ -315,6 +353,8 @@ because the linker rounds the first segment up, but don't copy the value.
 
 ```
 sycl-cart/          the framework
+  memory.x          badge flash and RAM layout, mirroring src/cart/cart_xip.ld
+  build.rs          puts memory.x on the linker search path
   src/platform/     wasm.rs, badge.rs, host.rs (for tests), ipc.rs (shared layout)
   src/gfx.rs        backbuffer, drawing, dirty tracking, volatile flush
   src/sprite.rs     sprites, sheets, sprite!/sprite_sheet!, animation
@@ -324,9 +364,11 @@ sycl-cart/          the framework
   src/log.rs        ufmt-based logging, compiled out when disabled
   src/rt.rs         Cart trait, Ctx, cart! macro, panic handler
   src/font.rs       generated — see tools/gen_font.py
+showcase/fill/      colour bands and solid fills, for hardware bring-up
 showcase/flappy/    a complete game
 showcase/itest/     interactive hardware test
-xtask/              build, and the watch server the simulator expects
+xtask/              build, uf2 packing, and the watch server the simulator expects
+  src/uf2.rs        ELF -> UF2, with the OS's own launch checks
 tools/              gen_font.py, sim_check.mjs
 ```
 
@@ -340,21 +382,19 @@ table reads the intuitive way.
 Working: the whole simulator path, verified by `tools/sim_check.mjs` — memory
 layout, rendering, audio encoding, trace output.
 
-Not yet done: **the badge backend has never been run on hardware.** It compiles
-for `thumbv8m.main-none-eabihf` and matches the documented protocol, but the
-entry point is missing — there is no vector table, no `.data`/`.bss` init, and no
-ELF→UF2 packer. That is the next milestone:
+The badge path now builds a flashable image. `cargo xtask uf2` produces a `.uf2`
+that is structurally identical to the ones `zig build` produces for Zig carts —
+same family, same load address, same block layout — and whose vector table
+passes every check `executeCart` makes before it hands over Core 1.
 
-1. `cortex-m-rt` with a `memory.x` placing `FLASH` at `0x101C0000` (256 KiB) and
-   `RAM` at `0x20034100` (`0x4BF00`). It handles scatter-init and enables the FPU
-   for `-eabihf` targets; call `platform::badge::init_fpu` for `FPCCR` as well.
-2. A `cart!` arm that emits the `cortex-m-rt` entry instead of wasm exports, with
-   the frame loop calling `update` then `present`.
-3. `cargo xtask uf2` — pack to UF2 with family `0xE48BFF59` and all target
-   addresses inside the cart window, then copy onto the badge's USB drive.
+**None of it has been run on hardware yet.** Everything above is verified against
+the OS sources and against a working Zig cart image, which is not the same as
+having seen a screen light up. The first thing to distrust if `fill` misbehaves
+is the pixel encoding in `src/platform/badge.rs`: it changed with PR #123, and a
+red/blue swap there would show up as bands whose labels do not match.
 
 Watch the size: the loader caps a cart image at roughly 160 KiB
 (`src/os/loader/loader.zig:233` against a 320 KiB staging buffer, 256 payload
-bytes per 512-byte UF2 block).
+bytes per 512-byte UF2 block). `xtask uf2` enforces it.
 
 [`ufmt`]: https://docs.rs/ufmt

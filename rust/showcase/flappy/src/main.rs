@@ -7,6 +7,7 @@
 //! Controls: A or Up to flap, Start to restart after a crash.
 
 #![no_std]
+#![no_main]
 
 use sycl_cart::audio::notes;
 use sycl_cart::math;

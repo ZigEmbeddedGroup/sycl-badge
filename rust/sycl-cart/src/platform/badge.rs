@@ -4,10 +4,12 @@
 //! through the shared IPC block and the RP2350 inter-core SIO FIFO — there is no
 //! syscall table and nothing to link against. See `src/os/ipc/mailbox.zig`.
 //!
-//! **Status: builds a flashable image, but has not been run on hardware.** The
-//! entry point is `cortex-m-rt`'s, laid out by `../../memory.x`; `cart!` supplies
-//! the frame loop and `cargo xtask uf2` packs the result. Everything here is
-//! verified against the OS sources, which is not the same as having seen it run.
+//! The entry point is `cortex-m-rt`'s, laid out by `../../memory.x`; `cart!`
+//! supplies the frame loop and `cargo xtask uf2` packs the result.
+//!
+//! **Status: runs on hardware.** `showcase/fill` draws, reads buttons and paces
+//! on `present`, so the display, input and handshake paths below are confirmed.
+//! The audio path and the neopixels are not: nothing has driven them on a badge.
 
 use crate::audio::{Shape, ToneLen};
 use crate::gfx::{self, Rect, HEIGHT, WIDTH};

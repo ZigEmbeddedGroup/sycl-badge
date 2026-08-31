@@ -26,6 +26,7 @@ const Range = error_prop.Range(f64);
 var revision_resistors = [_]f64{
     // ADC counts less than revision 1 range means revision 0.
     100, // Starts at revision 1
+    66.5,
 };
 
 pub fn calc_version_range(r1_scalar: f64) Range {

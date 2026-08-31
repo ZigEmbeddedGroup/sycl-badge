@@ -2,8 +2,11 @@
 //! transposition, the audio sequencer) without a simulator or hardware.
 //!
 //! Uses the simulator's pixel encoding so tests match what the simulator sees.
+//! The badge's encoding differs — see `badge::encode565` — so a test must never
+//! assert on a raw `Color` value, only on components round-tripped through
+//! `decode565`.
 
-use crate::audio::ToneLen;
+use crate::audio::{Shape, ToneLen};
 use crate::gfx::{Rect, HEIGHT, WIDTH};
 
 #[inline]
@@ -54,7 +57,7 @@ pub fn battery_level() -> u16 {
 pub fn set_neopixel(_index: usize, _r: u8, _g: u8, _b: u8) {}
 pub fn set_red_led(_on: bool) {}
 
-pub fn tone(_freq_hz: f32, _len: ToneLen, _volume: f32) {}
+pub fn tone(_freq_hz: f32, _len: ToneLen, _volume: f32, _shape: Shape) {}
 pub fn stop() {}
 pub fn set_global_volume(_volume: f32) {}
 pub const SUSTAIN_REFRESH_FRAMES: u16 = 200;

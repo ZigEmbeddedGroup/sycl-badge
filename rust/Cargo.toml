@@ -15,7 +15,7 @@ license = "MIT"
 repository = "https://github.com/ZigEmbeddedGroup/sycl-badge"
 
 # Carts are size-constrained: the simulator warns above 64 KiB of wasm, and the
-# badge's UF2 loader caps a cart image at ~160 KiB (src/os/loader/loader.zig:228).
+# badge's UF2 loader caps a cart image at ~160 KiB (src/os/loader/loader.zig:233).
 [profile.release]
 opt-level = "z"
 lto = "fat"

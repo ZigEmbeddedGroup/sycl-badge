@@ -20,8 +20,8 @@
 //! (trace buffer, tone parameters, dirty rect); those are badge-only and live in
 //! `platform::badge`.
 
-/// Button/joystick bitfield. Bit order must match `ButtonPoller.Buttons` in
-/// `src/os/kernel.zig` and `Controls` in `src/os/cart/api.zig`.
+/// Button/joystick bitfield. Bit order must match `Controls` in
+/// `src/os/cart/api.zig`, which `read_buttons` in `src/os/kernel.zig` fills in.
 pub const CONTROLS: usize = 0x00;
 /// Ambient light sensor, 12 bits significant.
 pub const LIGHT_LEVEL: usize = 0x02;

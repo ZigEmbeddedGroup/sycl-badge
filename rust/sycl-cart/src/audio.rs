@@ -1,12 +1,12 @@
-//! Audio: one square-wave voice, plus a tiny sequencer over `&'static` tracks.
+//! Audio: one monophonic voice, plus a tiny sequencer over `&'static` tracks.
 //!
 //! # Why the API is this small
 //!
-//! The badge's buzzer is a single monophonic square wave. `src/os/drivers/audio.zig`
+//! The badge's buzzer is a single monophonic voice. `src/os/drivers/audio.zig`
 //! drives GPIO9 with a 500 kHz PWM carrier whose duty cycle sets amplitude and a
-//! DMA channel flipping between two duty values at the note frequency; its whole
-//! state is `enum { off, square }`. There is no envelope, no second voice, no
-//! wave shape — the kernel does not even read the `tone_flags` a cart writes.
+//! DMA channel walking a wave table at the note frequency. It plays one note at
+//! a time, in one of three shapes ([`Shape`]), with no envelope and no second
+//! voice.
 //!
 //! The simulator, meanwhile, runs the full WASM-4 APU: four channels, ADSR,
 //! frequency slides, panning. Exposing that would mean composing against audio
@@ -25,7 +25,7 @@
 //! # Two hardware caveats
 //!
 //! * Pitch is currently about 400 cents sharp on real hardware — see the TODO at
-//!   `src/os/drivers/audio.zig:23`. We do not compensate, because compensating
+//!   `src/os/drivers/audio.zig:32`. We do not compensate, because compensating
 //!   would break when the driver is fixed.
 //! * The buzzer's response peaks near 2700 Hz and rolls off steeply either side
 //!   (`docs/audio_analysis/README.md`). Notes much below ~1 kHz will be quiet on
@@ -44,6 +44,28 @@ pub enum ToneLen {
     Sustained,
 }
 
+/// Wave shape of a note.
+///
+/// Mirrors `Tone2Options.Shape` in `src/os/cart/api.zig`, cut down to the three
+/// the buzzer driver can actually produce: `sine`, `major` and `minor` reach
+/// `src/os/drivers/audio.zig` and fall through to `stop()`, so a cart asking for
+/// one would get silence on hardware.
+///
+/// The simulator has no sawtooth, so it approximates one with a 25 % duty pulse
+/// — brighter than a square, and the closest the WASM-4 APU offers. That is the
+/// one shape that does not sound the same in both places.
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+#[repr(u8)]
+pub enum Shape {
+    /// `---___---___`, clarinet-ish. The default, and the loudest on the buzzer.
+    #[default]
+    Square = 0,
+    /// `/\/\/\`, flute-ish. Softer, and the APU plays it on its own channel.
+    Triangle = 1,
+    /// `|\|\|\`, violin-ish.
+    Sawtooth = 2,
+}
+
 /// One entry in a [`Track`].
 #[derive(Copy, Clone, Debug)]
 pub struct Step {
@@ -53,24 +75,38 @@ pub struct Step {
     pub frames: u16,
     /// 0.0..=1.0, perceptually linear (the OS maps it across ~50 dB).
     pub volume: f32,
+    /// Wave shape.
+    pub shape: Shape,
 }
 
 impl Step {
-    /// A note at full volume.
+    /// A square note at full volume.
     pub const fn note(freq: f32, frames: u16) -> Step {
         Step {
             freq,
             frames,
             volume: 1.0,
+            shape: Shape::Square,
         }
     }
 
-    /// A note at a given volume.
+    /// A square note at a given volume.
     pub const fn at(freq: f32, frames: u16, volume: f32) -> Step {
         Step {
             freq,
             frames,
             volume,
+            shape: Shape::Square,
+        }
+    }
+
+    /// A note in a given shape.
+    pub const fn shaped(freq: f32, frames: u16, volume: f32, shape: Shape) -> Step {
+        Step {
+            freq,
+            frames,
+            volume,
+            shape,
         }
     }
 
@@ -80,6 +116,7 @@ impl Step {
             freq: 0.0,
             frames,
             volume: 0.0,
+            shape: Shape::Square,
         }
     }
 }
@@ -216,11 +253,16 @@ impl Audio {
         g
     }
 
-    /// Play a single note immediately, above music and SFX.
+    /// Play a single square note immediately, above music and SFX.
     ///
     /// This is the one you want for a jump or a coin pickup:
     /// `c.audio.tone(880.0, ToneLen::Frames(4), 0.8)`.
     pub fn tone(&mut self, freq_hz: f32, len: ToneLen, volume: f32) {
+        self.tone_with(freq_hz, len, volume, Shape::Square);
+    }
+
+    /// [`Audio::tone`], in a given wave shape.
+    pub fn tone_with(&mut self, freq_hz: f32, len: ToneLen, volume: f32, shape: Shape) {
         let generation = self.bump();
         let (left, sustained) = match len {
             ToneLen::Frames(f) => (f.max(1), false),
@@ -231,6 +273,7 @@ impl Audio {
                 freq: freq_hz,
                 frames: left,
                 volume,
+                shape,
             },
             left,
             sustained,
@@ -334,7 +377,7 @@ impl Audio {
         } else {
             ToneLen::Frames(step.frames.max(1))
         };
-        platform::tone(step.freq, len, clamp01(volume));
+        platform::tone(step.freq, len, clamp01(volume), step.shape);
     }
 
     /// Resolve and drive one frame of audio. Called for you after `update`.
@@ -561,6 +604,35 @@ mod tests {
             a.tick();
         }
         assert!(a.is_playing());
+    }
+
+    #[test]
+    fn shape_discriminants_match_the_badge_api() {
+        // `Tone2Options.Shape` in `src/os/cart/api.zig`. The kernel passes the
+        // low three bits of `tone_flags` to `audio.tone`, which switches on
+        // them, so these numbers are the ABI and not an internal detail.
+        assert_eq!(Shape::Square as u8, 0);
+        assert_eq!(Shape::Triangle as u8, 1);
+        assert_eq!(Shape::Sawtooth as u8, 2);
+    }
+
+    #[test]
+    fn shape_reaches_the_winning_step() {
+        static TRI: Track = Track::once(&[Step::shaped(440.0, 2, 1.0, Shape::Triangle)]);
+        let mut a = audio();
+        a.play_sfx(&TRI);
+        assert_eq!(a.winner().expect("a note").1.shape, Shape::Triangle);
+
+        a.tone_with(880.0, ToneLen::Frames(1), 1.0, Shape::Sawtooth);
+        let (_, step, _) = a.winner().expect("the one-shot outranks the track");
+        assert_eq!(step.shape, Shape::Sawtooth);
+    }
+
+    #[test]
+    fn plain_constructors_stay_square() {
+        assert_eq!(Step::note(440.0, 1).shape, Shape::Square);
+        assert_eq!(Step::at(440.0, 1, 0.5).shape, Shape::Square);
+        assert_eq!(Step::rest(1).shape, Shape::Square);
     }
 
     #[test]

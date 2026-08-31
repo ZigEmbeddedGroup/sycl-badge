@@ -259,13 +259,29 @@ check(!distinct.has((POISON << 8) | POISON), "every pixel was written at least o
 
 console.log("\nservices:");
 check(unexpected.length === 0, "does not call the host drawing imports", unexpected.map(([n]) => n).join(", "));
-check(tones.length > 0, "played audio", `${tones.length} tone calls`);
-if (tones.length) {
-  const t = tones[0];
-  const duty = (t.flags >> 2) & 0x3;
-  const channel = t.flags & 0x3;
-  check(channel === 0, "uses pulse channel 0", `channel=${channel}`);
-  check(duty === 2, "uses 50% duty, matching the badge buzzer", `duty mode=${duty}`);
+// Silencing a channel is an all-zero call, and the framework makes several of
+// those per note, so look only at the calls that actually sound.
+const sounding = tones.filter((t) => t.frequency > 0 && t.volume > 0);
+check(sounding.length > 0, "played audio", `${sounding.length} of ${tones.length} tone calls sound`);
+if (sounding.length) {
+  // The badge buzzer has three wave shapes, and each maps onto exactly one set
+  // of APU flags. Anything else means a cart is composing against audio the
+  // hardware cannot reproduce.
+  const SHAPES = new Map([
+    [2 << 2, "square (pulse 0, 50% duty)"],
+    [2, "triangle (channel 2)"],
+    [1 << 2, "sawtooth (pulse 0, 25% duty)"],
+  ]);
+  const strays = [...new Set(sounding.map((t) => t.flags))].filter((f) => !SHAPES.has(f));
+  check(
+    strays.length === 0,
+    "every note uses a wave shape the badge can reproduce",
+    strays.length
+      ? `stray flags=${strays.join(",")}`
+      : [...new Set(sounding.map((t) => SHAPES.get(t.flags)))].join(", "),
+  );
+
+  const t = sounding[0];
   check(
     (t.volume & 0xff) === ((t.volume >> 8) & 0xff),
     "sustain and peak volume are equal",

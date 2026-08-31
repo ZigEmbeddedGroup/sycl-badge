@@ -45,7 +45,7 @@
 //! | | simulator (`wasm32`) | badge (`thumbv8m.main`) |
 //! |---|---|---|
 //! | framebuffer | wasm memory `0x20`, 1 buffer | `0x20020020`, 2 buffers |
-//! | pixel encoding | byte-swapped RGB565 | byte-swapped BGR565 |
+//! | pixel encoding | byte-swapped RGB565 | BGR565 |
 //! | present | host composites after `update` | dirty rect + SIO FIFO handshake |
 //! | trace/tone | `env` imports | shared buffer + FIFO messages |
 //!
@@ -72,7 +72,7 @@ pub mod text;
 #[doc(hidden)]
 pub use ufmt;
 
-pub use audio::{Audio, Step, ToneLen, Track};
+pub use audio::{Audio, Shape, Step, ToneLen, Track};
 pub use color::Color;
 pub use gfx::{Gfx, Rect, HEIGHT, WIDTH};
 pub use input::{Button, Input};
@@ -87,7 +87,7 @@ pub use text::TextBuf;
 pub mod prelude {
     pub use crate::{
         cart, debug, error, info, sprite, sprite_sheet, uformat, warn, Anim, AnimState, BlitFlags,
-        Button, Cart, Color, Ctx, Rect, Sprite, SpriteSheet, Step, TextBuf, ToneLen, Track, HEIGHT,
-        WIDTH,
+        Button, Cart, Color, Ctx, Rect, Shape, Sprite, SpriteSheet, Step, TextBuf, ToneLen, Track,
+        HEIGHT, WIDTH,
     };
 }

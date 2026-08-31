@@ -740,43 +740,6 @@ pub fn deleteCart(name: []const u8) bool {
     return false;
 }
 
-pub const CartSectorIterator = struct {
-    bytes_left: u32,
-    cluster: u16,
-    sector_idx: u32,
-    buf: [SECTOR_SIZE]u8 align(16) = undefined,
-
-    pub fn init(cart: CartInfo) CartSectorIterator {
-        return .{
-            .bytes_left = cart.size,
-            .cluster = cart.start_cluster,
-            .sector_idx = 0,
-        };
-    }
-
-    pub fn next(it: *CartSectorIterator) ?*[SECTOR_SIZE]u8 {
-        if (it.bytes_left == 0)
-            return null;
-
-        if (it.cluster >= 0xFFF8)
-            return null;
-
-        if (it.sector_idx >= SECTORS_PER_CLUSTER) {
-            it.sector_idx = 0;
-            it.cluster = fatEntry(it.cluster);
-        }
-
-        if (it.cluster >= 0xFFF8)
-            return null;
-
-        const lba = clusterToLba(it.cluster) + it.sector_idx;
-        log.info("next: lba={} cluster={} sector_idx={} bytes_left={}", .{ lba, it.cluster, it.sector_idx, it.bytes_left });
-        readSector(lba, &it.buf);
-        it.bytes_left -= @min(it.bytes_left, SECTOR_SIZE);
-        return &it.buf;
-    }
-};
-
 pub fn readCart(cart: CartInfo, dst: []u8) u32 {
     if (cart.size == 0) return 0;
     var bytes_left: u32 = cart.size;

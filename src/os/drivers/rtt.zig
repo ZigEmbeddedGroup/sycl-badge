@@ -32,18 +32,11 @@ pub fn log(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    const cs = microzig.interrupt.enter_critical_section();
-    defer cs.leave();
-
-    var buf: [1024]u8 = undefined;
-    var writer = rtt_instance.writer(0, &buf);
-
-    log_send.interface.print("{} [{s}] ({t}): " ++ format ++ "\r\n", .{
+    logf_core0("{} [{s}] ({t}): " ++ format ++ "\r\n", .{
         @as(u64, @backingInt(rp2xxx.time.get_time_since_boot())),
         level.asText(),
         scope,
-    } ++ args) catch {};
-    writer.interface.flush() catch {};
+    } ++ args);
 }
 
 pub fn log_core0(string: []const u8) void {

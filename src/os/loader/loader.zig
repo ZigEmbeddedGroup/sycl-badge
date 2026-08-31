@@ -254,15 +254,6 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
     log.info("cart_xip_end: 0x{X}", .{cart_xip_end});
     log.info("cart_xip_size: 0x{X}", .{cart_xip_size});
 
-    var parser1 = uf2.Parser{};
-    var it: storage.CartSectorIterator = .init(cart_info);
-    while (it.next()) |sector| {
-        _ = parser1.parseBlock(sector) catch |err| {
-            log.info("Failed to parse block: {}", .{err});
-            return LoadError.InvalidUF2;
-        };
-    }
-
     // Read the entire UF2 file into the cart buffer first
     const bytes_read = storage.readCart(cart_info, &cart_buffer);
     if (bytes_read == 0 or bytes_read != cart_info.size) {

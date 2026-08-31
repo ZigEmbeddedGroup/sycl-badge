@@ -140,7 +140,8 @@ fn write_spi_16_no_flush(data: []const u16) void {
 fn flush_spi() void {
     const spi_regs = spi_instance.get_regs();
 
-    const z = terry.core0.fn_zone_cond(@src(), spi_regs.SSPSR.read().BSY != 0); defer z.end();
+    const z = terry.core0.fn_zone_cond(@src(), spi_regs.SSPSR.read().BSY != 0);
+    defer z.end();
 
     // Drain RX FIFO, then wait for shifting to finish (which may be *after*
     // TX FIFO drains), then drain RX FIFO again
@@ -186,7 +187,8 @@ fn sync_resolve_state(wait_for_transfer: bool) void {
 }
 
 fn wait_for_ready() void {
-    const z = terry.core0.fn_zone_cond(@src(), state.*.is_waiting_for_interrupt()); defer z.end();
+    const z = terry.core0.fn_zone_cond(@src(), state.*.is_waiting_for_interrupt());
+    defer z.end();
 
     while (state.*.is_waiting_for_interrupt()) {}
     sync_resolve_state(true); // force synchronous SPI flush
@@ -350,7 +352,8 @@ pub const Config = struct {
 /// Low-level initialization (control pins only)
 /// Use initWithAllPins() for full initialization including SPI and TE pins
 pub fn init(pin_config: Pins, config: Config) !void {
-    const z = terry.core0.zone("lcd.init", @src()); defer z.end();
+    const z = terry.core0.zone("lcd.init", @src());
+    defer z.end();
 
     pins = pin_config;
 
@@ -410,7 +413,8 @@ pub fn init(pin_config: Pins, config: Config) !void {
 }
 
 fn initDisplay() void {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     // Software reset
     writeCommand(.SWRESET);
@@ -483,7 +487,8 @@ fn initDisplay() void {
 /// Re-initialize display registers (call after cart stops to restore LCD settings)
 /// This performs a quick reinit without full hardware reset for faster recovery
 pub fn reinitDisplay() void {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     // Reconfigure critical GPIO pins (cart may have changed them)
     pins.cs.set_function(.sio);
@@ -587,7 +592,8 @@ pub fn fillScreen(color: Color16) void {
 pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     if (x >= width or y >= height) return;
 
-    const z = terry.core0.fn_zone_cond(@src(), w * h > 16); defer z.end();
+    const z = terry.core0.fn_zone_cond(@src(), w * h > 16);
+    defer z.end();
 
     const x_clamped = @min(x, width - 1);
     const y_clamped = @min(y, height - 1);
@@ -687,7 +693,8 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
 }
 
 pub fn drawString(x: u16, y: u16, text: []const u8, color: Color16, bg_color: Color16, size: u8) void {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     var cursor_x = x;
     for (text) |char| {
@@ -705,15 +712,26 @@ pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, 
     if (y >= height) return; // Offscreen bottom
     if (w == 0 or h == 0) return; // No Area
 
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     var start = data;
     var draw_width = w;
     var draw_height = h;
-    if (x < 0) { start += @intCast(-x); draw_width -= @intCast(-x); }
-    if (y < 0) { start += @intCast(@as(u32, @intCast(-y)) * pitch); draw_height -= @intCast(-y); }
-    if (right > width) { draw_width -= @intCast(right - width); }
-    if (bottom > height) { draw_height -= @intCast(bottom - height); }
+    if (x < 0) {
+        start += @intCast(-x);
+        draw_width -= @intCast(-x);
+    }
+    if (y < 0) {
+        start += @intCast(@as(u32, @intCast(-y)) * pitch);
+        draw_height -= @intCast(-y);
+    }
+    if (right > width) {
+        draw_width -= @intCast(right - width);
+    }
+    if (bottom > height) {
+        draw_height -= @intCast(bottom - height);
+    }
 
     const x0: u16 = @intCast(@max(x, 0));
     const y0: u16 = @intCast(@max(y, 0));
@@ -735,7 +753,7 @@ pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, 
 
         start_DMA_data();
 
-        dma.startLCD(@ptrCast(start[0..draw_height * draw_width]));
+        dma.startLCD(@ptrCast(start[0 .. draw_height * draw_width]));
     } else {
         {
             const cs = microzig.interrupt.enter_critical_section();
@@ -759,7 +777,8 @@ pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, 
 pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u16) void {
     if (x >= width or y >= height) return;
 
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     const x1 = @min(x + w - 1, width - 1);
     const y1 = @min(y + h - 1, height - 1);

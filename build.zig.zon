@@ -11,8 +11,8 @@
     .minimum_zig_version = "0.17.0-dev.1471+ff10b90bc",
     .dependencies = .{
         .microzig = .{
-            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#176fa755f80b35f6aa4ce1c7521c0f132a773d05",
-            .hash = "microzig-0.15.2-D20YSXCh4ABF9k5e63eNTisnbfmptGTIPx2_rm39s4rf",
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#f417df931c4fe91266b571c9aae3911be8b7d1b3",
+            .hash = "microzig-0.15.2-D20YSafO4gA-5ehwvqR1DVAhUf2sX-TZBZp8VMfLvoCq",
         },
         .zigimg = .{
             .url = "git+https://github.com/zigimg/zigimg?ref=master#7b98e82621fe302a9edc147df1191f4d1b7ff7a5",

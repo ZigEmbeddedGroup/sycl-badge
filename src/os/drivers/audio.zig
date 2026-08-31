@@ -195,7 +195,10 @@ pub fn init() void {
             // Audio pin: hand control to the PWM peripheral
             board.rev0.audio.buzzer_pwm.set_function(.pwm);
 
-            buzzer_pwm_slice.set_clk_div(@intCast(buzzer_pwm_clk_div), 0);
+            buzzer_pwm_slice.set_clk_div(.{
+                .int = @intCast(buzzer_pwm_clk_div),
+                .frac = 0,
+            });
             buzzer_pwm_slice.set_wrap(@intCast(audio_levels));
 
             buzzer_pwm_ch.set_level(0);
@@ -345,7 +348,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
     // to ensure no sound comes out.
     // set_global_volume() has more handling of this case.
     if (global_volume != 0.0) {
-        board.buzzer_enable.put(1);
+        board.rev0.audio.buzzer_enable.put(1);
     }
 }
 
@@ -387,7 +390,10 @@ fn set_timing_PWM_hz(hz: f32) !void {
     const wrap_int: u32 = @intFromFloat(wrap_ticks - 1.0);
 
     audio_timing_slice.set_phase_correct(use_centered_mode);
-    audio_timing_slice.set_clk_div(@intCast(clk_div_int >> 4), @intCast(clk_div_int & 0xF));
+    audio_timing_slice.set_clk_div(.{
+        .int = @intCast(clk_div_int >> 4),
+        .frac = @intCast(clk_div_int & 0xF),
+    });
     audio_timing_slice.set_wrap(@intCast(wrap_int));
 }
 
@@ -548,7 +554,7 @@ pub fn stop() void {
     begin_stop_DMA();
     buzzer_pwm_slice.disable();
     audio_timing_slice.disable();
-    board.buzzer_pwm.put(0);
+    board.rev0.audio.buzzer_pwm.put(0);
     sound_type = .off;
 }
 

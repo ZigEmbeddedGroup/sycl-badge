@@ -7,6 +7,7 @@ const gpio = hal.gpio;
 const spi = hal.spi;
 const timer = @import("timer.zig");
 const dma = @import("dma.zig");
+const backlight = @import("backlight.zig");
 const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
@@ -264,6 +265,7 @@ const Command = enum(u8) {
     NORON = 0x13,
     INVOFF = 0x20,
     INVON = 0x21,
+    GAMSET = 0x26, // Gamma curve select
     DISPOFF = 0x28,
     DISPON = 0x29,
     CASET = 0x2A, // Column Address Set
@@ -443,7 +445,9 @@ fn initDisplay() void {
     writeCommandWithData(.PWCTR5, &.{ 0x8D, 0xEE }); // BCLK/2
 
     // VCOM control
-    writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
+    // VCOMH = 3.900V. Measured on hardware: lower lifts the dark end, higher
+    // washes the blacks out.
+    writeCommandWithData(.VMCTR1, &.{0x38});
 
     // Memory access control with 90° clockwise rotation
     // MV (0x20) = Row/Column exchange, MX (0x40) = Column address order
@@ -467,6 +471,10 @@ fn initDisplay() void {
         0x27, 0x25, 0x2D, 0x3B,
         0x00, 0x01, 0x04, 0x13,
     });
+
+    // Gamma curve 1 (GC1, one-hot). The panel ignores the GMCTRP1/GMCTRN1 tables
+    // above but honours this, and curve 1 measured best of the four.
+    writeCommandWithData(.GAMSET, &.{0x02});
 
     // Normal display mode
     writeCommand(.NORON);
@@ -518,9 +526,9 @@ pub fn reinitDisplay() void {
 
 /// Display Control
 pub fn setBacklight(on: bool) void {
-    if (pins.bl) |bl| {
-        bl.put(if (on) 1 else 0);
-    }
+    // The pin belongs to a PWM slice once backlight.init has run, so a plain put
+    // on it would be ignored.
+    backlight.set(if (on) backlight.default_level else 0);
 }
 
 /// Prepare LCD for cart execution
@@ -895,7 +903,7 @@ pub fn createDT018BTFTPins() LCDPins {
             // RST: Reset (tied to hardware on v2, no GPIO control)
             .rst = null,
 
-            // BKLT_PWM: Backlight (connected to VBUS/5V, no GPIO control)
+            // BKLT_PWM: Backlight, dimmed by PWM in backlight.zig
             .bl = board.BKLT_PWM,
         },
         .spi = .{

@@ -11,6 +11,7 @@ const audio = @import("../drivers/audio.zig");
 const usb = @import("../drivers/usb.zig");
 const timer = @import("../drivers/timer.zig");
 const lcd = @import("../drivers/lcd.zig");
+const backlight = @import("../drivers/backlight.zig");
 const rom = @import("../drivers/rom.zig");
 const loader = @import("../loader/loader.zig");
 const debug_log = @import("../debug_log.zig");
@@ -198,6 +199,8 @@ pub fn init(config: InitConfig) !void {
             lcd.initWithAllPins(lcd_pins, lcd_cfg) catch |err| {
                 return err;
             };
+            // Dim the backlight, now that the LCD has brought its pin up
+            backlight.init();
         }
     }
 

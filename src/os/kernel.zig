@@ -424,11 +424,7 @@ fn hashCart(name: []const u8, size: u32) void {
 fn refreshCartDisplay() void {
     const z = terry.core0.fn_zone(@src()); defer z.end();
 
-    const backlight_enable_pin = board.BKLT_PWM;
-    backlight_enable_pin.set_function(.sio);
-    backlight_enable_pin.set_direction(.out);
-    backlight_enable_pin.put(1); // Ensure backlight is on for menu
-    lcd.setBacklight(true);
+    lcd.setBacklight(true); // Ensure backlight is on for menu
     lcd.fillScreen(lcd.BLACK);
 
     // Header

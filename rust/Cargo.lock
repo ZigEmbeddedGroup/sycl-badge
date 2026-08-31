@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "beep"
+version = "0.1.0"
+dependencies = [
+ "cortex-m-rt",
+ "sycl-cart",
+]
+
+[[package]]
 name = "cortex-m-rt"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

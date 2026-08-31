@@ -109,11 +109,26 @@ fn write_at<T>(offset: usize, value: T) {
     unsafe { ((BASE + offset) as *mut T).write_volatile(value) }
 }
 
+/// Send one message to Core 0, after making sure everything it describes is
+/// visible.
+///
+/// Every message here is a pointer in disguise: `CART_TONE` means "the tone
+/// fields are set", `CART_TRACE` means "the buffer holds a string". Those fields
+/// are ordinary SRAM and the FIFO is Device memory, and the two are not ordered
+/// against each other on a Cortex-M33 — the store buffer can still be holding
+/// the SRAM writes when Core 0 reads them. Core 0 drains this FIFO every pass of
+/// its main loop, so it is genuinely quick enough to look early, and what it
+/// would read is the previous message's values, or zeroes on the first one. A
+/// zero frequency reads as `stop()` in `src/os/drivers/audio.zig`.
+///
+/// So: barrier first, every time. It is one instruction on a path that already
+/// costs a FIFO round trip.
 #[inline]
 fn fifo_write(msg: u32) -> bool {
     let start = micros_since_boot();
-    // SAFETY: fixed MMIO addresses on the RP2350.
+    // SAFETY: barrier instruction, then fixed MMIO addresses on the RP2350.
     unsafe {
+        core::arch::asm!("dsb", options(nomem, nostack));
         while SIO_FIFO_ST.read_volatile() & FIFO_RDY == 0 {
             if micros_since_boot().wrapping_sub(start) >= WAIT_LIMIT_MICROS {
                 return false;
@@ -194,10 +209,8 @@ pub fn present(buf: &[u16; WIDTH * HEIGHT], dirty: Option<Rect>) {
     write_at::<u16>(DIRTY_X + 4, r.w);
     write_at::<u16>(DIRTY_X + 6, r.h);
 
-    // Ensure the pixel and rect writes land before Core 0 observes the message.
-    // SAFETY: barrier instruction.
-    unsafe { core::arch::asm!("dsb", options(nomem, nostack)) };
-
+    // The pixels and the rect have to land before Core 0 sees the message;
+    // `fifo_write` carries the barrier that guarantees it.
     // payload bit 0 = buffer index (always 0), bit 1 = dirty rect valid.
     if fifo_write((FRAMEBUFFER_READY_V2 << 24) | 0x2) {
         FRAME_IN_FLIGHT.store(true, Ordering::Relaxed);

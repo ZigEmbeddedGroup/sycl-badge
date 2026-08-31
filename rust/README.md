@@ -382,16 +382,16 @@ table reads the intuitive way.
 Working: the whole simulator path, verified by `tools/sim_check.mjs` — memory
 layout, rendering, audio encoding, trace output.
 
-The badge path now builds a flashable image. `cargo xtask uf2` produces a `.uf2`
-that is structurally identical to the ones `zig build` produces for Zig carts —
-same family, same load address, same block layout — and whose vector table
-passes every check `executeCart` makes before it hands over Core 1.
+Working on hardware: `showcase/fill`, flashed to a badge as a `.uf2` built by
+`cargo xtask uf2`. It reaches its entry point, draws, reads buttons and paces
+itself on `present`, which exercises the reset vector, `cortex-m-rt`'s
+scatter-init, the frame loop, the dirty-rect publish and the SIO FIFO handshake.
+Its colour bands come out in the right order, which is what confirms the pixel
+encoding in `src/platform/badge.rs` — the part that changed with PR #123 and
+that no simulator run can check.
 
-**None of it has been run on hardware yet.** Everything above is verified against
-the OS sources and against a working Zig cart image, which is not the same as
-having seen a screen light up. The first thing to distrust if `fill` misbehaves
-is the pixel encoding in `src/platform/badge.rs`: it changed with PR #123, and a
-red/blue swap there would show up as bands whose labels do not match.
+Not yet run on hardware: the audio path (including the wave shapes), the
+neopixels, the `HardFault` handler, and `flappy` and `itest` as whole carts.
 
 Watch the size: the loader caps a cart image at roughly 160 KiB
 (`src/os/loader/loader.zig:233` against a 320 KiB staging buffer, 256 payload

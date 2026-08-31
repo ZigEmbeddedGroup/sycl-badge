@@ -134,6 +134,11 @@ const idle = (n) => {
   for (let i = 0; i < n; i++) exports.update();
 };
 
+/// Carts whose whole output is flat blocks of colour, so the "several distinct
+/// colours" check does not apply and pressing buttons only walks them somewhere
+/// less interesting.
+const FLAT_PATTERN = new Set(["fill", "levels"]);
+
 // Drive the cart. Each kind gets input that actually exercises it; unknown carts
 // just get a periodic button so something happens.
 const itest = { white: 0, red: 0, completed: false, sclera: 0, iris: 0, pupil: 0 };
@@ -243,10 +248,9 @@ if (kind === "itest") {
     }
   }
   FRAMES = 0;
-} else if (kind === "fill") {
-  // Leave it on mode 0, the band view. Pressing anything would walk it to a
-  // solid black screen, which is a legitimate thing for this cart to show and a
-  // useless thing to measure.
+} else if (FLAT_PATTERN.has(kind)) {
+  // Leave these on mode 0. Pressing anything walks them to a flat screen, which
+  // is a legitimate thing for them to show and a useless thing to measure.
   idle(4);
   FRAMES = 0;
 } else {
@@ -260,9 +264,9 @@ if (kind === "itest") {
 
 const distinct = new Set();
 for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) distinct.add(pixel(x, y));
-// `fill` on a solid mode is two colours and proud of it; every other cart that
-// renders a scene should manage four.
-if (kind !== "fill") {
+// The test-pattern carts land on flat two-colour screens on purpose; every cart
+// that renders a scene should manage four.
+if (!FLAT_PATTERN.has(kind)) {
   check(distinct.size >= 4, "renders several distinct colors", `${distinct.size} distinct`);
 }
 check(!distinct.has((POISON << 8) | POISON), "every pixel was written at least once");

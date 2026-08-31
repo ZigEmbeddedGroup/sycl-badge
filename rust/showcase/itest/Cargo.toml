@@ -5,8 +5,18 @@ edition.workspace = true
 license.workspace = true
 publish = false
 
-[lib]
-crate-type = ["cdylib"]
+[[bin]]
+# A cart is a bin with no `main`: the simulator instantiates the wasm module and
+# calls its `start` and `update` exports, and on the badge `cortex-m-rt` puts a
+# reset vector in front of the same two functions.
+name = "itest"
+path = "src/main.rs"
 
 [dependencies]
 sycl-cart = { path = "../../sycl-cart", features = ["log-info"] }
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+# The badge entry point and fault handler that `sycl_cart::cart!` emits expand
+# to `::cortex_m_rt` paths, which only resolve in the crate that invokes the
+# macro. Unused when building for the simulator.
+cortex-m-rt = "0.7"

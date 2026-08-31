@@ -19,6 +19,7 @@
 //!   The prompts never ask for both at once, but do not go looking for trouble.
 
 #![no_std]
+#![no_main]
 
 use sycl_cart::audio::notes::*;
 use sycl_cart::prelude::*;

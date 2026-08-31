@@ -243,6 +243,12 @@ if (kind === "itest") {
     }
   }
   FRAMES = 0;
+} else if (kind === "fill") {
+  // Leave it on mode 0, the band view. Pressing anything would walk it to a
+  // solid black screen, which is a legitimate thing for this cart to show and a
+  // useless thing to measure.
+  idle(4);
+  FRAMES = 0;
 } else {
   // flappy: a flap every 25 frames is roughly neutral buoyancy for its tuning,
   // so the bird survives long enough to pass a pipe and score.
@@ -254,7 +260,11 @@ if (kind === "itest") {
 
 const distinct = new Set();
 for (let x = 0; x < WIDTH; x++) for (let y = 0; y < HEIGHT; y++) distinct.add(pixel(x, y));
-check(distinct.size >= 4, "renders several distinct colors", `${distinct.size} distinct`);
+// `fill` on a solid mode is two colours and proud of it; every other cart that
+// renders a scene should manage four.
+if (kind !== "fill") {
+  check(distinct.size >= 4, "renders several distinct colors", `${distinct.size} distinct`);
+}
 check(!distinct.has((POISON << 8) | POISON), "every pixel was written at least once");
 
 console.log("\nservices:");
@@ -262,7 +272,12 @@ check(unexpected.length === 0, "does not call the host drawing imports", unexpec
 // Silencing a channel is an all-zero call, and the framework makes several of
 // those per note, so look only at the calls that actually sound.
 const sounding = tones.filter((t) => t.frequency > 0 && t.volume > 0);
-check(sounding.length > 0, "played audio", `${sounding.length} of ${tones.length} tone calls sound`);
+if (!tones.length) {
+  // A silent cart is a legitimate cart. Say so rather than failing it.
+  console.log("  --   no audio: this cart never called tone()");
+} else {
+  check(sounding.length > 0, "played audio", `${sounding.length} of ${tones.length} tone calls sound`);
+}
 if (sounding.length) {
   // The badge buzzer has three wave shapes, and each maps onto exactly one set
   // of APU flags. Anything else means a cart is composing against audio the
@@ -291,6 +306,29 @@ if (sounding.length) {
 }
 check(traces.length > 0, "emitted trace output", `${traces.length} messages`);
 for (const t of traces.slice(0, 6)) console.log(`       trace: ${t}`);
+
+if (kind === "fill") {
+  console.log("\nfill:");
+  // The point of this cart: each band must be the colour its label claims. If
+  // the simulator's encoder ever swaps a channel, this is what says so — and it
+  // is the same class of bug that PR #123 left in the Zig carts.
+  const BAND = Math.floor(WIDTH / 3);
+  const want = [
+    ["RED", [31, 0, 0]],
+    ["GREEN", [0, 63, 0]],
+    ["BLUE", [0, 0, 31]],
+  ];
+  for (let i = 0; i < want.length; i++) {
+    const [name, expect] = want[i];
+    // Sample below the labels, mid-band, clear of both edges.
+    const got = decode(pixel(BAND * i + Math.floor(BAND / 2), HEIGHT - 8));
+    check(
+      got.every((c, j) => c === expect[j]),
+      `${name} band decodes as ${name.toLowerCase()}`,
+      `rgb565 ${got.join(",")}`,
+    );
+  }
+}
 
 if (kind === "flappy") {
   console.log("\nflappy:");

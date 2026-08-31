@@ -4,9 +4,10 @@
 //! through the shared IPC block and the RP2350 inter-core SIO FIFO — there is no
 //! syscall table and nothing to link against. See `src/os/ipc/mailbox.zig`.
 //!
-//! **Status: compiles and matches the documented protocol, but has not been run
-//! on hardware.** The entry point (vector table, `.data`/`.bss` init via
-//! `cortex-m-rt`) is not wired up yet; that is the next milestone.
+//! **Status: builds a flashable image, but has not been run on hardware.** The
+//! entry point is `cortex-m-rt`'s, laid out by `../../memory.x`; `cart!` supplies
+//! the frame loop and `cargo xtask uf2` packs the result. Everything here is
+//! verified against the OS sources, which is not the same as having seen it run.
 
 use crate::audio::{Shape, ToneLen};
 use crate::gfx::{self, Rect, HEIGHT, WIDTH};
@@ -327,17 +328,67 @@ pub fn abort() -> ! {
     }
 }
 
-/// Belt-and-braces FPU setup for Core 1.
+/// Take over Core 1: mask interrupts and set the FPU up for our own use.
 ///
-/// `cortex-m-rt` enables CP10/CP11 for `-eabihf` targets, but does not touch
-/// `FPCCR`. Reset defaults have lazy stacking enabled and the kernel ran on this
-/// core first, so set it explicitly. Call once from the entry point.
-pub fn init_fpu() {
+/// Called once from the entry point, before any cart code runs. Everything the
+/// framework does is polled, so interrupts stay masked for the life of the
+/// cart, exactly as `cart_entry.zig` does for a Zig cart.
+///
+/// The OS has already masked interrupts and cleared Core 1's NVIC and fault
+/// state before it jumps here (`src/os/cart.zig`), and `cortex-m-rt` enables
+/// CP10/CP11 for an `-eabihf` target. Both are repeated anyway: they are two
+/// register writes, they are idempotent, and depending on the last thing that
+/// ran on this core is how bring-up bugs get written.
+pub fn init() {
+    const CPACR: *mut u32 = 0xE000_ED88 as *mut u32;
     const FPCCR: *mut u32 = 0xE000_EF34 as *mut u32;
-    // SAFETY: fixed system-control address; Core 1's FPU context is ours.
+
+    // SAFETY: interrupt-mask instruction, then two fixed system-control
+    // addresses. Core 1's FPU context is ours alone.
     unsafe {
-        let v = FPCCR.read_volatile();
-        FPCCR.write_volatile(v | (1 << 31) | (1 << 30)); // ASPEN | LSPEN
+        core::arch::asm!("cpsid i", options(nomem, nostack));
+
+        // Full access to CP10 and CP11, so FPU instructions do not trap.
+        CPACR.write_volatile(CPACR.read_volatile() | (0xF << 20));
+        // ASPEN | LSPEN: automatic and lazy FP context preservation.
+        FPCCR.write_volatile(FPCCR.read_volatile() | (1 << 31) | (1 << 30));
+
         core::arch::asm!("dsb", "isb", options(nomem, nostack));
     }
+}
+
+/// Report a fault through the trace channel, then park.
+///
+/// Worth the flash during bring-up: without it a fault is a silent freeze, and
+/// with it the address that faulted reaches the console over USB CDC.
+pub fn report_fault(kind: &str, pc: u32, lr: u32) -> ! {
+    let mut buf = [0u8; 64];
+    let mut n = 0;
+    let mut put = |bytes: &[u8]| {
+        for &b in bytes {
+            if n < buf.len() {
+                buf[n] = b;
+                n += 1;
+            }
+        }
+    };
+    put(b"[FAULT] ");
+    put(kind.as_bytes());
+    put(b" pc=");
+    put(&hex32(pc));
+    put(b" lr=");
+    put(&hex32(lr));
+    trace(&buf[..n]);
+    abort()
+}
+
+fn hex32(v: u32) -> [u8; 8] {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = [b'0'; 8];
+    let mut i = 0;
+    while i < 8 {
+        out[7 - i] = DIGITS[((v >> (i * 4)) & 0xf) as usize];
+        i += 1;
+    }
+    out
 }

@@ -3,6 +3,7 @@
 //! ```text
 //! cargo xtask build [-p <package>]   build a cart to target/cart.wasm
 //! cargo xtask watch [-p <package>]   build, then serve it with live reload
+//! cargo xtask uf2   [-p <package>]   build for the badge, pack to target/<p>.uf2
 //! ```
 //!
 //! `watch` implements the contract the existing simulator already speaks
@@ -30,8 +31,13 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
+mod uf2;
+
 const PORT: u16 = 2468;
 const TARGET: &str = "wasm32-unknown-unknown";
+/// The badge. Hard-float because the RP2354B's Cortex-M33 has an FPU and the
+/// framework's maths uses it.
+const BADGE_TARGET: &str = "thumbv8m.main-none-eabihf";
 const DEFAULT_PACKAGE: &str = "flappy";
 /// The simulator warns past this; see `simulator/src/runtime.ts`.
 const SIM_SIZE_WARN: u64 = 64 * 1024;
@@ -53,8 +59,13 @@ fn main() {
             }
         }
         "watch" => watch(&package, debug),
+        "uf2" => {
+            if build_uf2(&package, debug).is_none() {
+                std::process::exit(1);
+            }
+        }
         _ => {
-            eprintln!("usage: cargo xtask <build|watch> [-p <package>] [--debug]");
+            eprintln!("usage: cargo xtask <build|watch|uf2> [-p <package>] [--debug]");
             std::process::exit(2);
         }
     }
@@ -73,18 +84,14 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// Build the cart and copy it to `target/cart.wasm`. Returns the output path.
-fn build(package: &str, debug: bool) -> Option<PathBuf> {
-    let root = workspace_root();
-    let profile = if debug { "dev" } else { "release" };
-    let profile_dir = if debug { "debug" } else { "release" };
-
+/// Run `cargo build` for one cart and target. Returns whether it succeeded.
+fn cargo_build(root: &Path, package: &str, target: &str, profile: &str) -> bool {
     let status = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
-        .current_dir(&root)
+        .current_dir(root)
         .args([
             "build",
             "--target",
-            TARGET,
+            target,
             "--profile",
             profile,
             "-p",
@@ -93,15 +100,26 @@ fn build(package: &str, debug: bool) -> Option<PathBuf> {
         .status();
 
     match status {
-        Ok(s) if s.success() => {}
+        Ok(s) if s.success() => true,
         Ok(_) => {
             eprintln!("build failed");
-            return None;
+            false
         }
         Err(e) => {
             eprintln!("could not run cargo: {e}");
-            return None;
+            false
         }
+    }
+}
+
+/// Build the cart and copy it to `target/cart.wasm`. Returns the output path.
+fn build(package: &str, debug: bool) -> Option<PathBuf> {
+    let root = workspace_root();
+    let profile = if debug { "dev" } else { "release" };
+    let profile_dir = if debug { "debug" } else { "release" };
+
+    if !cargo_build(&root, package, TARGET, profile) {
+        return None;
     }
 
     let built = root
@@ -126,6 +144,64 @@ fn build(package: &str, debug: bool) -> Option<PathBuf> {
         print!("  [over the simulator's {SIM_SIZE_WARN}-byte soft limit]");
     }
     println!();
+    Some(out)
+}
+
+// ── uf2 ─────────────────────────────────────────────────────────────────────
+
+/// Build a cart for the badge and pack it into a flashable `.uf2`.
+fn build_uf2(package: &str, debug: bool) -> Option<PathBuf> {
+    let root = workspace_root();
+    let profile = if debug { "dev" } else { "release" };
+    let profile_dir = if debug { "debug" } else { "release" };
+
+    if !cargo_build(&root, package, BADGE_TARGET, profile) {
+        return None;
+    }
+
+    // A cart is a `[[bin]]`, so the artifact carries the bin name verbatim —
+    // no `-` to `_` rewriting, unlike a library.
+    let elf_path = root
+        .join("target")
+        .join(BADGE_TARGET)
+        .join(profile_dir)
+        .join(package);
+    let elf = match std::fs::read(&elf_path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("could not read {}: {e}", elf_path.display());
+            return None;
+        }
+    };
+
+    let image = match uf2::image_from_elf(&elf) {
+        Ok(image) => image,
+        Err(e) => {
+            eprintln!("{}: {e}", elf_path.display());
+            return None;
+        }
+    };
+
+    let out = root.join("target").join(format!("{package}.uf2"));
+    let blocks = uf2::pack(&image);
+    if let Err(e) = std::fs::write(&out, &blocks) {
+        eprintln!("could not write {}: {e}", out.display());
+        return None;
+    }
+
+    println!(
+        "built {package} -> target/{package}.uf2 ({} bytes of cart in {} blocks)",
+        image.bytes.len(),
+        blocks.len() / 512,
+    );
+    println!(
+        "  loads at {:#010x}..{:#010x}, sp {:#010x}, reset {:#010x}",
+        image.base,
+        image.base + image.bytes.len() as u32,
+        image.initial_sp(),
+        image.reset_vector(),
+    );
+    println!("  copy it onto the badge's USB drive, then reset the badge");
     Some(out)
 }
 

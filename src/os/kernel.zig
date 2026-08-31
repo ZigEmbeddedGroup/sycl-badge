@@ -205,8 +205,6 @@ pub fn main() !void {
                 display_active = true;
                 btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
                 ready_fb_state.set_state(.not_ready, @src());
-                console.println("[STOP] 7: reinitDisplay");
-                lcd.reinitDisplay();
                 console.println("[STOP] 8: refreshCartDisplay");
                 refreshCartDisplay();
                 last_cart_hash = computeCartHash();
@@ -392,7 +390,6 @@ pub fn main() !void {
             display_active = true;
             // Re-sync all button states so any buttons still held when the cart
             // exited are consumed and won't immediately re-trigger menu actions.
-            lcd.reinitDisplay();
             refreshCartDisplay();
             last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
@@ -439,7 +436,6 @@ fn refreshCartDisplay() void {
 
     lcd.set_backlight(brightness);
     lcd.fillScreen(lcd.BLACK);
-    //lcd.setBacklight(true);
 
     // Header
     lcd.drawString(0, 2, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);

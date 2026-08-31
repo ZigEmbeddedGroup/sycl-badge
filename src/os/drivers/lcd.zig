@@ -378,7 +378,10 @@ pub fn init(pin_config: Pins, config: Config) !void {
     }
 
     pins.bl.set_function(.pwm);
-    backlight.slice().set_clk_div(150, 0);
+    backlight.slice().set_clk_div(.{
+        .int = 150,
+        .frac = 0,
+    });
     backlight.slice().set_wrap(1023);
     backlight.set_level(512);
     backlight.slice().enable();
@@ -429,9 +432,12 @@ fn initDisplay() void {
     writeCommand(.SLPOUT);
     timer.sleep_ms(50);
 
+    // TODO: this display uses the ILI9163C, not the ST7735. It is similar, but
+    // commenting out the following line got rid of some inconsistent brightness
+    // issues on the screen.
     // Frame rate control (normal mode (ST7735S values))
-    writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(1);
+    //writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x03C, 0x3C });
+    //timer.sleep_ms(1);
 
     // Frame rate control (idle mode)
     writeCommandWithData(.FRMCTR2, &.{ 0x05, 0x3C, 0x3C });
@@ -487,43 +493,6 @@ fn initDisplay() void {
 
     // Enable DMA to send data to the screen
     dma.initLCD(spi_instance_num);
-}
-
-/// Re-initialize display registers (call after cart stops to restore LCD settings)
-/// This performs a quick reinit without full hardware reset for faster recovery
-pub fn reinitDisplay() void {
-    const z = terry.core0.fn_zone(@src());
-    defer z.end();
-
-    // Reconfigure critical GPIO pins (cart may have changed them)
-    pins.cs.set_function(.sio);
-    pins.cs.set_direction(.out);
-    pins.cs.put(1); // Deselect
-
-    pins.dc.set_function(.sio);
-    pins.dc.set_direction(.out);
-
-    // Reset SPI peripheral (cart may have changed SPI settings)
-    const spi_config = spi.Config{
-        .clock_config = hal.clock_config,
-        .baud_rate = 62_500_000,
-    };
-    spi_instance.apply(spi_config) catch {};
-
-    // Quick software reset (no hardware reset pin toggle)
-    writeCommand(.SWRESET);
-    timer.sleep_ms(10); // Reduced from 50ms
-
-    // Wake up display
-    writeCommand(.SLPOUT);
-    timer.sleep_ms(10); // Reduced from 50ms
-
-    // Restore critical registers only
-    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CW rotation, RGB
-    writeCommandWithData(.COLMOD, &.{0x05}); // 16-bit RGB565
-    writeCommand(.NORON); // Normal display mode
-    writeCommand(.DISPON); // Display on
-    timer.sleep_ms(5); // Short delay for display to stabilize
 }
 
 pub fn set_backlight(level: u10) void {

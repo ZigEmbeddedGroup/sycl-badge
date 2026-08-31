@@ -1136,9 +1136,6 @@ fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     // Restore the default cart selection screen
     println("Restoring menu...\r\n");
 
-    // Reinitialize LCD display (fixes color mode if cart changed it)
-    lcd.reinitDisplay();
-
     // Clear screen and draw header
     lcd.fillScreen(lcd.BLACK);
     lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);

@@ -56,7 +56,7 @@ pub fn initLED() void {
     const pin = board.led_pin;
     pin.set_function(.sio);
     pin.set_direction(.out);
-    pin.put(1);
+    pin.put(0);
 }
 
 pub fn setLED(state: bool) void {

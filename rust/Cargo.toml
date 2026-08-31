@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["sycl-cart", "showcase/fill", "showcase/flappy", "showcase/itest", "xtask"]
+members = ["sycl-cart", "showcase/beep", "showcase/fill", "showcase/flappy", "showcase/itest", "xtask"]
 
 # Carts are cross-compiled artifacts: they are `no_std` and get their
 # `#[panic_handler]` only on wasm and Arm targets. Building one for the host

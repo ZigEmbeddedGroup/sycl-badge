@@ -208,7 +208,12 @@ pub const Pins = struct {
     cs: gpio.Pin, // Chip Select
     dc: gpio.Pin, // Data/Command
     rst: ?gpio.Pin, // Reset (optional, may be tied to hardware)
-    bl: ?gpio.Pin, // Backlight (this pin is tied to ground)
+    bl: gpio.Pin, // Backlight (this pin is tied to ground)
+};
+
+pub const backlight = hal.pwm.Pwm{
+    .slice_number = 0,
+    .channel = .a,
 };
 
 /// SPI pin configuration for LCD
@@ -372,11 +377,11 @@ pub fn init(pin_config: Pins, config: Config) !void {
         rst.put(0);
     }
 
-    if (pins.bl) |bl| {
-        bl.set_function(.sio);
-        bl.set_direction(.out);
-        bl.put(1); // Turn on backlight
-    }
+    pins.bl.set_function(.pwm);
+    backlight.slice().set_clk_div(150, 0);
+    backlight.slice().set_wrap(1023);
+    backlight.set_level(512);
+    backlight.slice().enable();
 
     // Store SPI instance num and baudrate for DMA config
     spi_instance_num = config.spi_instance_num;
@@ -521,11 +526,8 @@ pub fn reinitDisplay() void {
     timer.sleep_ms(5); // Short delay for display to stabilize
 }
 
-/// Display Control
-pub fn setBacklight(on: bool) void {
-    if (pins.bl) |bl| {
-        bl.put(if (on) 1 else 0);
-    }
+pub fn set_backlight(level: u10) void {
+    backlight.set_level(level);
 }
 
 /// Prepare LCD for cart execution

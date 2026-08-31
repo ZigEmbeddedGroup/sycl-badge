@@ -102,6 +102,7 @@ var cart_names: [MAX_CARTS][MAX_CART_NAME_LEN]u8 = undefined;
 var cart_name_lengths: [MAX_CARTS]usize = undefined;
 var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
+var brightness: u10 = 512;
 
 var ready_fb_state: terry.core0.TrackedStateMachine(enum {
     not_ready,
@@ -436,10 +437,7 @@ fn refreshCartDisplay() void {
     const z = terry.core0.fn_zone(@src());
     defer z.end();
 
-    const backlight_enable_pin = board.BKLT_PWM;
-    backlight_enable_pin.set_function(.sio);
-    backlight_enable_pin.set_direction(.out);
-    backlight_enable_pin.put(1); // Ensure backlight is on for menu
+    lcd.set_backlight(brightness);
     lcd.fillScreen(lcd.BLACK);
     //lcd.setBacklight(true);
 

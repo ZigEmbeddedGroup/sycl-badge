@@ -60,7 +60,7 @@ fn clearOnBoot() void {
     asm volatile (
         \\  msr msplim, %[splim]
         :
-        : [splim] "r" (&__stack_limit__)
+        : [splim] "r" (&__stack_limit__),
     );
 
     // Clear kernel RAM after .bss (heap/shared_mem/unused).
@@ -98,13 +98,13 @@ fn copyRamTextSection() void {
 
 /// Configuration for system initialization
 pub const InitConfig = struct {
-    /// LCD pin configuration (optional, includes both control and SPI pins)
+    /// LCD pin configuration (includes both control and SPI pins)
     /// Use lcd.createDT018BTFTPins() to create this
-    lcd_pins: ?lcd.LCDPins = null,
+    lcd_pins: lcd.LCDPins,
 
-    /// LCD driver configuration (optional, required if lcd_pins is set)
+    /// LCD driver configuration (required if lcd_pins is set)
     /// Use lcd.createDT018BTFTConfig() to create this
-    lcd_config: ?lcd.Config = null,
+    lcd_config: lcd.Config,
 
     /// Whether to initialize Core 1
     init_core1: bool = false,
@@ -144,7 +144,8 @@ pub fn init(config: InitConfig) !void {
         _ = terry.client.wait_for_connection(deadline) catch {};
     }
 
-    const z = terry.core0.zone("Initialize", @src()); defer z.end();
+    const z = terry.core0.zone("Initialize", @src());
+    defer z.end();
 
     // 0. Detect board revision
     rev.init();
@@ -192,14 +193,10 @@ pub fn init(config: InitConfig) !void {
     interrupt.enable_interrupts();
 
     // 10. Initialize LCD if configured
-    if (config.lcd_pins) |lcd_pins| {
-        if (config.lcd_config) |lcd_cfg| {
-            // Initialize LCD with all pins (handles SPI and TE pin configuration)
-            lcd.initWithAllPins(lcd_pins, lcd_cfg) catch |err| {
-                return err;
-            };
-        }
-    }
+    // Initialize LCD with all pins (handles SPI and TE pin configuration)
+    lcd.initWithAllPins(config.lcd_pins, config.lcd_config) catch |err| {
+        return err;
+    };
 
     // 11. Wait for late tracy connection after initialization, with friendly screen message
     if (config.late_wait_for_tracy_time != 0 and terry.client.is_waiting_for_connection()) {
@@ -210,7 +207,7 @@ pub fn init(config: InitConfig) !void {
         }
         while (lcd.isBusy()) {}
         const msg = "Waiting for Tracy";
-        lcd.drawString(@intCast(lcd.width/2 - (msg.len * 4)), lcd.height/2 - 4, msg, lcd.CYAN, lcd.BLACK, 1);
+        lcd.drawString(@intCast(lcd.width / 2 - (msg.len * 4)), lcd.height / 2 - 4, msg, lcd.CYAN, lcd.BLACK, 1);
         if (terry.client.is_waiting_for_connection()) {
             while (true) {
                 terry.client.poll();

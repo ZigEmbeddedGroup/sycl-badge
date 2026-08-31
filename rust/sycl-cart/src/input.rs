@@ -3,7 +3,8 @@
 use crate::platform;
 
 /// A physical control. Bit positions must match `Controls` in
-/// `src/os/cart/api.zig` and `ButtonPoller.Buttons` in `src/os/kernel.zig`.
+/// `src/os/cart/api.zig`, which is also what `read_buttons` in
+/// `src/os/kernel.zig` fills in and publishes to the IPC block each frame.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Button {

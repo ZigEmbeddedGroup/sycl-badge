@@ -8,7 +8,7 @@
 //! on hardware.** The entry point (vector table, `.data`/`.bss` init via
 //! `cortex-m-rt`) is not wired up yet; that is the next milestone.
 
-use crate::audio::ToneLen;
+use crate::audio::{Shape, ToneLen};
 use crate::gfx::{self, Rect, HEIGHT, WIDTH};
 use crate::platform::ipc;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -26,7 +26,7 @@ const TONE_FREQ: usize = TRACE_BUF + 0x80; // 0x200340A0, f32
 const TONE_DURATION: usize = TONE_FREQ + 4; // 0x200340A4, f32 seconds
 const DIRTY_X: usize = TONE_DURATION + 4; // 0x200340A8, u16 x4
 const TONE_VOLUME: usize = DIRTY_X + 8; // 0x200340B0, f32
-const TONE_FLAGS: usize = TONE_VOLUME + 4; // 0x200340B4, u32 (kernel ignores it)
+const TONE_FLAGS: usize = TONE_VOLUME + 4; // 0x200340B4, u32
 const GLOBAL_VOLUME: usize = TONE_FLAGS + 4; // 0x200340B8, f32
 
 /// Longest trace message the kernel will read, minus the NUL it expects.
@@ -47,33 +47,48 @@ const CART_TRACE: u32 = 0x26;
 const CART_TONE: u32 = 0x27;
 const CART_VOLUME: u32 = 0x29;
 
-/// Bounds the spin in [`wait_for_flush`] so a wedged kernel cannot hang the cart
-/// forever. Mirrors the limit in `src/os/cart/api.zig`.
-const SPIN_LIMIT: u32 = 8_000_000;
+/// Bounds every FIFO wait so a wedged kernel cannot hang the cart forever.
+/// Mirrors `present_wait_time_limit` in `src/os/cart/api.zig`.
+const WAIT_LIMIT_MICROS: u64 = 500_000;
 
 /// True while the kernel is DMA'ing a published frame to the LCD.
 static FRAME_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 // ── Pixel encoding ──────────────────────────────────────────────────────────
 //
-// The kernel DMAs framebuffer bytes straight out to the ST7735S, which wants
-// BGR565 big-endian, i.e. R and B swapped relative to the simulator.
+// The kernel DMAs the framebuffer straight out to the ST7735S. The panel reads
+// each pixel as the two bytes [BBBBB_GGG, ggg_RRRRR] — R and B swapped relative
+// to the simulator — and the SPI block runs in 16-bit mode, which shifts each
+// halfword out most-significant byte first. So the halfword we store is plain
+// BGR565 and nothing byte-swaps it.
+//
+// This mirrors `Pixel.fromDisplayColor` in `src/os/cart/api.zig`, whose
+// `DisplayColor` carries `r` in the low five bits and goes to the framebuffer
+// with a bare `@bitCast`. Both halves changed together in PR #123, which moved
+// the LCD from byte-at-a-time SPI to 16-bit DMA; the bytes on the wire are the
+// same as before, so a swap here would now put them in the wrong order.
 
 #[inline]
 pub const fn encode565(r: u8, g: u8, b: u8) -> u16 {
-    let bgr = ((b as u16) << 11) | ((g as u16) << 5) | (r as u16);
-    bgr.swap_bytes()
+    ((b as u16) << 11) | ((g as u16) << 5) | (r as u16)
 }
 
 #[inline]
 pub const fn decode565(v: u16) -> (u8, u8, u8) {
-    let bgr = v.swap_bytes();
-    (
-        (bgr & 0x1f) as u8,
-        ((bgr >> 5) & 0x3f) as u8,
-        (bgr >> 11) as u8,
-    )
+    ((v & 0x1f) as u8, ((v >> 5) & 0x3f) as u8, (v >> 11) as u8)
 }
+
+// Pin the wire format. A silent R/B swap is the failure mode here, and it costs
+// a hardware flash to notice, so make the byte order a build error instead.
+const _: () = assert!(
+    encode565(31, 0, 0) == 0x001f,
+    "red goes in the low five bits"
+);
+const _: () = assert!(
+    encode565(0, 0, 31) == 0xf800,
+    "blue goes in the high five bits"
+);
+const _: () = assert!(encode565(0, 63, 0) == 0x07e0);
 
 // ── Raw IPC access ──────────────────────────────────────────────────────────
 
@@ -93,12 +108,11 @@ fn write_at<T>(offset: usize, value: T) {
 
 #[inline]
 fn fifo_write(msg: u32) -> bool {
-    let mut spins: u32 = 0;
+    let start = micros_since_boot();
     // SAFETY: fixed MMIO addresses on the RP2350.
     unsafe {
         while SIO_FIFO_ST.read_volatile() & FIFO_RDY == 0 {
-            spins = spins.wrapping_add(1);
-            if spins >= SPIN_LIMIT {
+            if micros_since_boot().wrapping_sub(start) >= WAIT_LIMIT_MICROS {
                 return false;
             }
             core::arch::asm!("nop", options(nomem, nostack));
@@ -126,19 +140,20 @@ fn drain_replies() {
 /// Block until the kernel has finished DMA'ing the previously published frame.
 ///
 /// We publish a single shared buffer, so the copy in [`present`] must not begin
-/// until the DMA reading that buffer has completed.
+/// until the DMA reading that buffer has completed. Bounded by wall-clock time
+/// rather than a spin count, so the limit means the same thing whatever the
+/// optimizer does to the loop — the same reason `src/os/cart/api.zig` switched.
 fn wait_for_flush() {
     if !FRAME_IN_FLIGHT.load(Ordering::Relaxed) {
         return;
     }
-    let mut spins: u32 = 0;
+    let start = micros_since_boot();
     while FRAME_IN_FLIGHT.load(Ordering::Relaxed) {
         drain_replies();
         if !FRAME_IN_FLIGHT.load(Ordering::Relaxed) {
             break;
         }
-        spins = spins.wrapping_add(1);
-        if spins >= SPIN_LIMIT {
+        if micros_since_boot().wrapping_sub(start) >= WAIT_LIMIT_MICROS {
             // Give up rather than wedge Core 1. The next frame will re-publish.
             FRAME_IN_FLIGHT.store(false, Ordering::Relaxed);
             return;
@@ -216,7 +231,7 @@ pub fn set_red_led(on: bool) {
 
 // ── Audio ───────────────────────────────────────────────────────────────────
 
-pub fn tone(freq_hz: f32, len: ToneLen, volume: f32) {
+pub fn tone(freq_hz: f32, len: ToneLen, volume: f32, shape: Shape) {
     let duration = match len {
         // The kernel arms a DMA transfer count, so finite notes end on their own.
         ToneLen::Frames(f) => f as f32 / 60.0,
@@ -226,13 +241,14 @@ pub fn tone(freq_hz: f32, len: ToneLen, volume: f32) {
     write_at::<f32>(TONE_FREQ, freq_hz);
     write_at::<f32>(TONE_DURATION, duration);
     write_at::<f32>(TONE_VOLUME, volume);
-    // Written for completeness; the kernel ignores it (`src/os/kernel.zig`).
-    write_at::<u32>(TONE_FLAGS, 0);
+    // Bits 0-2 select the wave shape. The kernel passes them straight to
+    // `audio.tone` (`src/os/kernel.zig`), which reads `flags & 0x7`.
+    write_at::<u32>(TONE_FLAGS, shape as u32);
     fifo_write(CART_TONE << 24);
 }
 
 pub fn stop() {
-    tone(0.0, ToneLen::Frames(0), 0.0);
+    tone(0.0, ToneLen::Frames(0), 0.0, Shape::Square);
 }
 
 pub fn set_global_volume(volume: f32) {

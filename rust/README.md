@@ -171,10 +171,14 @@ takes column-major pre-encoded data directly.
 ### Colors
 
 `Color` wraps an already-encoded `u16`, built by a `const fn` that picks the
-target's byte order: byte-swapped RGB565 in the simulator, byte-swapped BGR565 on
-the badge (whose bytes go straight to the ST7735 over SPI). Literals and sprite
-data are converted at compile time, so no drawing path converts anything per
-pixel. The raw `u16` is therefore not portable — never persist it.
+target's layout: byte-swapped RGB565 in the simulator, and plain BGR565 on the
+badge, where a 16-bit SPI DMA shifts each halfword out high byte first, straight
+to the ST7735. Literals and sprite data are converted at compile time, so no
+drawing path converts anything per pixel. The raw `u16` is therefore not
+portable — never persist it.
+
+Both encodings are pinned by `const` assertions in `src/platform/`, because an
+R/B swap is invisible until you flash a badge.
 
 `Color::mix(other, t)` blends at runtime, for flashes and fades. It decodes and
 re-encodes, so hoist it out of per-pixel loops.
@@ -184,7 +188,7 @@ re-encodes, so hoist it out of per-pixel loops.
 |  | simulator (`wasm32`) | badge (`thumbv8m.main`) |
 |---|---|---|
 | framebuffer | wasm memory `0x20`, one buffer | `0x20020020`, one of two used |
-| pixel encoding | byte-swapped RGB565 | byte-swapped BGR565 |
+| pixel encoding | byte-swapped RGB565 | BGR565 |
 | present | host composites after `update` | dirty rect + SIO FIFO handshake |
 | trace / tone / rand | `env` imports | shared IPC block + FIFO messages |
 | panic | trap → simulator blue screen | trace, then park |
@@ -252,11 +256,12 @@ values.
 
 ## Audio
 
-One monophonic square wave, because that is what the badge has: `src/os/drivers/audio.zig`
-drives GPIO9 with a PWM carrier whose duty sets amplitude, and its entire state
-is `enum { off, square }`. The simulator runs the full WASM-4 APU — four
-channels, ADSR, slides, panning — and we deliberately drive only the common
-subset, so a cart sounds the same in both places.
+One monophonic voice, because that is what the badge has: `src/os/drivers/audio.zig`
+drives GPIO9 with a PWM carrier whose duty sets amplitude, and a DMA channel
+walks a wave table at the note frequency. It plays one note at a time in one of
+three shapes. The simulator runs the full WASM-4 APU — four channels, ADSR,
+slides, panning — and we deliberately drive only the common subset, so a cart
+sounds the same in both places.
 
 `Audio::tone` is the raw primitive. Above it, a sequencer plays `&'static`
 tracks at three priorities (one-shot beep > SFX > music), resolves one winning
@@ -267,13 +272,23 @@ re-issuing the same note 60 times a second is audible as clicking.
 ```rust
 static SFX_FLAP: Track = Track::once(&[Step::at(notes::G6, 2, 0.55)]);
 c.audio.play_sfx(&SFX_FLAP);
+
+static BASS: Track = Track::looping(&[Step::shaped(notes::C6, 8, 0.5, Shape::Triangle)]);
+c.audio.play_music(&BASS);
 ```
+
+`Shape` is `Square` (the default, and the loudest), `Triangle` or `Sawtooth`.
+The badge's `Tone2Options.Shape` also lists `sine`, `major` and `minor`, but all
+three fall through to `stop()` in the driver, so the framework does not offer
+them. Sawtooth is the one shape without a simulator equivalent: the APU has no
+saw, so it plays as a 25 % duty pulse, which is brighter than a square but not
+the same timbre.
 
 `audio::notes` covers C4 to B7 chromatically, `S` meaning sharp — `DS6` is D#6.
 Octaves 6 and 7 are the ones that carry on the buzzer.
 
 Two hardware caveats we do not paper over: pitch is currently about 400 cents
-sharp on real hardware (`src/os/drivers/audio.zig:23`), and the buzzer's response
+sharp on real hardware (`src/os/drivers/audio.zig:32`), and the buzzer's response
 peaks near 2700 Hz and rolls off steeply either side, so low notes will be quiet
 on the badge however good they sound in the simulator.
 
@@ -293,7 +308,7 @@ in ways that are hard to diagnose:
   checks the stack pointer starts above the framebuffer.
 
 `--global-base=41248` is the first 32-byte boundary past the framebuffer.
-Note that `build.zig:315` uses `0xA01E`, which is two bytes *inside* it — benign
+Note that `build.zig:535` uses `0xA01E`, which is two bytes *inside* it — benign
 because the linker rounds the first segment up, but don't copy the value.
 
 ## Layout
@@ -339,7 +354,7 @@ ELF→UF2 packer. That is the next milestone:
    addresses inside the cart window, then copy onto the badge's USB drive.
 
 Watch the size: the loader caps a cart image at roughly 160 KiB
-(`src/os/loader/loader.zig:228` against a 320 KiB staging buffer, 256 payload
+(`src/os/loader/loader.zig:233` against a 320 KiB staging buffer, 256 payload
 bytes per 512-byte UF2 block).
 
 [`ufmt`]: https://docs.rs/ufmt

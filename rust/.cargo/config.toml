@@ -15,7 +15,7 @@
 #                          stack canary (see StackGuard).
 #   --global-base=41248    0xA120: first byte past the framebuffer
 #                          (0x20 + 160*128*2 = 0xA020), rounded up to 32.
-#                          NOTE: build.zig:315 uses 0xA01E, which is two bytes
+#                          NOTE: build.zig:535 uses 0xA01E, which is two bytes
 #                          *inside* the framebuffer. Do not copy that value.
 #   -zstack-size=65536     Pinned rather than inheriting rustc's 1 MiB default.
 [target.wasm32-unknown-unknown]

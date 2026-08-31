@@ -4,7 +4,7 @@
 //! composites the framebuffer out of it after each `update()`. See
 //! `simulator/src/runtime.ts` and `simulator/src/framebuffer.ts`.
 
-use crate::audio::ToneLen;
+use crate::audio::{Shape, ToneLen};
 use crate::gfx::{self, Rect, HEIGHT, WIDTH};
 use crate::platform::ipc;
 
@@ -24,8 +24,12 @@ mod env {
 
 // ── Pixel encoding ──────────────────────────────────────────────────────────
 //
-// `Framebuffer.drawPoint` stores `((color & 0xff) << 8) | (color >> 8)`, i.e.
-// byte-swapped RGB565.
+// `Framebuffer.drawPoint` stores `((color & 0xff) << 8) | (color >> 8)` and the
+// compositor swaps the bytes back before uploading the texture as RGB565, so
+// what we put in memory is byte-swapped RGB565.
+//
+// Note this is *not* the badge's encoding, and it is not what `DisplayColor` in
+// `src/os/cart/api.zig` produces for wasm either — see `badge::encode565`.
 
 #[inline]
 pub const fn encode565(r: u8, g: u8, b: u8) -> u16 {
@@ -42,6 +46,16 @@ pub const fn decode565(v: u16) -> (u8, u8, u8) {
         (rgb & 0x1f) as u8,
     )
 }
+
+// Pin the wire format, the same way `badge::encode565` does.
+const _: () = assert!(
+    encode565(31, 0, 0) == 0x00f8,
+    "red goes in the high five bits"
+);
+const _: () = assert!(
+    encode565(0, 0, 31) == 0x1f00,
+    "blue goes in the low five bits"
+);
 
 // ── Display ─────────────────────────────────────────────────────────────────
 
@@ -108,16 +122,36 @@ pub fn set_red_led(on: bool) {
 // ── Audio ───────────────────────────────────────────────────────────────────
 //
 // The simulator runs the full WASM-4 APU (four channels, ADSR, slides, panning).
-// We deliberately drive only what the badge's buzzer can do: one square-wave
-// voice, no envelope, no slide. See `simulator/src/apu-worklet.ts`.
+// We deliberately drive only what the badge's buzzer can do: one voice at a
+// time, no envelope, no slide. See `simulator/src/apu-worklet.ts`.
+//
+// `flags` is the WASM-4 layout: bits 0-1 channel, bits 2-3 duty mode (pulse
+// channels only), bits 4-5 pan.
 
 /// Channel 0 (pulse1), duty mode 2 (= 50%), centre pan.
 ///
-/// 50% is what the badge drives for maximum volume
+/// 50% is what the badge drives for a square wave at maximum volume
 /// (`src/os/drivers/audio.zig`); mode 0 would be 1/8 and sound thinner.
-const FLAGS_SQUARE_50: u32 = 2 << 2;
+const FLAGS_SQUARE: u32 = 2 << 2;
 
-pub fn tone(freq_hz: f32, len: ToneLen, volume: f32) {
+/// Channel 2, the APU's triangle voice. It has no duty cycle.
+const FLAGS_TRIANGLE: u32 = 2;
+
+/// Channel 0 at duty mode 1 (= 25%).
+///
+/// The APU has no sawtooth. A narrower pulse is brighter and reedier than a
+/// square, which is as close as the four channels get to the badge's saw.
+const FLAGS_SAWTOOTH: u32 = 1 << 2;
+
+const fn flags_for(shape: Shape) -> u32 {
+    match shape {
+        Shape::Square => FLAGS_SQUARE,
+        Shape::Triangle => FLAGS_TRIANGLE,
+        Shape::Sawtooth => FLAGS_SAWTOOTH,
+    }
+}
+
+pub fn tone(freq_hz: f32, len: ToneLen, volume: f32, shape: Shape) {
     let vol = clamp01(volume);
     if freq_hz <= 0.0 || vol <= 0.0 {
         stop();
@@ -138,18 +172,38 @@ pub fn tone(freq_hz: f32, len: ToneLen, volume: f32) {
     let f = freq_hz as u32;
     let f = if f > 0xffff { 0xffff } else { f };
 
+    // Only one note sounds at a time, so silence the other channel first —
+    // otherwise switching shape mid-note leaves the previous one ringing.
+    stop_other(shape);
+
     // SAFETY: plain call into a host import.
     unsafe {
         // sustainVolume in the low byte, peakVolume in the next; equal, so the
         // (unused, attack == 0) attack ramp cannot introduce a level jump.
-        env::tone(f, frames, v | (v << 8), FLAGS_SQUARE_50)
+        env::tone(f, frames, v | (v << 8), flags_for(shape))
     };
 }
 
 pub fn stop() {
     // All-zero durations put `releaseTime == startTime`, and `process()` gates
-    // on `time < releaseTime`, so the channel goes silent immediately.
-    unsafe { env::tone(0, 0, 0, FLAGS_SQUARE_50) };
+    // on `time < releaseTime`, so the channel goes silent immediately. Both
+    // channels we ever use get the message; a channel that was already quiet
+    // stays quiet.
+    // SAFETY: plain calls into a host import.
+    unsafe {
+        env::tone(0, 0, 0, FLAGS_SQUARE);
+        env::tone(0, 0, 0, FLAGS_TRIANGLE);
+    }
+}
+
+/// Silence whichever of our two channels `shape` is not about to use.
+fn stop_other(shape: Shape) {
+    let other = match shape {
+        Shape::Triangle => FLAGS_SQUARE,
+        Shape::Square | Shape::Sawtooth => FLAGS_TRIANGLE,
+    };
+    // SAFETY: plain call into a host import.
+    unsafe { env::tone(0, 0, 0, other) };
 }
 
 /// The simulator has no global volume control, so we fold it into per-note

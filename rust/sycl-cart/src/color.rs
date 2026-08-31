@@ -2,9 +2,9 @@
 
 use crate::platform;
 
-/// A screen color, stored in the exact byte order the target's framebuffer
-/// wants — byte-swapped RGB565 in the simulator, byte-swapped BGR565 on the
-/// badge (whose bytes are DMA'd straight to the ST7735).
+/// A screen color, stored in the exact layout the target's framebuffer wants —
+/// byte-swapped RGB565 in the simulator, plain BGR565 on the badge (whose
+/// halfwords are DMA'd straight to the ST7735 over 16-bit SPI).
 ///
 /// Because the encoding happens in a `const fn`, color literals and sprite data
 /// are converted at compile time and every drawing routine is a plain memory

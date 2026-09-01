@@ -24,6 +24,8 @@ pub const Config = struct {
         set_address: *const fn (address: u7) void,
         // This is for the out buffer
         get_buffer: *const fn () []const u8,
+        stall: *const fn (ep: types.Endpoint) void,
+        clear_endpoint_halt: *const fn (ep: types.Endpoint) void,
     };
 };
 
@@ -155,14 +157,18 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                 },
                 .clear_feature_endpoint => {
                     const feature_selector = pkt.value.native();
-                    const zero_interface_endpoint = pkt.index.native();
-                    log.info("CLEAR_FEATURE ENDPOINT feature_selector={} zero_interface_endpoint={}", .{
+                    const ep: types.Endpoint = @bitCast(@as(u8, @truncate(pkt.index.native())));
+                    log.info("CLEAR_FEATURE ENDPOINT ep={} feature_selector={}", .{
+                        ep,
                         feature_selector,
-                        zero_interface_endpoint,
                     });
 
-                    // TODO: handle this
-                    self.queue_in_xfer("", pkt.length.native());
+                    if (feature_selector != 0) {
+                        config.callbacks.stall(.{ .num = .ep0, .dir = .out });
+                    } else {
+                        config.callbacks.clear_endpoint_halt(ep);
+                        self.queue_in_xfer("", pkt.length.native());
+                    }
                 },
                 .get_status_device => {
                     const zero_interface_endpoint = pkt.index.native();

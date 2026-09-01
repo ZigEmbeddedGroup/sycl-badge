@@ -128,6 +128,8 @@ const SetupProcessor = setup.RequestPacketProcessor(.{
         .queue_receive = queue_receive,
         .set_address = set_address,
         .get_buffer = get_buffer,
+        .clear_endpoint_halt = clear_endpoint_halt,
+        .stall = stall,
     },
 });
 
@@ -143,9 +145,10 @@ const MSC_Driver = @import("usb/msc.zig").MSC_Driver(SetupProcessor, .{
     .callbacks = .{
         .get_max_lun = get_max_lun,
         .bulk_only_mass_storage_reset = bulk_only_mass_storage_reset,
-        .queue_packet = queue_msc_packet,
-        .queue_receive = queue_msc_receive,
-        .get_buffer = get_msc_buffer,
+        .queue_packet = msc_queue_packet,
+        .queue_receive = msc_queue_receive,
+        .get_buffer = msc_get_buffer,
+        .disarm_endpoints = msc_disarm_endpoints,
     },
 });
 
@@ -222,9 +225,76 @@ fn set_address(addr: u7) void {
     USB.ADDR_ENDP.write(.{ .ADDRESS = addr });
 }
 
+fn stall(ep: types.Endpoint) void {
+    log.info("stall: {}", .{ep});
+    const buf_ctrl = buffer_control(ep);
+
+    if (ep.num == .ep0) {
+        buf_ctrl.write(.{
+            .STALL = 1,
+            .LAST_0 = 1,
+        });
+
+        asm volatile (
+            \\ nop
+            \\ nop
+            \\ nop
+        );
+
+        buf_ctrl.modify(.{ .AVAILABLE_0 = 1 });
+        return;
+    }
+
+    disarm_endpoint(ep);
+    buf_ctrl.modify(.{ .STALL = 1 });
+}
+
+fn clear_endpoint_halt(ep: types.Endpoint) void {
+    _ = ep;
+    msc_driver.reset();
+}
+
+fn disarm_endpoint(ep: Endpoint) void {
+    assert(ep.num != .ep0, .{});
+    const buf_ctrl = buffer_control(ep);
+
+    if (buf_ctrl.read().AVAILABLE_0 == 1) {
+        switch (ep.dir) {
+            .in => {
+                USB.EP_ABORT.write(.{ .EP1_IN = 1 });
+                while (USB.EP_ABORT_DONE.read().EP1_IN == 0) {}
+                rp2xxx.hw.clear_alias(&USB.EP_ABORT_DONE).write(.{ .EP1_IN = 1 });
+            },
+            .out => {
+                USB.EP_ABORT.write(.{ .EP1_OUT = 1 });
+                while (USB.EP_ABORT_DONE.read().EP1_OUT == 0) {}
+                rp2xxx.hw.clear_alias(&USB.EP_ABORT_DONE).write(.{ .EP1_OUT = 1 });
+            },
+        }
+        USB.EP_ABORT.write(.{});
+    }
+
+    buf_ctrl.write(.{ .STALL = 0 });
+}
+
+fn msc_disarm_endpoints() void {
+    const in_ctrl = buffer_control(.{ .dir = .in, .num = .ep1 });
+    const out_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
+    log.debug("disarm_msc_endpoints: in.available={} out.available={}", .{
+        in_ctrl.read().AVAILABLE_0,
+        out_ctrl.read().AVAILABLE_0,
+    });
+
+    disarm_endpoint(.{ .dir = .in, .num = .ep1 });
+    disarm_endpoint(.{ .dir = .out, .num = .ep1 });
+
+    // drop abandoned buffers
+    rp2xxx.hw.clear_alias(&USB.BUFF_STATUS).write(.{ .EP1_IN = 1, .EP1_OUT = 1 });
+}
+
 fn queue_packet(data: []const u8, pid: setup.PID) void {
     const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
-    assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
+    //assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
     assert(data.len <= 64, .{});
 
     log.debug("queue_packet: len={} pid={}", .{ data.len, pid });
@@ -249,7 +319,7 @@ fn queue_packet(data: []const u8, pid: setup.PID) void {
     });
 }
 
-fn queue_msc_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
+fn msc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
     const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep1 });
     assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
     assert(data.len <= 64, .{});
@@ -280,7 +350,7 @@ fn get_buffer() []const u8 {
     return "";
 }
 
-fn get_msc_buffer() []const u8 {
+fn msc_get_buffer() []const u8 {
     const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
     const ptr: [*]const u8 = @ptrFromInt(dpram_addr + 0x180 + 64);
     return ptr[0..buf_ctrl.read().LENGTH_0];
@@ -309,7 +379,7 @@ fn queue_receive() void {
     });
 }
 
-fn queue_msc_receive(pid: endpoint.PacketIdentifier) void {
+fn msc_queue_receive(pid: endpoint.PacketIdentifier) void {
     const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
 
     log.debug("queue_msc_receive: pid={}", .{pid});
@@ -360,7 +430,7 @@ fn setup_endpoints() void {
         .ENABLE = 1,
     });
 
-    queue_msc_receive(.DATA0);
+    msc_queue_receive(.DATA0);
 
     // EP2 IN AND OUT: CDC
 
@@ -373,16 +443,10 @@ pub fn poll() void {
         log.debug("BUS_RESET", .{});
         USB.ADDR_ENDP.write(.{ .ADDRESS = 0 });
 
+        msc_driver.reset();
+
         // TODO: use clear alias?
         USB.SIE_STATUS.write(.{ .BUS_RESET = 1 });
-    }
-
-    if (interrupts.SETUP_REQ == 1) {
-        log.debug("SETUP_REQ", .{});
-        USB.SIE_STATUS.write(.{ .SETUP_REC = 1 });
-
-        const pkt: *volatile types.SetupPacket = @ptrCast(@alignCast(&USB_DPRAM.SETUP_PACKET_LOW));
-        setup_processor.submit_setup_request(pkt.*);
     }
 
     if (interrupts.BUFF_STATUS == 1) {
@@ -413,6 +477,14 @@ pub fn poll() void {
             msc_driver.out_ready();
             clear.write(.{ .EP1_OUT = 1 });
         }
+    }
+
+    if (interrupts.SETUP_REQ == 1) {
+        log.debug("SETUP_REQ", .{});
+        USB.SIE_STATUS.write(.{ .SETUP_REC = 1 });
+
+        const pkt: *volatile types.SetupPacket = @ptrCast(@alignCast(&USB_DPRAM.SETUP_PACKET_LOW));
+        setup_processor.submit_setup_request(pkt.*);
     }
 
     setup_processor.poll();

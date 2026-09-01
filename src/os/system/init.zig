@@ -151,10 +151,6 @@ pub fn init(config: InitConfig) !void {
     // 0. Detect board revision
     rev.init();
 
-    std.log.info("=================================================", .{});
-    std.log.info("INITIALIZING KERNEL", .{});
-    std.log.info("=================================================", .{});
-
     // 1. Initialize GPIO subsystem
     gpio.init();
 

@@ -39,6 +39,7 @@ pub const Callbacks = struct {
     queue_packet: *const fn (data: []const u8, pid: endpoint.PacketIdentifier) void,
     queue_receive: *const fn (pid: endpoint.PacketIdentifier) void,
     get_buffer: *const fn () []const u8,
+    disarm_endpoints: *const fn () void,
 };
 
 /// Command Block Wrapper
@@ -624,9 +625,10 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
         }
 
         pub fn reset(self: *@This()) void {
+            config.callbacks.disarm_endpoints();
             self.set_state(.awaiting_cbw);
             self.ready = .{
-                .in = false,
+                .in = true,
                 .out = false,
             };
             self.endpoints.in.reset();

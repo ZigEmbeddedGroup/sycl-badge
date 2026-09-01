@@ -297,7 +297,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
         for (0..512 / 8) |row| {
             const row_data = block_data[8 * row ..];
             const addr: u32 = @intFromPtr(&cart_buffer) + block_offset + (8 * row);
-            log.info("0x{X}: {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}", .{
+            log.debug("0x{X}: {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2} {X:0>2}", .{
                 addr,
                 row_data[0],
                 row_data[1],
@@ -312,7 +312,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
 
         // Parse the block
         const block = parser.parseBlock(block_data) catch {
-            log.info("Failed to parse block block_index={} num_blocks={}", .{ block_index, num_blocks });
+            log.err("Failed to parse block block_index={} num_blocks={}", .{ block_index, num_blocks });
             return LoadError.InvalidUF2;
         };
 
@@ -325,7 +325,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!u32 {
 
             // Check block count matches file length
             if (block.header.num_blocks != num_blocks) {
-                log.info("block count does not match file length: block.header.num_blocks={} num_blocks={}", .{ block.header.num_blocks, num_blocks });
+                log.err("block count does not match file length: block.header.num_blocks={} num_blocks={}", .{ block.header.num_blocks, num_blocks });
                 return LoadError.InvalidUF2;
             }
 

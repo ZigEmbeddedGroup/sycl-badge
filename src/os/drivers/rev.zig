@@ -22,14 +22,14 @@ pub var debug = false;
 /// The hardware revison.
 pub var revision: Revision = .unknown;
 
-pub const Revision = enum {
+pub const Revision = enum(u16) {
     /// r0 has a green board
     r0,
     /// r1 has a purple board.
     /// This revision adds an audio driver chip which
     /// receives digital level signals.
     r1,
-    unknown,
+    unknown = 0xFFFF,
 
     pub fn str(r: Revision) []const u8 {
         return switch (r) {

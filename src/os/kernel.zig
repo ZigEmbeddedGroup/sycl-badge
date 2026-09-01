@@ -29,6 +29,7 @@ const i2c = @import("drivers/i2c.zig");
 pub const panic = @import("system/panic.zig").panic;
 pub const std_options = microzig.std_options(.{
     .logFn = rtt.log,
+    .log_level = .info,
 });
 
 comptime {

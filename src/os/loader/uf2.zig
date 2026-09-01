@@ -2,6 +2,7 @@
 /// UF2 (USB Flashing Format) is a file format designed for flashing microcontrollers
 /// Each block is 512 bytes and self-contained
 const std = @import("std");
+const log = std.log.scoped(.uf2);
 
 /// UF2 block size (always 512 bytes)
 pub const BLOCK_SIZE: usize = 512;
@@ -52,6 +53,7 @@ pub const Block = extern struct {
 
     /// Validate block magic numbers
     pub fn isValid(self: *const Block) bool {
+        log.info("block: {*}", .{self});
         return self.header.magic_start0 == MAGIC_START0 and
             self.header.magic_start1 == MAGIC_START1 and
             self.magic_end == MAGIC_END;
@@ -117,16 +119,27 @@ pub const Parser = struct {
 
     /// Parse and validate a single UF2 block
     /// Returns the block if valid, or an error
-    pub fn parseBlock(self: *Parser, data: *align(1) const [BLOCK_SIZE]u8) Error!*const Block {
+    pub fn parseBlock(self: *Parser, data: []const u8) Error!*const Block {
         const block: *const Block = @ptrCast(@alignCast(data));
 
         // Validate magic numbers
         if (!block.isValid()) {
-            return Error.InvalidMagic;
+            log.err("invalid magic: block_addr=0x{X} start0=0x{X} vs. 0x{X} start1=0x{X} vs. 0x{X} end=0x{X} vs. 0x{X}", .{
+                @intFromPtr(data.ptr),
+                block.header.magic_start0,
+                MAGIC_START0,
+                block.header.magic_start1,
+                MAGIC_START1,
+                block.magic_end,
+                MAGIC_END,
+            });
+
+            return error.InvalidMagic;
         }
 
         // Validate payload size
         if (block.header.payload_size > MAX_PAYLOAD_SIZE) {
+            log.err("invalid payload size", .{});
             return Error.InvalidPayloadSize;
         }
 
@@ -141,6 +154,7 @@ pub const Parser = struct {
 
         // Validate block number
         if (block.header.block_no >= block.header.num_blocks) {
+            log.err("invalid block number", .{});
             return Error.InvalidBlockNumber;
         }
 

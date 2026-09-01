@@ -13,10 +13,11 @@ const timer = @import("../drivers/timer.zig");
 const lcd = @import("../drivers/lcd.zig");
 const rom = @import("../drivers/rom.zig");
 const loader = @import("../loader/loader.zig");
-const debug_log = @import("../debug_log.zig");
 const rev = @import("../drivers/rev.zig");
 const rtt = @import("../drivers/rtt.zig");
 const terry = @import("../system/terry.zig");
+const uart = @import("../drivers/uart.zig");
+const i2c = @import("../drivers/i2c.zig");
 
 // System imports
 const console = @import("console.zig");
@@ -162,6 +163,8 @@ pub fn init(config: InitConfig) !void {
     // 4. Initialize buzzer (GPIO 8/9 for CMT-7525-80 magnetic buzzer)
     audio.init();
 
+    i2c.init();
+
     // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
     // Ensure internal flash is connected before any ROM access (improves persistence across power cycles)
@@ -169,7 +172,6 @@ pub fn init(config: InitConfig) !void {
     storage.init();
 
     // 5. Initialize USB
-    const usb_start = timer.micros();
     try usb.init();
 
     // 6. Wait for USB enumeration
@@ -178,7 +180,6 @@ pub fn init(config: InitConfig) !void {
     while (timer.millis() - start_time < usb_enum_timeout_ms) {
         usb.poll();
     }
-    const usb_time = timer.micros() - usb_start;
 
     // 7. Initialize shared memory (for IPC)
     shared_mem.init();
@@ -229,5 +230,4 @@ pub fn init(config: InitConfig) !void {
     loader.init();
 
     _ = boot_start;
-    _ = usb_time;
 }

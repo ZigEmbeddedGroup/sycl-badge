@@ -42,6 +42,9 @@ pub const LCD_TE = gpio.num(20); // LCD Tearing Effect output (GPIO input, optio
 // Note: TFT_LITE (backlight) connected directly to VBUS (5V)
 // Note: SPI4W tied to 3V3 (High = 4-wire SPI mode)
 
+pub const UART0_TX = gpio.num(28);
+pub const UART0_RX = gpio.num(29);
+
 // LEDs
 pub const led_pin = gpio.num(14); // regular LED
 pub const neopixel_pin = gpio.num(15); // Neopixel data pin
@@ -60,11 +63,30 @@ pub const button_select = gpio.num(38); // SELECT1
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;
 
-// Buzzer / Speaker (CMT-7525-80-SMT-TR)
-pub const buzzer_enable = gpio.num(8); // SPKR_EN  - speaker enable (active-high)
-pub const buzzer_pwm = gpio.num(9); // SPKR_A0  - PWM audio output (PWM slice 4, channel B)
-
 // Voltage divider for testing hardware revision
 // see drivers/rev.zig for details.
 pub const revision_pin = gpio.num(47);
 pub const revision_adc: hal.adc.Input = .ain7;
+
+pub const rev0 = struct {
+    pub const audio = struct {
+        // Buzzer / Speaker (CMT-7525-80-SMT-TR)
+        pub const buzzer_enable = gpio.num(8); // SPKR_EN  - speaker enable (active-high)
+        pub const buzzer_pwm = gpio.num(9); // SPKR_A0  - PWM audio output (PWM slice 4, channel B)
+    };
+};
+
+pub const rev1 = struct {
+    pub const i2c = struct {
+        pub const instance = hal.i2c.instance.num(0);
+        pub const scl = gpio.num(12);
+        pub const sda = gpio.num(13);
+    };
+
+    pub const audio = struct {
+        pub const sd_mode_n = gpio.num(8);
+        pub const din = gpio.num(9);
+        pub const bclk = gpio.num(10);
+        pub const lrclk = gpio.num(11);
+    };
+};

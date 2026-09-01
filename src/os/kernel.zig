@@ -3,6 +3,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const board = microzig.board;
+const rp2xxx = microzig.hal;
 
 const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
@@ -21,11 +22,23 @@ const multicore = @import("system/multicore.zig");
 const terry = @import("system/terry.zig");
 const mailbox = @import("ipc/mailbox.zig");
 const cart_api = @import("cart/api.zig");
-
 const Controls = cart_api.Controls;
+const i2c = @import("drivers/i2c.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
+pub const std_options = microzig.std_options(.{
+    .logFn = rtt.log,
+    .log_level = .info,
+});
+
+comptime {
+    _ = microzig.export_startup();
+}
+
+pub const microzig_options: microzig.Options = .{
+    .interrupts = @import("interrupts.zig").interrupts,
+};
 
 pub fn read_buttons() Controls {
     return .{
@@ -92,10 +105,6 @@ var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
 var brightness: u10 = 512;
 
-pub const microzig_options: microzig.Options = .{
-    .interrupts = @import("interrupts.zig").interrupts,
-};
-
 var ready_fb_state: terry.core0.TrackedStateMachine(enum {
     not_ready,
     ready_rect,
@@ -141,6 +150,8 @@ pub fn main() !void {
         terry.client.poll();
 
         fps_overlay.poll();
+
+        i2c.poll();
 
         // Process console input
         console.processInput();
@@ -195,8 +206,6 @@ pub fn main() !void {
                 display_active = true;
                 btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
                 ready_fb_state.set_state(.not_ready, @src());
-                console.println("[STOP] 7: reinitDisplay");
-                lcd.reinitDisplay();
                 console.println("[STOP] 8: refreshCartDisplay");
                 refreshCartDisplay();
                 last_cart_hash = computeCartHash();
@@ -382,7 +391,6 @@ pub fn main() !void {
             display_active = true;
             // Re-sync all button states so any buttons still held when the cart
             // exited are consumed and won't immediately re-trigger menu actions.
-            lcd.reinitDisplay();
             refreshCartDisplay();
             last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
@@ -483,11 +491,11 @@ fn refreshCartDisplay() void {
 
     // Always show the hardware revision in the bottom right corner
     var rev_buf: [16]u8 = undefined;
-    const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{d}", .{rev.rev}) catch "rev error";
+    const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{s}", .{rev.revision.str()}) catch "rev error";
     const gray: lcd.Color16 = .rgb(0x10, 0x10, 0x10);
     lcd.drawString(@intCast(lcd.width - 8 * rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
 
-    if (rev.debug or rev.rev == rev.unknown) {
+    if (rev.debug or rev.revision == .unknown) {
         const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
         lcd.drawString(@intCast(lcd.width - 8 * adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
     }

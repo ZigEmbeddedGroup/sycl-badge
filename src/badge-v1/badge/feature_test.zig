@@ -38,16 +38,16 @@ export fn update() void {
     offset +%= 1;
 
     var inputs_buf: [128]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&inputs_buf);
+    var writer: std.Io.Writer = .fixed(&inputs_buf);
 
     // ENABLE AT YOUR OWN RISK
     // fbs.writer().print("{d}\n", .{read_stored_number()}) catch unreachable;
 
-    inline for (std.meta.fields(cart.Controls)) |control| {
-        if (comptime !std.mem.eql(u8, control.name, "padding")) {
-            if (@field(cart.controls.*, control.name)) {
-                fbs.writer().writeAll(control.name) catch unreachable;
-                fbs.writer().writeAll("\n") catch unreachable;
+    inline for (@typeInfo(cart.Controls).@"struct".field_names) |control_name| {
+        if (comptime !std.mem.eql(u8, control_name, "padding")) {
+            if (@field(cart.controls.*, control_name)) {
+                writer.writeAll(control_name) catch unreachable;
+                writer.writeAll("\n") catch unreachable;
             }
         }
     }
@@ -139,7 +139,7 @@ export fn update() void {
     });
 
     cart.text(.{
-        .str = fbs.getWritten(),
+        .str = writer.buffered(),
         .x = 0,
         .y = 0,
         .text_color = .{ .r = 0, .g = 0, .b = 0 },

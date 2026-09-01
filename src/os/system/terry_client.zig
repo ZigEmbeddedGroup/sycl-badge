@@ -1,6 +1,5 @@
 /// Terry is a reimplementation of the Tracy 0.14.0 client designed for a
 /// low-memory threadless microcontroller environment with RTT output.
-
 const terry = @import("terry.zig");
 const q = @import("terry_protocol.zig");
 
@@ -33,7 +32,7 @@ const State = enum {
     send_welcome_msg,
     send_on_demand_payload,
     new_connection,
-    
+
     connected,
     buffer_full,
 
@@ -72,7 +71,9 @@ pub const server_timeout_us = 1_000_000;
 // So the core0 id here is the address of the descriptive name to
 // be used in the Tracy view.
 const core0_thread_id_ptr = terry.external_string("Core 0 (OS)");
-pub fn core0_thread_id() u32 { return @intFromPtr(core0_thread_id_ptr); }
+pub fn core0_thread_id() u32 {
+    return @intFromPtr(core0_thread_id_ptr);
+}
 
 pub var core0_thread_ref_time: i64 = 0;
 pub var has_core0_thread_context: bool = false;
@@ -84,7 +85,7 @@ var atomic_connection_id: u16 = 0;
 var atomic_is_connected: bool = false;
 
 pub var param_callback_obj: ?*anyopaque = null;
-pub var param_callback_fn: ?*const fn(?*anyopaque, u32, i32) void = null;
+pub var param_callback_fn: ?*const fn (?*anyopaque, u32, i32) void = null;
 
 var last_up_read: usize = 0;
 var last_up_write: usize = 0;
@@ -100,7 +101,7 @@ pub const WireLayout = struct {
 
 fn header_size(literal_bytes: usize) usize {
     // Fast case for small lengths, which is most of them
-    if (literal_bytes < 15+255) {
+    if (literal_bytes < 15 + 255) {
         return 1 + @as(usize, @intFromBool(literal_bytes >= 15));
     }
     // 4 bytes compressed len, 1 byte token, ceil(max(0, data_bytes - 15) / 255) bytes len
@@ -109,7 +110,7 @@ fn header_size(literal_bytes: usize) usize {
 
 fn match_copy_len_bytes(copy_len: usize) usize {
     // Fast case for small lengths, which is most of them
-    if (copy_len < 19+255) {
+    if (copy_len < 19 + 255) {
         return @intFromBool(copy_len >= 19);
     }
     return (copy_len + (255 - 19)) / 255;
@@ -287,7 +288,6 @@ fn core0_emit_zone_bulk_end(time: i64) void {
     const repeat_end = q.packet(.ZoneEnd16, .{ .time = 0 });
     const begin_error = q.packet(.ZoneBegin16, .{ .time = 0, .srcloc = @intFromPtr(warning_zone) });
 
-
     // With less than 4 zones, we can't meaningfully compress the data. The whole thing is a literal.
     if (num_zones < 4) {
         starter_literal_size += (num_zones - 1) * @sizeOf(@TypeOf(repeat_end)) + @sizeOf(@TypeOf(begin_error));
@@ -403,7 +403,7 @@ fn compute_zone_bulk_begin_max_len(num_zones: u32) usize {
 
     const item_block_size = 1 + 4 + 2; // token 0x43, src_loc 4, 0x000b
     // -2: 1 for the original begin and one for the tail
-    const repeat_payload_size = @as(u32, @min(num_zones-1, core0_max_zones) - 2) * item_block_size;
+    const repeat_payload_size = @as(u32, @min(num_zones - 1, core0_max_zones) - 2) * item_block_size;
 
     // If we go past the end of the recorded zone stack, emit a repeated "unknown" begin.
     var error_copy_bytes: usize = 0;
@@ -498,7 +498,7 @@ fn core0_emit_zone_bulk_begin(time: i64) void {
 
     const item_block_size = 1 + 4 + 2; // token 0x43, src_loc 4, 0x000b
     // -2 for the original begin, -1 for the tail
-    const last_repeat_zone: u32 = @min(num_zones-1, core0_max_zones);
+    const last_repeat_zone: u32 = @min(num_zones - 1, core0_max_zones);
     const repeat_payload_size = (last_repeat_zone - 2) * item_block_size;
 
     // If we go past the end of the recorded zone stack, emit a repeated "unknown" begin.
@@ -534,7 +534,7 @@ fn core0_emit_zone_bulk_begin(time: i64) void {
     cursor.write_assume_available(std.mem.asBytes(&begin_one));
     // We can't match copy less than 4 bytes, so we include some of
     // the second item here to make a larger copyable region
-    cursor.write_assume_available(&.{ @intFromEnum(q.Type.ZoneBegin16), 0, 0 });
+    cursor.write_assume_available(&.{ @backingInt(q.Type.ZoneBegin16), 0, 0 });
     cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(core0_zones[1]))));
     // Match copy start at the beginning of begin_one
     cursor.write_assume_available(&std.mem.toBytes(@as(u16, @sizeOf(@TypeOf(begin_one)))));
@@ -569,7 +569,7 @@ fn core0_emit_zone_bulk_begin(time: i64) void {
     // Last literal. In the case of going past core0_max_zones, we could include some of this in
     // the match copy, but with the 5-byte rule for the last block it would only save 3 bytes,
     // so it's not worth the extra work that would be needed to calculate the length.
-    const last_zone = if (num_zones <= core0_max_zones) core0_zones[num_zones-1] else overflow_zone;
+    const last_zone = if (num_zones <= core0_max_zones) core0_zones[num_zones - 1] else overflow_zone;
     cursor.write_byte_assume_available(0x80);
     cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(last_zone))));
     cursor.commit();
@@ -588,7 +588,7 @@ fn compute_sm_bulk_end_len(num_states: u32) usize {
 
     // Each repeat copies 21 bytes, which means it needs 1 byte of extended matchlen.
     // The last repeat copies only 12 bytes, so it needs 0 bytes of extended matchlen.
-    // We consider a repeat to include the matchlen from the previous 
+    // We consider a repeat to include the matchlen from the previous
     const starter_literal_len = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
     const starter_lz4_len = header_size(starter_literal_len) + starter_literal_len + 2; // 2 byte offset
     const num_repeats = num_states - 2;
@@ -624,7 +624,7 @@ fn core0_emit_sm_bulk_end(time: i64) void {
 
     // Each repeat copies 21 bytes, which means it needs 1 byte of extended matchlen.
     // The last repeat copies only 12 bytes, so it needs 0 bytes of extended matchlen.
-    // We consider a repeat to include the matchlen from the previous 
+    // We consider a repeat to include the matchlen from the previous
     const starter_literal_len = @sizeOf(q.TrackedSMUpdatePacket) + @sizeOf(q.Packet(q.ThreadContext));
     const starter_lz4_len = header_size(starter_literal_len) + starter_literal_len + 2; // 2 byte offset
     const num_repeats = num_states - 2;
@@ -637,32 +637,36 @@ fn core0_emit_sm_bulk_end(time: i64) void {
     var track = core0_tracked_states.?;
     var cursor = send.cursor();
     cursor.write_assume_available(std.mem.asBytes(&total_lz4_len));
-    
+
     var packet: q.TrackedSMUpdatePacket = undefined;
-    comptime { std.debug.assert(starter_literal_len >= 15 and starter_literal_len < (15 + 255)); }
-    comptime { std.debug.assert(@sizeOf(q.TrackedSMUpdatePacket) - 4 >= 15 + 4); }
+    comptime {
+        std.debug.assert(starter_literal_len >= 15 and starter_literal_len < (15 + 255));
+    }
+    comptime {
+        std.debug.assert(@sizeOf(q.TrackedSMUpdatePacket) - 4 >= 15 + 4);
+    }
 
     // First literal header
     cursor.write_byte_assume_available(if (num_states == 2) 0xF8 else 0xFF);
     cursor.write_byte_assume_available(@intCast(starter_literal_len - 15));
     // First literal data, first item and second up to ctx
-    cursor.write_assume_available( packet.set(track.name, time, warning_zone) );
+    cursor.write_assume_available(packet.set(track.name, time, warning_zone));
     track = track.next.?;
     packet.ctx.data = .{ .thread = @intFromPtr(track.name) };
-    cursor.write_assume_available( std.mem.asBytes(&packet.ctx) );
+    cursor.write_assume_available(std.mem.asBytes(&packet.ctx));
     const offset: u16 = @sizeOf(q.TrackedSMUpdatePacket);
-    cursor.write_assume_available( &std.mem.toBytes(offset) );
+    cursor.write_assume_available(&std.mem.toBytes(offset));
 
     for (2..num_states) |n| {
         track = track.next.?;
-        cursor.write_byte_assume_available( @intCast(@sizeOf(q.TrackedSMUpdatePacket) - 4 - 19) );
-        cursor.write_byte_assume_available( if (n+1 == num_states) 0xF8 else 0xFF );
-        cursor.write_assume_available( &std.mem.toBytes(@as(u32, @intFromPtr(track.name))) );
-        cursor.write_assume_available( &std.mem.toBytes(offset) );
+        cursor.write_byte_assume_available(@intCast(@sizeOf(q.TrackedSMUpdatePacket) - 4 - 19));
+        cursor.write_byte_assume_available(if (n + 1 == num_states) 0xF8 else 0xFF);
+        cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.name))));
+        cursor.write_assume_available(&std.mem.toBytes(offset));
     }
 
     cursor.write_byte_assume_available(0x80);
-    cursor.write_assume_available( &std.mem.toBytes(@as(u64, @intFromPtr(warning_zone))) );
+    cursor.write_assume_available(&std.mem.toBytes(@as(u64, @intFromPtr(warning_zone))));
 
     cursor.commit();
 }
@@ -673,7 +677,7 @@ fn core0_compute_sm_bulk_declare_len() usize {
     const num_states = core0_num_pending_states;
     if (num_states == 0) return 0;
     if (num_states == 1) return wire_layout(@sizeOf(q.TrackedSMRegisterPacket)).total_bytes;
-    
+
     const first_literal_size = @sizeOf(q.TrackedSMRegisterPacket) + @sizeOf(q.Packet(q.ThreadContext));
     const single_repeat_size = 1 + 4 + 2 + 1 + 4 + 2;
     const last_literal_size = 8;
@@ -728,9 +732,11 @@ fn core0_emit_sm_bulk_declare_and_mark_tracked(time: i64) void {
     var cursor = send.cursor();
     cursor.write_assume_available(&std.mem.toBytes(total_lz4_size));
 
-    comptime { std.debug.assert(header_size(first_literal_size) == 2); }
+    comptime {
+        std.debug.assert(header_size(first_literal_size) == 2);
+    }
     cursor.write_byte_assume_available(0xF5);
-    cursor.write_byte_assume_available(@intCast( first_literal_size - 15 ));
+    cursor.write_byte_assume_available(@intCast(first_literal_size - 15));
     var packet: q.TrackedSMRegisterPacket = undefined;
     const bytes = packet.set(track.name, time, track.srcloc);
     cursor.write_assume_available(bytes);
@@ -775,7 +781,6 @@ fn core0_compute_sm_bulk_update_len() usize {
     const total_lz4_size = header_size(first_literal_size) + first_literal_size + 2 + (single_repeat_size * (num_states - 2)) + header_size(last_literal_size) + last_literal_size;
 
     return 4 + total_lz4_size;
-
 }
 
 fn core0_emit_sm_bulk_update(time: i64) void {
@@ -786,7 +791,9 @@ fn core0_emit_sm_bulk_update(time: i64) void {
     has_core0_thread_context = false;
 
     var track = core0_tracked_states.?;
-    defer { std.debug.assert(track.next == null); }
+    defer {
+        std.debug.assert(track.next == null);
+    }
 
     if (num_states == 1) {
         var packet: q.TrackedSMUpdatePacket = undefined;
@@ -811,9 +818,11 @@ fn core0_emit_sm_bulk_update(time: i64) void {
     var cursor = send.cursor();
     cursor.write_assume_available(&std.mem.toBytes(total_lz4_size));
 
-    comptime { std.debug.assert(header_size(first_literal_size) == 2); }
+    comptime {
+        std.debug.assert(header_size(first_literal_size) == 2);
+    }
     cursor.write_byte_assume_available(0xF8);
-    cursor.write_byte_assume_available(@intCast( first_literal_size - 15 ));
+    cursor.write_byte_assume_available(@intCast(first_literal_size - 15));
     var packet: q.TrackedSMUpdatePacket = undefined;
     const bytes = packet.set(track.name, time, track.srcloc);
     cursor.write_assume_available(bytes);
@@ -952,7 +961,7 @@ pub fn get_connection_id_core1() bool {
 pub fn core0_rtt_timeout(stream_valid: bool) void {
     log("\nTERRY: CORE0 RTT TIMEOUT!\n\n");
     if (is_connected_core0()) {
-        @atomicStore(bool, &atomic_is_connected,false, .release);
+        @atomicStore(bool, &atomic_is_connected, false, .release);
         clear_queues(); // We've probably been blocking for a while, unblock other threads.
 
         // Note: Changing the state here might interrupt a pending send.
@@ -1035,7 +1044,7 @@ pub fn poll() void {
             var protocol_ver: u32 = 0;
             if (recv.read_if_available(std.mem.asBytes(&protocol_ver))) {
                 if (protocol_ver != q.ProtocolVersion) {
-                    logf("TERRY: invalid protocol version! expect {d}, found {d}\n", .{q.ProtocolVersion, protocol_ver});
+                    logf("TERRY: invalid protocol version! expect {d}, found {d}\n", .{ q.ProtocolVersion, protocol_ver });
                     state = .bad_protocol_version;
                 } else {
                     log("TERRY: .handshake => .send_welcome_msg\n");
@@ -1110,9 +1119,9 @@ pub fn poll() void {
 
                 if (!recv.read_if_available(std.mem.asBytes(&query))) break;
 
-                logf("TERRY: server query: {s}\n", .{@tagName(query.@"type")});
+                logf("TERRY: server query: {s}\n", .{@tagName(query.type)});
 
-                switch (query.@"type") {
+                switch (query.type) {
                     .ServerQueryString => send_string_ptr(query.ptr, .StringData, .server_query),
                     .ServerQueryPlotName => send_string_ptr(query.ptr, .PlotName, .server_query),
                     .ServerQueryFrameName => send_string_ptr(query.ptr, .FrameName, .server_query),
@@ -1243,7 +1252,7 @@ fn try_send_packet() void {
     if (pending_packet_type == .no_packet) return;
 
     const ty = tmp_packet_as(q.Type).*;
-    const packet_size = q.PacketSize[@intFromEnum(ty)];
+    const packet_size = q.PacketSize[@backingInt(ty)];
     const data_size = packet_size + tmp_packet_data.len;
     const layout = wire_layout(data_size);
     const size = layout.total_bytes;
@@ -1264,8 +1273,9 @@ fn try_send_packet() void {
         } else if (size > rtt.tracy_send_size / 3 and available >= layout.header_bytes + packet_size) {
             // TODO: Large packet sends should probably not block. Instead,
             // they could disable profiling with a bulk end, then on poll send
-            // any available data before 
-            const z = terry.core0.zone("Terry Send Large Data Packet (Interrupt Profiling Disabled)", @src()); defer z.end();
+            // any available data before
+            const z = terry.core0.zone("Terry Send Large Data Packet (Interrupt Profiling Disabled)", @src());
+            defer z.end();
 
             // The packet is likely too large to be able to send
             // without blocking. We're going to do a blocking send.
@@ -1373,7 +1383,7 @@ fn send_src_loc(ptr: u64, pending_ty: PendingPacket) void {
 
 fn send_empty(ty: q.Type, pending_ty: PendingPacket) void {
     pending_packet_type = pending_ty;
-    std.debug.assert(q.PayloadSize[@intFromEnum(ty)] == 0);
+    std.debug.assert(q.PayloadSize[@backingInt(ty)] == 0);
     tmp_packet_as(q.Packet(q.Empty)).* = .{ .ty = ty, .data = .{} };
     tmp_packet_data.len = 0;
     logf("TERRY: send_empty .{s} => .{s}\n", .{ @tagName(ty), @tagName(pending_packet_type) });
@@ -1429,6 +1439,7 @@ inline fn make_welcome_msg() q.WelcomeMessage {
         .hostInfo = std.mem.zeroes([q.WelcomeMessageHostInfoSize]u8),
     };
     const prg_name = "sycl-os-kernel.uf2";
+
     msg.programName[0..prg_name.len].* = prg_name[0..].*;
     _ = std.fmt.bufPrint(&msg.hostInfo,
         \\OS: SYCL
@@ -1436,11 +1447,11 @@ inline fn make_welcome_msg() q.WelcomeMessage {
         \\User: root
         \\Arch: ARM
         \\CPU: Cortex-M33
-        \\Device: SYCL Badge V2 rev{d}
+        \\Device: SYCL Badge V2 rev{s}
         \\CPU cores: 2
         \\RAM: 520 KB
         \\Client: Terry
         \\
-    , .{ builtin.zig_version, rev.rev }) catch @panic("Host Info too large!");
+    , .{ builtin.zig_version, rev.revision.str() }) catch @panic("Host Info too large!");
     return msg;
 }

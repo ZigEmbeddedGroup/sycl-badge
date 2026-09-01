@@ -1,5 +1,4 @@
 /// This file contains the data layouts of the terry protocol for 0.14.0
-
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -9,12 +8,11 @@ inline fn static_assert(condition: bool, err: []const u8) void {
 
 comptime {
     if (builtin.cpu.arch.endian() != .little)
-            @compileError("Tracy only supports little endian CPUs");
+        @compileError("Tracy only supports little endian CPUs");
 }
 
 /// ------------------------- Messages for Application comms with server ----------------------------------
-
-pub const Type = enum (u8) {
+pub const Type = enum(u8) {
     ZoneText,
     ZoneName,
     Message,
@@ -149,17 +147,14 @@ pub const Type = enum (u8) {
     FiberName,
     _,
 
-    pub const NUM_TYPES = @typeInfo(@This()).@"enum".fields.len;
+    pub const NUM_TYPES = @typeInfo(@This()).@"enum".field_names.len;
 };
 
 fn Extend(A: type, B: type) type {
-    return @Type(.{ .@"struct" = .{
-        .backing_integer = null,
-        .decls = &.{},
-        .fields = @typeInfo(A).@"struct".fields ++ @typeInfo(B).@"struct".fields,
-        .is_tuple = false,
-        .layout = .@"extern",
-    } });
+    const field_names = @typeInfo(A).@"struct".field_names ++ @typeInfo(B).@"struct".field_names;
+    const field_types = @typeInfo(A).@"struct".field_types ++ @typeInfo(B).@"struct".field_types;
+    const field_attrs = @typeInfo(A).@"struct".field_attrs ++ @typeInfo(B).@"struct".field_attrs;
+    return @Struct(.@"extern", null, field_names, field_types, field_attrs);
 }
 
 pub const Empty = extern struct {};
@@ -173,7 +168,7 @@ pub const ZoneBeginLean = extern struct {
 };
 
 pub const ZoneBegin = Extend(ZoneBeginLean, extern struct {
-    srcloc: u64 align(1),    // ptr
+    srcloc: u64 align(1), // ptr
 });
 
 pub const ZoneBeginThread = Extend(ZoneBegin, extern struct {
@@ -242,7 +237,7 @@ pub const StringTransfer16 = Extend(StringTransfer, extern struct {
 
 pub const FrameMark = extern struct {
     time: i64 align(1),
-    name: u64 align(1),      // ptr
+    name: u64 align(1), // ptr
 };
 
 pub const FrameVsync = extern struct {
@@ -258,13 +253,13 @@ pub const FrameImage = extern struct {
 };
 
 pub const FrameImageFat = Extend(FrameImage, extern struct {
-    image: u64 align(1),     // ptr
+    image: u64 align(1), // ptr
 });
 
 pub const SourceLocation = extern struct {
     name: u64 align(1),
-    function: u64 align(1),  // ptr
-    file: u64 align(1),      // ptr
+    function: u64 align(1), // ptr
+    file: u64 align(1), // ptr
     line: u32 align(1),
     b: u8 align(1),
     g: u8 align(1),
@@ -272,7 +267,7 @@ pub const SourceLocation = extern struct {
 };
 
 pub const ZoneTextFat = extern struct {
-    text: u64 align(1),      // ptr
+    text: u64 align(1), // ptr
     size: u16 align(1),
 };
 
@@ -289,13 +284,13 @@ pub const LockType = enum(u8) {
 pub const LockAnnounce = extern struct {
     id: u32 align(1),
     time: i64 align(1),
-    lckloc: u64 align(1),    // ptr
+    lckloc: u64 align(1), // ptr
     type: LockType align(1),
 };
 
 pub const FiberEnter = extern struct {
     time: i64 align(1),
-    fiber: u64 align(1),     // ptr
+    fiber: u64 align(1), // ptr
     thread: u32 align(1),
     groupHint: i32 align(1),
 };
@@ -312,7 +307,7 @@ pub const SectionEnter = extern struct {
 };
 
 pub const SectionEnterFat = Extend(SectionEnter, extern struct {
-    text: u64 align(1),      // ptr
+    text: u64 align(1), // ptr
     size: u16 align(1),
 });
 
@@ -326,7 +321,7 @@ pub const SectionSetup = extern struct {
 };
 
 pub const SectionSetupFat = Extend(SectionSetup, extern struct {
-    text: u64 align(1),      // ptr
+    text: u64 align(1), // ptr
     size: u16 align(1),
 });
 
@@ -359,7 +354,7 @@ pub const LockReleaseShared = Extend(LockRelease, extern struct {
 pub const LockMark = extern struct {
     thread: u32 align(1),
     id: u32 align(1),
-    srcloc: u64 align(1),    // ptr
+    srcloc: u64 align(1), // ptr
 };
 
 pub const LockName = extern struct {
@@ -367,12 +362,12 @@ pub const LockName = extern struct {
 };
 
 pub const LockNameFat = Extend(LockName, extern struct {
-    name: u64 align(1),      // ptr
+    name: u64 align(1), // ptr
     size: u16 align(1),
 });
 
 pub const PlotDataBase = extern struct {
-    name: u64 align(1),      // ptr
+    name: u64 align(1), // ptr
     time: i64 align(1),
 };
 
@@ -392,34 +387,34 @@ pub const MessageSourceType = enum(u8) {
     User,
     Tracy,
     _,
-    
+
     pub const COUNT = @typeInfo(@This()).@"enum".fields.len;
 };
 
 pub const MessageSeverity = enum(u8) {
-    Trace,   // Broadly track variable states and events in the software program.
-    Debug,   // Describes variable states and details about specific internal events in the software, that are useful for investigations.
-    Info,    // Describes normal events, which inform on the expected progress and state of your software.
+    Trace, // Broadly track variable states and events in the software program.
+    Debug, // Describes variable states and details about specific internal events in the software, that are useful for investigations.
+    Info, // Describes normal events, which inform on the expected progress and state of your software.
     Warning, // Describes potentially dangerous situations caused by unexpected events and states.
-    Error,   // Describes the occurrence of unexpected behavior. Does not interrupt the execution of the software.
-    Fatal,   // Describes a critical event that will lead to a software failure/crash.
+    Error, // Describes the occurrence of unexpected behavior. Does not interrupt the execution of the software.
+    Fatal, // Describes a critical event that will lead to a software failure/crash.
     _,
 
     pub const COUNT = @typeInfo(@This()).@"enum".fields.len;
 };
 
 pub fn MakeMessageMetadata(source: MessageSourceType, severity: MessageSeverity) u8 {
-    static_assert( MessageSourceType.COUNT < ( 1 << 4 ), "We use 4 bits for the messages source." );
-    static_assert( MessageSeverity.COUNT < ( 1 << 4 ), "We use 4 bits for the messages severity." );
-    return ( @intFromEnum(severity) << 4 ) | @intFromEnum(source);
+    static_assert(MessageSourceType.COUNT < (1 << 4), "We use 4 bits for the messages source.");
+    static_assert(MessageSeverity.COUNT < (1 << 4), "We use 4 bits for the messages severity.");
+    return (@backingInt(severity) << 4) | @backingInt(source);
 }
 
 pub fn MessageSourceFromMetadata(metadata: u8) MessageSourceType {
-    return @enumFromInt( metadata & 0x0F );
+    return @fromBackingInt(@intCast(metadata & 0x0F));
 }
 
 pub fn MessageSeverityFromMetadata(metadata: u8) MessageSeverity {
-    return @enumFromInt( ( metadata & 0xF0 ) >> 4 );
+    return @fromBackingInt(@intCast((metadata & 0xF0) >> 4));
 }
 
 // QueueMessage*Metadata and QueMessageLiteral* are the only structures sent over the wire
@@ -443,7 +438,7 @@ pub const MessageColorMetadata = Extend(MessageColor, extern struct {
 });
 
 pub const MessageLiteral = Extend(Message, extern struct {
-    textAndMetadata: TaggedUserlandAddress align(1),      // ptr + log level/channels
+    textAndMetadata: TaggedUserlandAddress align(1), // ptr + log level/channels
 });
 
 pub const MessageLiteralThread = Extend(MessageLiteral, extern struct {
@@ -451,7 +446,7 @@ pub const MessageLiteralThread = Extend(MessageLiteral, extern struct {
 });
 
 pub const MessageColorLiteral = Extend(MessageColor, extern struct {
-    textAndMetadata: TaggedUserlandAddress align(1),      // ptr + log level/channels
+    textAndMetadata: TaggedUserlandAddress align(1), // ptr + log level/channels
 });
 
 pub const MessageColorLiteralThread = Extend(MessageColorLiteral, extern struct {
@@ -459,7 +454,7 @@ pub const MessageColorLiteralThread = Extend(MessageColorLiteral, extern struct 
 });
 
 pub const MessageFat = Extend(Message, extern struct {
-    textAndMetadata: TaggedUserlandAddress align(1),      // ptr + log level/channels
+    textAndMetadata: TaggedUserlandAddress align(1), // ptr + log level/channels
     size: u16 align(1),
 });
 
@@ -468,7 +463,7 @@ pub const MessageFatThread = Extend(MessageFat, extern struct {
 });
 
 pub const MessageColorFat = Extend(MessageColor, extern struct {
-    textAndMetadata: TaggedUserlandAddress align(1),      // ptr + log level/channels
+    textAndMetadata: TaggedUserlandAddress align(1), // ptr + log level/channels
     size: u16 align(1),
 });
 
@@ -492,7 +487,7 @@ pub const GpuContextType = enum(u8) {
     _,
 };
 
-pub const GpuContextFlags = packed struct (u8) {
+pub const GpuContextFlags = packed struct(u8) {
     GpuContextCalibration: bool,
     _reserved: u7 = 0,
 };
@@ -668,7 +663,7 @@ pub const SymbolInformationFat = Extend(SymbolInformation, extern struct {
 
 pub const CrashReport = extern struct {
     time: i64 align(1),
-    text: u64 align(1),      // ptr
+    text: u64 align(1), // ptr
 };
 
 pub const CrashReportThread = extern struct {
@@ -683,7 +678,7 @@ pub const SysTime = extern struct {
 pub const SysPower = extern struct {
     time: i64 align(1),
     delta: u64 align(1),
-    name: u64 align(1),  // ptr
+    name: u64 align(1), // ptr
 };
 
 pub const ContextSwitch = extern struct {
@@ -724,7 +719,7 @@ pub const PlotFormatType = enum(u8) {
 };
 
 pub const PlotConfig = extern struct {
-    name: u64 align(1),      // ptr
+    name: u64 align(1), // ptr
     type: u8 align(1),
     step: u8 align(1),
     fill: u8 align(1),
@@ -733,7 +728,7 @@ pub const PlotConfig = extern struct {
 
 pub const ParamSetup = extern struct {
     idx: u32 align(1),
-    name: u64 align(1),      // ptr
+    name: u64 align(1), // ptr
     type: u8 align(1),
     val: i32 align(1),
 };
@@ -866,63 +861,62 @@ pub const TrackedSMUpdatePacket = extern struct {
     }
 };
 
-
-pub const PayloadType = [Type.NUM_TYPES]type {
-    Empty,                                  // zone text
-    Empty,                                  // zone name
-    MessageMetadata,     // Message
-    MessageColorMetadata,// MessageColor
-    MessageMetadata,     // MessageCallstack
-    MessageColorMetadata,// MessageColorCallstack
-    Message,         // app info
-    ZoneBeginLean,   // allocated source location
-    ZoneBeginLean,   // allocated source location, callstack
-    Empty,                                  // callstack memory
-    Empty,                                  // callstack
-    Empty,                                  // callstack alloc
+pub const PayloadType = [Type.NUM_TYPES]type{
+    Empty, // zone text
+    Empty, // zone name
+    MessageMetadata, // Message
+    MessageColorMetadata, // MessageColor
+    MessageMetadata, // MessageCallstack
+    MessageColorMetadata, // MessageColorCallstack
+    Message, // app info
+    ZoneBeginLean, // allocated source location
+    ZoneBeginLean, // allocated source location, callstack
+    Empty, // callstack memory
+    Empty, // callstack
+    Empty, // callstack alloc
     CallstackSample,
     CallstackSample32,
     CallstackSample16,
-    CallstackSample,   // context switch
+    CallstackSample, // context switch
     CallstackSample32, // context switch
     CallstackSample16, // context switch
     FrameImage,
     ZoneBegin,
     ZoneBegin32,
     ZoneBegin16,
-    ZoneBegin,       // callstack
-    ZoneBegin32,     // callstack
-    ZoneBegin16,     // callstack
+    ZoneBegin, // callstack
+    ZoneBegin32, // callstack
+    ZoneBegin16, // callstack
     ZoneEnd,
     ZoneEnd32,
     ZoneEnd16,
     LockWait,
     LockObtain,
     LockRelease,
-    LockWait,        // shared
-    LockObtain,      // shared
+    LockWait, // shared
+    LockObtain, // shared
     LockReleaseShared,
     LockName,
     MemAlloc,
-    MemAlloc,        // named
+    MemAlloc, // named
     MemFree,
-    MemFree,         // named
-    MemAlloc,        // callstack
-    MemAlloc,        // callstack, named
-    MemFree,         // callstack
-    MemFree,         // callstack, named
+    MemFree, // named
+    MemAlloc, // callstack
+    MemAlloc, // callstack, named
+    MemFree, // callstack
+    MemFree, // callstack, named
     MemDiscard,
-    MemDiscard,      // callstack
+    MemDiscard, // callstack
     GpuZoneBegin,
-    GpuZoneBegin,    // callstack
-    GpuZoneBeginLean,// allocated source location
-    GpuZoneBeginLean,// allocated source location, callstack
+    GpuZoneBegin, // callstack
+    GpuZoneBeginLean, // allocated source location
+    GpuZoneBeginLean, // allocated source location, callstack
     GpuZoneEnd,
-    GpuZoneBegin,    // serial
-    GpuZoneBegin,    // serial, callstack
-    GpuZoneBeginLean,// serial, allocated source location
-    GpuZoneBeginLean,// serial, allocated source location, callstack
-    GpuZoneEnd,      // serial
+    GpuZoneBegin, // serial
+    GpuZoneBegin, // serial, callstack
+    GpuZoneBeginLean, // serial, allocated source location
+    GpuZoneBeginLean, // serial, allocated source location, callstack
+    GpuZoneEnd, // serial
     PlotDataInt,
     PlotDataFloat,
     PlotDataDouble,
@@ -933,28 +927,28 @@ pub const PayloadType = [Type.NUM_TYPES]type {
     GpuAnnotationName,
     CallstackFrameSize,
     SymbolInformation,
-    Empty,                                  // ExternalNameMetadata - not for wire transfer
-    Empty,                                  // SymbolCodeMetadata - not for wire transfer
-    Empty,                                  // SourceCodeMetadata - not for wire transfer
+    Empty, // ExternalNameMetadata - not for wire transfer
+    Empty, // SymbolCodeMetadata - not for wire transfer
+    Empty, // SourceCodeMetadata - not for wire transfer
     FiberEnter,
     FiberLeave,
     SectionEnter,
     SectionLeave,
     SectionSetup,
     // above items must be first
-    Empty,                                  // terminate
-    Empty,                                  // keep alive
+    Empty, // terminate
+    Empty, // keep alive
     ThreadContext,
     GpuCalibration,
     GpuTimeSync,
-    Empty,                                  // crash
+    Empty, // crash
     CrashReport,
     ZoneValidation,
     ZoneColor,
     ZoneValue,
-    FrameMark,       // continuous frames
-    FrameMark,       // start
-    FrameMark,       // end
+    FrameMark, // continuous frames
+    FrameMark, // start
+    FrameMark, // end
     FrameVsync,
     SourceLocation,
     LockAnnounce,
@@ -962,46 +956,46 @@ pub const PayloadType = [Type.NUM_TYPES]type {
     LockMark,
     MessageLiteral,
     MessageColorLiteral,
-    MessageLiteral,  // callstack
+    MessageLiteral, // callstack
     MessageColorLiteral, // callstack
     GpuNewContext,
     CallstackFrame,
     SysTime,
     SysPower,
     TidToPid,
-    HwSample,        // cpu cycle
-    HwSample,        // instruction retired
-    HwSample,        // cache reference
-    HwSample,        // cache miss
-    HwSample,        // branch retired
-    HwSample,        // branch miss
+    HwSample, // cpu cycle
+    HwSample, // instruction retired
+    HwSample, // cache reference
+    HwSample, // cache miss
+    HwSample, // branch retired
+    HwSample, // branch miss
     PlotConfig,
     ParamSetup,
-    Empty,                                  // server query acknowledgement
+    Empty, // server query acknowledgement
     SourceCodeNotAvailable,
-    Empty,                                  // symbol code not available
+    Empty, // symbol code not available
     CpuTopology,
-    Empty,                                  // single string data
-    Empty,                                  // second string data
-    Empty,                                  // single string data, 8 bit length
-    Empty,                                  // second string data, 8 bit length
+    Empty, // single string data
+    Empty, // second string data
+    Empty, // single string data, 8 bit length
+    Empty, // second string data, 8 bit length
     MemNamePayload,
     ThreadGroupHint,
     GpuZoneAnnotation, // GPU zone annotation
     // keep all QueueStringTransfer below
-    StringTransfer16,  // string data
-    StringTransfer16,  // thread name
-    StringTransfer16,  // plot name
-    StringTransfer16,  // allocated source location payload
-    StringTransfer,  // callstack payload
-    StringTransfer,  // callstack alloc payload
-    StringTransfer16,  // frame name
-    StringTransfer,  // frame image data
-    StringTransfer16,  // external name
-    StringTransfer16,  // external thread name
-    StringTransfer,  // symbol code
-    StringTransfer,  // source code
-    StringTransfer16,  // fiber name
+    StringTransfer16, // string data
+    StringTransfer16, // thread name
+    StringTransfer16, // plot name
+    StringTransfer16, // allocated source location payload
+    StringTransfer, // callstack payload
+    StringTransfer, // callstack alloc payload
+    StringTransfer16, // frame name
+    StringTransfer, // frame image data
+    StringTransfer16, // external name
+    StringTransfer16, // external thread name
+    StringTransfer, // symbol code
+    StringTransfer, // source code
+    StringTransfer16, // fiber name
 };
 
 pub const PayloadSize: [Type.NUM_TYPES]usize = blk: {
@@ -1027,7 +1021,7 @@ pub const PacketSize: [Type.NUM_TYPES]usize = blk: {
     break :blk sizes;
 };
 
-pub fn packet(comptime ty: Type, data: PayloadType[@intFromEnum(ty)]) Packet(PayloadType[@intFromEnum(ty)]) {
+pub fn packet(comptime ty: Type, data: PayloadType[@backingInt(ty)]) Packet(PayloadType[@backingInt(ty)]) {
     return .{ .ty = ty, .data = data };
 }
 
@@ -1040,7 +1034,7 @@ pub const MaxPacketSize = blk: {
     break :blk max;
 };
 
-pub const ProtocolOffset8Bit  = (1 << 8);
+pub const ProtocolOffset8Bit = (1 << 8);
 pub const ProtocolOffset16Bit = (1 << 16);
 pub const ProtocolOffset32Bit = (1 << 16) + (1 << 32);
 
@@ -1052,10 +1046,10 @@ pub const SourceLocationData = extern struct {
     color: u32,
 };
 
-
 /// ------------------------- Messages for Runtime comms with server ----------------------------------
-
-pub fn Lz4CompressBound( size: u32 ) u32 { return size + ( size / 255 ) + 16; }
+pub fn Lz4CompressBound(size: u32) u32 {
+    return size + (size / 255) + 16;
+}
 
 pub const ProtocolVersion: u32 = 82;
 pub const BroadcastVersion: u16 = 3;
@@ -1063,15 +1057,15 @@ pub const BroadcastVersion: u16 = 3;
 pub const lz4sz_t = u32;
 
 pub const TargetFrameSize = 256 * 1024;
-pub const LZ4Size = Lz4CompressBound( TargetFrameSize );
+pub const LZ4Size = Lz4CompressBound(TargetFrameSize);
 comptime {
-    static_assert( LZ4Size <= std.math.maxInt(lz4sz_t), "LZ4Size greater than lz4sz_t" );
-    static_assert( TargetFrameSize * 2 >= 64 * 1024, "Not enough space for LZ4 stream buffer" );
+    static_assert(LZ4Size <= std.math.maxInt(lz4sz_t), "LZ4Size greater than lz4sz_t");
+    static_assert(TargetFrameSize * 2 >= 64 * 1024, "Not enough space for LZ4 stream buffer");
 }
 
 pub const HandshakeShibboleth = "TracyPrf";
 
-pub const HandshakeStatus = enum (u8) {
+pub const HandshakeStatus = enum(u8) {
     HandshakePending,
     HandshakeWelcome,
     HandshakeProtocolMismatch,
@@ -1084,7 +1078,7 @@ pub const WelcomeMessageHostInfoSize = 1024;
 pub const WelcomeMessageProgramNameSize = 64;
 
 // Must increase left query space after handling!
-pub const ServerQuery = enum (u8) {
+pub const ServerQuery = enum(u8) {
     ServerQueryTerminate,
     ServerQueryString,
     ServerQueryThreadString,
@@ -1106,17 +1100,17 @@ pub const ServerQuery = enum (u8) {
 };
 
 pub const ServerQueryPacket = extern struct {
-    @"type": ServerQuery align(1),
+    type: ServerQuery align(1),
     ptr: u64 align(1),
     extra: u32 align(1),
 };
 
-pub const ServerQueryPacketSize = @sizeOf( ServerQueryPacket );
+pub const ServerQueryPacketSize = @sizeOf(ServerQueryPacket);
 comptime {
     static_assert(ServerQueryPacketSize == 13, "align(1) not working properly");
 }
 
-pub const CpuArchitecture = enum (u8) {
+pub const CpuArchitecture = enum(u8) {
     CpuArchUnknown,
     CpuArchX86,
     CpuArchX64,
@@ -1125,12 +1119,12 @@ pub const CpuArchitecture = enum (u8) {
     _,
 };
 
-pub const WelcomeFlags = packed struct (u8) {
-    OnDemand        : bool,
-    IgnoreMemFaults : bool,
-    CodeTransfer    : bool,
-    CombineSamples  : bool,
-    IdentifySamples : bool,
+pub const WelcomeFlags = packed struct(u8) {
+    OnDemand: bool,
+    IgnoreMemFaults: bool,
+    CodeTransfer: bool,
+    CombineSamples: bool,
+    IdentifySamples: bool,
     _pad: u3 = 0,
 };
 
@@ -1162,7 +1156,7 @@ pub const BroadcastMessage = extern struct {
     listenPort: u16 align(1),
     protocolVersion: u32 align(1),
     pid: u64 align(1),
-    activeTime: i32 align(1),        // in seconds
+    activeTime: i32 align(1), // in seconds
     programName: [WelcomeMessageProgramNameSize]u8 align(1),
 };
 

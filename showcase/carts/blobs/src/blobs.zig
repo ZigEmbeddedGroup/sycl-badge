@@ -97,7 +97,7 @@ const Mode = union(enum) {
 };
 
 const global = struct {
-    var disk_state = [_]u8{0} ** 1;
+    var disk_state: [1]u8 = @splat(0);
     pub var rand_seed: u8 = 0;
     pub var mode: Mode = .{ .start_menu = .{} };
     pub var rand: std.Random.DefaultPrng = undefined;
@@ -107,7 +107,7 @@ const global = struct {
         return &blobs[0];
     }
 
-    var ai_controls = [_]Control{.none} ** (global.blobs.len - 4);
+    var ai_controls: [global.blobs.len - 4]Control = @splat(.none);
     var multitones_buf: [20]MultiTone = undefined;
     var multitones_count: usize = 0;
     var my_eat_tone_frame: ?u8 = null;
@@ -162,12 +162,7 @@ var points_buf: [5000]XY(i32) = undefined;
 // returns a random f32 in the range [0,1) (includes 0 but not 1)
 // it uses (byte_count*8) bits of granualarity
 fn getRandomScale(comptime byte_count: comptime_int) f32 {
-    const UInt = @Type(std.builtin.Type{
-        .int = .{
-            .signedness = .unsigned,
-            .bits = byte_count * 8,
-        },
-    });
+    const UInt = @Int(.unsigned, byte_count * 8);
     var buf: [byte_count]u8 = undefined;
     global.rand.fill(&buf);
     const r = std.mem.readInt(UInt, &buf, .big);

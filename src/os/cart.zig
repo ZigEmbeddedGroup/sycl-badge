@@ -241,7 +241,7 @@ fn handleCartLoad(payload: u24) void {
     const info: storage.CartInfo = .{
         .start_cluster = req.start_cluster,
         .size = req.size,
-        .short_name = [_]u8{0} ** 12,
+        .short_name = @splat(0),
         .long_name = undefined,
         .long_name_len = 0,
     };

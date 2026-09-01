@@ -10,6 +10,10 @@ const builtin = @import("builtin");
 const microzig = @import("microzig");
 const cart_api = @import("cart-api");
 
+comptime {
+    _ = microzig.export_startup();
+}
+
 // Pull in the user cart module so its exported symbols are linked.
 const user_cart = @import("user_cart");
 comptime {

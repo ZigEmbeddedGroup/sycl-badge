@@ -555,6 +555,14 @@ fn updateSettingsMode(settings: *Settings) void {
 }
 
 export fn update() void {
+    cart.tone(.{
+        .frequency = 2700,
+        .duration = 60 * 60 * 60,
+        .volume = 1000, // no opt on hardware
+        .flags = .{
+            .channel = .pulse1,
+        },
+    });
     switch (mode) {
         .start_menu => updateStartMenu(&mode.start_menu),
         .play => updatePlayMode(&mode.play),

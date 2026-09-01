@@ -14,7 +14,7 @@ const external_linksection = ".rodata";
 
 fn StringWrap(comptime str: [:0]const u8) type {
     return struct {
-        const bytes linksection(external_linksection) = str[0..str.len:0].*;
+        const bytes linksection(external_linksection) = str[0..str.len :0].*;
     };
 }
 
@@ -38,14 +38,12 @@ pub inline fn external_source_location(comptime name: ?[:0]const u8, comptime zi
     return &SourceLocationWrap(name, zig_src_loc, color).src_loc;
 }
 
-
 pub const ZoneCtxData = struct {
     pub const inactive: ZoneCtxData = .{ .active = false, .conn_id = undefined };
 
     active: bool,
     conn_id: u16,
 };
-
 
 pub const core0 = struct {
     const interface = struct {
@@ -182,7 +180,7 @@ pub const core0 = struct {
             var thread_ctx_data: q.Packet(q.ThreadContext) = undefined;
             writer.thread_ctx(&thread_ctx_data);
             var begin_data: q.ZoneBeginData = undefined;
-            writer.add_extent( begin_data.set( writer.thread_time(), src_loc ) );
+            writer.add_extent(begin_data.set(writer.thread_time(), src_loc));
             writer.reserved_space = client.reserved_space_for_begin_zone();
             _ = writer.commit();
 
@@ -218,7 +216,7 @@ pub const core0 = struct {
             var thread_ctx_data: q.Packet(q.ThreadContext) = undefined;
             writer.thread_ctx(&thread_ctx_data);
             var end_data: q.ZoneEndData = undefined;
-            writer.add_extent( end_data.set( writer.thread_time() ) );
+            writer.add_extent(end_data.set(writer.thread_time()));
             writer.reserved_space = client.reserved_space_for_end_zone();
             _ = writer.commit();
 
@@ -264,7 +262,6 @@ pub const core0 = struct {
 
                 outline_update_state(&self.track);
             }
-
         };
     }
 
@@ -281,7 +278,7 @@ pub const core0 = struct {
 
         var packet: q.TrackedSMRegisterPacket = undefined;
 
-        writer.add_extent( packet.set(track.name, writer.start_time_tracy, track.srcloc) );
+        writer.add_extent(packet.set(track.name, writer.start_time_tracy, track.srcloc));
         writer.has_core0_thread_ctx = false;
 
         writer.reserved_space = client.reserved_space_for_non_zone();
@@ -322,7 +319,7 @@ pub const core0 = struct {
             _ = client.try_resume_data(writer.start_time_tracy);
         } else {
             var packet: q.TrackedSMUpdatePacket = undefined;
-            writer.add_extent( packet.set(track.name, writer.start_time_tracy, track.srcloc) );
+            writer.add_extent(packet.set(track.name, writer.start_time_tracy, track.srcloc));
             writer.has_core0_thread_ctx = false; // Clear the thread context
 
             writer.reserved_space = client.reserved_space_for_non_zone();
@@ -332,19 +329,23 @@ pub const core0 = struct {
     }
 };
 
-const EnumLiteral = @Type(.enum_literal);
+const EnumLiteral = @EnumLiteral();
 fn field_slice(str: anytype, start: EnumLiteral, end: EnumLiteral) []const u8 {
     const Struct = @typeInfo(@TypeOf(str)).pointer.child;
-    comptime { std.debug.assert(@typeInfo(Struct).@"struct".layout == .@"extern"); }
+    comptime {
+        std.debug.assert(@typeInfo(Struct).@"struct".layout == .@"extern");
+    }
     const start_offset = @offsetOf(Struct, @tagName(start));
     const end_offset = @offsetOf(Struct, @tagName(end)) + @sizeOf(@TypeOf(@field(str, @tagName(end))));
-    comptime { std.debug.assert(start_offset <= end_offset); }
+    comptime {
+        std.debug.assert(start_offset <= end_offset);
+    }
     return std.mem.asBytes(str)[start_offset..end_offset];
 }
 
 pub fn register_parameter_callback(
     comptime Ctx: type,
-    comptime cb: fn(*Ctx, u32, i32) void,
+    comptime cb: fn (*Ctx, u32, i32) void,
     ctx: *Ctx,
 ) void {
     client.param_callback_obj = ctx;
@@ -356,7 +357,7 @@ pub fn register_parameter_callback(
 }
 
 pub fn register_parameter_callback_static(
-    comptime cb: fn(u32, i32) void,
+    comptime cb: fn (u32, i32) void,
 ) void {
     client.param_callback_obj = null;
     client.param_callback_fn = struct {

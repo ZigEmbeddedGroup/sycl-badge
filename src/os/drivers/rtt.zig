@@ -1,5 +1,6 @@
 const std = @import("std");
 const microzig = @import("microzig");
+const rp2xxx = microzig.hal;
 const rtt = @import("microzig_rtt.zig");
 
 const rtt_instance = rtt.RTT(.{
@@ -25,6 +26,19 @@ pub fn init() void {
     log_core0("\n\n======================== Rebooted ==========================\n\n");
 }
 
+pub fn log(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    logf_core0("{} [{s}] ({t}): " ++ format ++ "\r\n", .{
+        @as(u64, @backingInt(rp2xxx.time.get_time_since_boot())),
+        level.asText(),
+        scope,
+    } ++ args);
+}
+
 pub fn log_core0(string: []const u8) void {
     const cs = microzig.interrupt.enter_critical_section();
     defer cs.leave();
@@ -46,4 +60,3 @@ pub fn logf_core0(comptime fmt: []const u8, args: anytype) void {
 noinline fn rtt_initialized() void {
     asm volatile ("");
 }
-

@@ -114,6 +114,13 @@ pub fn render(self: *Camera, world: *HittableList) !void {
                 .g = @truncate(color.rgb.g >> 2),
                 .b = @truncate(color.rgb.b >> 3),
             });
+            cart.markDirtyRect(@intCast(i), @intCast(j), 1, 1);
+            cart.present();
+            cart.framebuffer[i][j].setColor(.{
+                .r = @truncate(color.rgb.r >> 3),
+                .g = @truncate(color.rgb.g >> 2),
+                .b = @truncate(color.rgb.b >> 3),
+            });
         }
     }
     //std.debug.print("Done!\n", .{});

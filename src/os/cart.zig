@@ -253,7 +253,7 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
         FPCCR.* = FPCCR.* | (1 << 31) | (1 << 30);
 
         // Grant full access to CP10 and CP11 (the FPU).
-        CPACR.* = CPACR.* | (0xF << 20);
+        CPACR.* = 0xFFFF_FFFF;
 
         // Barriers so subsequent instructions see the new FPU/VTOR state.
         asm volatile ("dsb");

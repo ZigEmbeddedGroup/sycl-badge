@@ -8,6 +8,7 @@ const mailbox = @import("ipc/mailbox.zig");
 const loader = @import("loader/loader.zig");
 const storage = @import("loader/storage.zig");
 const shared_mem = @import("ipc/shared_mem.zig");
+const cd = @import("cart/cart_descriptor.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -15,6 +16,8 @@ pub const panic = @import("system/panic.zig").panic;
 /// Linker symbols for cart_xip region
 extern const __cart_xip_start__: u8;
 extern const __cart_xip_end__: u8;
+extern const __process_ram_start__: u8;
+extern const __process_ram_end__: u8;
 
 /// Get cart_xip base address
 fn getCartXipStart() u32 {
@@ -23,6 +26,14 @@ fn getCartXipStart() u32 {
 
 fn getCartXipEnd() u32 {
     return @intFromPtr(&__cart_xip_end__);
+}
+
+fn getCartRamStart() u32 {
+    return @intFromPtr(&__process_ram_start__);
+}
+
+fn getCartRamEnd() u32 {
+    return @intFromPtr(&__process_ram_end__);
 }
 
 fn clearCore1InterruptAndFaultState() void {
@@ -125,8 +136,8 @@ fn handleMessage(msg: mailbox.Message) void {
     switch (msg_type) {
         mailbox.MessageType.CART_EXECUTE => {
             // Execute cart at the given entry point offset
-            const entry_offset = mailbox.MessageType.getEntryPointOffset(msg);
-            executeCart(entry_offset);
+            const exec: mailbox.MessageType.CartExecute = @bitCast(msg);
+            executeCart(exec);
         },
         mailbox.MessageType.CART_LOAD => {
             // Legacy cart load (deprecated)
@@ -155,55 +166,106 @@ fn handleMessage(msg: mailbox.Message) void {
 /// cores creates a data race that can make the kernel see the state flicker,
 /// causing it to treat the cart as stopped and restart the menu while the
 /// cart is still running.
-fn executeCart(vector_table_offset: u24) void {
-    const cart_xip_start = getCartXipStart();
-    const cart_xip_end = getCartXipEnd();
-    const vector_table_addr = cart_xip_start + vector_table_offset;
-
+fn executeCart(exec: mailbox.MessageType.CartExecute) void {
     mailbox.send(mailbox.MessageType.CART_RUNNING);
 
-    const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
-    const initial_sp = vector_table[0];
-    const entry_point = vector_table[1];
+    const cart_xip_start = getCartXipStart();
+    const cart_xip_end = getCartXipEnd();
+    const cart_ram_start = getCartRamStart();
+    const cart_ram_end = getCartRamEnd();
+    if (exec.xip) {
+        const vector_table_addr = cart_xip_start + exec.offset;
 
-    // Validate SP/PC from cart vector table before taking over Core 1.
-    // Bad values here often show up later as UsageFault INVSTATE on first
-    // exception entry/return.
-    if ((initial_sp & 0x7) != 0) {
-        mailbox.send(mailbox.MessageType.CART_CRASHED);
-        return;
+        const vector_table: *const [2]u32 = @ptrFromInt(vector_table_addr);
+        const initial_sp = vector_table[0];
+        const entry_point = vector_table[1];
+
+        // Validate SP/PC from cart vector table before taking over Core 1.
+        // Bad values here often show up later as UsageFault INVSTATE on first
+        // exception entry/return.
+        if ((initial_sp & 0x7) != 0) {
+            mailbox.send(mailbox.MessageType.CART_CRASHED);
+            return;
+        }
+        if (initial_sp < 0x2002A100 or initial_sp > 0x20080000) {
+            mailbox.send(mailbox.MessageType.CART_CRASHED);
+            return;
+        }
+        if ((entry_point & 0x1) == 0) {
+            mailbox.send(mailbox.MessageType.CART_CRASHED);
+            return;
+        }
+        const entry_even = entry_point & 0xFFFF_FFFE;
+        if (entry_even < cart_xip_start or entry_even >= cart_xip_end) {
+            mailbox.send(mailbox.MessageType.CART_CRASHED);
+            return;
+        }
+
+        clearCore1InterruptAndFaultState();
+
+        // Point Core 1's VTOR at the cart's vector table so that any exceptions
+        // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
+        const VTOR: *volatile u32 = @ptrFromInt(0xE000ED08);
+        VTOR.* = vector_table_addr;
+
+        asm volatile ("dsb");
+        asm volatile ("isb");
+
+        // One-way jump — the cart takes over Core 1.  jumpToCart never returns.
+        jumpToCart(initial_sp, entry_point);
+    } else {
+        const header: [*]u32 = @ptrFromInt(cart_ram_start + exec.offset);
+        if (header[0] != cd.CART_MAGIC) {
+            mailbox.send(mailbox.MessageType.CART_CRASHED);
+            return;
+        }
+        const initial_stack = cart_ram_end;
+        var entry_point: u32 = 0;
+        switch (header[1]) {
+            cd.CART_VERSION_V1 => {
+                const descriptor: *const cd.CartDescriptorTable_v1 = @ptrCast(header);
+                // BSS has been cleared already by the loader
+                entry_point = @intFromPtr(descriptor.entry_point);
+            },
+            else => {
+                mailbox.send(mailbox.MessageType.CART_CRASHED);
+                return;
+            },
+        }
+
+        clearCore1InterruptAndFaultState();
+
+        microzig.interrupt.disable_interrupts();
+
+        // Point Core 1's VTOR at the cart's vector table so that any exceptions
+        // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
+        // TODO set VTOR to some sort of OS fault handler vector table
+        //const VTOR: *volatile u32 = @ptrFromInt(0xE000ED08);
+        //VTOR.* = vector_table_addr;
+
+        // CPACR — Coprocessor Access Control Register (0xE000ED88)
+        // Bits [23:20] = CP11:CP10 access. 0b11 each = full access.
+        const CPACR: *volatile u32 = @ptrFromInt(0xE000ED88);
+        // FPCCR — Floating-Point Context Control Register (0xE000EF34)
+        const FPCCR: *volatile u32 = @ptrFromInt(0xE000EF34);
+
+        // Enable lazy FP state preservation (bits 31:30 = ASPEN:LSPEN).
+        FPCCR.* = FPCCR.* | (1 << 31) | (1 << 30);
+
+        // Grant full access to CP10 and CP11 (the FPU).
+        CPACR.* = CPACR.* | (0xF << 20);
+
+        // Barriers so subsequent instructions see the new FPU/VTOR state.
+        asm volatile ("dsb");
+        asm volatile ("isb");
+
+        jumpToCart(initial_stack, entry_point);
     }
-    if (initial_sp < 0x2002A100 or initial_sp > 0x20080000) {
-        mailbox.send(mailbox.MessageType.CART_CRASHED);
-        return;
-    }
-    if ((entry_point & 0x1) == 0) {
-        mailbox.send(mailbox.MessageType.CART_CRASHED);
-        return;
-    }
-    const entry_even = entry_point & 0xFFFF_FFFE;
-    if (entry_even < cart_xip_start or entry_even >= cart_xip_end) {
-        mailbox.send(mailbox.MessageType.CART_CRASHED);
-        return;
-    }
-
-    clearCore1InterruptAndFaultState();
-
-    // Point Core 1's VTOR at the cart's vector table so that any exceptions
-    // (HardFault, etc.) use the cart's handlers instead of the OS kernel's.
-    const VTOR: *volatile u32 = @ptrFromInt(0xE000ED08);
-    VTOR.* = vector_table_addr;
-
-    asm volatile ("dsb");
-    asm volatile ("isb");
-
-    // One-way jump — the cart takes over Core 1.  jumpToCart never returns.
-    jumpToCart(initial_sp, entry_point);
 }
 
 /// Jump to cart code with new stack pointer
 /// This function does not return - it transfers control to the cart
-fn jumpToCart(stack_pointer: u32, entry_point: u32) void {
+fn jumpToCart(stack_pointer: u32, entry_point: u32) noreturn {
     // Set up the stack pointer and jump to the entry point
     // Using inline assembly for ARM Cortex-M
     asm volatile (

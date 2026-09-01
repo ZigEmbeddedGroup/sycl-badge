@@ -514,10 +514,11 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .name = options.name,
         .target = badge_v2_target,
         .optimize = options.optimize,
-        .root_source_file = dep.builder.path("src/os/cart/cart_entry.zig"),
+        .root_source_file = dep.builder.path("src/os/cart/cart_ram_entry.zig"),
         .linker_script = .{
-            .file = dep.builder.path("src/cart/cart_xip.ld"),
+            .file = dep.builder.path("src/cart/cart_ram.ld"),
             .generate = .none,
+            .assert_microzig_main = false,
         },
     });
 

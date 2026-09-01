@@ -79,7 +79,7 @@ pub const Block = extern struct {
     }
 
     /// Get the payload data slice (only the used portion)
-    pub fn getPayload(self: *const Block) []const u8 {
+    pub fn getPayload(self: *const Block) []align(4) const u8 {
         const size = @min(self.header.payload_size, MAX_PAYLOAD_SIZE);
         return self.data[0..size];
     }
@@ -119,8 +119,8 @@ pub const Parser = struct {
 
     /// Parse and validate a single UF2 block
     /// Returns the block if valid, or an error
-    pub fn parseBlock(self: *Parser, data: []const u8) Error!*const Block {
-        const block: *const Block = @ptrCast(@alignCast(data));
+    pub fn parseBlock(self: *Parser, data: *align(4) const [BLOCK_SIZE]u8) Error!*const Block {
+        const block: *const Block = @ptrCast(data);
 
         // Validate magic numbers
         if (!block.isValid()) {
@@ -158,27 +158,9 @@ pub const Parser = struct {
             return Error.InvalidBlockNumber;
         }
 
-        // Track address range
-        const addr = block.header.target_addr;
-        const end_addr = addr + block.header.payload_size;
-        if (addr < self.min_addr) {
-            self.min_addr = addr;
-        }
-        if (end_addr > self.max_addr) {
-            self.max_addr = end_addr;
-        }
-
         self.blocks_parsed += 1;
 
         return block;
-    }
-
-    /// Check if a target address range is valid for cart execution
-    pub fn validateAddressRange(self: *const Parser, cart_xip_start: u32, cart_xip_end: u32) Error!void {
-        // Check if the UF2's address range fits within cart_xip
-        if (self.min_addr < cart_xip_start or self.max_addr > cart_xip_end) {
-            return Error.AddressOutOfRange;
-        }
     }
 
     /// Get the total binary size (max_addr - min_addr)

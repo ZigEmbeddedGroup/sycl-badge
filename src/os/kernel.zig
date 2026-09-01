@@ -563,6 +563,7 @@ fn runSelectedCart() void {
             loader.LoadError.InvalidUF2 => "Invalid UF2",
             loader.LoadError.UnsupportedFamily => "Wrong chip",
             loader.LoadError.AddressMismatch => "Wrong address",
+            loader.LoadError.VersionMismatch => "Bad Cart Version",
             loader.LoadError.FlashWriteError => "Flash error",
             loader.LoadError.ReadError => "Read error",
         };
@@ -573,7 +574,7 @@ fn runSelectedCart() void {
     };
 
     // Prepare LCD for cart: ensure normal mode (not inverted) and clear screen
-    console.printf("[BTN] cart loaded, entry_point=0x{x}\r\n", .{entry_point});
+    console.printf("[BTN] cart loaded, entry_point={any}\r\n", .{entry_point});
     // NOTE: do NOT touch the LCD here - prepareForCart/fillScreen before executeCart
     // interferes with the cart's own LCD init (forces MADCTL, may leave DMA running).
     // The console 'cart run' command works precisely because it skips these LCD calls.

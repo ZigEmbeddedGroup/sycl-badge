@@ -217,10 +217,8 @@ SECTIONS
   .process_ram (NOLOAD) :
   {
     . = ALIGN(8);
-    __process_ram_start__ = .;
     *(.process_ram*)
     . = ALIGN(8);
-    __process_ram_end__ = .;
   } > process_ram
 
   /* compile-time symbol describing the maximum heap limit (start of shared_mem) */

@@ -179,29 +179,13 @@ fn getCartXipStart() u32 {
 /// Execute a cart that has been loaded into cart_xip
 /// entry_point: Full 32-bit entry point address
 /// Returns true if message was sent successfully
-pub fn executeCart(entry_point: u32) bool {
+pub fn executeCart(msg: mailbox.MessageType.CartExecute) bool {
     if (!core1_running) {
         return false;
     }
 
-    const cart_xip_start = getCartXipStart();
-
-    // Calculate offset from cart_xip_start
-    // Entry point must be within cart_xip region
-    if (entry_point < cart_xip_start) {
-        return false;
-    }
-
-    const offset = entry_point - cart_xip_start;
-
-    // Offset must fit in 24 bits (256KB = 0x40000, fits in 24 bits)
-    if (offset > 0xFFFFFF) {
-        return false;
-    }
-
     // Send CART_EXECUTE message to Core 1
-    const msg = mailbox.MessageType.cartExecute(@intCast(offset));
-    mailbox.send(msg);
+    mailbox.send(@bitCast(msg));
 
     return true;
 }

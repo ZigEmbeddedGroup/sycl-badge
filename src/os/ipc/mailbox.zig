@@ -83,6 +83,22 @@ pub const MessageType = struct {
     // CART_EXECUTE: payload contains entry point address (lower 24 bits)
     // For full 32-bit entry point, use shared memory
     pub const CART_EXECUTE: u8 = 0x20; // Execute cart at entry point
+    pub const CartExecute = packed struct (u32) {
+        /// Offset of the vector table or cart descriptor.
+        /// If XIP is true, this is the offset from cart_xip_start
+        /// to the vector table.
+        /// If XIP is false, this is the offset from cart_ram_start
+        /// to the cart descriptor
+        offset: u23,
+        /// If true, the cart is an XIP flash cart and contains a
+        /// vector table with the start address.
+        /// If false, the cart is a RAM cart with a cart descriptor
+        /// which can be used to initialize it.
+        xip: bool,
+        /// Message type for sending this value through the mailbox
+        msg: u8 = CART_EXECUTE,
+    };
+
     pub const CART_RUNNING: Message = 0x20000001; // Core 1 confirms cart is running
     pub const CART_FINISHED: Message = 0x20000002; // Cart execution completed
     pub const CART_CRASHED: Message = 0x20000003; // Cart crashed/faulted
@@ -139,22 +155,5 @@ pub const MessageType = struct {
     /// Extract payload from a message
     pub fn getPayload(msg: Message) u24 {
         return @truncate(msg);
-    }
-
-    /// Create a CART_EXECUTE message with entry point offset
-    /// The offset is relative to cart_xip_start (0x101C0000)
-    /// This allows 24-bit payload to address full 256KB cart region
-    pub fn cartExecute(entry_point_offset: u24) Message {
-        return withPayload(CART_EXECUTE, entry_point_offset);
-    }
-
-    /// Check if a message is a CART_EXECUTE message
-    pub fn isCartExecute(msg: Message) bool {
-        return getType(msg) == CART_EXECUTE;
-    }
-
-    /// Get entry point offset from CART_EXECUTE message
-    pub fn getEntryPointOffset(msg: Message) u24 {
-        return getPayload(msg);
     }
 };

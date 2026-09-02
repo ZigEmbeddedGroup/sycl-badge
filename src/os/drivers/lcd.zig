@@ -52,7 +52,6 @@ var remaining_dmas: u32 = 0;
 var dma_ptr: [*]const u16 = undefined;
 var dma_len: usize = 0;
 var dma_stride: usize = 0;
-var dma_size: @TypeOf(microzig.chip.peripherals.DMA.CH0_CTRL_TRIG.read().DATA_SIZE) = .size_8;
 var post_dma_commands: PostDMACommands = .none;
 
 var int_running: bool = false;
@@ -264,13 +263,13 @@ var spi_instance: spi.SPI = undefined;
 var spi_instance_num: u1 = 0;
 var spi_baudrate: u32 = 62_500_000; // Fixed baudrate for LCD (max for RP2350 SPI is 62.5 MHz)
 
-/// ST7735/ST7789 Commands
 const Command = enum(u8) {
     SWRESET = 0x01,
     SLPOUT = 0x11,
     NORON = 0x13,
     INVOFF = 0x20,
     INVON = 0x21,
+    GAMSET = 0x26,
     DISPOFF = 0x28,
     DISPON = 0x29,
     CASET = 0x2A, // Column Address Set
@@ -288,8 +287,10 @@ const Command = enum(u8) {
     PWCTR4 = 0xC3,
     PWCTR5 = 0xC4,
     VMCTR1 = 0xC5,
+    VMOFF = 0xC7,
     GMCTRP1 = 0xE0,
     GMCTRN1 = 0xE1,
+    gamma_adjustment = 0xF2,
 };
 
 /// Low-level SPI communication
@@ -417,79 +418,45 @@ pub fn init(pin_config: Pins, config: Config) !void {
     }
 
     // Initialize display
-    initDisplay();
+    init_display();
 }
 
-fn initDisplay() void {
+fn init_display() void {
     const z = terry.core0.fn_zone(@src());
     defer z.end();
 
-    // Software reset
-    writeCommand(.SWRESET);
-    timer.sleep_ms(50);
+    writeCommandWithData(.SWRESET, &.{});
+    timer.sleep_ms(120);
 
-    // Sleep out
-    writeCommand(.SLPOUT);
-    timer.sleep_ms(50);
+    writeCommandWithData(.SLPOUT, &.{});
+    timer.sleep_ms(5);
 
-    // TODO: this display uses the ILI9163C, not the ST7735. It is similar, but
-    // commenting out the following line got rid of some inconsistent brightness
-    // issues on the screen.
-    // Frame rate control (normal mode (ST7735S values))
-    //writeCommandWithData(.FRMCTR1, &.{ 0x05, 0x03C, 0x3C });
-    //timer.sleep_ms(1);
-
-    // Frame rate control (idle mode)
-    writeCommandWithData(.FRMCTR2, &.{ 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(1);
-
-    // Frame rate control (partial mode)
-    writeCommandWithData(.FRMCTR3, &.{ 0x05, 0x3C, 0x3C, 0x05, 0x3C, 0x3C });
-    timer.sleep_ms(1);
-
-    // Display inversion control
-    writeCommandWithData(.INVCTR, &.{0x03});
-
-    // Power control settings (ST7735S values)
-    writeCommandWithData(.PWCTR1, &.{ 0x28, 0x08, 0x04 }); // GVDD = 4.7V, 1.0uA
-    writeCommandWithData(.PWCTR2, &.{0xC0}); // VGH=14.7V, VGL=-7.35V
-    writeCommandWithData(.PWCTR3, &.{ 0x0D, 0x00 }); // Opamp current small
-    writeCommandWithData(.PWCTR4, &.{ 0x8D, 0x2A }); // BCLK/2
-    writeCommandWithData(.PWCTR5, &.{ 0x8D, 0xEE }); // BCLK/2
-
-    // VCOM control
-    writeCommandWithData(.VMCTR1, &.{0x1A}); // VCOM = -0.775V
-
-    // Memory access control with 90° clockwise rotation
-    // MV (0x20) = Row/Column exchange, MX (0x40) = Column address order
-    writeCommandWithData(.MADCTL, &.{0x60}); // 90° CW rotation, RGB
-
-    // Color mode (16-bit RGB565)
     writeCommandWithData(.COLMOD, &.{0x05});
-
-    // Gamma correction (positive)
+    writeCommandWithData(.GAMSET, &.{0x04});
+    writeCommandWithData(.gamma_adjustment, &.{0x01});
     writeCommandWithData(.GMCTRP1, &.{
-        0x04, 0x22, 0x07, 0x0A,
-        0x2E, 0x30, 0x25, 0x2A,
-        0x28, 0x26, 0x2E, 0x3A,
-        0x00, 0x01, 0x03, 0x13,
+        0x3F, 0x25, 0x1C, 0x1E, 0x20, 0x12, 0x2A, 0x90,
+        0x24, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00,
     });
-
-    // Gamma correction (negative)
     writeCommandWithData(.GMCTRN1, &.{
-        0x04, 0x16, 0x06, 0x0D,
-        0x2D, 0x26, 0x23, 0x27,
-        0x27, 0x25, 0x2D, 0x3B,
-        0x00, 0x01, 0x04, 0x13,
+        0x20, 0x20, 0x20, 0x20, 0x05, 0x00, 0x15, 0xA7,
+        0x3D, 0x18, 0x25, 0x2A, 0x2B, 0x2B, 0x3A,
     });
+    writeCommandWithData(.FRMCTR1, &.{ 0x08, 0x08 });
+    writeCommandWithData(.INVCTR, &.{0x07});
+    writeCommandWithData(.PWCTR1, &.{ 0x0A, 0x02 });
+    writeCommandWithData(.PWCTR2, &.{0x02});
+    writeCommandWithData(.VMCTR1, &.{ 0x50, 0x5B });
+    writeCommandWithData(.VMOFF, &.{0x40});
+    writeCommandWithData(.CASET, &.{ 0x00, 0x00, 0x00, 0x7F });
+    writeCommandWithData(.RASET, &.{ 0x00, 0x00, 0x00, 0x9F });
 
-    // Normal display mode
-    writeCommand(.NORON);
-    timer.sleep_ms(1);
+    timer.sleep_ms(250);
+
+    writeCommandWithData(.MADCTL, &.{0x60});
 
     // Display on
-    writeCommand(.DISPON);
-    timer.sleep_ms(20);
+    writeCommandWithData(.DISPON, &.{});
 
     // Enable DMA to send data to the screen
     dma.initLCD(spi_instance_num);
@@ -511,10 +478,6 @@ pub fn prepareForCart() void {
 
 pub fn displayOn(on: bool) void {
     writeCommand(if (on) .DISPON else .DISPOFF);
-}
-
-pub fn invertDisplay(invert: bool) void {
-    writeCommand(if (invert) .INVON else .INVOFF);
 }
 
 /// Drawing Functions

@@ -11,8 +11,6 @@ const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
 
-const log = std.log.scoped(.lcd);
-
 /// Display Configuration
 pub const width: u16 = 160;
 pub const height: u16 = 128;
@@ -54,7 +52,6 @@ var remaining_dmas: u32 = 0;
 var dma_ptr: [*]const u16 = undefined;
 var dma_len: usize = 0;
 var dma_stride: usize = 0;
-var dma_size: @TypeOf(microzig.chip.peripherals.DMA.CH0_CTRL_TRIG.read().DATA_SIZE) = .size_8;
 var post_dma_commands: PostDMACommands = .none;
 
 var int_running: bool = false;

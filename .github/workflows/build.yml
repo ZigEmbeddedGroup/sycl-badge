@@ -22,7 +22,3 @@ jobs:
 
       - name: Build
         run: zig build
-
-      - name: Build Showcase
-        working-directory: showcase
-        run: zig build

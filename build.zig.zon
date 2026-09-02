@@ -8,11 +8,11 @@
         "build.zig.zon",
         "src",
     },
-    .minimum_zig_version = "0.17.0-dev.1471+ff10b90bc",
+    .minimum_zig_version = "0.17.0-dev.1936+5a625d5f3",
     .dependencies = .{
         .microzig = .{
-            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#f417df931c4fe91266b571c9aae3911be8b7d1b3",
-            .hash = "microzig-0.15.2-D20YSafO4gA-5ehwvqR1DVAhUf2sX-TZBZp8VMfLvoCq",
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#88c6cce8d500f14580c912e648c2d20eacf380ea",
+            .hash = "microzig-0.15.2-D20YST7O4gCGMqR7ZkMIWM6Yn7A5HWWoZQMBaJ_t2ubY",
         },
         .zigimg = .{
             .url = "git+https://github.com/zigimg/zigimg?ref=master#7b98e82621fe302a9edc147df1191f4d1b7ff7a5",

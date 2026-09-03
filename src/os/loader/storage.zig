@@ -740,6 +740,39 @@ pub fn deleteCart(name: []const u8) bool {
     return false;
 }
 
+pub const FileIterator = struct {
+    bytes_left: usize,
+    cluster: u16,
+    sector_index: u8,
+
+    pub fn init(size: u32, start_cluster: u16) @This() {
+        return .{ .bytes_left = size, .cluster = start_cluster, .sector_index = 0 };
+    }
+
+    pub fn next(it: *@This()) ?[]align(4) const u8 {
+        if (it.bytes_left == 0) return null;
+
+        if (it.sector_index >= SECTORS_PER_CLUSTER) {
+            it.cluster = fatEntry(it.cluster, &sector_bufs[0], &sector_bufs[1]);
+            it.sector_index = 0;
+        }
+
+        if (it.cluster < 2 or it.cluster >= 0xFFF8) {
+            it.bytes_left = 0;
+            return null;
+        }
+
+        const lba = clusterToLba(it.cluster) + it.sector_index;
+        readSector(lba, sector_bufs[0][0..]);
+
+        const valid_len: usize = @min(it.bytes_left, SECTOR_SIZE);
+        it.sector_index += 1;
+        it.bytes_left -= valid_len;
+
+        return sector_bufs[0][0..valid_len];
+    }
+};
+
 pub fn readCart(cart: CartInfo, dst: []u8) u32 {
     if (cart.size == 0) return 0;
     var bytes_left: u32 = cart.size;

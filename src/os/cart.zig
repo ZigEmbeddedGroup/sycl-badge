@@ -172,6 +172,7 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
     const cart_xip_start = getCartXipStart();
     const cart_xip_end = getCartXipEnd();
     const cart_ram_start = getCartRamStart();
+    const cart_shared_ram_end = cart_ram_start + 4 + @sizeOf(@TypeOf(mailbox.shared_data.*));
     const cart_ram_end = getCartRamEnd();
     if (exec.xip) {
         const vector_table_addr = cart_xip_start + exec.offset;
@@ -187,7 +188,7 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
             mailbox.send(mailbox.MessageType.CART_CRASHED);
             return;
         }
-        if (initial_sp < 0x2002A100 or initial_sp > 0x20080000) {
+        if (initial_sp < cart_shared_ram_end or initial_sp > cart_ram_end) {
             mailbox.send(mailbox.MessageType.CART_CRASHED);
             return;
         }

@@ -30,22 +30,16 @@ MEMORY
     /* Cart RAM region - for variables, stack, heap.
      *
      * IMPORTANT:  The first part of process_ram is reserved by the OS for the
-     * cart IPC block, framebuffer, and IPC buffers. Do NOT touch these ranges:
+     * cart IPC block, framebuffer, and IPC buffers. For specific layout, see
+     * the CartIPCData structure in os/cart/api.zig
      *
-     *   0x20020000 - 0x2002001F  IPC block (controls, sensors, etc.)    32 B
-    *   0x20020020 - 0x2002A01F  Framebuffer 0 (160 * 128 * 2)      40960 B
-    *   0x2002A020 - 0x2003401F  Framebuffer 1 (160 * 128 * 2)      40960 B
-    *   0x20034020 - 0x2003409F  CART_TRACE_BUF (128 bytes)            128 B
-    *   0x200340A0 - 0x200340A7  CART_TONE_FREQ + CART_TONE_DURATION     8 B
-    *   0x200340A8 - 0x200340AF  Reserved IPC padding                    8 B
-    *   0x200340B0 - 0x200340B7  Dirty-rect metadata (x,y,w,h u16)       8 B
-    *   0x200340B8 - 0x200340FF  Reserved IPC padding                   72 B
-    *   0x20034100 - 0x2007FFFF  Cart RAM (variables, heap, stack)   ~303 KB
+     *   0x20020000 - 0x200350FF  IPC Block                            ~86 KB
+     *   0x20035100 - 0x2007FFFF  Cart RAM (variables, heap, stack)   ~307 KB
      *
      * Cart code writes pixels via api.framebuffer (active draw buffer).
-     * Cart globals start at 0x20034100 to avoid aliasing IPC/framebuffers.
+     * Cart globals start at 0x20035100 to avoid aliasing IPC/framebuffers.
      */
-    RAM(rwx) : ORIGIN = 0x20034100, LENGTH = 0x4BF00
+    RAM(rwx) : ORIGIN = 0x20035100, LENGTH = 0x4AF00
 }
 
 SECTIONS

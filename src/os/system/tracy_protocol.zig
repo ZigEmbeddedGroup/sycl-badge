@@ -807,6 +807,10 @@ pub const ZoneBeginData = extern union {
             return std.mem.asBytes(&data.zone_64);
         }
     }
+
+    pub fn max_size(_: *@This()) usize {
+        return @sizeOf(@This());
+    }
 };
 
 pub const ZoneEndData = extern union {
@@ -828,6 +832,10 @@ pub const ZoneEndData = extern union {
             data.* = .{ .zone_64 = .{ .ty = .ZoneEnd, .data = .{ .time = dt - ProtocolOffset32Bit } } };
             return std.mem.asBytes(&data.zone_64);
         }
+    }
+
+    pub fn max_size(_: *@This()) usize {
+        return @sizeOf(@This());
     }
 };
 

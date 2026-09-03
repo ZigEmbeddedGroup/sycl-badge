@@ -532,6 +532,9 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
     // directly import font.zig, which Zig prohibits.
     const board_mod = fw.core_mod.import_table.get("board").?;
     cart_api_module.addImport("board", board_mod);
+    cart_api_module.addImport("tracy_protocol", b.createModule(.{
+        .root_source_file = b.path("src/os/system/tracy_protocol.zig"),
+    }));
 
     mb.install_firmware(fw, .{ .format = .elf });
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });

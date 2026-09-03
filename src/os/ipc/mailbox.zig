@@ -138,6 +138,10 @@ pub const MessageType = struct {
     /// Cart writes global volume before sending
     pub const CART_VOLUME: u8 = 0x29;
 
+    pub const SYNC_TIME_REQ_CLR: u32 = 0x2a000001;
+    pub const SYNC_TIME_ACK_CLR: u32 = 0x2a000002;
+    pub const SYNC_TIME_REQ_TIME: u32 = 0x2a000003;
+
     // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
     pub const APP_BASE: Message = 0x30000000;
 

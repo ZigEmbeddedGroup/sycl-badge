@@ -55,6 +55,9 @@ pub const Sprite = struct {
 
     pub fn drawFromTo(sprite: anytype, src_rect: Rect, dst_rect: Rect) void {
         if (@TypeOf(sprite) == Texture) return;
+
+        const z = cart.zone("Sprite.draw", @src()); defer z.end();
+
         var src_x0: usize = @intCast(src_rect.x);
         const src_y0: usize = @intCast(src_rect.y);
         const flip_x = src_rect.w < 0;
@@ -77,6 +80,8 @@ pub const Sprite = struct {
 
 pub const Tilemap = struct {
     pub fn draw(map: Texture, tiles: anytype, rect: Rect, tile_size: usize) void {
+        const z = cart.zone("Tilemap.draw", @src()); defer z.end();
+
         const dst_x0 = rect.x - scroll.x;
         const dst_y0 = rect.y - scroll.y;
         var y: usize = 0;
@@ -104,6 +109,8 @@ pub const Tilemap = struct {
 pub fn init() void {}
 
 pub fn clear() void {
+    const z = cart.fn_zone(@src()); defer z.end();
+
     cart.rect(.{
         .x = 0,
         .y = 0,

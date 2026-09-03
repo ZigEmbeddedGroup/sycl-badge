@@ -1,4 +1,3 @@
-const std = @import("std");
 const cart = @import("cart-api");
 comptime {
     cart.export_start_code();

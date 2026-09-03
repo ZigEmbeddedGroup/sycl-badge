@@ -20,8 +20,8 @@ const needleman = @import("stages/needleman.zig").needleman;
 
 const screen_width = cart.screen_width; // 256
 const screen_height = cart.screen_height; // 240
-const target_frame_time = 1.0 / 60.0;
-const min_frame_time = 1.0 / 10.0;
+// const target_frame_time = 1.0 / 60.0;
+// const min_frame_time = 1.0 / 10.0;
 
 const title_tex = gfx.title;
 const healthbar_tex = gfx.healthbar;

@@ -1,6 +1,5 @@
 const std = @import("std");
 const Build = std.Build;
-const sycl_badge = @import("sycl_badge");
 
 pub const author_name = "Stevie Hryciw";
 pub const author_handle = "hryx";

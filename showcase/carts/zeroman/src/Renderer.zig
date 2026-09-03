@@ -1,8 +1,5 @@
 const cart = @import("cart-api");
 
-const fb_width = 256;
-const fb_height = 240;
-
 pub var scroll = Point.init(0, 0);
 
 pub const Point = struct {

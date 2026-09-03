@@ -14,7 +14,6 @@ const PELLET_SIZE_PT: i32 = 24;
 const ARENA_HALF_WIDTH_PT: i32 = 3200;
 const ARENA_HALF_HEIGHT_PT: i32 = 2560;
 const MAX_POINTS_PER_PIXEL: i32 = @divTrunc(ARENA_HALF_WIDTH_PT * 2, WIDTH);
-const EAT_SIZE_MARGIN_PT: i32 = 12;
 
 const Col = struct {
     pub const bg: cart.DisplayColor = .{ .r = 1, .g = 2, .b = 3 };

@@ -1,4 +1,3 @@
-const std = @import("std");
 const cart = @import("cart-api");
 const gfx = @import("gfx");
 

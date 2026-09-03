@@ -1,6 +1,5 @@
 const std = @import("std");
 const cart = @import("cart-api");
-const gfx = @import("gfx");
 
 comptime {
     cart.export_start_code();

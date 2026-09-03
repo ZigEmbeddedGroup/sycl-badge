@@ -1,5 +1,4 @@
 const std = @import("std");
-const fmt = std.fmt;
 const cart = @import("cart-api");
 comptime {
     cart.export_start_code();
@@ -21,7 +20,6 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     }
 }
 
-const GameScaler: f32 = 1.0;
 const black = defColor(0x000000);
 const white = defColor(0xffffff);
 const zig = defColor(0xF7A41D);

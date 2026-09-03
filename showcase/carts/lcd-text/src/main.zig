@@ -3,7 +3,6 @@
 /// Edit text_blocks below to display any text you want.
 /// Use joystick LEFT/RIGHT to switch between blocks.
 /// Use UP/DOWN to scale text, and A button to toggle color.
-const std = @import("std");
 const cart = @import("cart-api");
 comptime {
     cart.export_start_code();

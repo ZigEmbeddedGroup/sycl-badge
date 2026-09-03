@@ -86,7 +86,7 @@ Once the build is complete you will find a mix of file extensions:
 
 We will be using the `uf2` file to upload our cart here. when you plug in and
 turn the power on the badge, most PC operating systems will automatically mount
-the drive. Our drive will be named `SYCL BADGE V2`. To load a particualar cart,
+the drive. Our drive will be named `SYCLBADGE`. To load a particualar cart,
 copy or move the file to the mounted drive. You will see a progess indicator on
 the screen until it is completely transfered. It may be run at this time.
 
@@ -113,7 +113,7 @@ source]($link.ref('building-from-source')) you need to:
    buttons at the same time.
 3. Release the `RESET` button.
 4. Release the `BOOT_SELL` button.
-5. Confirm that the `RASPI` mounted drive shows up. Linux may require manully
+5. Confirm that the `RP2350` mounted drive shows up. Linux may require manully
    mounting it.
 6. Copy/move the file `zig-out/firmware/sycl-os-kernel.uf2` to the newly mounted
    drive.
@@ -188,12 +188,12 @@ define rtt-init
     set $rtt_addr = &RttControlBlock
     eval "monitor rtt setup 0x%x 0x40 \"SEGGER RTT\"", $rtt_addr
     monitor rtt start
-    monitor rtt server start 60000 0
+    monitor rtt server start 60000 1
 end
 
 monitor reset halt
 load
-break init.zig:120
+break drivers.rtt.rtt_initialized
 run
 rtt-init
 delete 1
@@ -224,3 +224,11 @@ you'll see the printout for when the kernel starts up as you continue to debug.
 
 SWD and UART JST connectors are wired incorrectly, the pins are reverse from
 what they need to be in order to match the cable for the pico debug.
+
+## [Revision 1]($section.id('revision-1'))
+
+The SDA and SCL connections on the I2C connector are wired incorrectly. The
+GPIOs they are connected to have the other's required alternate function. This
+means that in order to use the I2C connector to interact with an external
+device, either a PIO block needs to implement I2C, or the wires need to be
+swapped physically.

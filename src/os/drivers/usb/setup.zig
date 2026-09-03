@@ -127,7 +127,7 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                             // speed. When making this code reusable, this is
                             // going to have to depend on the descriptors/what
                             // kind of device this is.
-                            config.callbacks.stall(.{ .num = .ep0, .dir = .out });
+                            config.callbacks.stall(.{ .num = .ep0, .dir = .in });
                             return;
                         },
                         else => @panic("unhandled desc type"),

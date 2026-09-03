@@ -435,41 +435,39 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
                             log.info("read_capacity_16", .{});
                             const read_capacity: *const scsi.cdb.ReadCapacity16 = @ptrCast(@alignCast(&cbw.command_data[1]));
                             _ = read_capacity;
-                            //    const total: u64 = storage.totalSectors() - 1;
-                            //    var resp: [32]u8 = @splat(0);
-
-                            //    var writer: std.Io.Writer = .fixed(&resp);
-                            //    writer.writeInt(u64, total, .big) catch unreachable;
-                            //    writer.writeInt(u32, @intCast(storage.SECTOR_SIZE), .big) catch unreachable;
-                            @panic("TODO");
+                            const total: u64 = storage.totalSectors() - 1;
+                            var writer: std.Io.Writer = .fixed(&self.buf_in);
+                            writer.writeInt(u64, total, .big) catch unreachable;
+                            writer.writeInt(u32, @intCast(storage.SECTOR_SIZE), .big) catch unreachable;
+                            self.send_data(tag, transfer_len, writer.buffered());
                         },
                         .read_format_capacities => {
                             log.info("read_format_capacities", .{});
                             const read_format_capacities: *const scsi.cdb.ReadFormatCapacities = @ptrCast(@alignCast(&cbw.command_data[1]));
                             _ = read_format_capacities;
-                            //    const total = storage.totalSectors();
-                            //    var resp: [12]u8 = undefined;
-                            //    var writer: std.Io.Writer = .fixed(&resp);
-                            //    writer.splatByteAll(0, 3) catch unreachable;
-                            //    // Capacity list length = 8
-                            //    writer.writeByte(8) catch unreachable;
-                            //    // Number of blocks (total sectors)
-                            //    writer.writeInt(u32, total, .big) catch unreachable;
-                            //    // Descriptor type = formatted media
-                            //    writer.writeByte(0x02) catch unreachable;
-                            //    // Block length (3 bytes, big-endian)
-                            //    writer.writeInt(u24, @intCast(storage.SECTOR_SIZE), .big) catch unreachable;
-                            @panic("TODO");
+                            const total = storage.totalSectors();
+                            var writer: std.Io.Writer = .fixed(&self.buf_in);
+                            writer.splatByteAll(0, 3) catch unreachable;
+                            // Capacity list length = 8
+                            writer.writeByte(8) catch unreachable;
+                            // Number of blocks (total sectors)
+                            writer.writeInt(u32, total, .big) catch unreachable;
+                            // Descriptor type = formatted media
+                            writer.writeByte(0x02) catch unreachable;
+                            // Block length (3 bytes, big-endian)
+                            writer.writeInt(u24, @intCast(storage.SECTOR_SIZE), .big) catch unreachable;
+                            self.send_data(tag, transfer_len, writer.buffered());
                         },
                         .mode_sense_10 => {
                             log.info("mode_sense_10", .{});
-                            //    // Bytes 0-1: mode data length
-                            //    // Byte 2: medium type
-                            //    // Byte 3: device-specific parameter (bit 7 = write protect)
-                            //    // Bytes 4-5: reserved
-                            //    // Bytes 6-7: block descriptor length
-                            //    var resp: [8]u8 = .{ 0, 6, 0, 0x00, 0, 0, 0, 0 }; // 0x00 = writable
-                            @panic("TODO");
+                            // Bytes 0-1: mode data length
+                            // Byte 2: medium type
+                            // Byte 3: device-specific parameter (bit 7 = write protect)
+                            // Bytes 4-5: reserved
+                            // Bytes 6-7: block descriptor length
+                            const resp: [8]u8 = .{ 0, 6, 0, 0x00, 0, 0, 0, 0 }; // 0x00 = writable
+                            @memcpy(self.buf_in[0..8], resp[0..8]);
+                            self.send_data(tag, transfer_len, self.buf_in[0..8]);
                         },
                         else => {
                             log.info("ERROR OPCODE: {}", .{opcode});
@@ -520,9 +518,9 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
                     });
 
                     self.endpoints.out.pid.toggle();
-                    config.callbacks.queue_receive(self.endpoints.out.pid);
                     @memcpy(self.buf_out[sm.block_offset .. sm.block_offset + pkt.len], pkt);
                     sm.block_offset += pkt.len;
+                    config.callbacks.queue_receive(self.endpoints.out.pid);
 
                     if (sm.block_offset >= storage.SECTOR_SIZE) {
                         storage.writeSector(sm.lba, &self.buf_out);
@@ -533,7 +531,6 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
                     if (sm.lba >= sm.start + sm.logical_blocks) {
                         log.debug("done receiving sectors", .{});
 
-                        // TODO:
                         storage.flushPendingWrites();
                         self.queue_csw(sm.tag, sm.transfer_len, sm.transfer_len - (storage.SECTOR_SIZE * sm.logical_blocks), .passed);
                     }

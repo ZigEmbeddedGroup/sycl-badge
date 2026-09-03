@@ -3,7 +3,6 @@ const assert = microzig.assert;
 const descriptor = microzig.core.usb.descriptor;
 const types = microzig.core.usb.types;
 
-const usb = @import("../usb.zig");
 const timer = @import("../timer.zig");
 
 const std = @import("std");
@@ -122,6 +121,15 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                             break :blk desc.payload;
                         },
                         .configuration => self.desc.configurations[desc_idx],
+                        .device_qualifier => {
+                            // TODO: We are sending a stall because this is a
+                            // full speed device that doesn't support high
+                            // speed. When making this code reusable, this is
+                            // going to have to depend on the descriptors/what
+                            // kind of device this is.
+                            config.callbacks.stall(.{ .num = .ep0, .dir = .out });
+                            return;
+                        },
                         else => @panic("unhandled desc type"),
                     };
 

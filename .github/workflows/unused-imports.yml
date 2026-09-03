@@ -1,7 +1,7 @@
 name: Unused Imports Check
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
   workflow_dispatch:
 
@@ -16,7 +16,9 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          allow-unsafe-pr-checkout: true
 
       - name: Setup Zig
         uses: mlugg/setup-zig@v2

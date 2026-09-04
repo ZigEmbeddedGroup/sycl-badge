@@ -170,8 +170,11 @@ const rev0 = struct {
 };
 
 const rev1 = struct {
-    const Sample = i16;
-    const I2S = @import("../drivers/i2s.zig").I2S(Sample, .{ .sample_rate = max_sample_rate });
+    const Sample = packed struct(u32) {
+        right: i16,
+        left: i16,
+    };
+    const I2S = @import("../drivers/i2s.zig").I2S(i16, .{ .sample_rate = max_sample_rate, .stereo_mode = .packed_samples });
     var i2s: I2S = undefined;
 
     fn init() void {
@@ -207,14 +210,15 @@ const rev1 = struct {
                 const base = @backingInt(TransferRequest.pio0_tx0);
                 break :blk @fromBackingInt(base + (stride * @backingInt(i2s.pio)) + @backingInt(i2s.sm)); // + 0 for tx
             },
-            .data_size = .size_16,
-            .ring_size = @fromBackingInt(@intCast(log2_dma_buf_size + 1)),
+            .data_size = .size_32,
+            .ring_size = @fromBackingInt(@intCast(log2_dma_buf_size + 2)),
             .write_addr = @intFromPtr(i2s.pio.sm_get_tx_fifo(i2s.sm)),
         };
     }
 
     fn encode_sample(val: f32) Sample {
-        return @intFromFloat(std.math.clamp(val, -1.0, 1.0) * @as(f32, @floatFromInt(std.math.maxInt(i16))));
+        const mono_val: i16 = @intFromFloat(std.math.clamp(val, -1.0, 1.0) * @as(f32, @floatFromInt(std.math.maxInt(i16))));
+        return .{ .left = mono_val, .right = mono_val };
     }
 };
 
@@ -305,10 +309,14 @@ fn mix_buffer(buffer: *align(64) [dma_buf_size]u32) bool {
         }
     } else dma_buf_size;
 
-    return if (@backingInt(rev.revision) < 1)
-        mix_buffer_samples(rev0, buffer, samples_to_mix)
+    const more_buffers = if (@backingInt(rev.revision) < 1)
+        mix_buffer_samples(rev0, @as([*]rev0.Sample, @ptrCast(buffer))[0..dma_buf_size], samples_to_mix)
     else
-        mix_buffer_samples(rev1, @as([*]i16, @ptrCast(buffer))[0..dma_buf_size], samples_to_mix);
+        mix_buffer_samples(rev1, @as([*]rev1.Sample, @ptrCast(buffer))[0..dma_buf_size], samples_to_mix);
+
+    asm volatile ("dmb" ::: .{ .memory = true });
+
+    return more_buffers;
 }
 
 noinline fn mix_buffer_samples(comptime impl: type, buffer: []impl.Sample, samples_to_mix: u32) bool {
@@ -379,7 +387,6 @@ pub fn poll() void {
 
             const start = timer.micros();
             const more_buffers = mix_buffer(&audio_dma_buf[mix_idx]);
-            std.mem.doNotOptimizeAway(&audio_dma_buf[mix_idx]);
             if (!more_buffers) {
                 mix_state.set_state(.shutting_down, @src());
                 // Turn off the continuation after the mixed buffer

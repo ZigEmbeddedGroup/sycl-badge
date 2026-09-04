@@ -10,8 +10,22 @@ const gpio = rp2xxx.gpio;
 
 const log = std.log.scoped(.i2s);
 
+pub const StereoMode = enum {
+    // Samples in the fifo alternate between left and right,
+    // with left coming before right
+    alternate_samples,
+    // Samples in the fifo are packed into single words,
+    // with the left channel in the high bits and the
+    // right channel in the low bits.
+    packed_samples,
+};
+
 pub fn I2S(comptime Sample: type, comptime args: struct {
     sample_rate: u32,
+    // When set, an individual item in the fifo is two samples
+    // packed together, with the left sample in the high bits
+    // and the right sample in the low bits.
+    stereo_mode: StereoMode = .alternate_samples,
 }) type {
     switch (args.sample_rate) {
         8_000,
@@ -108,7 +122,10 @@ pub fn I2S(comptime Sample: type, comptime args: struct {
                 }),
                 .shift = .{
                     .autopull = true,
-                    .pull_threshold = @as(u5, @truncate(sample_width)),
+                    .pull_threshold = switch (args.stereo_mode) {
+                        .packed_samples => @as(u5, @truncate(sample_width * 2)),
+                        .alternate_samples => @as(u5, @truncate(sample_width)),
+                    },
                     .join_tx = true,
                     .out_shiftdir = .left,
                 },
@@ -135,16 +152,24 @@ pub fn I2S(comptime Sample: type, comptime args: struct {
         const UnsignedSample = @Int(.unsigned, @bitSizeOf(Sample));
         fn sample_to_fifo_entry(sample: Sample) u32 {
             const sample_shift = comptime 32 - sample_width;
-            return @as(
+            return @shlExact(@as(
                 u32,
                 @intCast(@as(UnsignedSample, @bitCast(sample))),
-            ) << sample_shift;
+            ), sample_shift);
         }
 
         pub fn write_mono(self: Self, sample: Sample) void {
             const value = sample_to_fifo_entry(sample);
-            self.pio.sm_write(self.sm, value);
-            self.pio.sm_write(self.sm, value);
+            switch (args.stereo_mode) {
+                .packed_samples =>
+                    self.pio.sm_write(
+                        value | @shrExact(value, sample_width),
+                    ),
+                .alternate_samples => {
+                    self.pio.sm_write(self.sm, value);
+                    self.pio.sm_write(self.sm, value);
+                },
+            }
         }
 
         pub const StereoSample = struct {
@@ -153,13 +178,31 @@ pub fn I2S(comptime Sample: type, comptime args: struct {
         };
 
         pub fn write_stereo(self: Self, sample: StereoSample) void {
-            self.pio.sm_write(self.sm, sample_to_fifo_entry(sample.left));
-            self.pio.sm_write(self.sm, sample_to_fifo_entry(sample.right));
+            switch (args.stereo_mode) {
+                .packed_samples =>
+                    self.pio.sm_write(
+                        sample_to_fifo_entry(sample.left) |
+                        @shrExact(sample_to_fifo_entry(sample.right), sample_width)
+                    ),
+                .alternate_samples => {
+                    self.pio.sm_write(self.sm, sample_to_fifo_entry(sample.left));
+                    self.pio.sm_write(self.sm, sample_to_fifo_entry(sample.right));
+                },
+            }
         }
 
         pub fn write_stereo_blocking(self: Self, sample: StereoSample) void {
-            self.pio.sm_blocking_write(self.sm, sample_to_fifo_entry(sample.left));
-            self.pio.sm_blocking_write(self.sm, sample_to_fifo_entry(sample.right));
+            switch (args.stereo_mode) {
+                .packed_samples =>
+                    self.pio.sm_write(
+                        sample_to_fifo_entry(sample.left) |
+                        @shrExact(sample_to_fifo_entry(sample.right), sample_width)
+                    ),
+                .alternate_samples => {
+                    self.pio.sm_blocking_write(self.sm, sample_to_fifo_entry(sample.left));
+                    self.pio.sm_blocking_write(self.sm, sample_to_fifo_entry(sample.right));
+                },
+            }
         }
     };
 }

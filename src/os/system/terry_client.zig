@@ -93,9 +93,6 @@ var atomic_is_connected: bool = false;
 pub var param_callback_obj: ?*anyopaque = null;
 pub var param_callback_fn: ?*const fn (?*anyopaque, u32, i32) void = null;
 
-var last_up_read: usize = 0;
-var last_up_write: usize = 0;
-
 const Cursor = mzrtt.channel.Up.Cursor;
 
 pub const WireLayout = struct {
@@ -666,7 +663,7 @@ fn core0_emit_sm_bulk_end(time: i64) void {
     for (2..num_states) |n| {
         track = track.next.?;
         cursor.write_byte_assume_available(@intCast(@sizeOf(q.TrackedSMUpdatePacket) - 4 - 19));
-        cursor.write_byte_assume_available(if (n + 1 == num_states) 0xF8 else 0xFF);
+        cursor.write_byte_assume_available(if (n + 1 == num_states) 0x48 else 0x4F);
         cursor.write_assume_available(&std.mem.toBytes(@as(u32, @intFromPtr(track.name))));
         cursor.write_assume_available(&std.mem.toBytes(offset));
     }
@@ -1608,8 +1605,7 @@ fn do_syspower() void {
     // TODO emit power status packets
 }
 
-// TODO get this through a real config somewhere
-const clk_frequency = 125_000_000;
+const clk_frequency: comptime_float = microzig.hal.clock_config.get_frequency(.clk_sys).?;
 
 inline fn make_welcome_msg() q.WelcomeMessage {
     var msg: q.WelcomeMessage = .{

@@ -3,16 +3,13 @@
 const microzig = @import("microzig");
 const cpu = microzig.cpu;
 const int = cpu.interrupt;
-const DMA = microzig.chip.peripherals.DMA;
 
-const audio = @import("drivers/audio.zig");
 const lcd = @import("drivers/lcd.zig");
 
 const std = @import("std");
 
 pub const interrupts: microzig.InterruptOptions = .{
     .DMA_IRQ_0 = .{ .c = lcd.interrupt_DMA_0 },
-    .DMA_IRQ_1 = .{ .c = audio.interrupt_DMA_1 },
     .HardFault = fault("HardFault"),
     .MemManageFault = fault("MemManageFault"),
     .BusFault = fault("BusFault"),
@@ -22,7 +19,6 @@ pub const interrupts: microzig.InterruptOptions = .{
 
 pub fn init() void {
     int.enable(.DMA_IRQ_0);
-    int.enable(.DMA_IRQ_1);
 }
 
 fn fault(comptime name: []const u8) microzig.interrupt.Handler {

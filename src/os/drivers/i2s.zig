@@ -1,6 +1,4 @@
 const std = @import("std");
-const EnumField = std.builtin.Type.EnumField;
-const StructField = std.builtin.Type.StructField;
 
 const microzig = @import("microzig");
 const assert = microzig.assert;

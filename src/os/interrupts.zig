@@ -3,9 +3,7 @@
 const microzig = @import("microzig");
 const cpu = microzig.cpu;
 const int = cpu.interrupt;
-const DMA = microzig.chip.peripherals.DMA;
 
-const audio = @import("drivers/audio.zig");
 const lcd = @import("drivers/lcd.zig");
 
 const std = @import("std");

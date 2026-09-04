@@ -13,7 +13,6 @@ const microzig = @import("microzig");
 const assert = microzig.assert;
 const hal = microzig.hal;
 const pwm = hal.pwm;
-const cpu = microzig.cpu;
 const board = microzig.board;
 const PWM = microzig.chip.peripherals.PWM;
 const DMA = microzig.chip.peripherals.DMA;

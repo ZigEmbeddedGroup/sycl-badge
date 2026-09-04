@@ -93,9 +93,6 @@ var atomic_is_connected: bool = false;
 pub var param_callback_obj: ?*anyopaque = null;
 pub var param_callback_fn: ?*const fn (?*anyopaque, u32, i32) void = null;
 
-var last_up_read: usize = 0;
-var last_up_write: usize = 0;
-
 const Cursor = mzrtt.channel.Up.Cursor;
 
 pub const WireLayout = struct {

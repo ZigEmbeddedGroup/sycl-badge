@@ -12,6 +12,7 @@ const adc = microzig.hal.adc;
 // Add other revisions here
 const r0_max = 235;
 const r1_max = 430;
+const r2_max = 595;
 const num_retries: usize = 10;
 
 /// Set this to true to add the ADC value to the
@@ -29,12 +30,15 @@ pub const Revision = enum(u16) {
     /// This revision adds an audio driver chip which
     /// receives digital level signals.
     r1,
+    /// r2 is the production run for SYCL 2026
+    r2,
     unknown = 0xFFFF,
 
     pub fn str(r: Revision) []const u8 {
         return switch (r) {
             .r0 => "0",
             .r1 => "1",
+            .r2 => "2",
             .unknown => "<UNKNOWN!!!>",
         };
     }
@@ -56,6 +60,8 @@ pub fn init() void {
         revision = .r0;
     } else if (raw_reading < r1_max) {
         revision = .r1;
+    } else if (raw_reading < r2_max) {
+        revision = .r2;
     } else {
         revision = .unknown;
         debug = true;

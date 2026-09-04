@@ -1608,8 +1608,7 @@ fn do_syspower() void {
     // TODO emit power status packets
 }
 
-// TODO get this through a real config somewhere
-const clk_frequency = 125_000_000;
+const clk_frequency: comptime_float = microzig.hal.clock_config.get_frequency(.clk_sys).?;
 
 inline fn make_welcome_msg() q.WelcomeMessage {
     var msg: q.WelcomeMessage = .{

@@ -1,4 +1,7 @@
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const WIDTH: i32 = @intCast(cart.screen_width);
 const HEIGHT: i32 = @intCast(cart.screen_height);
@@ -11,7 +14,6 @@ const PELLET_SIZE_PT: i32 = 24;
 const ARENA_HALF_WIDTH_PT: i32 = 3200;
 const ARENA_HALF_HEIGHT_PT: i32 = 2560;
 const MAX_POINTS_PER_PIXEL: i32 = @divTrunc(ARENA_HALF_WIDTH_PT * 2, WIDTH);
-const EAT_SIZE_MARGIN_PT: i32 = 12;
 
 const Col = struct {
     pub const bg: cart.DisplayColor = .{ .r = 1, .g = 2, .b = 3 };
@@ -211,7 +213,7 @@ fn resetGame() void {
     }
 }
 
-export fn start() void {
+pub fn start() void {
     mode = .{ .start_menu = .{} };
 }
 
@@ -554,7 +556,7 @@ fn updateSettingsMode(settings: *Settings) void {
     }
 }
 
-export fn update() void {
+pub fn update() void {
     cart.tone(.{
         .frequency = 2700,
         .duration = 60 * 60 * 60,

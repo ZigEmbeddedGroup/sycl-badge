@@ -15,8 +15,8 @@
             .hash = "microzig-0.15.2-D20YST7O4gCGMqR7ZkMIWM6Yn7A5HWWoZQMBaJ_t2ubY",
         },
         .zigimg = .{
-            .url = "git+https://github.com/zigimg/zigimg?ref=master#7b98e82621fe302a9edc147df1191f4d1b7ff7a5",
-            .hash = "zigimg-0.1.0-8_eo2qWHFwA-S24SH7x7NplPii0EbIQiUfDrimgA6rzN",
+            .url = "git+https://github.com/SpexGuy/zigimg?ref=sycl_badge#9db3abb43ad18dd45512d83d812816dc8840b7e1",
+            .hash = "zigimg-0.1.0-8_eo2tTaFwBecfCKenltx5ud0R_0jZwzC84RQGM-xkpM",
         },
     },
 }

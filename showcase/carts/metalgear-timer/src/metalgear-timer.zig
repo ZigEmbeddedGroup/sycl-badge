@@ -1,5 +1,7 @@
-const std = @import("std");
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const total_width = 67;
 const total_height = 54;
@@ -13,7 +15,7 @@ var sx: usize = 1;
 var sy: usize = 1;
 var color: cart.DisplayColor = black;
 
-export fn start() void {
+pub fn start() void {
     r(0, 0, cart.screen_width, cart.screen_height);
     tx = cart.screen_width / 2 - total_width;
     ty = cart.screen_height / 2 - total_height;
@@ -246,7 +248,7 @@ fn text_lines() void {
     }
 }
 
-export fn update() void {
+pub fn update() void {
     color = red;
     r(0, 0, total_width, 1);
     r(0, 11, total_width, total_height - 11);

@@ -1,5 +1,8 @@
 const std = @import("std");
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const StartMenu = struct {
     seed: u32,
@@ -81,11 +84,11 @@ fn clear() void {
     };
 }
 
-export fn start() void {
+pub fn start() void {
     clear();
 }
 
-export fn update() void {
+pub fn update() void {
     if (isButtonTriggered(.up, &global.up_pressed)) {
         if (global.bright == 0) {
             global.bright += 1;

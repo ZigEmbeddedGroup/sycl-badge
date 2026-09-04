@@ -2,6 +2,10 @@ const std = @import("std");
 const cart = @import("cart-api");
 const gfx = @import("gfx");
 
+comptime {
+    cart.export_start_code();
+}
+
 const Renderer = @import("Renderer.zig");
 const Rect = Renderer.Rect;
 const Sprite = Renderer.Sprite;
@@ -16,8 +20,8 @@ const needleman = @import("stages/needleman.zig").needleman;
 
 const screen_width = cart.screen_width; // 256
 const screen_height = cart.screen_height; // 240
-const target_frame_time = 1.0 / 60.0;
-const min_frame_time = 1.0 / 10.0;
+// const target_frame_time = 1.0 / 60.0;
+// const min_frame_time = 1.0 / 10.0;
 
 const title_tex = gfx.title;
 const healthbar_tex = gfx.healthbar;
@@ -322,6 +326,8 @@ pub const GameData = struct {
     }
 
     fn tick(self: *GameData) void {
+        const z = cart.zone("GameData.tick", @src()); defer z.end();
+
         clearText();
         self.prev_input = self.input;
         self.input = Player.Input.scanGamepad();
@@ -390,10 +396,12 @@ fn setNextRoom(next_room_index: u8) void {
 }
 
 fn drawTitle() void {
+    const z = cart.fn_zone(@src()); defer z.end();
     Sprite.drawFrame(title_tex, Rect.init(0, 0, 160, 48), 0, 32);
 }
 
 fn drawHealthbar() void {
+    const z = cart.fn_zone(@src()); defer z.end();
     Sprite.drawFrame(healthbar_tex, Rect.init(0, 0, 12, 68), 22, 14);
     const h = 4 + (31 - @as(i32, game_data.player.health)) * 2;
     Sprite.drawFrame(healthbar_tex, Rect.init(12, 0, 12, h), 22, 14);
@@ -406,6 +414,8 @@ fn draw() void {
     if (game_data.state == .title) {
         drawTitle();
     } else {
+        const z = cart.zone("draw game", @src()); defer z.end();
+
         Renderer.scroll.x = game_data.scrollr.x;
         Renderer.scroll.y = game_data.scrollr.y;
 
@@ -441,12 +451,16 @@ fn draw() void {
     if (game_data.state != .title) drawHealthbar();
 
     // text layer
+    const z = cart.zone("draw text", @src()); defer z.end();
+
     text_tex.updateData(text_buffer[0..]);
     const text_rect = Rect.init(0, 0, screen_width, screen_height);
     Renderer.Tilemap.draw(text_tex, font_tex, text_rect, 8);
 }
 
 fn drawRoom(room: Room, room_tex: Renderer.Texture, door1_h: u8, door2_h: u8) void {
+    const z = cart.fn_zone(@src()); defer z.end();
+
     Renderer.Tilemap.draw(room_tex, tiles_tex, room.bounds.toRect(), 16);
 
     if (room.door1_y != Room.no_door) {
@@ -470,11 +484,13 @@ fn drawRoom(room: Room, room_tex: Renderer.Texture, door1_h: u8, door2_h: u8) vo
     }
 }
 
-pub export fn start() void {
+pub fn start() void {
     game_data.reset();
 }
 
-pub export fn update() void {
+pub fn update() void {
+    const z = cart.fn_zone(@src()); defer z.end();
+
     game_data.tick();
     draw();
 

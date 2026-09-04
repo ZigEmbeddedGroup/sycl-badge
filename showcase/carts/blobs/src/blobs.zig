@@ -1,18 +1,22 @@
 const std = @import("std");
 const cart = @import("cart-api");
-const startlogo = @import("startlogo.zig");
+//const startlogo = @import("startlogo.zig");
 const music = @import("music.zig");
 const Tone = music.Tone;
 const colors = @import("colors.zig");
 const Color = cart.DisplayColor;
 
+comptime {
+    cart.export_start_code();
+}
+
 const arena_half_width_pt: i32 = 100000;
 // NOTE: for 160x128 display
 const arena_half_height_pt: i32 = 80000;
 const arena_max_half_size_pt: i32 = arena_half_width_pt;
-const arena_max_half_size_pt_f32: f32 = @floatFromInt(arena_half_width_pt);
+const arena_max_half_size_pt_f32: f32 = @floatFromInt(arena_max_half_size_pt);
 
-const arena_half_width_pt_f32: f32 = @floatFromInt(arena_half_width_pt);
+//const arena_half_width_pt_f32: f32 = @floatFromInt(arena_half_width_pt);
 const max_points_per_pixel: i32 = (arena_half_width_pt * 2) / 160;
 
 const base_speed_pt: f32 = 90;
@@ -349,7 +353,7 @@ fn eatTone(blob: *const Blob) void {
     });
 }
 
-export fn start() void {
+pub fn start() void {
     cart.trace("blobs:start");
     initStartMenuMusic();
     cart.trace("blobs:start-done");
@@ -418,7 +422,7 @@ fn clear() void {
     });
 }
 
-export fn update() void {
+pub fn update() void {
     cart.trace("blobs:update");
     cart.trace("blobs:pre-clear");
     clear();

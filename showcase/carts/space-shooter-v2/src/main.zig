@@ -1,5 +1,7 @@
-const std = @import("std");
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 const WIDTH: i32 = @intCast(cart.screen_width);
 const HEIGHT: i32 = @intCast(cart.screen_height);
@@ -443,14 +445,14 @@ fn drawGameOver() void {
     }
 }
 
-export fn start() void {
+pub fn start() void {
     rng_state = 0xC001D00D;
     mode = .intro;
     intro_a_released = false;
     intro_blink = 0;
 }
 
-export fn update() void {
+pub fn update() void {
     switch (mode) {
         .intro => {
             tickIntro();

@@ -1,6 +1,8 @@
 const std = @import("std");
-const fmt = std.fmt;
 const cart = @import("cart-api");
+comptime {
+    cart.export_start_code();
+}
 
 /// Custom panic handler: sends the message via cart.trace() then halts
 /// without @breakpoint() (which causes a silent HardFault and system reset).
@@ -18,7 +20,6 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     }
 }
 
-const GameScaler: f32 = 1.0;
 const black = defColor(0x000000);
 const white = defColor(0xffffff);
 const zig = defColor(0xF7A41D);
@@ -132,7 +133,7 @@ const PlayerWidth = 8;
 const MaxBullets = 100;
 var bullets: [MaxBullets]Bullet = undefined;
 
-export fn start() void {
+pub fn start() void {
     rand = std.Random.DefaultPrng.init(5831);
     for (&starfield) |*star| {
         const speed = rand_float();
@@ -631,7 +632,7 @@ var select_held_frames: u8 = 0; // Debounce: require SELECT held to reset from g
 // pinpoints the crash location.
 var diag_frame: u32 = 0;
 
-export fn update() void {
+pub fn update() void {
     if (stateTick > 1000) stateTick = 100;
     stateTick +%= 1;
 

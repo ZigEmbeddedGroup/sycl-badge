@@ -253,6 +253,18 @@ var mix_state: terry.core0.TrackedStateMachine(MixState) = undefined;
 
 var period_per_sample: f32 = 0;
 var phase: f32 = 0;
+fn mix_audio_square(comptime impl: type, noalias buf: []impl.Sample) void {
+    for (buf, 0..) |*sample, i| {
+        const f: f32 = @floatFromInt(i);
+        const samp_phase = phase + period_per_sample * f;
+        const fract_phase = samp_phase - @trunc(samp_phase);
+        const vol_adj = if (fract_phase < 0.5) vol_amplitude else -vol_amplitude;
+        sample.* = impl.encode_sample(vol_adj);
+    }
+    phase += @as(f32, @floatFromInt(buf.len)) * period_per_sample;
+    phase = phase - @trunc(phase);
+}
+
 fn mix_audio_sawtooth(comptime impl: type, noalias buf: []impl.Sample) void {
     for (buf, 0..) |*sample, i| {
         const f: f32 = @floatFromInt(i);
@@ -301,7 +313,8 @@ fn mix_buffer(buffer: *align(64) [dma_buf_size]u32) bool {
 
 noinline fn mix_buffer_samples(comptime impl: type, buffer: []impl.Sample, samples_to_mix: u32) bool {
     switch (sound_type.state) {
-        .off, .square => {}, // mixer shouldn't be in use
+        .off => {}, // mixer shouldn't be in use
+        .square => mix_audio_square(impl, buffer[0..samples_to_mix]),
         .sawtooth => mix_audio_sawtooth(impl, buffer[0..samples_to_mix]),
         .triangle => mix_audio_triangle(impl, buffer[0..samples_to_mix]),
         .sample => {
@@ -447,6 +460,7 @@ pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
     } else {
         period_per_sample = freq_hz / max_sample_rate;
         switch (sample_sel) {
+            0 => sound_type.set_state(.square, @src()),
             1 => sound_type.set_state(.triangle, @src()),
             2 => sound_type.set_state(.sawtooth, @src()),
             else => {

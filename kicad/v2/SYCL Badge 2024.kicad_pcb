@@ -8227,7 +8227,7 @@
 	(footprint "Resistor_SMD:R_0402_1005Metric"
 		(layer "B.Cu")
 		(uuid "0ad91166-3aee-44a4-9ce1-3fedd9214838")
-		(at 197.785 103.11 -90)
+		(at 197.785 104.08915 -90)
 		(descr "Resistor SMD 0402 (1005 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "resistor")
 		(property "Reference" "R10"
@@ -32871,6 +32871,17 @@
 			(uuid "54ff6cfa-6b77-4ed8-8d41-6910190ea646")
 		)
 		(embedded_fonts no)
+		(model "${KIPRJMOD}/packages3D/BAT-SMD_BH-AAA-B5AA005.step"
+			(offset
+				(xyz 17 -6.7 -0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz -0 -0 -0)
+			)
+		)
 	)
 	(footprint "Package_TO_SOT_SMD:SOT-23"
 		(layer "B.Cu")
@@ -38495,7 +38506,7 @@
 			(uuid "a69b657f-ac76-46f0-8115-188542d2b048")
 		)
 		(embedded_fonts no)
-		(model "${KICAD10_3DMODEL_DIR}/Package_DFN_QFN.3dshapes/TQFN-16-1EP_3x3mm_P0.5mm_EP1.23x1.23mm.step"
+		(model "${KIPRJMOD}/packages3D/TQFN-16_L3.0-W3.0-P0.50-BL-EP1.5.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -41231,8 +41242,8 @@
 			(justify left bottom mirror)
 		)
 	)
-	(gr_text "Ivan Cheung\nVanessa Chu\nKatie Goncalves\nSarah Oskuei\nEric Tannant\n\nMatthew Knight"
-		(at 203.4578 101.5238 0)
+	(gr_text "Ivan Cheung\nVanessa Chu\nKatie Goncalves\nSarah Oskuei\nEric Tannant\n\nMatthew Knight\nMartin Wickham"
+		(at 203.4578 102.743 0)
 		(layer "B.SilkS")
 		(uuid "d6893128-366b-47ab-89f4-d7a2d784c9d0")
 		(effects
@@ -43016,6 +43027,14 @@
 		(uuid "5cf321de-8def-48dd-83b6-31b3dfd5578c")
 	)
 	(segment
+		(start 197.785 103.57915)
+		(end 197.785 100.62)
+		(width 0.2)
+		(layer "B.Cu")
+		(net "/BUTTON2")
+		(uuid "6d8c4ddd-9911-42a3-889b-c4b9eb14ff6b")
+	)
+	(segment
 		(start 174.88 105.8)
 		(end 191.895 105.8)
 		(width 0.2)
@@ -43046,14 +43065,6 @@
 		(layer "B.Cu")
 		(net "/BUTTON2")
 		(uuid "c8baed0a-230a-4f2f-a861-4f4543228764")
-	)
-	(segment
-		(start 197.785 102.6)
-		(end 197.785 100.62)
-		(width 0.2)
-		(layer "B.Cu")
-		(net "/BUTTON2")
-		(uuid "cc5ee816-2326-461e-8e5a-c76bb1cdd18d")
 	)
 	(segment
 		(start 170.827 103.752)
@@ -43392,7 +43403,7 @@
 		(uuid "164cebef-c5e0-45a7-b50c-dfec1c748e43")
 	)
 	(via
-		(at 199.585 104.03)
+		(at 199.585 105.00915)
 		(size 0.6)
 		(drill 0.3)
 		(layers "F.Cu" "B.Cu")
@@ -44444,8 +44455,8 @@
 		(uuid "1b2afed2-4316-4e7c-9c14-c03d8314394a")
 	)
 	(segment
-		(start 198.1875 104.0225)
-		(end 197.785 103.62)
+		(start 198.1875 105.00165)
+		(end 197.785 104.59915)
 		(width 0.6)
 		(layer "B.Cu")
 		(net "GND")
@@ -44604,8 +44615,8 @@
 		(uuid "33e29ebe-5a3c-401b-91f8-dd021f3317c2")
 	)
 	(segment
-		(start 199.585 104.03)
-		(end 199.5775 104.0225)
+		(start 199.585 105.00915)
+		(end 199.5775 105.00165)
 		(width 0.6)
 		(layer "B.Cu")
 		(net "GND")
@@ -45300,8 +45311,8 @@
 		(uuid "b81a0d3f-bfed-4a1d-a815-da896ff67e65")
 	)
 	(segment
-		(start 199.5775 104.0225)
-		(end 198.1875 104.0225)
+		(start 199.5775 105.00165)
+		(end 198.1875 105.00165)
 		(width 0.6)
 		(layer "B.Cu")
 		(net "GND")

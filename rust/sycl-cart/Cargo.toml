@@ -1,0 +1,33 @@
+[package]
+name = "sycl-cart"
+version = "0.1.0"
+description = "Write SYCL Badge v2 carts in Rust. no_std, zero allocation."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufmt = { version = "0.2", default-features = false }
+
+[features]
+default = ["log-warn", "panic-messages", "panic-handler"]
+
+# Provide `#[panic_handler]`. Turn off (via `default-features = false`) only if
+# your cart defines its own.
+panic-handler = []
+
+# Log levels cascade: enabling a lower level enables everything above it.
+# Disabled levels are compiled out entirely, format strings included.
+log-error = []
+log-warn = ["log-error"]
+log-info = ["log-warn"]
+log-debug = ["log-info"]
+
+# Include panic message text in the binary. Costs flash; worth it while developing.
+panic-messages = []
+
+# Draw a frame-timing overlay (update vs present, dirty-rect outline).
+debug-overlay = []
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m-rt = "0.7.6"

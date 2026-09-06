@@ -43,6 +43,7 @@ zig build watch
 ## Documentation Map
 
 - [Introduction](docs/introduction/README.md)
+- [Rust carts](rust/README.md)
 - [Firmware architecture](src/README.md)
 - [Simulator](simulator/README.md)
 - [Showcase carts](showcase/README.md)

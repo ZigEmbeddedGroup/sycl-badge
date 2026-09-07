@@ -1,0 +1,31 @@
+[buildPlans.LiberatedIosevka]
+family = "Liberated Iosevka"
+spacing = "term"
+serifs = "slab"
+exportGlyphNames = false
+noCvSs = true
+noLigation = true
+
+[buildPlans.LiberatedIosevka.variants]
+inherits = "ss06"
+
+[buildPlans.LiberatedIosevka.variants.design]
+asterisk = "penta-low"
+
+[buildPlans.LiberatedIosevka.slopes.Upright]
+angle = 0
+shape = "upright"
+menu = "upright"
+css = "normal"
+
+[buildPlans.LiberatedIosevka.slopes.Italic]
+angle = 9.4
+shape = "italic"
+menu = "italic"
+css = "italic"
+
+[buildPlans.LiberatedIosevka.subset.include]
+ranges = [
+    [0x0020, 0x007E],   # ASCII
+    [0x2500, 0x259F],   # Box drawing / block elements
+]

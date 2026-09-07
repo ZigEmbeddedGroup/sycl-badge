@@ -1,0 +1,42 @@
+# Wasm link flags for the SYCL badge simulator. Every one of these matters:
+#
+#   --import-memory        The simulator OWNS the memory (env.memory, 64 fixed
+#                          pages) and composites the framebuffer out of it. Omit
+#                          this and the module exports its own memory instead;
+#                          instantiation still SUCCEEDS (JS ignores unneeded
+#                          imports) and you get a silent black screen.
+#   --initial/--max-memory 4 MiB == 64 pages, must match the simulator's
+#                          `new WebAssembly.Memory({initial: 64, maximum: 64})`.
+#   --no-stack-first       rustc defaults to placing the wasm stack at [0, size)
+#                          growing down, which lands *inside* the framebuffer at
+#                          0x20. This moves the stack above static data instead.
+#                          Trade-off: stack overflow now corrupts .data/.bss
+#                          rather than trapping, so `sycl_cart::debug` ships a
+#                          stack canary (see StackGuard).
+#   --global-base=41248    0xA120: first byte past the framebuffer
+#                          (0x20 + 160*128*2 = 0xA020), rounded up to 32.
+#                          NOTE: build.zig:535 uses 0xA01E, which is two bytes
+#                          *inside* the framebuffer. Do not copy that value.
+#   -zstack-size=65536     Pinned rather than inheriting rustc's 1 MiB default.
+[target.wasm32-unknown-unknown]
+rustflags = [
+  "-Clink-arg=--import-memory",
+  "-Clink-arg=--initial-memory=4194304",
+  "-Clink-arg=--max-memory=4194304",
+  "-Clink-arg=--no-stack-first",
+  "-Clink-arg=--global-base=41248",
+  "-Clink-arg=-zstack-size=65536",
+  "-Clink-arg=--export=__stack_pointer",
+]
+
+# Badge link flags. `link.x` comes from cortex-m-rt; it pulls in the `memory.x`
+# that `sycl-cart/build.rs` drops on the linker search path, and it places the
+# vector table at ORIGIN(FLASH) where the OS loader scans for it
+# (`findVectorTableAddr` in `src/os/loader/loader.zig`).
+[target.'cfg(target_arch = "arm")']
+rustflags = [
+  "-Clink-arg=-Tlink.x",
+]
+
+[alias]
+xtask = "run --package xtask --release --"

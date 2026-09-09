@@ -99,6 +99,10 @@
           ""
         ],
         [
+          "connection_width|139133008|129076890|b773152d-fd35-4ac1-ad04-dddc8757f377|00000000-0000-0000-0000-000000000000",
+          ""
+        ],
+        [
           "silk_edge_clearance|153145000|73545000|5e733eac-ae1a-4cf8-a993-77bbd4796bad|1ac60ae8-4881-41b9-9aa5-da8009c8cb2b",
           ""
         ],
@@ -116,10 +120,6 @@
         ],
         [
           "silk_edge_clearance|186050000|72094646|2b56a56e-3d54-4d90-8480-79258f14c768|2f59732e-3216-435a-83bc-e405762f9a65",
-          ""
-        ],
-        [
-          "text_thickness|124590800|127838200|051569f0-3627-43cf-90fd-2314b6c916c2|00000000-0000-0000-0000-000000000000",
           ""
         ],
         [
@@ -885,6 +885,14 @@
       "version": 1
     },
     "net_format_name": "",
+    "ngspice": {
+      "fix_include_paths": true,
+      "meta": {
+        "version": 0
+      },
+      "model_mode": 4,
+      "workbook_filename": ""
+    },
     "page_layout_descr_file": "empty.kicad_wks",
     "plot_directory": "",
     "reuse_designators": true,
@@ -904,7 +912,7 @@
         "uuid": "270f9e40-8c49-4ca4-8093-db6f728721f5"
       }
     ],
-    "used_designators": "TP1-8,START1,Q1-2,LS1,L1-2,J1-5,IC1,SELECT1,R1-41,H1-5,B1,Y1,#PWR1-84,D1-8,U1-8,SW1-3,C1-42,A1,JP1-4,#P+1-20,#+3V1-8",
+    "used_designators": "",
     "variants": []
   },
   "sheets": [

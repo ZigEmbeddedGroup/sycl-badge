@@ -90,3 +90,11 @@ pub const rev1 = struct {
         pub const lrclk = gpio.num(11);
     };
 };
+
+pub const rev2 = struct {
+    pub const i2c = struct {
+        pub const instance = hal.i2c.instance.num(0);
+        pub const sda = gpio.num(12);
+        pub const scl = gpio.num(13);
+    };
+};

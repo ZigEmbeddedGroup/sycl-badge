@@ -27,9 +27,9 @@
 (version 1)
 (rule "Trace Width - JLCPCB"
   (condition "A.Type == 'Track'")
-  (constraint track_width (min 0.1016mm)))
+  (constraint track_width (min 0.12mm)))
 (rule "Clearance - JLCPCB"
-  (constraint clearance (min 0.1016mm)))
+  (constraint clearance (min 0.12mm)))
 (rule "Via Drill - JLCPCB"
   (condition "A.Type == 'Via'")
   (constraint hole_size (min 0.2mm)))

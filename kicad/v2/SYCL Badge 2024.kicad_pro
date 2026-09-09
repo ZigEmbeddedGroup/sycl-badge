@@ -99,6 +99,10 @@
           ""
         ],
         [
+          "connection_width|139133008|129076890|b773152d-fd35-4ac1-ad04-dddc8757f377|00000000-0000-0000-0000-000000000000",
+          ""
+        ],
+        [
           "silk_edge_clearance|153145000|73545000|5e733eac-ae1a-4cf8-a993-77bbd4796bad|1ac60ae8-4881-41b9-9aa5-da8009c8cb2b",
           ""
         ],
@@ -908,7 +912,7 @@
         "uuid": "270f9e40-8c49-4ca4-8093-db6f728721f5"
       }
     ],
-    "used_designators": "#PWR64,#PWR88-90,C43,R44-45,#P+21-22,U9-10",
+    "used_designators": "",
     "variants": []
   },
   "sheets": [

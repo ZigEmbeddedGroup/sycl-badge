@@ -15,8 +15,9 @@
 #                          stack canary (see StackGuard).
 #   --global-base=41248    0xA120: first byte past the framebuffer
 #                          (0x20 + 160*128*2 = 0xA020), rounded up to 32.
-#                          NOTE: build.zig:535 uses 0xA01E, which is two bytes
-#                          *inside* the framebuffer. Do not copy that value.
+#                          NOTE: build.zig sets wasm.global_base to
+#                          160 * 128 * 2 + 0x1e = 0xA01E, two bytes *inside* the
+#                          framebuffer. Do not copy that value.
 #   -zstack-size=65536     Pinned rather than inheriting rustc's 1 MiB default.
 [target.wasm32-unknown-unknown]
 rustflags = [
@@ -29,13 +30,16 @@ rustflags = [
   "-Clink-arg=--export=__stack_pointer",
 ]
 
-# Badge link flags. `link.x` comes from cortex-m-rt; it pulls in the `memory.x`
-# that `sycl-cart/build.rs` drops on the linker search path, and it places the
-# vector table at ORIGIN(FLASH) where the OS loader scans for it
-# (`findVectorTableAddr` in `src/os/loader/loader.zig`).
+# Badge link flags. `cart_ram.x` is the framework's linker script — a RAM cart
+# laid out the way `src/cart/cart_ram.ld` lays out the Zig carts — which
+# `sycl-cart/build.rs` drops on the linker search path. `--nmagic` turns off
+# page alignment between the code and data segments; without it the linker
+# leaves a gap of up to 4 KiB between them, and every byte of that gap is RAM
+# the UF2 has to carry and the loader has to copy.
 [target.'cfg(target_arch = "arm")']
 rustflags = [
-  "-Clink-arg=-Tlink.x",
+  "-Clink-arg=-Tcart_ram.x",
+  "-Clink-arg=--nmagic",
 ]
 
 [alias]

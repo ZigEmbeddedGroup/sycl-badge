@@ -15,9 +15,8 @@
 //!   reloads when it receives the text `reload`. If the socket closes, the
 //!   simulator shows "Watcher was disconnected".
 //!
-//! There is no watcher in the repo at the moment — `docs/introduction/build.zig`
-//! calls a `install_with_watcher` helper that no longer exists in `build.zig` —
-//! so this fills a gap for Zig carts too, given a `.wasm` in the right place.
+//! There is no watcher in the repo at the moment, so this fills a gap for Zig
+//! carts too, given a `.wasm` in the right place.
 //!
 //! Zero dependencies, so `cargo xtask` is quick and there is no supply chain to
 //! vet for a dev tool.
@@ -195,11 +194,16 @@ fn build_uf2(package: &str, debug: bool) -> Option<PathBuf> {
         blocks.len() / 512,
     );
     println!(
-        "  loads at {:#010x}..{:#010x}, sp {:#010x}, reset {:#010x}",
+        "  RAM {:#010x}..{:#010x}, .bss to {:#010x}, entry {:#010x}",
         image.base,
-        image.base + image.bytes.len() as u32,
-        image.initial_sp(),
-        image.reset_vector(),
+        image.end(),
+        image.descriptor.bss_end,
+        image.descriptor.entry,
+    );
+    println!(
+        "  {} bytes free below the {} KiB stack reserve",
+        image.headroom(),
+        uf2::STACK_RESERVE / 1024,
     );
     println!("  copy it onto the badge's USB drive, then reset the badge");
     Some(out)

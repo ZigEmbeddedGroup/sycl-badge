@@ -11,9 +11,3 @@ path = "src/main.rs"
 
 [dependencies]
 sycl-cart = { path = "../../sycl-cart", features = ["log-info"] }
-
-[target.'cfg(target_arch = "arm")'.dependencies]
-# The badge entry point and fault handler that `sycl_cart::cart!` emits expand
-# to `::cortex_m_rt` paths, which only resolve in the crate that invokes the
-# macro. Unused when building for the simulator.
-cortex-m-rt = "0.7"

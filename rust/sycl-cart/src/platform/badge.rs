@@ -4,12 +4,17 @@
 //! through the shared IPC block and the RP2350 inter-core SIO FIFO — there is no
 //! syscall table and nothing to link against. See `src/os/ipc/mailbox.zig`.
 //!
-//! The entry point is `cortex-m-rt`'s, laid out by `../../memory.x`; `cart!`
-//! supplies the frame loop and `cargo xtask uf2` packs the result.
+//! The cart is a *RAM cart*: `cargo xtask uf2` packs the linked image with RAM
+//! addresses, the OS loader copies it into place, zeroes `.bss` and jumps to the
+//! `_start` that `cart!` emits, with MSP already at the top of cart RAM. There is
+//! no reset handler and no scatter-init between the two; `../../cart_ram.x` lays
+//! the image out and [`init`] finishes what the loader leaves to us.
 //!
-//! **Status: runs on hardware.** `showcase/fill` draws, reads buttons and paces
-//! on `present`, so the display, input and handshake paths below are confirmed.
-//! The audio path and the neopixels are not: nothing has driven them on a badge.
+//! **Status: the IPC paths below ran on hardware**, back when this was an XIP
+//! cart: `showcase/fill` drew, read buttons and paced on `present`, so the
+//! display, input and handshake code is confirmed. The RAM-cart entry — the
+//! descriptor, `_start`, our own vector table — follows the OS's new loader and
+//! has not been flashed yet. Neither has the audio path or the neopixels.
 
 use crate::audio::{Shape, ToneLen};
 use crate::gfx::{self, Rect, HEIGHT, WIDTH};
@@ -20,9 +25,8 @@ use core::sync::atomic::{AtomicBool, Ordering};
 const BASE: usize = 0x2002_0004;
 
 // Badge-only fields, which sit after the *two* framebuffers. Offsets derived
-// from the field order in `CartIPCData`; note that the address comments in
-// `src/cart/cart_xip.ld` are stale (they place the dirty rect at 0x200340B0,
-// but the struct puts it at 0x200340A8). The struct is the source of truth.
+// from the field order in `CartIPCData`, which is the source of truth; the
+// address comments beside each field there agree with these.
 const AFTER_FRAMEBUFFERS: usize = ipc::FRAMEBUFFER + 2 * ipc::FRAMEBUFFER_BYTES;
 const TRACE_BUF: usize = AFTER_FRAMEBUFFERS; // 0x20034020, 128 bytes
 const TONE_FREQ: usize = TRACE_BUF + 0x80; // 0x200340A0, f32
@@ -31,6 +35,25 @@ const DIRTY_X: usize = TONE_DURATION + 4; // 0x200340A8, u16 x4
 const TONE_VOLUME: usize = DIRTY_X + 8; // 0x200340B0, f32
 const TONE_FLAGS: usize = TONE_VOLUME + 4; // 0x200340B4, u32
 const GLOBAL_VOLUME: usize = TONE_FLAGS + 4; // 0x200340B8, f32
+// Then a pad word and the tracy ring that the OS's profiler client drains: 4 KiB
+// of ring at 0x200340C0, followed by a read position, a write-control word and
+// a spinlock, each on its own 16-byte granule, through 0x200350F0. We never
+// touch any of it, but it is why cart RAM starts where it does.
+const TRACY_RING: usize = GLOBAL_VOLUME + 8; // 0x200340C0
+const IPC_END: usize = BASE + TRACY_RING + 0x1000 + 3 * 16; // 0x200350F0
+
+/// Where cart RAM starts, as `../../cart_ram.x` lays it out. `cart_ram.ld` in
+/// the badge tree reserves the same 0x15100 bytes below it for the IPC block,
+/// which `CartIPCData` asserts it fits in.
+pub const RAM_START: usize = 0x2003_5100;
+/// End of `process_ram`. The OS sets MSP here before it jumps to `_start`
+/// (`executeCart` in `src/os/cart.zig`).
+pub const RAM_END: usize = 0x2008_0000;
+
+const _: () = assert!(
+    IPC_END <= RAM_START,
+    "cart RAM overlaps the IPC block: cart_ram.x and CartIPCData disagree"
+);
 
 /// Longest trace message the kernel will read, minus the NUL it expects.
 const TRACE_MAX: usize = 127;
@@ -249,7 +272,9 @@ pub fn set_red_led(on: bool) {
 
 pub fn tone(freq_hz: f32, len: ToneLen, volume: f32, shape: Shape) {
     let duration = match len {
-        // The kernel arms a DMA transfer count, so finite notes end on their own.
+        // The kernel counts the note out itself — a DMA transfer count on a
+        // revision 0 board, mixed samples on later ones — so finite notes end
+        // on their own.
         ToneLen::Frames(f) => f as f32 / 60.0,
         // Exactly -1.0 means endless; see `src/os/drivers/audio.zig`.
         ToneLen::Sustained => -1.0,
@@ -343,26 +368,32 @@ pub fn abort() -> ! {
     }
 }
 
-/// Take over Core 1: mask interrupts and set the FPU up for our own use.
+/// Take over Core 1: mask interrupts, set the FPU up for our own use, and point
+/// VTOR at `vectors` so a fault reaches our handlers.
 ///
-/// Called once from the entry point, before any cart code runs. Everything the
+/// Called once from `_start`, before any cart code runs. Everything the
 /// framework does is polled, so interrupts stay masked for the life of the
-/// cart, exactly as `cart_entry.zig` does for a Zig cart.
+/// cart, exactly as the OS's own cart wrapper does.
 ///
-/// The OS has already masked interrupts and cleared Core 1's NVIC and fault
-/// state before it jumps here (`src/os/cart.zig`), and `cortex-m-rt` enables
-/// CP10/CP11 for an `-eabihf` target. Both are repeated anyway: they are two
-/// register writes, they are idempotent, and depending on the last thing that
-/// ran on this core is how bring-up bugs get written.
-pub fn init() {
+/// `executeCart` in `src/os/cart.zig` has already masked interrupts, cleared
+/// Core 1's NVIC and fault state and enabled CP10/CP11 before it jumps here.
+/// All of that is repeated anyway: it is a handful of register writes, they are
+/// idempotent, and depending on the last thing that ran on this core is how
+/// bring-up bugs get written. VTOR is the one register it leaves alone for a
+/// RAM cart — it stays on the OS's Core 1 table, whose HardFault is an OS panic
+/// — so that write is the one that matters.
+pub fn init(vectors: &'static VectorTable) {
+    const VTOR: *mut u32 = 0xE000_ED08 as *mut u32;
     const CPACR: *mut u32 = 0xE000_ED88 as *mut u32;
     const FPCCR: *mut u32 = 0xE000_EF34 as *mut u32;
 
-    // SAFETY: interrupt-mask instruction, then two fixed system-control
-    // addresses. Core 1's FPU context is ours alone.
+    // SAFETY: interrupt-mask instruction, then three fixed system-control
+    // addresses. Core 1's vector table and FPU context are ours alone, and
+    // `VectorTable` carries the 128-byte alignment VTOR requires.
     unsafe {
         core::arch::asm!("cpsid i", options(nomem, nostack));
 
+        VTOR.write_volatile(vectors as *const VectorTable as u32);
         // Full access to CP10 and CP11, so FPU instructions do not trap.
         CPACR.write_volatile(CPACR.read_volatile() | (0xF << 20));
         // ASPEN | LSPEN: automatic and lazy FP context preservation.
@@ -370,6 +401,104 @@ pub fn init() {
 
         core::arch::asm!("dsb", "isb", options(nomem, nostack));
     }
+}
+
+// ── Vector table and faults ─────────────────────────────────────────────────
+//
+// A RAM cart has no reset vector for the OS to read: the loader takes the entry
+// point from the cart descriptor and leaves VTOR on its own table. We still want
+// a HardFault to be legible — through the OS's table it is a Core 1 panic that
+// the cart never hears about — so `cart!` emits a 16-entry table of our own and
+// `init` installs it. Interrupts are masked for the cart's lifetime, so only
+// NMI and HardFault can actually fire; the rest park with a message anyway.
+
+/// One vector table entry. A union because the stack word, the reset slot and
+/// the handler slots are three types, and none of them can be cast to another
+/// in a `const` initializer.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union Vector {
+    reserved: usize,
+    stack_top: usize,
+    reset: unsafe extern "C" fn() -> !,
+    handler: unsafe extern "C" fn(),
+}
+
+/// The Armv8-M system exception vectors, aligned as VTOR requires.
+///
+/// Created by [`crate::cart!`]; not for direct use.
+#[doc(hidden)]
+#[repr(C, align(128))]
+pub struct VectorTable([Vector; 16]);
+
+impl VectorTable {
+    /// `reset` is `_start`. The OS jumps there from the descriptor rather than
+    /// from here, but a table with its reset slot filled is a complete one.
+    pub const fn new(reset: unsafe extern "C" fn() -> !) -> VectorTable {
+        let park = Vector {
+            handler: default_handler,
+        };
+        let hole = Vector { reserved: 0 };
+        VectorTable([
+            Vector { stack_top: RAM_END },
+            Vector { reset },
+            park, // 2 NMI
+            Vector {
+                handler: hard_fault_trampoline,
+            }, // 3 HardFault
+            park, // 4 MemManage
+            park, // 5 BusFault
+            park, // 6 UsageFault
+            park, // 7 SecureFault
+            hole,
+            hole,
+            hole,
+            park, // 11 SVCall
+            park, // 12 DebugMonitor
+            hole,
+            park, // 14 PendSV
+            park, // 15 SysTick
+        ])
+    }
+}
+
+/// The registers the core stacks on exception entry, in stack order.
+#[repr(C)]
+pub struct ExceptionFrame {
+    pub r0: u32,
+    pub r1: u32,
+    pub r2: u32,
+    pub r3: u32,
+    pub r12: u32,
+    pub lr: u32,
+    pub pc: u32,
+    pub xpsr: u32,
+}
+
+/// HardFault entry. The frame sits at SP on entry, and any Rust prologue would
+/// move SP before we could read it, so this is a naked shim that hands SP to
+/// the real handler as its first argument.
+#[unsafe(naked)]
+unsafe extern "C" fn hard_fault_trampoline() {
+    core::arch::naked_asm!("mov r0, sp", "b {handler}", handler = sym hard_fault);
+}
+
+extern "C" fn hard_fault(frame: &ExceptionFrame) -> ! {
+    report_fault("HardFault", frame.pc, frame.lr)
+}
+
+/// Every other exception. Interrupts are masked so none should arrive; if one
+/// does, say which.
+unsafe extern "C" fn default_handler() {
+    const SCB_ICSR: *const u32 = 0xE000_ED04 as *const u32;
+    // SAFETY: fixed system-control address, read-only.
+    let active = unsafe { SCB_ICSR.read_volatile() } & 0x1FF;
+    let mut msg = *b"[FAULT] exception 000";
+    msg[18] = b'0' + (active / 100) as u8;
+    msg[19] = b'0' + (active / 10 % 10) as u8;
+    msg[20] = b'0' + (active % 10) as u8;
+    trace(&msg);
+    abort()
 }
 
 /// Report a fault through the trace channel, then park.

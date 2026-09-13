@@ -2,34 +2,38 @@
 //!
 //! # Why the API is this small
 //!
-//! The badge's buzzer is a single monophonic voice. `src/os/drivers/audio.zig`
-//! drives GPIO9 with a 500 kHz PWM carrier whose duty cycle sets amplitude and a
-//! DMA channel walking a wave table at the note frequency. It plays one note at
-//! a time, in one of three shapes ([`Shape`]), with no envelope and no second
-//! voice.
+//! The badge has a single monophonic voice. `src/os/drivers/audio.zig` plays one
+//! note at a time, in one of three shapes ([`Shape`]), with no envelope and no
+//! second voice. How it makes the sound depends on the board revision: a
+//! revision 0 board drives a magnetic buzzer from a 300 kHz PWM carrier, with a
+//! DMA channel flipping the duty at the note frequency for a square wave and a
+//! software mixer for the other shapes; revision 1 and later boards mix every
+//! shape in software at 44.1 kHz and stream it to an I2S amplifier. The cart
+//! sees neither: the IPC contract is a frequency, a duration, a volume and a
+//! shape, and the kernel picks the backend.
 //!
 //! The simulator, meanwhile, runs the full WASM-4 APU: four channels, ADSR,
 //! frequency slides, panning. Exposing that would mean composing against audio
 //! the badge cannot produce, so we deliberately drive only the common subset. A
-//! cart sounds the same in both places.
+//! cart sounds the same in all three places.
 //!
 //! # Structure
 //!
 //! [`Audio::tone`] is the raw primitive, at exact hardware parity. Above it sits
 //! a sequencer with three priority levels — a one-shot beep, an SFX track, and a
 //! music track — that resolves a single winning note each frame and only touches
-//! the hardware when that note *changes*. That last part matters: every `tone()`
-//! on the badge aborts a DMA channel and reprograms a PWM slice, so re-issuing
-//! the same note 60 times a second is audible as clicking.
+//! the hardware when that note *changes*. That last part matters: on a revision
+//! 0 board every `tone()` aborts a DMA channel and reprograms a PWM slice, so
+//! re-issuing the same note 60 times a second is audible as clicking, and on
+//! any board it is a FIFO message Core 0 has to service.
 //!
-//! # Two hardware caveats
+//! # A hardware caveat
 //!
-//! * Pitch is currently about 400 cents sharp on real hardware — see the TODO at
-//!   `src/os/drivers/audio.zig:32`. We do not compensate, because compensating
-//!   would break when the driver is fixed.
-//! * The buzzer's response peaks near 2700 Hz and rolls off steeply either side
-//!   (`docs/audio_analysis/README.md`). Notes much below ~1 kHz will be quiet on
-//!   hardware however good they sound in the simulator.
+//! The revision 0 buzzer's response peaks near 2700 Hz and rolls off steeply
+//! either side (`docs/audio_analysis/README.md`). Notes much below ~1 kHz will
+//! be quiet on that board however good they sound in the simulator. The
+//! driver's old note about pitch running ~400 cents sharp went with its
+//! rewrite; we have not measured the new one.
 
 use crate::platform;
 
@@ -47,7 +51,7 @@ pub enum ToneLen {
 /// Wave shape of a note.
 ///
 /// Mirrors `Tone2Options.Shape` in `src/os/cart/api.zig`, cut down to the three
-/// the buzzer driver can actually produce: `sine`, `major` and `minor` reach
+/// the audio driver can actually produce: `sine`, `major` and `minor` reach
 /// `src/os/drivers/audio.zig` and fall through to `stop()`, so a cart asking for
 /// one would get silence on hardware.
 ///
@@ -434,10 +438,11 @@ fn clamp01(v: f32) -> f32 {
 pub mod notes {
     //! Equal-tempered pitches, A4 = 440 Hz. `S` means sharp, so `DS6` is D#6.
     //!
-    //! The badge's buzzer peaks near 2700 Hz and rolls off steeply either side,
-    //! so octaves 6 and 7 are the ones that will actually carry on hardware.
-    //! Anything below roughly 1 kHz will be quiet however good it sounds in the
-    //! simulator. Raw Hz works too — these are only a convenience.
+    //! A revision 0 badge's buzzer peaks near 2700 Hz and rolls off steeply
+    //! either side, so octaves 6 and 7 are the ones that will actually carry on
+    //! that board. Anything below roughly 1 kHz will be quiet there however good
+    //! it sounds in the simulator. Raw Hz works too — these are only a
+    //! convenience.
 
     pub const C4: f32 = 261.63;
     pub const CS4: f32 = 277.18;

@@ -53,11 +53,20 @@ cargo xtask uf2 -p fill
 # copy target/fill.uf2 onto the badge's USB drive, then reset the badge
 ```
 
-The badge's OS reads the `.uf2` off its FAT12 drive, programs the payload into
-the cart_xip flash region and jumps to the reset vector on Core 1
-(`src/os/loader/loader.zig`, then `executeCart` in `src/os/cart.zig`). There is
-no debugger in that loop, so `xtask uf2` re-runs every check the OS makes —
-stack pointer, reset vector, address range — and fails at the desk instead.
+The badge's OS reads the `.uf2` off its FAT12 drive and copies every block to
+its target address in cart RAM (`src/os/loader/loader.zig`). It then finds the
+*cart descriptor* — a five-word table it scans the image for, defined in
+`src/os/cart/cart_descriptor.zig` — zeroes the `.bss` range the descriptor
+names, and has Core 1 set its stack pointer to the top of cart RAM and jump to
+the descriptor's entry point (`executeCart` in `src/os/cart.zig`). A cart is a
+*RAM cart*: no flash is erased or programmed, and it runs from SRAM, the same
+way the OS now builds its own Zig carts.
+
+There is no debugger in that loop, so `xtask uf2` re-runs every check the
+loader makes — address window, descriptor magic and version, `.bss` bounds, a
+Thumb entry point inside the image — plus one the loader does not: that the
+image and `.bss` together stay out of the 32 KiB stack reserve. It fails at the
+desk instead, and prints how much RAM is left.
 
 [`showcase/fill`](showcase/fill/src/main.rs) is the cart to flash first. It draws
 three labelled colour bands, then solid fills you step through with A and B.
@@ -65,16 +74,13 @@ Every mode names the colour it is drawing, which turns the one bug this port is
 most likely to have — a red/blue swap in the pixel encoding — into something you
 can read off the screen.
 
-A cart that targets the badge needs `cortex-m-rt` among its own dependencies:
-
-```toml
-[target.'cfg(target_arch = "arm")'.dependencies]
-cortex-m-rt = "0.7"
-```
-
-That is not decoration. `cart!` expands to `cortex-m-rt`'s `#[entry]` and
-`#[exception]` attributes, and those generate absolute `::cortex_m_rt` paths
-that only resolve in the crate that invoked the macro.
+Nothing else is needed: a cart's only dependency is `sycl-cart`. There is no
+runtime crate and no reset handler between the loader and the cart's code.
+`cart!` emits the `_start` the descriptor points at, and
+[`sycl-cart/cart_ram.x`](sycl-cart/cart_ram.x) lays the image out the way
+`src/cart/cart_ram.ld` lays out a Zig cart — vector table, descriptor, code,
+read-only data, `.data` linked in place, `.bss` — and writes the descriptor
+itself, since the `.bss` bounds it carries are linker facts.
 
 ## Writing a cart
 
@@ -106,8 +112,8 @@ sycl_cart::cart!(Game);
 
 A cart is a `[[bin]]` with `#![no_std]` and `#![no_main]`. It has no `main` of
 its own: the simulator calls the `start` and `update` exports, and on the badge
-`cortex-m-rt` puts a reset vector in front of the same two functions and `cart!`
-supplies the frame loop. Three complete carts to read:
+the OS jumps to the `_start` that `cart!` emits, which runs the same two
+functions in a loop. Three complete carts to read:
 
 * [`showcase/fill`](showcase/fill/src/main.rs) — colour bands and solid fills.
   The smallest thing worth flashing, and the one that proves the pixel encoding.
@@ -224,11 +230,12 @@ re-encodes, so hoist it out of per-pixel loops.
 
 |  | simulator (`wasm32`) | badge (`thumbv8m.main`) |
 |---|---|---|
+| image | a wasm module the host instantiates | a RAM cart the OS copies to `0x20035100` |
 | framebuffer | wasm memory `0x20`, one buffer | `0x20020020`, one of two used |
 | pixel encoding | byte-swapped RGB565 | BGR565 |
 | present | host composites after `update` | dirty rect + SIO FIFO handshake |
 | trace / tone / rand | `env` imports | shared IPC block + FIFO messages |
-| frame loop | the host calls `update` | `cortex-m-rt` entry, `present` paces it |
+| frame loop | the host calls `update` | `_start` from `cart!`, `present` paces it |
 | panic | trap → simulator blue screen | trace, then park |
 | save data | 4 MiB host buffer | not implemented on v2 |
 
@@ -284,8 +291,10 @@ Levels cascade through cargo features (`log-error` ⊂ `log-warn` ⊂ `log-info`
 *entirely*, format strings included — verified by grepping the built wasm. They
 are still type-checked, so disabled logging cannot rot.
 
-Formatting uses [`ufmt`], not `core::fmt`, which would cost 10–20 KiB of a
-~160 KiB cart budget. `ufmt` has no float support, so use `text::fx` for those.
+Formatting uses [`ufmt`], not `core::fmt`, which would cost 10–20 KiB of a cart
+budget that is all RAM: about 275 KiB for code and `.bss` together, 40 KiB of
+which the backbuffer already takes. `ufmt` has no float support, so use
+`text::fx` for those.
 
 Keep the rate low. On the badge the kernel drains the message FIFO once per loop
 iteration, so several traces in one frame may be coalesced or lost, and each one
@@ -294,18 +303,31 @@ values.
 
 ## Audio
 
-One monophonic voice, because that is what the badge has: `src/os/drivers/audio.zig`
-drives GPIO9 with a PWM carrier whose duty sets amplitude, and a DMA channel
-walks a wave table at the note frequency. It plays one note at a time in one of
-three shapes. The simulator runs the full WASM-4 APU — four channels, ADSR,
+One monophonic voice, because that is what the badge has. `src/os/drivers/audio.zig`
+plays one note at a time in one of three shapes, and how it makes the sound
+depends on the board revision the OS detects at boot (`src/os/drivers/rev.zig`):
+
+* **Revision 0** (green board) has a magnetic buzzer on GPIO9. A square wave is
+  a PWM carrier at 300 kHz whose duty sets the amplitude, with a DMA channel
+  flipping between two levels at the note frequency. Triangle and sawtooth go
+  through the software mixer below, into the same PWM.
+* **Revisions 1 and 2** (purple, and the SYCL 2026 production run) have an I2S
+  amplifier. Every shape is mixed in software at 44.1 kHz and streamed out
+  through a PIO as stereo 16-bit samples, the same value on both channels.
+
+The cart cannot tell which it is running on, and does not need to: the IPC
+contract is a frequency, a duration, a volume and a shape, and the kernel picks
+the backend. The simulator runs the full WASM-4 APU — four channels, ADSR,
 slides, panning — and we deliberately drive only the common subset, so a cart
-sounds the same in both places.
+sounds the same in all three places.
 
 `Audio::tone` is the raw primitive. Above it, a sequencer plays `&'static`
 tracks at three priorities (one-shot beep > SFX > music), resolves one winning
-note per frame, and only touches the hardware when that note *changes* — every
-`tone()` on the badge aborts a DMA channel and reprograms a PWM slice, so
-re-issuing the same note 60 times a second is audible as clicking.
+note per frame, and only touches the hardware when that note *changes*. On a
+revision 0 board every `tone()` aborts the DMA channel and reprograms the PWM
+slice, so re-issuing the same note 60 times a second is audible as clicking;
+the mixer on later boards takes a new note in its stride, but a message per
+frame is still a FIFO round trip Core 0 has to service.
 
 ```rust
 static SFX_FLAP: Track = Track::once(&[Step::at(notes::G6, 2, 0.55)]);
@@ -323,12 +345,15 @@ saw, so it plays as a 25 % duty pulse, which is brighter than a square but not
 the same timbre.
 
 `audio::notes` covers C4 to B7 chromatically, `S` meaning sharp — `DS6` is D#6.
-Octaves 6 and 7 are the ones that carry on the buzzer.
+Octaves 6 and 7 are the ones that carry on a revision 0 buzzer.
 
-Two hardware caveats we do not paper over: pitch is currently about 400 cents
-sharp on real hardware (`src/os/drivers/audio.zig:32`), and the buzzer's response
-peaks near 2700 Hz and rolls off steeply either side, so low notes will be quiet
-on the badge however good they sound in the simulator.
+One hardware caveat we do not paper over: the revision 0 buzzer's response
+peaks near 2700 Hz and rolls off steeply either side
+(`docs/audio_analysis/README.md`), so low notes will be quiet on that board
+however good they sound in the simulator. The driver used to carry a note that
+pitch ran about 400 cents sharp; the rewrite that added the revision backends
+dropped it and derives its timing from the system clock. We have not measured
+the result.
 
 ## Wasm link flags
 
@@ -346,15 +371,16 @@ in ways that are hard to diagnose:
   checks the stack pointer starts above the framebuffer.
 
 `--global-base=41248` is the first 32-byte boundary past the framebuffer.
-Note that `build.zig:535` uses `0xA01E`, which is two bytes *inside* it — benign
-because the linker rounds the first segment up, but don't copy the value.
+Note that `build.zig` sets `wasm.global_base` to `160 * 128 * 2 + 0x1e`, which
+is two bytes *inside* it — benign because the linker rounds the first segment
+up, but don't copy the value.
 
 ## Layout
 
 ```
 sycl-cart/          the framework
-  memory.x          badge flash and RAM layout, mirroring src/cart/cart_xip.ld
-  build.rs          puts memory.x on the linker search path
+  cart_ram.x        badge RAM layout and cart descriptor, mirroring src/cart/cart_ram.ld
+  build.rs          puts cart_ram.x on the linker search path
   src/platform/     wasm.rs, badge.rs, host.rs (for tests), ipc.rs (shared layout)
   src/gfx.rs        backbuffer, drawing, dirty tracking, volatile flush
   src/sprite.rs     sprites, sheets, sprite!/sprite_sheet!, animation
@@ -368,7 +394,7 @@ showcase/fill/      colour bands and solid fills, for hardware bring-up
 showcase/flappy/    a complete game
 showcase/itest/     interactive hardware test
 xtask/              build, uf2 packing, and the watch server the simulator expects
-  src/uf2.rs        ELF -> UF2, with the OS's own launch checks
+  src/uf2.rs        ELF -> UF2, with the OS loader's own checks
 tools/              gen_font.py, sim_check.mjs
 ```
 
@@ -382,19 +408,22 @@ table reads the intuitive way.
 Working: the whole simulator path, verified by `tools/sim_check.mjs` — memory
 layout, rendering, audio encoding, trace output.
 
-Working on hardware: `showcase/fill`, flashed to a badge as a `.uf2` built by
-`cargo xtask uf2`. It reaches its entry point, draws, reads buttons and paces
-itself on `present`, which exercises the reset vector, `cortex-m-rt`'s
-scatter-init, the frame loop, the dirty-rect publish and the SIO FIFO handshake.
-Its colour bands come out in the right order, which is what confirms the pixel
-encoding in `src/platform/badge.rs` — the part that changed with PR #123 and
-that no simulator run can check.
+Ran on hardware: `showcase/fill`, as an XIP cart under the previous OS loader.
+It reached its entry point, drew, read buttons and paced itself on `present`,
+which exercised the frame loop, the dirty-rect publish and the SIO FIFO
+handshake. Its colour bands came out in the right order, which is what confirms
+the pixel encoding in `src/platform/badge.rs` — the part that changed with
+PR #123 and that no simulator run can check. None of that code has changed
+since.
 
-Not yet run on hardware: the audio path (including the wave shapes), the
-neopixels, the `HardFault` handler, and `flappy` and `itest` as whole carts.
+Not yet run on hardware: the RAM-cart path that replaced XIP when the OS moved
+its own carts to RAM — the descriptor, `_start`, our vector table and the VTOR
+write in `platform::init` — so `fill` is again the cart to flash first. Also
+untested there: the audio path (including the wave shapes), the neopixels, the
+`HardFault` handler, and `flappy` and `itest` as whole carts.
 
-Watch the size: the loader caps a cart image at roughly 160 KiB
-(`src/os/loader/loader.zig:233` against a 320 KiB staging buffer, 256 payload
-bytes per 512-byte UF2 block). `xtask uf2` enforces it.
+Watch the size: a RAM cart's code, data and `.bss` share about 275 KiB
+(`cart_ram.x`: 0x4AF00 bytes of RAM less a 32 KiB stack reserve), and the
+40 KiB backbuffer is already in there. `xtask uf2` reports what is left.
 
 [`ufmt`]: https://docs.rs/ufmt

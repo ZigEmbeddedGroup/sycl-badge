@@ -25,8 +25,9 @@
 //!
 //! # Why not `format!`
 //!
-//! `format!` allocates, and `core::fmt` costs 10–20 KiB of flash against a
-//! ~160 KiB cart budget. Formatting here goes through [`ufmt`], which is 1–2 KiB.
+//! `format!` allocates, and `core::fmt` costs 10–20 KiB against a cart budget of
+//! about 275 KiB of RAM that code shares with `.bss`. Formatting here goes
+//! through [`ufmt`], which is 1–2 KiB.
 //!
 //! Two consequences of that choice:
 //!

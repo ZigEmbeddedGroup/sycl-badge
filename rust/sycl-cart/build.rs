@@ -1,9 +1,9 @@
-//! Puts `memory.x` where `cortex-m-rt`'s `link.x` can find it.
+//! Puts `cart_ram.x` where the linker can find it.
 //!
-//! `link.x` does `INCLUDE memory.x`, and the linker resolves that against its
-//! search path. Emitting the search path from here rather than from each cart
-//! means a cart crate needs no build script of its own — the same reason a HAL
-//! crate normally does this.
+//! `.cargo/config.toml` links every badge build with `-Tcart_ram.x`, and the
+//! linker resolves that name against its search path. Emitting the search path
+//! from here rather than from each cart means a cart crate needs no build
+//! script of its own — the same reason a HAL crate normally does this.
 
 use std::env;
 use std::fs;
@@ -18,8 +18,8 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=memory.x");
+    println!("cargo:rerun-if-changed=cart_ram.x");
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
-    fs::write(out.join("memory.x"), include_bytes!("memory.x")).expect("write memory.x");
+    fs::write(out.join("cart_ram.x"), include_bytes!("cart_ram.x")).expect("write cart_ram.x");
     println!("cargo:rustc-link-search={}", out.display());
 }

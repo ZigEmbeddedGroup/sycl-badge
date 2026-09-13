@@ -5,8 +5,9 @@
 //!
 //! # Design constraints
 //!
-//! * **`core::fmt` is not used.** Rust's formatting machinery costs 10–20 KiB of
-//!   flash, against a ~160 KiB cart budget. We use [`ufmt`] instead, at 1–2 KiB.
+//! * **`core::fmt` is not used.** Rust's formatting machinery costs 10–20 KiB,
+//!   against a cart budget of about 275 KiB of RAM that code shares with `.bss`.
+//!   We use [`ufmt`] instead, at 1–2 KiB.
 //! * **Disabled levels vanish.** Each macro is wrapped in `if ENABLED`, where
 //!   `ENABLED` is a `const bool` from a cargo feature. The call, the arguments
 //!   *and the format strings* are dropped by the optimizer, so a release cart

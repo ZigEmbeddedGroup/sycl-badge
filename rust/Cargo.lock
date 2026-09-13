@@ -6,35 +6,13 @@ version = 4
 name = "beep"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "sycl-cart",
-]
-
-[[package]]
-name = "cortex-m-rt"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c439b23bf18154d8a634543caf1ee73cceb723f2902f7ea243634159a00fd47"
-dependencies = [
- "cortex-m-rt-macros",
-]
-
-[[package]]
-name = "cortex-m-rt-macros"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061a75f3e7f3f01d649668d68e02d0ef92c7041a9c97b8fe6bc354ddbf40822d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
 name = "fill"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "sycl-cart",
 ]
 
@@ -42,7 +20,6 @@ dependencies = [
 name = "flappy"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "sycl-cart",
 ]
 
@@ -50,7 +27,6 @@ dependencies = [
 name = "itest"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "sycl-cart",
 ]
 
@@ -58,7 +34,6 @@ dependencies = [
 name = "levels"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "sycl-cart",
 ]
 
@@ -84,7 +59,6 @@ dependencies = [
 name = "sycl-cart"
 version = "0.1.0"
 dependencies = [
- "cortex-m-rt",
  "ufmt",
 ]
 
@@ -93,17 +67,6 @@ name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
-version = "2.0.119"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -128,7 +91,7 @@ checksum = "d337d3be617449165cb4633c8dece429afd83f84051024079f97ad32a9663716"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn",
 ]
 
 [[package]]

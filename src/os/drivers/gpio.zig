@@ -209,26 +209,30 @@ pub fn resetCartHardware() void {
 /// enum may only have 8 variants (RP2040). @enumFromInt(8..11) would be
 /// invalid and can panic. Direct CSR writes work for all 12 slices.
 pub fn resetCartPWM() void {
-    const PWM_BASE: u32 = 0x400a8000;
-    const CH_SIZE: u32 = 0x14; // 20 bytes per channel (CSR, DIV, CTR, CC, TOP)
-    const CSR_EN: u32 = 1;
+    // TODO: The OS is using these PWMs, we need special allocations if cart can use them.
 
-    var i: u32 = 0;
-    while (i < 12) : (i += 1) {
-        const csr_addr = PWM_BASE + i * CH_SIZE;
-        const csr: *volatile u32 = @ptrFromInt(csr_addr);
-        csr.* = csr.* & ~CSR_EN; // Clear EN bit to disable
-    }
+    // const PWM_BASE: u32 = 0x400a8000;
+    // const CH_SIZE: u32 = 0x14; // 20 bytes per channel (CSR, DIV, CTR, CC, TOP)
+    // const CSR_EN: u32 = 1;
+
+    // var i: u32 = 0;
+    // while (i < 12) : (i += 1) {
+    //     const csr_addr = PWM_BASE + i * CH_SIZE;
+    //     const csr: *volatile u32 = @ptrFromInt(csr_addr);
+    //     csr.* = csr.* & ~CSR_EN; // Clear EN bit to disable
+    // }
 }
 
 /// Step 3: Disable all PIO state machines
 pub fn resetCartPIO() void {
-    const PIO0_CTRL: *volatile u32 = @ptrFromInt(0x50200000);
-    const PIO1_CTRL: *volatile u32 = @ptrFromInt(0x50300000);
-    const PIO2_CTRL: *volatile u32 = @ptrFromInt(0x50400000);
-    PIO0_CTRL.* = PIO0_CTRL.* & ~@as(u32, 0xF);
-    PIO1_CTRL.* = PIO1_CTRL.* & ~@as(u32, 0xF);
-    PIO2_CTRL.* = PIO2_CTRL.* & ~@as(u32, 0xF);
+    // TODO: The OS is using these PIOs, we need special allocations if cart can use them.
+
+    // const PIO0_CTRL: *volatile u32 = @ptrFromInt(0x50200000);
+    // const PIO1_CTRL: *volatile u32 = @ptrFromInt(0x50300000);
+    // const PIO2_CTRL: *volatile u32 = @ptrFromInt(0x50400000);
+    // PIO0_CTRL.* = PIO0_CTRL.* & ~@as(u32, 0xF);
+    // PIO1_CTRL.* = PIO1_CTRL.* & ~@as(u32, 0xF);
+    // PIO2_CTRL.* = PIO2_CTRL.* & ~@as(u32, 0xF);
 }
 
 /// Step 4: Clear neopixels via WS2812B protocol

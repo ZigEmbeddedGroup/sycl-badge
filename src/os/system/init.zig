@@ -203,10 +203,10 @@ pub fn init(config: InitConfig) !void {
     if (config.late_wait_for_tracy_time != 0 and terry.client.is_waiting_for_connection()) {
         const deadline = timer.micros() + config.late_wait_for_tracy_time;
         lcd.clearScreen(lcd.BLACK);
-        while (lcd.isBusy() and terry.client.is_waiting_for_connection()) {
+        while (lcd.is_busy() and terry.client.is_waiting_for_connection()) {
             terry.client.poll();
         }
-        while (lcd.isBusy()) {}
+        while (lcd.is_busy()) {}
         const msg = "Waiting for Tracy";
         lcd.drawString(@intCast(lcd.width / 2 - (msg.len * 4)), lcd.height / 2 - 4, msg, lcd.CYAN, lcd.BLACK, 1);
         if (terry.client.is_waiting_for_connection()) {

@@ -193,6 +193,11 @@ pub fn build(b: *Build) void {
         .root_source_file = b.path("showcase/carts/zeroman/src/main.zig"),
         .custom_builder = @import("showcase/carts/zeroman/build.zig").build_cart,
     });
+    add_os_cart(b, &dep, .{
+        .name = "vsync",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("showcase/carts/vsync/src/main.zig"),
+    });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = b.addExecutable(.{
@@ -501,7 +506,7 @@ pub const OsCartOptions = struct {
     name: []const u8,
     optimize: std.builtin.OptimizeMode,
     root_source_file: Build.LazyPath,
-    custom_builder: ?*const fn(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step: *Build.Step) void = null,
+    custom_builder: ?*const fn (b: *Build, cart: *Build.Module, cart_api: *Build.Module, step: *Build.Step) void = null,
 };
 
 pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
@@ -545,7 +550,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         const shared_step = b.allocator.create(Build.Step.TopLevel) catch @panic("oom");
         shared_step.* = .{
             .step = .init(.{
-                .name = b.fmt("{s} assets", .{ options.name }),
+                .name = b.fmt("{s} assets", .{options.name}),
                 .tag = .top_level,
                 .owner = b,
             }),

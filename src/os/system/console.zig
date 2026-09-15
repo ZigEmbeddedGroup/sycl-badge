@@ -1108,7 +1108,7 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // Menu Command - Return to cart selection screen
-var menu_y_pos: u16 = 0;
+var menu_y_pos: i16 = 0;
 
 fn menuCartVisitor(name: []const u8, size: u32) void {
     _ = size;
@@ -1213,7 +1213,7 @@ fn lcdFpsBenchmark() void {
     while (i < 100) : (i += 1) {
         const color = colors[i % colors.len];
         lcd.clearScreen(color);
-        lcd.vsync();
+        lcd.wait_for_ready();
     }
 
     const end_time = timer.get_time_since_boot();

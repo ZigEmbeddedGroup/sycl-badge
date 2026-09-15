@@ -10,6 +10,9 @@ const dma = @import("dma.zig");
 const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
+const fps_overlay = @import("../system/fps_overlay.zig");
+
+const log = std.log.scoped(.lcd);
 
 /// Display Configuration
 pub const width: u16 = 160;
@@ -22,6 +25,8 @@ const State = enum {
     /// Ready to send new data
     /// any draw operation will transition
     ready,
+    /// Waiting for vsync before starting the next DMA
+    wait_vsync,
     /// Waiting for a pending DMA.
     /// interrupt will handle transition
     wait_dma,
@@ -34,28 +39,116 @@ const State = enum {
     flush_spi,
 
     pub fn is_waiting_for_interrupt(st: State) bool {
-        return st == .wait_dma or st == .shutdown_dma;
+        return switch (st) {
+            .wait_vsync, .wait_dma, .shutdown_dma => true,
+            .ready, .flush_spi => false,
+        };
     }
 };
 
-/// Cleanup to do after DMA finishes, for any persistent
-/// screen state
-const PostDMACommands = enum {
-    none,
-    reset_orientation,
+/// Orientation of the data to be sent to the screen
+const DataOrientation = enum {
+    row_major, // data[y][x]
+    col_major, // data[x][y], scanline rendering order
 };
 
 var _state: State = .ready;
 var state: *volatile State = &_state;
 
-var remaining_dmas: u32 = 0;
-var dma_ptr: [*]const u16 = undefined;
-var dma_len: usize = 0;
-var dma_stride: usize = 0;
-var post_dma_commands: PostDMACommands = .none;
+var dma_buf: [*]const u16 = undefined;
+var dma_buf_pitch: usize = 0;
+var dma_rects: [5]Rect8 = undefined;
+var num_dma_rects: usize = 0;
+var next_dma_rect: usize = 0;
+var curr_scanlines_left: usize = 0;
+var curr_scanline: [*]const u16 = undefined;
+var curr_scanline_width: usize = 0;
+var dma_orientation: DataOrientation = .row_major;
+
+var cart_vsync_enabled: bool = false;
+
+fn setup_dma_rects(buf: [*]const u16, buf_pitch: usize, num_rects: usize, orientation: DataOrientation) void {
+    dma_buf = buf;
+    dma_buf_pitch = buf_pitch;
+    num_dma_rects = num_rects;
+    next_dma_rect = 0;
+    curr_scanlines_left = 0;
+    curr_scanline = undefined;
+    curr_scanline_width = 0;
+    dma_orientation = orientation;
+}
+
+fn setup_dma_region(buf: [*]const u16, buf_pitch: usize, scanline_width: usize, num_scanlines: usize, orientation: DataOrientation) void {
+    dma_buf_pitch = buf_pitch;
+    num_dma_rects = 0;
+    next_dma_rect = 0;
+    curr_scanline = buf;
+    if (scanline_width == buf_pitch) {
+        curr_scanline_width = scanline_width * num_scanlines;
+        curr_scanlines_left = 1;
+    } else {
+        curr_scanline_width = scanline_width;
+        curr_scanlines_left = num_scanlines;
+    }
+    dma_orientation = orientation;
+}
+
+fn start_scanline_dma() void {
+    asm volatile ("" ::: .{ .memory = true });
+    state.* = .wait_dma;
+
+    std.debug.assert(curr_scanlines_left >= 1);
+    dma.startLCD(curr_scanline[0..curr_scanline_width]);
+    curr_scanline += dma_buf_pitch;
+    curr_scanlines_left -= 1;
+}
+
+fn start_next_dma() void {
+    if (curr_scanlines_left > 0) {
+        start_scanline_dma();
+        return;
+    } else while (next_dma_rect < num_dma_rects) {
+        const rect = &dma_rects[next_dma_rect];
+        next_dma_rect += 1;
+        if (!rect.has_area()) {
+            continue;
+        }
+
+        // Update the DMA rect
+        flush_spi();
+        end_data();
+        set_window(rect.*, dma_orientation);
+        start_data();
+
+        curr_scanline = dma_buf + (rect.min_x * dma_buf_pitch) + rect.min_y;
+        curr_scanline_width = (rect.max_y - rect.min_y);
+        curr_scanlines_left = (rect.max_x - rect.min_x);
+        if (curr_scanline_width == dma_buf_pitch) {
+            curr_scanline_width *= curr_scanlines_left;
+            curr_scanlines_left = 1;
+        }
+
+        start_scanline_dma();
+        return;
+    }
+
+    state.* = .flush_spi;
+}
 
 var int_running: bool = false;
 
+// Interrupt handler for the "tearing effect" pin.
+// Called on vsync when set_vsync_interrupt(true)
+// has been called.
+pub fn interrupt_te(events: gpio.IrqEvents) void {
+    if (events.rise != 0 and state.* == .wait_vsync) {
+        state.* = .wait_dma;
+        start_next_dma();
+        set_vsync_interrupt(false);
+    }
+}
+
+// Interrupt handler for DMA finished
 pub fn interrupt_DMA_0() callconv(.c) void {
     const DMA = microzig.chip.peripherals.DMA;
     const flags = DMA.INTS0.raw;
@@ -69,22 +162,21 @@ pub fn interrupt_DMA_0() callconv(.c) void {
         }
         int_running = true;
 
-        var start_dma_buf: ?[]const u16 = null;
+        var should_start_dma = false;
 
-        switch (state.*) {
+        handle_dma: switch (state.*) {
+            .wait_vsync => {
+                // Shouldn't happen, we shouldn't be running DMAs
+                // while waiting for vsync. To prevent a softlock,
+                // chain the DMA anyway.
+                log.err("interrupt_DMA_0 called in wait_vsync state", .{});
+                continue :handle_dma .wait_dma;
+            },
             .wait_dma => {
-                if (remaining_dmas > 1) {
-                    // Schedule the next DMA
-                    remaining_dmas -= 1;
-                    start_dma_buf = dma_ptr[0..dma_len];
-                    dma_ptr += dma_stride;
-                } else {
-                    remaining_dmas = 0;
-                    state.* = .flush_spi; // poll() will continue
-                }
+                should_start_dma = true;
             },
             .shutdown_dma => {
-                remaining_dmas = 0;
+                setup_dma_region(undefined, 1, 0, 0, dma_orientation);
                 state.* = .flush_spi;
             },
             .ready, .flush_spi => {},
@@ -95,8 +187,8 @@ pub fn interrupt_DMA_0() callconv(.c) void {
         DMA.INTS0.write_raw(0b1);
 
         // Don't start the new DMA until after clearing the status register!
-        if (start_dma_buf) |buf| {
-            dma.startLCD(buf);
+        if (should_start_dma) {
+            start_next_dma();
         }
     }
 }
@@ -174,10 +266,10 @@ fn sync_resolve_state(wait_for_transfer: bool) void {
         } else {
             flush_spi_rx_values();
         }
-        finish_DMA_data();
-        switch (post_dma_commands) {
-            .none => {},
-            .reset_orientation => {
+        end_data();
+        switch (dma_orientation) {
+            .row_major => {},
+            .col_major => {
                 writeCommandWithData(.MADCTL, &.{0x60});
             },
         }
@@ -185,7 +277,7 @@ fn sync_resolve_state(wait_for_transfer: bool) void {
     }
 }
 
-fn wait_for_ready() void {
+pub fn wait_for_ready() void {
     const z = terry.core0.fn_zone_cond(@src(), state.*.is_waiting_for_interrupt());
     defer z.end();
 
@@ -193,11 +285,25 @@ fn wait_for_ready() void {
     sync_resolve_state(true); // force synchronous SPI flush
 }
 
+// Enable the vsync interrupt.
+// This interrupt is "one-shot", it disables itself.
+// It must be enabled again any time we want to wait
+// for vsync.
+fn set_vsync_interrupt(enabled: bool) void {
+    const te_pin = board.LCD_TE;
+    if (enabled) {
+        te_pin.set_irq_enabled(.{ .rise = 1 }, true);
+    } else {
+        te_pin.set_irq_enabled(.{ .rise = 1 }, false);
+    }
+}
+
 fn ensure_ready() void {
     if (state.* != .ready) {
         // TODO: this is a programmer error, it will likely
         // cause an audio glitch. Find a way to report this
         // for OS debugging without crashing everything.
+        log.warn("Blocking wait for LCD DMA to finish", .{});
         wait_for_ready();
     }
 }
@@ -247,6 +353,58 @@ pub const Color16 = packed struct(u16) {
     }
 };
 
+// An absolute AABB Rect 2D clipped to the screen
+pub const Rect8 = struct {
+    min_x: u8, // inclusive
+    min_y: u8, // inclusive
+    max_x: u8, // exclusive
+    max_y: u8, // exclusive
+
+    pub const all: Rect8 = .{
+        .min_x = 0,
+        .min_y = 0,
+        .max_x = width,
+        .max_y = height,
+    };
+
+    pub const none: Rect8 = .{
+        .min_x = width,
+        .min_y = height,
+        .max_x = 0,
+        .max_y = 0,
+    };
+
+    pub fn clip_absolute(abs: [4]i16) Rect8 {
+        return .{
+            .min_x = @intCast(@max(0, @min(width, abs[0]))),
+            .min_y = @intCast(@max(0, @min(height, abs[1]))),
+            .max_x = @intCast(@max(0, @min(width, abs[2]))),
+            .max_y = @intCast(@max(0, @min(height, abs[3]))),
+        };
+    }
+
+    pub fn clip_relative(rel: [4]i16) Rect8 {
+        return .clip_absolute(.{ rel[0], rel[1], rel[0] + rel[2], rel[1] + rel[3] });
+    }
+
+    pub fn has_area(rect: Rect8) bool {
+        return rect.max_x > rect.min_x and rect.max_y > rect.min_y;
+    }
+
+    pub fn transposed(rect: Rect8) Rect8 {
+        return .{
+            .min_x = rect.min_y,
+            .min_y = rect.min_x,
+            .max_x = rect.max_y,
+            .max_y = rect.max_x,
+        };
+    }
+
+    pub fn format(self: Rect8, writer: *std.io.Writer) !void {
+        try writer.print("{{ ({d}, {d}), ({d}, {d}) }}", .{ self.min_x, self.min_y, self.max_x, self.max_y });
+    }
+};
+
 // Common colors (RGB565 format)
 pub const BLACK: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
 pub const WHITE: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x1F };
@@ -275,6 +433,8 @@ const Command = enum(u8) {
     CASET = 0x2A, // Column Address Set
     RASET = 0x2B, // Row Address Set
     RAMWR = 0x2C, // Memory Write
+    TEAROFF = 0x34, // Disable tearing effect (vsync) signal
+    TEARON = 0x35, // Enable tearing effect (vsync) signal
     MADCTL = 0x36, // Memory Access Control
     COLMOD = 0x3A, // Color Mode
     FRMCTR1 = 0xB1,
@@ -320,25 +480,15 @@ fn writeData16(data: []const u16) void {
     pins.cs.put(1); // Deselect
 }
 
-fn startData() void {
+fn start_data() void {
     pins.dc.put(1);
     pins.cs.put(0);
     spi_instance.get_regs().SSPCR0.modify(.{ .DSS = 15 });
 }
 
-fn endData() void {
+fn end_data() void {
     spi_instance.get_regs().SSPCR0.modify(.{ .DSS = 7 });
     pins.cs.put(1);
-}
-
-fn start_DMA_data() void {
-    startData();
-    dma.set_DMA_enabled(true);
-}
-
-fn finish_DMA_data() void {
-    dma.set_DMA_enabled(false);
-    endData();
 }
 
 fn writeCommandWithData(cmd: Command, data: []const u8) void {
@@ -357,11 +507,11 @@ pub const Config = struct {
 
 /// Low-level initialization (control pins only)
 /// Use initWithAllPins() for full initialization including SPI and TE pins
-pub fn init(pin_config: Pins, config: Config) !void {
+pub fn init(lcd_pins: LCDPins, config: Config) !void {
     const z = terry.core0.zone("lcd.init", @src());
     defer z.end();
 
-    pins = pin_config;
+    pins = lcd_pins.control;
 
     // Configure GPIO pins
     pins.cs.set_function(.sio);
@@ -384,7 +534,7 @@ pub fn init(pin_config: Pins, config: Config) !void {
         .frac = 0,
     });
     backlight.slice().set_wrap(1023);
-    backlight.set_level(512);
+    backlight.set_level(0);
     backlight.slice().enable();
 
     // Store SPI instance num and baudrate for DMA config
@@ -442,12 +592,15 @@ fn init_display() void {
         0x20, 0x20, 0x20, 0x20, 0x05, 0x00, 0x15, 0xA7,
         0x3D, 0x18, 0x25, 0x2A, 0x2B, 0x2B, 0x3A,
     });
-    writeCommandWithData(.FRMCTR1, &.{ 0x08, 0x08 });
+
+    set_framerate_no_vsync();
+
     writeCommandWithData(.INVCTR, &.{0x07});
     writeCommandWithData(.PWCTR1, &.{ 0x0A, 0x02 });
     writeCommandWithData(.PWCTR2, &.{0x02});
     writeCommandWithData(.VMCTR1, &.{ 0x50, 0x5B });
     writeCommandWithData(.VMOFF, &.{0x40});
+    writeCommandWithData(.TEARON, &.{0x00}); // enable vsync but not hsync
     writeCommandWithData(.CASET, &.{ 0x00, 0x00, 0x00, 0x7F });
     writeCommandWithData(.RASET, &.{ 0x00, 0x00, 0x00, 0x9F });
 
@@ -460,6 +613,100 @@ fn init_display() void {
 
     // Enable DMA to send data to the screen
     dma.initLCD(spi_instance_num);
+}
+
+fn set_framerate_no_vsync() void {
+    ensure_ready();
+
+    writeCommandWithData(.FRMCTR1, &.{ 0x08, 0x08 });
+}
+
+fn frame_ms_for_settings(clk_div: f32, vsync_porch: f32) f32 {
+    return ((160.0 + vsync_porch) * (clk_div + 4.0)) / 200.0;
+}
+
+const FramerateSetting = struct {
+    actual_ms: f32,
+    sub_frames: u16,
+    clk_div: u8,
+    vsync_porch: u8,
+};
+
+fn find_framerate_setting(raw_frame_ms: f32) FramerateSetting {
+    // The maximum refresh time is about 18 mS. For requested times longer than that,
+    // we need to divide it into sub-frames.
+    const max_single_frame = comptime frame_ms_for_settings(0x0F, 0x1F);
+    const min_sub_frames = @max(1, @ceil(raw_frame_ms / max_single_frame));
+    const target_frame_ms = raw_frame_ms / min_sub_frames;
+
+    // Testing shows framerates under this may tear.
+    // I would love to have math to back up this number.
+    // This is ~11.5 mS per frame. We can probably get it down to 9 mS
+    // by optimizing the rectangular DMA to avoid needing interrupt
+    // attention. We can get it down further by changing SPI to run
+    // on a faster clock or by reimplemting SPI to run on PIO (which
+    // has a N/M clock divider)
+    const min_frame_without_tearing = comptime frame_ms_for_settings(0x08, 0x1F);
+    if (target_frame_ms < min_frame_without_tearing) {
+        return .{
+            .actual_ms = min_frame_without_tearing * min_sub_frames,
+            .sub_frames = @intFromFloat(min_sub_frames),
+            .clk_div = 0x08,
+            .vsync_porch = 0x1F,
+        };
+    }
+
+    // FRMCTR1 sets the framerate. Params [clk_div: u4, vsync_porch: u5]
+    //The formula is
+    // FPS = 200_000 / ((160 + vsync_porch) * (clk_div + 4))
+    //  mS = ((160 + vsync_porch) * (clk_div + 4)) / 200
+
+    // We want to have a low clock (to conserve power), but we also want
+    // a high ratio of porch to refresh, to avoid flashing. To split the
+    // difference, find the minimum clock rate that supports the target,
+    // then adjust the porch to match it.
+    var clk_div: f32 = 0x0F;
+    var vsync_porch: f32 = 0x1F;
+
+    var actual_ms = max_single_frame;
+    while (clk_div > 0) {
+        const next_ms = frame_ms_for_settings(clk_div - 1, vsync_porch);
+        if (next_ms < target_frame_ms) break;
+        actual_ms = next_ms;
+        clk_div -= 1;
+    }
+
+    while (vsync_porch > 0) {
+        const next_ms = frame_ms_for_settings(clk_div, vsync_porch - 1);
+        if (next_ms < target_frame_ms) break;
+        actual_ms = next_ms;
+        vsync_porch -= 1;
+    }
+
+    return .{
+        .actual_ms = actual_ms * min_sub_frames,
+        .sub_frames = @intFromFloat(min_sub_frames),
+        .clk_div = @intFromFloat(clk_div),
+        .vsync_porch = @intFromFloat(vsync_porch),
+    };
+}
+
+fn set_target_framerate_for_vsync(raw_frame_ms: f32) void {
+    const setting = find_framerate_setting(raw_frame_ms);
+
+    ensure_ready();
+
+    writeCommandWithData(.FRMCTR1, &.{ setting.clk_div, setting.vsync_porch });
+}
+
+pub fn disable_vsync() void {
+    set_framerate_no_vsync();
+    cart_vsync_enabled = false;
+}
+
+pub fn enable_vsync(frame_ms: f32) void {
+    set_target_framerate_for_vsync(frame_ms);
+    cart_vsync_enabled = true;
 }
 
 pub fn set_backlight(level: u10) void {
@@ -481,11 +728,16 @@ pub fn displayOn(on: bool) void {
 }
 
 /// Drawing Functions
-fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
-    const x0_offset = x0 + xstart;
-    const x1_offset = x1 + xstart;
-    const y0_offset = y0 + ystart;
-    const y1_offset = y1 + ystart;
+fn set_window(raw_rect: Rect8, orientation: DataOrientation) void {
+    const rect: Rect8 = switch (orientation) {
+        .row_major => raw_rect,
+        .col_major => raw_rect.transposed(),
+    };
+
+    const x0_offset = rect.min_x + xstart;
+    const x1_offset = rect.max_x - 1 + xstart;
+    const y0_offset = rect.min_y + ystart;
+    const y1_offset = rect.max_y - 1 + ystart;
 
     // Column address set - send all 4 bytes at once
     writeCommand(.CASET);
@@ -510,12 +762,13 @@ fn setWindow(x0: u16, y0: u16, x1: u16, y1: u16) void {
     writeCommand(.RAMWR);
 }
 
-pub fn drawPixel(x: u16, y: u16, color: Color16) void {
-    if (x >= width or y >= height) return;
+pub fn drawPixel(x: i16, y: i16, color: Color16) void {
+    const rect: Rect8 = .clip_relative(.{ x, y, 1, 1 });
+    if (!rect.has_area()) return;
 
     ensure_ready();
 
-    setWindow(x, y, x, y);
+    set_window(rect, .row_major);
     writeData16(@ptrCast(@as(*const [1]Color16, &color)));
 }
 
@@ -523,32 +776,26 @@ pub fn fillScreen(color: Color16) void {
     fillRect(0, 0, width, height, color);
 }
 
-pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
-    if (x >= width or y >= height) return;
+pub fn fillRect(x: i16, y: i16, w: i16, h: i16, color: Color16) void {
+    const rect: Rect8 = .clip_relative(.{ x, y, w, h });
+    if (!rect.has_area()) return;
 
     const z = terry.core0.fn_zone_cond(@src(), w * h > 16);
     defer z.end();
 
-    const x_clamped = @min(x, width - 1);
-    const y_clamped = @min(y, height - 1);
-    const w_actual = @min(w, width - x_clamped);
-    const h_actual = @min(h, height - y_clamped);
-
-    if (w_actual == 0 or h_actual == 0) return;
-
-    const x1 = x_clamped + w_actual - 1;
-    const y1 = y_clamped + h_actual - 1;
-
     ensure_ready();
 
-    setWindow(x_clamped, y_clamped, x1, y1);
+    set_window(rect, .row_major);
+
+    const h_actual = rect.max_y - rect.min_y;
+    const w_actual = rect.max_x - rect.min_x;
 
     // Create a line buffer
     var line: [width]u16 = undefined;
     @memset(line[0..w_actual], @bitCast(color));
 
     // Keep CS selected for entire fill operation to reduce overhead
-    startData();
+    start_data();
 
     // Write each line
     var row: u16 = 0;
@@ -558,7 +805,7 @@ pub fn fillRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
 
     flush_spi();
 
-    endData();
+    end_data();
 }
 
 pub fn drawHLine(x: u16, y: u16, w: u16, color: Color16) void {
@@ -576,7 +823,7 @@ pub fn drawRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
     drawVLine(x + w - 1, y, h, color);
 }
 
-pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, size: u8) void {
+pub fn drawChar(x: i16, y: i16, char: u8, color: Color16, bg_color: Color16, size: u8) void {
     if (x >= width or y >= height) return;
     if (size == 0) return;
 
@@ -590,25 +837,32 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
 
     // Draw the character bitmap
     if (size == 1) {
+        const rect: Rect8 = .clip_relative(.{ x, y, 8, 8 });
+        if (!rect.has_area()) return;
+
+        const start_col: u8 = @intCast(@max(0, -x));
+        const start_row: u8 = @intCast(@max(0, -y));
+        const max_col: u8 = @intCast(rect.max_x - x);
+        const max_row: u8 = @intCast(rect.max_y - y);
         // Single-size characters: write each row as a contiguous 8-pixel transfer
-        setWindow(x, y, x + 7, y + 7);
-        startData();
-        var row_idx: u8 = 0;
-        while (row_idx < 8) : (row_idx += 1) {
+        set_window(rect, .row_major);
+        start_data();
+        var row_idx: u8 = start_row;
+        while (row_idx < max_row) : (row_idx += 1) {
             const line = glyph[row_idx];
             var buf: [8]u16 = undefined; // 8 pixels * 2 bytes
-            var col: u8 = 0;
-            while (col < 8) : (col += 1) {
+            var col: u8 = start_col;
+            while (col < max_col) : (col += 1) {
                 // Check if pixel is set (0 = foreground, 1 = background in this font)
                 const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
                 const pixel_color = if (bit_set) color else bg_color;
                 buf[col] = @bitCast(pixel_color);
             }
             // Set window for this row and stream it as one transfer
-            write_spi_16_no_flush(&buf);
+            write_spi_16_no_flush(buf[start_col..max_col]);
         }
         flush_spi();
-        endData();
+        end_data();
     } else {
         // Draw the scaled character bitmap
         var row: u8 = 0;
@@ -620,13 +874,13 @@ pub fn drawChar(x: u16, y: u16, char: u8, color: Color16, bg_color: Color16, siz
                 const bit_set = (line & (@as(u8, 1) << @as(u3, @intCast(7 - col)))) == 0;
                 const pixel_color = if (bit_set) color else bg_color;
                 // Draw scaled pixel block
-                fillRect(x + @as(u16, col) * size, y + @as(u16, row) * size, size, size, pixel_color);
+                fillRect(x + @as(i16, col) * size, y + @as(i16, row) * size, size, size, pixel_color);
             }
         }
     }
 }
 
-pub fn drawString(x: u16, y: u16, text: []const u8, color: Color16, bg_color: Color16, size: u8) void {
+pub fn drawString(x: i16, y: i16, text: []const u8, color: Color16, bg_color: Color16, size: u8) void {
     const z = terry.core0.fn_zone(@src());
     defer z.end();
 
@@ -637,186 +891,56 @@ pub fn drawString(x: u16, y: u16, text: []const u8, color: Color16, bg_color: Co
     }
 }
 
-pub fn drawImageClipped(x: i32, y: i32, w: u32, h: u32, data: [*]const Color16, pitch: u32) void {
-    const right = x +% @as(i32, @intCast(w));
-    const bottom = y +% @as(i32, @intCast(h));
-    if (right < 0) return; // Offscreen left
-    if (x >= width) return; // Offscreen right
-    if (bottom < 0) return; // Offscreen top
-    if (y >= height) return; // Offscreen bottom
-    if (w == 0 or h == 0) return; // No Area
+pub noinline fn drawImageClipped(x: i16, y: i16, w: i16, h: i16, data: [*]const Color16, pitch: u32) void {
+    const rect: Rect8 = .clip_relative(.{ x, y, w, h });
+    if (!rect.has_area()) return;
 
-    const z = terry.core0.fn_zone(@src());
-    defer z.end();
-
-    var start = data;
-    var draw_width = w;
-    var draw_height = h;
-    if (x < 0) {
-        start += @intCast(-x);
-        draw_width -= @intCast(-x);
-    }
-    if (y < 0) {
-        start += @intCast(@as(u32, @intCast(-y)) * pitch);
-        draw_height -= @intCast(-y);
-    }
-    if (right > width) {
-        draw_width -= @intCast(right - width);
-    }
-    if (bottom > height) {
-        draw_height -= @intCast(bottom - height);
-    }
-
-    const x0: u16 = @intCast(@max(x, 0));
-    const y0: u16 = @intCast(@max(y, 0));
-    const x1: u16 = @intCast(x0 + draw_width - 1);
-    const y1: u16 = @intCast(y0 + draw_height - 1);
+    const start_col: u8 = @intCast(@max(0, -x));
+    const start_row: u8 = @intCast(@max(0, -y));
+    const max_col: u8 = @intCast(rect.max_x - x);
+    const max_row: u8 = @intCast(rect.max_y - y);
 
     ensure_ready();
 
-    setWindow(x0, y0, x1, y1);
-    if (draw_width == pitch) {
-        {
-            const cs = microzig.interrupt.enter_critical_section();
-            defer cs.leave();
+    if (@sizeOf(@TypeOf(data[0])) != @sizeOf(u16)) @compileError("Image data must be colors");
+    const raw_data: [*]const u16 = @ptrCast(data);
+    setup_dma_region(raw_data + start_row * pitch + start_col, pitch, max_col - start_col, max_row - start_row, .row_major);
 
-            remaining_dmas = 1;
-            state.* = .wait_dma;
-            post_dma_commands = .none;
-        }
-
-        start_DMA_data();
-
-        dma.startLCD(@ptrCast(start[0 .. draw_height * draw_width]));
-    } else {
-        {
-            const cs = microzig.interrupt.enter_critical_section();
-            defer cs.leave();
-
-            remaining_dmas = draw_height;
-            state.* = .wait_dma;
-            dma_stride = pitch;
-            dma_ptr = @ptrCast(start + pitch);
-            dma_len = draw_width;
-            post_dma_commands = .none;
-        }
-
-        start_DMA_data();
-
-        dma.startLCD(@ptrCast(start[0..draw_width]));
-    }
+    set_window(rect, .row_major);
+    start_data();
+    start_next_dma();
 }
 
-/// Direct buffer writing (for framebuffer updates)
-pub fn writeBuffer(x: u16, y: u16, w: u16, h: u16, buffer: []const u16) void {
-    if (x >= width or y >= height) return;
-
-    const z = terry.core0.fn_zone(@src());
-    defer z.end();
-
-    const x1 = @min(x + w - 1, width - 1);
-    const y1 = @min(y + h - 1, height - 1);
-
-    ensure_ready();
-
-    setWindow(x, y, x1, y1);
-    writeData16(buffer);
-}
-
-/// Write a column-major framebuffer (the cart API layout) to the full display.
+/// Write a rectangle from a column-major cart framebuffer.
 ///
+/// Rect is in cart coordinates (x:0..159, y:0..127), where x is horizontal
+/// and y is vertical on the user-facing display.
 /// Temporarily switches to MADCTL=0x40 (MV=0, MX=1, MY=0) so the
 /// native column axis (128 = screen-Y) is the fast scan direction, matching
 /// the framebuffer memory order, and the image orientation matches the
 /// right-side-up landscape MADCTL=0x60 used for normal UI rendering.
-pub fn writeCartBuffer(buffer: []const u16) void {
-    ensure_ready();
-
-    // MV=0: no row/column exchange; CASET = native cols (0-127), RASET = native rows (0-159).
-    // MX=1: columns scan 127→0 so cart_y=0 maps to native col 127 (screen top, since
-    //        landscape MADCTL=0x60 maps native_col=127-screen_y).
-    // MY=0: rows scan 0→159 so cart_x=0 maps to native row 0 (screen left).
-    writeCommandWithData(.MADCTL, &.{0x40});
-
-    // With MV=0: CASET = native columns (0-127), RASET = native rows (0-159).
-    // Send CASET/RASET directly to avoid confusion with setWindow's x/y naming.
-    writeCommand(.CASET);
-    writeData8(&[_]u8{ 0x00, 0x00 + xstart, 0x00, 127 + xstart });
-    writeCommand(.RASET);
-    writeData8(&[_]u8{ 0x00, 0x00 + ystart, 0x00, 159 + ystart });
-    writeCommand(.RAMWR);
-
-    start_DMA_data();
-
-    {
-        const cs = microzig.interrupt.enter_critical_section();
-        defer cs.leave();
-
-        remaining_dmas = 1;
-        state.* = .wait_dma;
-        post_dma_commands = .reset_orientation;
-    }
-
-    dma.startLCD(buffer);
-}
-
-/// Write only a rectangle from a column-major cart framebuffer.
-///
-/// Rect is in cart coordinates (x:0..159, y:0..127), where x is horizontal
-/// and y is vertical on the user-facing display.
-pub fn writeCartBufferRect(buffer: []const u16, x: u16, y: u16, w: u16, h: u16) void {
-    // If the update is very large, full-frame transfer is usually cheaper.
-    const area: u32 = @as(u32, w) * @as(u32, h);
-    if (area >= (width * height * 3) / 4) {
-        writeCartBuffer(buffer);
-        return;
-    }
-
-    if (x >= width or y >= height or w == 0 or h == 0) return;
-
-    const x0: u16 = x;
-    const y0: u16 = y;
-    const x1: u16 = @min(x + w - 1, width - 1);
-    const y1: u16 = @min(y + h - 1, height - 1);
-
-    const rw: u16 = 1 + x1 - x0;
-    const rh: u16 = 1 + y1 - y0;
-    if (rw == 0 or rh == 0) return;
+pub fn write_cart_buffer(buffer: []const u16, rect: Rect8) void {
+    const has_data = rect.has_area();
+    if (!has_data and !cart_vsync_enabled) return;
 
     ensure_ready();
 
-    // MV=0/MX=1/MY=0 mode matching writeCartBuffer.
-    writeCommandWithData(.MADCTL, &.{0x40});
+    if (has_data) {
+        writeCommandWithData(.MADCTL, &.{0x40});
 
-    // In this mode, cart x maps to native row and cart y maps to native col (reversed).
-    const col_start: u16 = y0;
-    const col_end: u16 = y1;
-    const row_start: u16 = x0;
-    const row_end: u16 = x1;
-
-    writeCommand(.CASET);
-    writeData8(&[_]u8{ 0x00, @truncate(col_start + xstart), 0x00, @truncate(col_end + xstart) });
-    writeCommand(.RASET);
-    writeData8(&[_]u8{ 0x00, @truncate(row_start + ystart), 0x00, @truncate(row_end + ystart) });
-    writeCommand(.RAMWR);
-
-    const col_base = @as(usize, x0) * height + y0;
-
-    start_DMA_data();
-
-    {
-        const cs = microzig.interrupt.enter_critical_section();
-        defer cs.leave();
-
-        remaining_dmas = rw;
-        state.* = .wait_dma;
-        dma_stride = height;
-        dma_ptr = buffer.ptr + col_base + height;
-        dma_len = rh;
-        post_dma_commands = .reset_orientation;
+        const num_rects = fps_overlay.clip_draw_rects(rect, &dma_rects);
+        setup_dma_rects(buffer.ptr, height, num_rects, .col_major);
+    } else {
+        setup_dma_region(undefined, 1, 0, 0, .row_major);
     }
 
-    dma.startLCD(buffer[col_base..][0..rh]);
+    if (cart_vsync_enabled) {
+        asm volatile ("" ::: .{ .memory = true });
+        state.* = .wait_vsync;
+        set_vsync_interrupt(true);
+    } else if (has_data) {
+        start_next_dma();
+    }
 }
 
 /// Test Functions
@@ -903,25 +1027,32 @@ pub fn initWithAllPins(all_pins: LCDPins, config: Config) !void {
     configureLCDTEPin(all_pins.te);
 
     // Initialize LCD with control pins
-    try init(all_pins.control, config);
+    try init(all_pins, config);
 }
 
 // DMA Functions
 
-pub fn vsync() void {
-    wait_for_ready();
-}
-
 /// Stop DMA transfers
-pub fn stopDMA() void {
+fn stop_DMA() void {
     var wait_for_shutdown = false;
     {
         const cs = microzig.interrupt.enter_critical_section();
         defer cs.leave();
 
-        if (state.*.is_waiting_for_interrupt()) {
-            state.* = .shutdown_dma;
-            wait_for_shutdown = true;
+        set_vsync_interrupt(false);
+
+        switch (state.*) {
+            .wait_vsync => {
+                state.* = .flush_spi;
+            },
+            .wait_dma => {
+                state.* = .shutdown_dma;
+                wait_for_shutdown = true;
+            },
+            .shutdown_dma => {
+                wait_for_shutdown = true; // Shouldn't happen but just in case
+            },
+            .flush_spi, .ready => {},
         }
     }
     if (wait_for_shutdown) {
@@ -934,10 +1065,22 @@ pub fn stopDMA() void {
     pins.cs.put(1);
 }
 
+pub fn reset() void {
+    stop_DMA();
+
+    disable_vsync();
+}
+
 /// Check if DMA transfer in progress
-pub fn isBusy() bool {
+pub fn is_busy() bool {
     sync_resolve_state(false); // Don't wait for synchronous flush
     return state.* != .ready;
+}
+
+pub fn is_waiting_for_vsync() bool {
+    // No need to sync, that won't affect
+    // whether vsync is happening
+    return state.* != .wait_vsync;
 }
 
 /// Fast fill screen with single color
@@ -947,19 +1090,12 @@ pub fn clearScreen(color: Color16) void {
 
     clear_val[0] = @bitCast(color);
 
-    setWindow(0, 0, width - 1, height - 1);
+    setup_dma_region(undefined, 1, 0, 1, .row_major);
 
-    start_DMA_data();
+    set_window(.all, .row_major);
+    start_data();
 
-    {
-        const cs = microzig.interrupt.enter_critical_section();
-        defer cs.leave();
-
-        remaining_dmas = 1;
-        state.* = .wait_dma;
-        post_dma_commands = .none;
-    }
-
-    // Start/restart DMA transfer (CS stays low, DC stays high)
+    asm volatile ("" ::: .{ .memory = true });
+    state.* = .wait_dma;
     dma.startLCDPattern(&clear_val, 0, width * height);
 }

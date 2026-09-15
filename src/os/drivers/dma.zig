@@ -71,10 +71,8 @@ pub fn initLCD(spi_instance_num: u1) void {
 
     DMA.INTE0.write_raw(DMA.INTE0.raw | 0b1);
     DMA.INTS0.write_raw(0b1);
-}
 
-pub fn set_DMA_enabled(enabled: bool) void {
-    SPI_SSPDMACR.modify(.{ .TXDMAE = @intFromBool(enabled) });
+    SPI_SSPDMACR.modify(.{ .TXDMAE = 1 });
 }
 
 /// Start DMA transfer
@@ -165,8 +163,10 @@ pub fn abortCartChannels() void {
     // DMA base = 0x50000000, CHAN_ABORT offset = 0x444.
     const DMA_CHAN_ABORT: *volatile u32 = @ptrFromInt(0x50000444);
 
-    // Request abort for channels 1-15 (bit mask 0xFFFE: all bits except bit 0).
-    const cart_channel_mask: u32 = 0x0000_FFFE;
+    // Request abort for channels 3-15.
+    // Channel 0: LCD
+    // Channel 1-2: Audio
+    const cart_channel_mask: u32 = 0x0000_FFF8;
     DMA_CHAN_ABORT.* = cart_channel_mask;
 
     // Wait until all requested aborts have been serviced (register clears).

@@ -5,14 +5,7 @@ comptime {
     cart.export_start_code();
 }
 
-pub fn start() void {
-    // Clear garbage bytes from framebuffer at init since the whole screen is not cleared otherwise.
-    for (cart.framebuffer) |*col| {
-        for (col) |*pos| {
-            pos.* = .from_color(.{ .r = 0, .b = 0, .g = 0 });
-        }
-    }
-}
+pub fn start() void {}
 
 var dvd_hue: f32 = 0;
 var dvd_x: isize = 0;

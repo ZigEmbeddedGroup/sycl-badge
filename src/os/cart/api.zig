@@ -251,6 +251,7 @@ pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
 const framebuffer0: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[0]);
 const framebuffer1: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[1]);
 pub var framebuffer: *[screen_width][screen_height]Pixel = framebuffer0;
+pub var frontbuffer: *[screen_width][screen_height]Pixel = framebuffer1;
 const tracy_ring: [*]u8 = @volatileCast(&ipc_data.tracy_ring);
 const tracy_atomic_write_ctrl: *u32 = @volatileCast(&ipc_data.tracy_write_ctrl);
 const tracy_atomic_read_pos: *u32 = @volatileCast(&ipc_data.tracy_read_pos);
@@ -268,8 +269,8 @@ var dirty_min_y: u16 = 0;
 var dirty_max_x: u16 = 0;
 var dirty_max_y: u16 = 0;
 
-fn update_draw_buffer_pointer() void {
-    framebuffer = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
+fn updateDrawBufferPointer() void {
+    framebuffer, frontbuffer = if (draw_buffer_index == 0) .{ framebuffer0, framebuffer1 } else .{ framebuffer1, framebuffer1 };
 }
 
 fn reset_dirty_rect() void {

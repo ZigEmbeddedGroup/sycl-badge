@@ -11,8 +11,8 @@
     .minimum_zig_version = "0.17.0-dev.1936+5a625d5f3",
     .dependencies = .{
         .microzig = .{
-            .url = "git+https://github.com/ZigEmbeddedGroup/microzig#1403d59639c7f23553ec8e3e438d35597a8a988b",
-            .hash = "microzig-0.15.2-D20YSd7Z4gD2s67njiwfyMp_wC9FBB0x6jvQk7jegbAZ",
+            .url = "https://github.com/ZigEmbeddedGroup/microzig/releases/download/0.17.7/microzig.tar.gz",
+            .hash = "microzig-0.17.7-D20YSb7KAAAdJvjGJpx-9NG8th__5s2OaJbug645qrgM",
         },
         .zigimg = .{
             .url = "git+https://github.com/SpexGuy/zigimg?ref=sycl_badge#9db3abb43ad18dd45512d83d812816dc8840b7e1",

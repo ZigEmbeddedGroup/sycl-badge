@@ -121,25 +121,19 @@ source]($link.ref('building-from-source')) you need to:
 This will cause the drive to disappear and the Badge will reset, running your
 new OS firmware build.
 
-# [Building and Running OpenOCD]($section.id('building-and-running-openocd'))
+# [Installing and Running `probe-rs`]($section.id('installing-and-running-probe-rs'))
 
-OpenOCD is not required for regular programming of the Badge. It is, however,
-required if one wishes to use the debug probe. At the time of writing, RP2350
-support has not been upstreamed to OpenOCD version available on Debian, so we
-include instructions to build it from source.
+`probe-rs` or tools like it, such as OpenOCD, are not required for regular
+programming of the Badge. It is, however, required if one wishes to use the
+debug probe. Please install by following
+[these](https://probe.rs/docs/getting-started/installation/) instructions.
 
-```
-git clone https://github.com/raspberrypi/openocd
-```
-
-This section will be filled in later with detailed instructions.
-
-## [Running OpenOCD]($section.id('running-openocd')) 
-
-From within the `openocd` directory:
+Once complete, plug in the debug probe to the badge using the SWD/D ports, and
+to your PC. Connect the Badge to that same PC, and flip the power switch to the
+ON position. Run probe-rs in a terminal with the following arguments:
 
 ```
-sudo src/openocd -s tcl -f interface/cmsis-dap.cfg -f target/rp2350.cfg -c "adapter speed 5000"
+probe-rs gdb --chip RP235x
 ```
 
 ## [Flashing with the Debug Probe]($section.id('flashing-with-the-debug-probe'))  
@@ -218,14 +212,425 @@ logs show in this session. Note that when you rebuild the kernel, you'll be able
 to reflash the Badge with the `load` command. The RTT session will persist and
 you'll see the printout for when the kernel starts up as you continue to debug.
 
-# [Errata]($section.id('errata'))
+# [Appendix A: Zig Cart API]($section.id('appendix-a'))
 
-## [Revision 0]($section.id('revision-0'))
+## [Constants]($section.id('appendix-a-constants'))
+
+| name | type | value |
+| ---- | ---- | ----- |
+| screen_width | u32 | 160 |
+| screen_height | u32 | 128 |
+| font_width | u32 | 8 |
+| font_height | u32 | 8 |
+| flash_page_size | comptime_int | 256 |
+| flash_page_count | comptime_int | 8000 |
+| tracy_buffer_size | comptime_int | 4096 |
+
+## [Globals]($section.id('appendix-a-globals'))
+
+| name | type | address |
+| ---- | ---- | ------- |
+| controls | [Controls](#controls) | 0x20020004 |
+| light_level | u12 | |
+| neopixels | \[5\][NeopixelColor](#neopixel-color) | |
+| user_led | bool | |
+| framebuffer | \[160\]\[128\][DisplayColor](#pixel) | |
+
+## [Types]($section.id('appendix-a-types'))
+
+### [`NeopixelColor`]($section.id('neopixel-color').attrs('doc-entry'))
+
+RGB888, true color
+
+- Class: extern struct
+
+**Fields**
+
+| Name  | Type |
+| ----- | ---- |
+| g | u8 |
+| r | u8 |
+| b | u8 |
+
+### [`DisplayColor`]($section.id('display-color').attrs('doc-entry'))
+
+RGB565, high color
+
+- Class: packed struct (u16)
+- Declarations:
+  - [Optional](#display-color-optional)
+
+**Fields**
+
+| Name  | Type |
+| ----- | ---- |
+| r | u5 |
+| g | u6 |
+| b | u5 |
+
+### [`DisplayColor.Optional`]($section.id('display-color-optional').attrs('doc-entry'))
+
+- Class: enum(i32)
+- Methods:
+  - [from](#display-color-optional-from)
+  - [unwrap](#display-color-optional-unwrap)
+
+### [`Pixel`]($section.id('pixel').attrs('doc-entry'))
+
+- Class: packed struct (u16)
+
+**Fields**
+
+| Name  | Type |
+| ----- | ---- |
+| bits | u16 |
+
+### [`Controls`]($section.id('controls').attrs('doc-entry'))
+
+- Class: packed struct(u16)
+
+**Fields**
+
+| Name  | Type |
+| ----- | ---- |
+| start | bool |
+| select | bool |
+| a | bool |
+| b | bool |
+| click | bool |
+| up | bool |
+| down | bool |
+| left | bool |
+| right | bool |
+
+### [`BlitOptions`]($section.id('blit-options').attrs('doc-entry'))
+
+- Class: struct 
+- Declarations:
+  - [Flags](#blit-options-flags)
+
+| Name  | Type | Default Value | Description |
+| ----- | ---- | ------------- | ----------- |
+| sprite | \[*\]const [DisplayColor](#display-color) | | |
+| x | i32 | | |
+| y | i32 | | |
+| width | u32 | | |
+| height | u32 | | |
+| src_x | u32 | 0 | x within the sprite atlas |
+| src_y | u32 | 0 | y within the sprite atlas|
+| stride | ?u32 | null | Width of the entire sprite atlas |
+| flags | [Flags](#blit-options-flags) | | |
+
+### [`BlitOptions.Flags`]($section.id('blit-options-flags').attrs('doc-entry'))
+
+- Class: packed struct(u32)
+
+**Fields**
+
+| Name  | Type | Default Value |
+| ----- | ---- | ------------- |
+| flip_x | bool | false |
+| flip_y | bool | false |
+| rotate | bool | false |
+
+
+### [`LineOptions`]($section.id('line-options').attrs('doc-entry'))
+
+- Class: struct
+
+**Fields**
+
+| Name  | Type |
+| ----- | ---- |
+| x1 | i32 |
+| y1 | i32 |
+| x2 | i32 |
+| y2 | i32 |
+| color | [DisplayColor](#display-color) |
+
+### [`OvalOptions`]($section.id('oval-options').attrs('doc-entry'))
+
+pub const OvalOptions = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    stroke_color: ?DisplayColor = null,
+    fill_color: ?DisplayColor = null,
+};
+
+### [`RectOptions`]($section.id('rect-options').attrs('doc-entry'))
+
+### [`TextOptions`]($section.id('text-options').attrs('doc-entry'))
+
+### [`StraightLineOptions`]($section.id('straight-line-options').attrs('doc-entry'))
+
+### [`ToneOptions`]($section.id('tone-options').attrs('doc-entry'))
+
+Deprecated, Mostly unsupported on Badge v2. Use Tone2Options and tone2() instead.
+
+### [`Tone2Options`]($section.id('tone2-options').attrs('doc-entry'))
+
+### [`Zone`]($section.id('zone').attrs('doc-entry'))
+
+### [`TracyAtomicWriteCtrl`]($section.id('tracy-atomic-write-ctrl').attrs('doc-entry'))
+
+## [Functions]($section.id('appendix-a-functions').attrs('doc-entry'))
+
+### [`export_start_code`]($section.id('export-start-code').attrs('doc-entry'))
+
+- Return Type: void
+- Arguments: none
+
+### [`micros_since_boot`]($section.id('micros-since-boot').attrs('doc-entry'))
+
+- Return Type: u64
+- Arguments: none
+
+### [`cycles`]($section.id('cycles').attrs('doc-entry'))
+
+Cycle count for profiling. This must be called at least once every 30 seconds to
+maintain accuracy. The OS will call it before every update() to maintain this,
+but if update() ever takes more than 30 seconds there may be mistakes.
+
+- Return Type: i64
+- Arguments: none
+
+### [`os_align_cycles`]($section.id('os-align-cycles').attrs('doc-entry'))
+
+Aligns core 0 and core 1 cycle counts for profiling. If you have an extremely
+long update (30+ seconds), or you put core 1 to sleep, you can call this to
+resynchronize and restore correct timing in tracy. This function must wait until
+the OS is ready to synchronize timing, which could take several milliseconds in
+the worst case.
+
+- Return Type: void
+- Arguments: none
+
+### [`mark_dirty_rect`]($section.id('mark-dirty-rect').attrs('doc-entry'))
+
+- Return Type: void
+- Arguments:
+  - x: i32
+  - y: i32
+  - w: i32
+  - h: i32
+
+### [`DisplayColor.Optional.from`]($section.id('display-color-optional-from').attrs('doc-entry'))
+
+- Return Type: [DisplayColor.Optional](#display-color-optional)
+- Arguments:
+  - color: [?DisplayColor](#display-color)
+
+### [`DisplayColor.Optional.unwrap`]($section.id('display-color-optional-unwrap').attrs('doc-entry'))
+
+- Return Type: [?DisplayColor](#display-color)
+- Arguments:
+  - opt: [DisplayColor.Optional](#display-color-optional)
+  
+### [`blit`]($section.id('blit').attrs('doc-entry'))
+
+Copies pixels to the framebuffer.
+
+- Return Type: void
+- Arguments:
+  - options: [BlitOptions](#blit-options)
+
+### [`line`]($section.id('line').attrs('doc-entry'))
+
+Draws a line between two points.
+
+- Return Type: void
+- Arguments:
+  - options: [LineOptions](#line-options)
+
+### [`oval`]($section.id('oval').attrs('doc-entry'))
+
+Draws an oval (or circle).
+
+- Return Type: void
+- Arguments:
+  - options: [OvalOptions](#oval-options)
+
+### [`rect`]($section.id('rect').attrs('doc-entry'))
+
+Draws a rectangle.
+
+- Return Type: void
+- Arguments:
+  - options: [RectOptions](#rect-options)
+
+### [`text`]($section.id('text').attrs('doc-entry'))
+
+Draws text using the built-in system font.
+
+- Return Type: void
+- Arguments:
+  - options: [TextOptions](#text-options)
+
+### [`hline`]($section.id('hline').attrs('doc-entry'))
+
+Draws a horizontal line.
+
+- Return Type: void
+- Arguments:
+  - options: [TextOptions](#straight-line-options)
+
+### [`vline`]($section.id('vline').attrs('doc-entry'))
+
+Draws a vertical line.
+
+- Return Type: void
+- Arguments:
+  - options: [TextOptions](#straight-line-options)
+
+### [`tone`]($section.id('tone').attrs('doc-entry'))
+
+Deprecated, Mostly unsupported on Badge v2. Use tone2() instead.
+
+- Return Type: void
+- Arguments:
+  - options: [ToneOptions](#tone-options)
+
+### [`tone2`]($section.id('tone2').attrs('doc-entry'))
+
+Plays a sound tone via the hardware buzzer. Cancels any other audio that might
+be playing. Sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer or
+I2S depending on board revision.
+
+- Return Type: void
+- Arguments:
+  - options: [ToneOptions](#tone2-options)
+
+### [`set_global_volume`]($section.id('set-global-volume').attrs('doc-entry'))
+
+Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually linear scale
+from about -50dB to 0dB adjustment from the maximum speaker volume.
+
+- Return Type: void
+- Arguments:
+  - volume: f32
+
+### [`rand`]($section.id('rand').attrs('doc-entry'))
+
+Returns a random number from the RP2350 ring oscillator random bit.
+Useful for seeding a faster PRNG.
+
+- Return Type: u32
+- Arguments: none
+
+### [`trace`]($section.id('trace').attrs('doc-entry'))
+
+Prints a message to the debug console. On native: copies string to shared buffer
+and sends CART_TRACE via FIFO; kernel prints to UART. Used by Blobs and other
+carts for panic/debug output.
+
+- Return Type: void
+- Arguments:
+  - x: []const u8
+
+### [`present`]($section.id('present').attrs('doc-entry'))
+
+Signal Core 0 that the framebuffer is ready and wait for the LCD flush to
+complete before returning.
+
+Call this once per frame (typically at the end of update().attrs('doc-entry')). On WASM this is a
+no-op because the simulator owns the display.
+
+- Return Type: void
+- Arguments: none
+
+### [`read_flash`]($section.id('read-flash').attrs('doc-entry'))
+
+Attempts to fill dst, returns the amount of bytes actually read.
+NOTE: No dedicated cart save-data flash region exists yet; returns 0.
+
+- Return Type: u32
+- Arguments:
+  - offset: u32
+  - dst: []u8
+
+### [`write_flash_page`]($section.id('write-flash-page').attrs('doc-entry'))
+
+NOTE: No dedicated cart save-data flash region exists yet; this is a no-op stub.
+
+- Return Type: void
+- Arguments:
+  - page: u16
+  - src: \[flash_page_size\]u8
+
+### [`fn_zone`]($section.id('fn-zone').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+
+### [`fn_zone_color`]($section.id('fn-zone-color').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - color: u32
+
+### [`zone`]($section.id('zone-fn').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - name: ?\[:0\]const u8
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+
+### [`zone_color`]($section.id('zone-color').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - name: ?\[:0\]const u8
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - color: u32
+
+### [`fn_zone_cond`]($section.id('fn-zone-cond').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - active: bool
+
+### [`fn_zone_color_cond`]($section.id('fn-zone-color-cond').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - color: u32
+  - active: bool
+
+### [`zone_cond`]($section.id('zone-cond').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - name: ?\[:0\]const u8
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - active: bool
+
+### [`zone_color_cond`]($section.id('zone-color-cond').attrs('doc-entry'))
+
+- Return Type: [Zone](#zone)
+- Arguments:
+  - name: ?\[:0\]const u8
+  - loc: [std.builtin.SourceLocation](https://ziglang.org/documentation/master/std/#std.lang.SourceLocation)
+  - color: u32
+  - active: bool
+
+### [`spin_lock_acquire`]($section.id('spin-lock-acquire').attrs('doc-entry'))
+
+### [`spin_lock_release`]($section.id('spin-lock-release').attrs('doc-entry'))
+
+# [Errata]($section.id('errata').attrs('doc-entry'))
+
+## [Revision 0]($section.id('revision-0').attrs('doc-entry'))
 
 SWD and UART JST connectors are wired incorrectly, the pins are reverse from
 what they need to be in order to match the cable for the pico debug.
 
-## [Revision 1]($section.id('revision-1'))
+## [Revision 1]($section.id('revision-1').attrs('doc-entry'))
 
 The SDA and SCL connections on the I2C connector are wired incorrectly. The
 GPIOs they are connected to have the other's required alternate function. This

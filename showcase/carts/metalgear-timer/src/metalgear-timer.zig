@@ -41,7 +41,7 @@ fn r(x: usize, y: usize, w: usize, h: usize) void {
         const y1 = y0 + sy * h;
         for (y0..y1) |yi| {
             for (x0..x1) |xi| {
-                cart.framebuffer[xi][yi].setColor(color);
+                cart.framebuffer[xi][yi].set_color(color);
             }
         }
     }

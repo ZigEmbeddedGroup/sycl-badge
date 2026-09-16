@@ -109,14 +109,14 @@ pub fn render(self: *Camera, world: *HittableList) !void {
             col = col.div_scalar(samples);
 
             const color = vec.color3_to_color(col);
-            cart.framebuffer[i][j].setColor(.{
+            cart.framebuffer[i][j].set_color(.{
                 .r = @truncate(color.rgb.r >> 3),
                 .g = @truncate(color.rgb.g >> 2),
                 .b = @truncate(color.rgb.b >> 3),
             });
-            cart.markDirtyRect(@intCast(i), @intCast(j), 1, 1);
+            cart.mark_dirty_rect(@intCast(i), @intCast(j), 1, 1);
             cart.present();
-            cart.framebuffer[i][j].setColor(.{
+            cart.framebuffer[i][j].set_color(.{
                 .r = @truncate(color.rgb.r >> 3),
                 .g = @truncate(color.rgb.g >> 2),
                 .b = @truncate(color.rgb.b >> 3),

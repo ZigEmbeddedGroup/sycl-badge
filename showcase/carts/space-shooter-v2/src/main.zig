@@ -94,7 +94,7 @@ fn clamp(v: i32, lo: i32, hi: i32) i32 {
 }
 
 fn fillScreen(color: cart.DisplayColor) void {
-    const px = cart.Pixel.fromColor(color);
+    const px = cart.Pixel.from_color(color);
     for (cart.framebuffer) |*col| {
         @memset(col, px);
     }
@@ -109,7 +109,7 @@ fn fillRect(x: i32, y: i32, w: i32, h: i32, color: cart.DisplayColor) void {
     const y1 = clamp(y + h, 0, HEIGHT);
     if (x0 >= x1 or y0 >= y1) return;
 
-    const px = cart.Pixel.fromColor(color);
+    const px = cart.Pixel.from_color(color);
     var xx: i32 = x0;
     while (xx < x1) : (xx += 1) {
         @memset(cart.framebuffer[@intCast(xx)][@intCast(y0)..@intCast(y1)], px);

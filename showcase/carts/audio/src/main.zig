@@ -9,8 +9,8 @@ const DisplayColor = cart.DisplayColor;
 
 const W = cart.screen_width;
 const H = cart.screen_height;
-const HW = W/2;
-const HH = H/2;
+const HW = W / 2;
+const HH = H / 2;
 
 const white = DisplayColor{ .b = 31, .g = 63, .r = 31 };
 const black = DisplayColor{ .b = 0, .g = 0, .r = 0 };
@@ -25,7 +25,7 @@ fn freqFromMidi(midi: f32) f32 {
     return 440.0 * @exp((midi - 69.0) * (@log(2.0) / 12.0));
 }
 
-const major = [_]u32 {
+const major = [_]u32{
     0,
     2,
     4,
@@ -64,18 +64,18 @@ const note_names_flats: [12][]const u8 = .{
     "B",
 };
 const major_scale_uses_sharps: [12]bool = .{
-    true,  // Techincally C major has neither sharps nor flats
+    true, // Techincally C major has neither sharps nor flats
     false, // Db major, though sometimes C# major
-    true,  // D major
+    true, // D major
     false, // Eb major
-    true,  // E major
+    true, // E major
     false, // F major
     false, // Can be either, F# major (#) or Gb major (b)
-    true,  // G major
+    true, // G major
     false, // Ab major
-    true,  // A major
+    true, // A major
     false, // Bb major
-    true,  // B major
+    true, // B major
 };
 
 const wave_shapes = [_]cart.Tone2Options.Shape{
@@ -97,7 +97,7 @@ var last_abs_time: u64 = 0;
 var volume: f32 = 1.0;
 
 pub fn start() void {
-    change_time = cart.microsSinceBoot() + micros_per_note;
+    change_time = cart.micros_since_boot() + micros_per_note;
 }
 
 var was_down = false;
@@ -108,7 +108,7 @@ const piano_max_note = 108;
 const piano_max_fundamental = piano_max_note - 12;
 
 pub fn update() void {
-    const abs_time = cart.microsSinceBoot();
+    const abs_time = cart.micros_since_boot();
     defer last_abs_time = abs_time;
 
     const delta_sec: f32 = @as(f32, @floatFromInt(abs_time - last_abs_time)) * 0.000_001;
@@ -167,7 +167,6 @@ pub fn update() void {
                 note_changed = true;
             },
         }
-        
     }
     if (controls.up and !was_up) {
         switch (selected_param) {
@@ -185,14 +184,14 @@ pub fn update() void {
                 }
                 active_wave_shape -= 1;
                 note_changed = true;
-            }
+            },
         }
     }
     was_down = controls.down;
     was_up = controls.up;
 
     if (controls.left or controls.right) {
-        cart.setGlobalVolume(volume);
+        cart.set_global_volume(volume);
     }
 
     if (abs_time >= change_time or note_changed) {
@@ -220,20 +219,21 @@ pub fn update() void {
 
     const note_names = if (major_scale_uses_sharps[fundamental % 12])
         note_names_sharps
-    else note_names_flats;
+    else
+        note_names_flats;
 
     const scale_name = note_names[fundamental % 12];
 
     var buf: [20]u8 = undefined;
 
-    const volume_top = HH-10;
+    const volume_top = HH - 10;
     const volume_bot = volume_top + 20;
-    const vol_width = 12*8 + 2*8;
+    const vol_width = 12 * 8 + 2 * 8;
 
     // Clear behind the scale name
-    const max_scale_width = 10*8;
+    const max_scale_width = 10 * 8;
     cart.rect(.{
-        .x = HW - max_scale_width/2,
+        .x = HW - max_scale_width / 2,
         .y = volume_top - 10,
         .width = max_scale_width,
         .height = 8,
@@ -241,8 +241,7 @@ pub fn update() void {
     });
 
     // Then draw the scale name
-    const text = std.fmt.bufPrint(&buf, "{s}{d} major", .{scale_name, fundamental / 12 - 1})
-        catch "Err";
+    const text = std.fmt.bufPrint(&buf, "{s}{d} major", .{ scale_name, fundamental / 12 - 1 }) catch "Err";
     var x_pos: u16 = @intCast(HW - text.len * 4);
     cart.text(.{
         .str = text[0..scale_name.len],
@@ -250,16 +249,16 @@ pub fn update() void {
         .y = volume_top - 10,
         .text_color = if (selected_param == .note) yellow else white,
     });
-    x_pos += @intCast(8*scale_name.len);
+    x_pos += @intCast(8 * scale_name.len);
     cart.text(.{
         .str = text[scale_name.len..][0..2],
         .x = x_pos,
         .y = volume_top - 10,
         .text_color = if (selected_param == .octave) yellow else white,
     });
-    x_pos += 8*2;
+    x_pos += 8 * 2;
     cart.text(.{
-        .str = text[scale_name.len+2..],
+        .str = text[scale_name.len + 2 ..],
         .x = x_pos,
         .y = volume_top - 10,
         .text_color = white,
@@ -267,7 +266,7 @@ pub fn update() void {
 
     // Clear the center of the screen with a white rect
     cart.rect(.{
-        .x = HW-vol_width/2 - 2,
+        .x = HW - vol_width / 2 - 2,
         .y = volume_top,
         .width = vol_width + 4,
         .height = 20,
@@ -275,8 +274,8 @@ pub fn update() void {
     });
     // Draw the volume slider
     cart.rect(.{
-        .x = HW-vol_width/2,
-        .y = HH-8,
+        .x = HW - vol_width / 2,
+        .y = HH - 8,
         .width = @intFromFloat(volume * @as(comptime_float, vol_width) + 0.5),
         .height = 16,
         .fill_color = lt_blue,
@@ -287,20 +286,19 @@ pub fn update() void {
         const midi_note = fundamental + major[scale_pos];
         const freq = freqFromMidi(@floatFromInt(midi_note));
         const name = note_names[midi_note % 12];
-        const note_text = std.fmt.bufPrint(&buf, "{s}{d} {d:5.1}Hz", .{ name, midi_note / 12 - 1, freq })
-            catch "Err";
+        const note_text = std.fmt.bufPrint(&buf, "{s}{d} {d:5.1}Hz", .{ name, midi_note / 12 - 1, freq }) catch "Err";
         // Draw the text
         cart.text(.{
             .str = note_text,
-            .x = @intCast(HW-4*note_text.len),
-            .y = HH-4,
+            .x = @intCast(HW - 4 * note_text.len),
+            .y = HH - 4,
             .text_color = black,
         });
     }
 
     // Clear behind the wave shape
     cart.rect(.{
-        .x = HW - max_scale_width/2,
+        .x = HW - max_scale_width / 2,
         .y = volume_bot + 2,
         .width = max_scale_width,
         .height = 8,
@@ -308,8 +306,7 @@ pub fn update() void {
     });
 
     // Draw the wave shape
-    const wave_name = std.fmt.bufPrint(&buf, ".{s}", .{ @tagName(wave_shapes[active_wave_shape]) })
-        catch "Err";
+    const wave_name = std.fmt.bufPrint(&buf, ".{s}", .{@tagName(wave_shapes[active_wave_shape])}) catch "Err";
     cart.text(.{
         .str = wave_name,
         .x = @intCast(HW - wave_name.len * 4),

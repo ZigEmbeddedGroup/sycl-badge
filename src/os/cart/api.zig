@@ -34,7 +34,7 @@ pub const font_height: u32 = 8;
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-pub fn microsSinceBoot() u64 {
+pub fn micros_since_boot() u64 {
     if (is_wasm) {
         // TODO
         const statics = struct {
@@ -51,17 +51,17 @@ pub fn microsSinceBoot() u64 {
     }
 }
 
-/// A 64 bit offset to align core 1 times with core 0 times.
-/// This is set before cart startup by the OS.
+/// A 64 bit offset to align core 1 times with core 0 times. This is set before
+/// cart startup by the OS.
 var cycles_offset: i64 = 0;
 var last_cycles: u32 = 0;
-/// Cycle count for profiling. This must be called at least once
-/// every 30 seconds to maintain accuracy. The OS will call it
-/// before every update() to maintain this, but if update()
-/// ever takes more than 30 seconds there may be mistakes. 
+/// Cycle count for profiling. This must be called at least once every 30
+/// seconds to maintain accuracy. The OS will call it before every update() to
+/// maintain this, but if update() ever takes more than 30 seconds there may be
+/// mistakes.
 pub fn cycles() linksection(".ramfunc") i64 {
     if (is_wasm) {
-        return @bitCast(microsSinceBoot());
+        return @bitCast(micros_since_boot());
     } else {
         const DWT_CYCCNT: *volatile u32 = @ptrFromInt(0xe0001004);
         const cycles_low = DWT_CYCCNT.*;
@@ -74,13 +74,11 @@ pub fn cycles() linksection(".ramfunc") i64 {
     }
 }
 
-/// Aligns core 0 and core 1 cycle counts for profiling.
-/// If you have an extremely long update (30+ seconds),
-/// or you put core 1 to sleep, you can call this to
-/// resynchronize and restore correct timing in tracy.
-/// This function must wait until the OS is ready to
-/// synchronize timing, which could take several
-/// milliseconds in the worst case.
+/// Aligns core 0 and core 1 cycle counts for profiling. If you have an
+/// extremely long update (30+ seconds), or you put core 1 to sleep, you can
+/// call this to resynchronize and restore correct timing in tracy. This
+/// function must wait until the OS is ready to synchronize timing, which could
+/// take several milliseconds in the worst case.
 pub fn os_align_cycles() void {
     if (!is_wasm) {
         // RP2350 SIO FIFO registers (same address on both cores, core-local view)
@@ -166,7 +164,7 @@ pub const DisplayColor = packed struct(u16) {
 pub const Pixel = packed struct(u16) {
     bits: u16,
 
-    pub fn fromColor(color: DisplayColor) Pixel {
+    pub fn from_color(color: DisplayColor) Pixel {
         if (is_wasm) {
             // WASM/simulator: standard RGB565 big-endian (matches old behavior)
             return .{ .bits = @byteSwap(@as(u16, @bitCast(color))) };
@@ -175,7 +173,7 @@ pub const Pixel = packed struct(u16) {
         }
     }
 
-    pub fn toColor(pixel: Pixel) DisplayColor {
+    pub fn to_color(pixel: Pixel) DisplayColor {
         if (is_wasm) {
             return @bitCast(@byteSwap(pixel.bits));
         } else {
@@ -183,8 +181,8 @@ pub const Pixel = packed struct(u16) {
         }
     }
 
-    pub fn setColor(pixel: *Pixel, color: DisplayColor) void {
-        pixel.* = fromColor(color);
+    pub fn set_color(pixel: *Pixel, color: DisplayColor) void {
+        pixel.* = from_color(color);
     }
 };
 
@@ -210,31 +208,31 @@ const base = if (is_wasm) 4 else 0x20020004;
 pub const CartIPCData = extern struct {
     // Starting offset is 4
     controls: Controls, // 4..6
-    light_level: u16,   // 6..8
+    light_level: u16, // 6..8
     neopixels: [5]NeopixelColor, // 8..x17 bytes
     _pad1: [5]u8, // x17..x1C
-    red_led: bool, // x1C..x1D
+    user_led: bool, // x1C..x1D
     _pad2: u8, // x1D..x1E
     battery_level: u16, // x1E..x20
     framebuffers: [2][screen_width][screen_height]Pixel, // x20..xA020, xA020..x14020
-    trace_buf: [0x80]u8,// x14020..x140A0
+    trace_buf: [0x80]u8, // x14020..x140A0
     tone_freq: f32, // x140A0..x140A4
     tone_duration: f32, // x140A4..x140A8
-    dirty_rect_x: u16,  // x140A8..x140AA
-    dirty_rect_y: u16,  // x140AA..x140AC
-    dirty_rect_w: u16,  // x140AC..x140AE
-    dirty_rect_h: u16,  // x140AE..x140B0
-    tone_volume: f32,   // x140B0..x140B4
-    tone_flags: u32,    // x140B4..x140B8
+    dirty_rect_x: u16, // x140A8..x140AA
+    dirty_rect_y: u16, // x140AA..x140AC
+    dirty_rect_w: u16, // x140AC..x140AE
+    dirty_rect_h: u16, // x140AE..x140B0
+    tone_volume: f32, // x140B0..x140B4
+    tone_flags: u32, // x140B4..x140B8
     global_volume: f32, // x140B8..x140BC
-    _pad3: u32,         // x140BC..x140C0
+    _pad3: u32, // x140BC..x140C0
     tracy_ring: [tracy_buffer_size]u8, // x140C0..x150C0
-    tracy_read_pos: u32,   // x150C0..x150C4
-    _pad4: [3]u32,         // x150C4..x150D0, tracy_read_pos needs its own granule
+    tracy_read_pos: u32, // x150C0..x150C4
+    _pad4: [3]u32, // x150C4..x150D0, tracy_read_pos needs its own granule
     tracy_write_ctrl: u32, // x150D0..x150D4
-    _pad5: [3]u32,         // x150D4..x150E0, tracy_write_ctrl needs its own granule
-    tracy_spinlock: u32,   // x150E0..x150E4
-    _pad6: [3]u32,         // x150E4..x150F0, tracy_spinlock gets its own granule
+    _pad5: [3]u32, // x150D4..x150E0, tracy_write_ctrl needs its own granule
+    tracy_spinlock: u32, // x150E0..x150E4
+    _pad6: [3]u32, // x150E4..x150F0, tracy_spinlock gets its own granule
 
     comptime {
         // cart_xip.ld reserves 0x15100 bytes for IPC data.
@@ -248,7 +246,7 @@ const ipc_data: *volatile CartIPCData = @ptrFromInt(base);
 pub const controls: *const volatile Controls = &ipc_data.controls;
 pub const light_level: *volatile u12 = @ptrCast(&ipc_data.light_level);
 pub const neopixels: *volatile [5]NeopixelColor = &ipc_data.neopixels;
-pub const red_led: *volatile bool = &ipc_data.red_led;
+pub const user_led: *volatile bool = &ipc_data.user_led;
 pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
 const framebuffer0: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[0]);
 const framebuffer1: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[1]);
@@ -270,11 +268,11 @@ var dirty_min_y: u16 = 0;
 var dirty_max_x: u16 = 0;
 var dirty_max_y: u16 = 0;
 
-fn updateDrawBufferPointer() void {
+fn update_draw_buffer_pointer() void {
     framebuffer = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
 }
 
-fn resetDirtyRect() void {
+fn reset_dirty_rect() void {
     dirty_any = false;
     dirty_min_x = 0;
     dirty_min_y = 0;
@@ -282,7 +280,7 @@ fn resetDirtyRect() void {
     dirty_max_y = 0;
 }
 
-pub fn markDirtyRect(x: i32, y: i32, w: i32, h: i32) void {
+pub fn mark_dirty_rect(x: i32, y: i32, w: i32, h: i32) void {
     if (w <= 0 or h <= 0) return;
 
     const x0 = @max(x, 0);
@@ -339,7 +337,7 @@ pub const BlitOptions = struct {
     flags: Flags = .{},
 };
 
-fn clipPixel(x: i32, y: i32, pixel: Pixel) void {
+fn clip_pixel(x: i32, y: i32, pixel: Pixel) void {
     if (x < 0 or x >= screen_width) return;
     if (y < 0 or y >= screen_height) return;
     framebuffer[@intCast(x)][@intCast(y)] = pixel;
@@ -383,7 +381,7 @@ pub fn blit(options: BlitOptions) void {
                 @intCast(@min(signed_height, @as(i32, @intCast(screen_height)) - options.y)),
             };
 
-        markDirtyRect(options.x, options.y, if (flags.rotate) signed_height else signed_width, if (flags.rotate) signed_width else signed_height);
+        mark_dirty_rect(options.x, options.y, if (flags.rotate) signed_height else signed_width, if (flags.rotate) signed_width else signed_height);
 
         for (clip_y_min..clip_y_max) |y| {
             for (clip_x_min..clip_x_max) |x| {
@@ -398,10 +396,10 @@ pub fn blit(options: BlitOptions) void {
                 const sx = options.src_x + @as(u32, @intCast(if (flip_x) signed_width - signed_x - 1 else signed_x));
                 const sy = options.src_y + @as(u32, @intCast(if (flags.flip_y) signed_height - signed_y - 1 else signed_y));
 
-                // Use clipPixel and Pixel.fromColor so any out-of-bounds tx/ty are safely
+                // Use clip_pixel and Pixel.from_color so any out-of-bounds tx/ty are safely
                 // discarded instead of causing a hard fault when indexing the framebuffer.
                 if (tx < screen_width and ty < screen_height) {
-                    framebuffer[tx][ty] = Pixel.fromColor(options.sprite[sy * stride + sx]);
+                    framebuffer[tx][ty] = Pixel.from_color(options.sprite[sy * stride + sx]);
                 }
             }
         }
@@ -428,7 +426,7 @@ pub fn line(options: LineOptions) void {
         var y0 = options.y1;
         const x1 = options.x2;
         const y1 = options.y2;
-        const pixel = Pixel.fromColor(options.color);
+        const pixel = Pixel.from_color(options.color);
 
         const dx: i32 = @intCast(@abs(x1 - x0));
         const sx: i32 = if (x0 < x1) 1 else -1;
@@ -436,7 +434,7 @@ pub fn line(options: LineOptions) void {
         const sy: i32 = if (y0 < y1) 1 else -1;
         var err = dx + dy;
 
-        markDirtyRect(@min(options.x1, options.x2), @min(options.y1, options.y2), @abs(options.x2 - options.x1) + 1, @abs(options.y2 - options.y1) + 1);
+        mark_dirty_rect(@min(options.x1, options.x2), @min(options.y1, options.y2), @abs(options.x2 - options.x1) + 1, @abs(options.y2 - options.y1) + 1);
 
         while (true) {
             if (x0 >= 0 and x0 < screen_width and y0 >= 0 and y0 < screen_height) {
@@ -500,18 +498,18 @@ pub fn oval(options: OvalOptions) void {
 
             if (min_x >= max_x or min_y >= max_y) return;
 
-            const fill_pixel = Pixel.fromColor(fill_color.unwrap().?);
+            const fill_pixel = Pixel.from_color(fill_color.unwrap().?);
             for (framebuffer[min_x..max_x]) |*col| {
                 @memset(col[min_y..max_y], fill_pixel);
             }
-            markDirtyRect(x, y, w, h);
+            mark_dirty_rect(x, y, w, h);
             return;
         }
 
         const signed_width: i32 = @intCast(options.width);
         const signed_height: i32 = @intCast(options.height);
 
-        markDirtyRect(options.x, options.y, signed_width, signed_height);
+        mark_dirty_rect(options.x, options.y, signed_width, signed_height);
 
         var a = signed_width - 1;
         const b = signed_height - 1;
@@ -531,14 +529,14 @@ pub fn oval(options: OvalOptions) void {
         a = 8 * a2;
         b1 = 8 * b2;
 
-        const stroke_pixel = if (stroke_color.unwrap()) |sc| Pixel.fromColor(sc) else null;
+        const stroke_pixel = if (stroke_color.unwrap()) |sc| Pixel.from_color(sc) else null;
 
         while (true) {
             if (stroke_pixel) |sp| {
-                clipPixel(east, north, sp);
-                clipPixel(west, north, sp);
-                clipPixel(west, south, sp);
-                clipPixel(east, south, sp);
+                clip_pixel(east, north, sp);
+                clip_pixel(west, north, sp);
+                clip_pixel(west, south, sp);
+                clip_pixel(east, south, sp);
             }
 
             const oval_start = west + 1;
@@ -566,11 +564,11 @@ pub fn oval(options: OvalOptions) void {
 
         if (stroke_pixel) |sp| {
             while (north - south < signed_height) {
-                clipPixel(west - 1, north, sp);
-                clipPixel(east + 1, north, sp);
+                clip_pixel(west - 1, north, sp);
+                clip_pixel(east + 1, north, sp);
                 north += 1;
-                clipPixel(west - 1, south, sp);
-                clipPixel(east + 1, south, sp);
+                clip_pixel(west - 1, south, sp);
+                clip_pixel(east + 1, south, sp);
                 south -= 1;
             }
         }
@@ -616,10 +614,10 @@ pub fn rect(options: RectOptions) linksection(".ramfunc") void {
         const max_x: usize = @intCast(@min(end_x, screen_width));
         const max_y: usize = @intCast(@min(end_y, screen_height));
 
-        markDirtyRect(options.x, options.y, @intCast(end_x - options.x), @intCast(end_y - options.y));
+        mark_dirty_rect(options.x, options.y, @intCast(end_x - options.x), @intCast(end_y - options.y));
 
         if (stroke_color) |sc| {
-            const stroke_pixel = Pixel.fromColor(sc);
+            const stroke_pixel = Pixel.from_color(sc);
             if (min_x < max_x and min_y < max_y) {
                 @memset(framebuffer[min_x][min_y..max_y], stroke_pixel);
                 if (max_x > min_x + 1) {
@@ -633,7 +631,7 @@ pub fn rect(options: RectOptions) linksection(".ramfunc") void {
                 }
             }
             if (fill_color) |fc| {
-                const fill_pixel = Pixel.fromColor(fc);
+                const fill_pixel = Pixel.from_color(fc);
                 if (max_x > min_x + 2 and max_y > min_y + 2) {
                     for (framebuffer[min_x + 1 .. max_x - 1]) |*col| {
                         @memset(col[min_y + 1 .. max_y - 1], fill_pixel);
@@ -641,7 +639,7 @@ pub fn rect(options: RectOptions) linksection(".ramfunc") void {
                 }
             }
         } else if (fill_color) |fc| {
-            const fill_pixel = Pixel.fromColor(fc);
+            const fill_pixel = Pixel.from_color(fc);
             for (framebuffer[min_x..max_x]) |*col| @memset(col[min_y..max_y], fill_pixel);
         }
     }
@@ -675,8 +673,8 @@ pub fn text(options: TextOptions) void {
         // Accessed here (not at file scope) so that @import("board") is only resolved
         // for native builds — WASM builds take the branch above and never reach this.
         const font_data = @import("board").font.font;
-        const text_pixel: ?Pixel = if (options.text_color) |c| Pixel.fromColor(c) else null;
-        const bg_pixel: ?Pixel = if (options.background_color) |c| Pixel.fromColor(c) else null;
+        const text_pixel: ?Pixel = if (options.text_color) |c| Pixel.from_color(c) else null;
+        const bg_pixel: ?Pixel = if (options.background_color) |c| Pixel.from_color(c) else null;
         const scale = @max(options.scale, 1);
         const scale_usize: usize = @intCast(scale);
         const line_step: i32 = @as(i32, @intCast(@as(u32, 8) * scale));
@@ -695,7 +693,7 @@ pub fn text(options: TextOptions) void {
         }
         if (current_line > longest_line) longest_line = current_line;
         if (longest_line > 0 and line_count > 0) {
-            markDirtyRect(options.x, options.y, longest_line * line_step, line_count * line_step);
+            mark_dirty_rect(options.x, options.y, longest_line * line_step, line_count * line_step);
         }
 
         var char_x: i32 = options.x;
@@ -756,8 +754,8 @@ pub fn hline(options: StraightLineOptions) void {
         if (options.len == 0 or options.y < 0 or options.y >= screen_height or options.x >= screen_width) return;
         const end_x = options.x +| @min(options.len, std.math.maxInt(i32));
         if (end_x <= 0) return;
-        const pixel = Pixel.fromColor(options.color);
-        markDirtyRect(options.x, options.y, @intCast(end_x - options.x), 1);
+        const pixel = Pixel.from_color(options.color);
+        mark_dirty_rect(options.x, options.y, @intCast(end_x - options.x), 1);
         const start_x: usize = @intCast(@max(options.x, 0));
         const end_x_clamped: usize = @intCast(@min(end_x, screen_width));
         const y_idx: usize = @intCast(options.y);
@@ -777,8 +775,8 @@ pub fn vline(options: StraightLineOptions) void {
         if (options.len == 0 or options.x < 0 or options.x >= screen_width or options.y >= screen_height) return;
         const end_y = options.y +| @min(options.len, std.math.maxInt(i32));
         if (end_y <= 0) return;
-        const pixel = Pixel.fromColor(options.color);
-        markDirtyRect(options.x, options.y, 1, @intCast(end_y - options.y));
+        const pixel = Pixel.from_color(options.color);
+        mark_dirty_rect(options.x, options.y, 1, @intCast(end_y - options.y));
         @memset(framebuffer[@intCast(options.x)][@max(options.y, 0)..@intCast(@min(end_y, screen_height))], pixel);
     }
 }
@@ -910,7 +908,7 @@ pub fn tone2(options: Tone2Options) void {
 /// Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually
 /// linear scale from about -50dB to 0dB adjustment from the maximum
 /// speaker volume.
-pub fn setGlobalVolume(volume: f32) void {
+pub fn set_global_volume(volume: f32) void {
     if (is_wasm) {
         // TODO wasm volume
     } else {
@@ -995,7 +993,7 @@ pub inline fn zone_color(comptime name: ?[:0]const u8, comptime loc: std.builtin
 pub inline fn fn_zone_cond(comptime loc: std.builtin.SourceLocation, active: bool) Zone {
     return zone_color_cond(null, loc, 0, active);
 }
-pub inline fn fn_zone_color_cond(comptime loc: std.builtin.SourceLocation, comptime color: u32, active: bool) Zone {
+pub inline fn fn_zone_color_cond(comptime loc: std.builtin.SourceLocation, comptime color: u33, active: bool) Zone {
     return zone_color_cond(null, loc, color, active);
 }
 pub inline fn zone_cond(comptime name: ?[:0]const u8, comptime loc: std.builtin.SourceLocation, active: bool) Zone {
@@ -1013,7 +1011,7 @@ const external_linksection = ".rodata";
 
 fn StringWrap(comptime str: [:0]const u8) type {
     return struct {
-        const bytes linksection(external_linksection) = str[0..str.len:0].*;
+        const bytes linksection(external_linksection) = str[0..str.len :0].*;
     };
 }
 
@@ -1037,7 +1035,7 @@ inline fn external_source_location(comptime name: ?[:0]const u8, comptime zig_sr
     return &SourceLocationWrap(name, zig_src_loc, color).src_loc;
 }
 
-pub const TracyAtomicWriteCtrl = packed struct (u32) {
+pub const TracyAtomicWriteCtrl = packed struct(u32) {
     write_pos: u16,
     _pad: u12 = 0,
     server_connected: bool,
@@ -1059,7 +1057,7 @@ pub const TracyAtomicWriteCtrl = packed struct (u32) {
 };
 
 inline fn ring_available(read_pos: u16, write_pos: u16, size: u16) u16 {
-    return (read_pos -% 1 -% write_pos) & (size-1);
+    return (read_pos -% 1 -% write_pos) & (size - 1);
 }
 
 const RingBufferWriter = struct {
@@ -1079,7 +1077,7 @@ const RingBufferWriter = struct {
             const second_len = bytes.len - first_len;
             @memcpy(w.buf[0..second_len], bytes[first_len..]);
         }
-        w.write_pos = @intCast((w.write_pos +% bytes.len) & (w.size-1));
+        w.write_pos = @intCast((w.write_pos +% bytes.len) & (w.size - 1));
     }
 };
 
@@ -1103,14 +1101,13 @@ inline fn spin_lock_acquire_sw(lock: *u32) void {
         \\    cmp %[t1], #0                  // check if lock is taken
         \\    bne 1b                         // retry if lock is taken
         \\    strex %[t1], %[t0], [%[lock]]  // attempt to claim the lock
-         \\   cmp %[t1], #0                 //  check if we got it
-          \\  bne 1b                       //   retry if not
-           //\\ dmb                         //    finally, memory barrier
-        : [t0] "=&r" (tmp0)
-        , [t1] "=&r" (tmp1)
-        : [lock] "r" (lock)
-        : .{ .memory = true }
-    );
+        \\   cmp %[t1], #0                 //  check if we got it
+        \\  bne 1b                       //   retry if not
+        //\\ dmb                         //    finally, memory barrier
+        : [t0] "=&r" (tmp0),
+          [t1] "=&r" (tmp1),
+        : [lock] "r" (lock),
+        : .{ .memory = true });
 }
 
 inline fn spin_lock_release_sw(lock: *u32) void {
@@ -1118,15 +1115,15 @@ inline fn spin_lock_release_sw(lock: *u32) void {
     asm volatile (
         \\ stl %[zero], [%[lock]] // store with release semantics
         :
-        : [zero] "r" (zero)
-        , [lock] "r" (lock)
+        : [zero] "r" (zero),
+          [lock] "r" (lock),
     );
 }
 
 pub const spin_lock_acquire = spin_lock_acquire_hw;
 pub const spin_lock_release = spin_lock_release_hw;
 
-inline fn cmpxchgStrong(ptr: *volatile u32, expected: u32, new: u32) ?u32 {
+inline fn cmpxchg_strong(ptr: *volatile u32, expected: u32, new: u32) ?u32 {
     spin_lock_acquire(tracy_spinlock);
     defer spin_lock_release(tracy_spinlock);
 
@@ -1200,7 +1197,7 @@ inline fn write_tracy_data_with_delta_time(time: i64, record_block: bool, data_w
             write_ctrl.write_pos = writer.write_pos;
         }
 
-        write_ctrl_word = if (cmpxchgStrong(tracy_atomic_write_ctrl, write_ctrl_word, @bitCast(write_ctrl))) |v| v else {
+        write_ctrl_word = if (cmpxchg_strong(tracy_atomic_write_ctrl, write_ctrl_word, @bitCast(write_ctrl))) |v| v else {
             tracy_ref_time = ref_time;
             return true;
         };
@@ -1263,7 +1260,7 @@ noinline fn write_tracy_data_blocking_with_delta_time(time: i64, write_pos: u16,
             write_ctrl.write_pos = writer.write_pos;
         }
 
-        write_ctrl_word = if (cmpxchgStrong(tracy_atomic_write_ctrl, write_ctrl_word, @bitCast(write_ctrl))) |v| v else {
+        write_ctrl_word = if (cmpxchg_strong(tracy_atomic_write_ctrl, write_ctrl_word, @bitCast(write_ctrl))) |v| v else {
             tracy_ref_time = ref_time;
             return true;
         };
@@ -1380,11 +1377,11 @@ pub fn present() void {
     }
 
     if (has_in_flight_frame) {
-        const spin_start_time = microsSinceBoot();
+        const spin_start_time = micros_since_boot();
         while (has_in_flight_frame) {
             while (SIO_FIFO_ST.* & FIFO_VLD == 0) {
                 asm volatile ("nop");
-                const now = microsSinceBoot();
+                const now = micros_since_boot();
                 if (now - spin_start_time >= present_wait_time_limit) {
                     // Stop waiting rather than deadlocking Core 1 forever.
                     present_timeout_events +%= 1;
@@ -1411,7 +1408,7 @@ pub fn present() void {
         ipc_data.dirty_rect_w = dirty_max_x - dirty_min_x + 1;
         ipc_data.dirty_rect_h = dirty_max_y - dirty_min_y + 1;
         payload |= 0x2;
-    } else if (computeDirtyRectLegacyFallback()) |r| {
+    } else if (compute_dirty_recxt_legacy_fallback()) |r| {
         ipc_data.dirty_rect_x = r.x;
         ipc_data.dirty_rect_y = r.y;
         ipc_data.dirty_rect_w = r.w;
@@ -1425,10 +1422,10 @@ pub fn present() void {
     std.mem.doNotOptimizeAway(framebuffer);
 
     const ready_v2: u32 = (@as(u32, FRAMEBUFFER_READY_V2) << 24) | payload;
-    const spin_start_time = microsSinceBoot();
+    const spin_start_time = micros_since_boot();
     while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
         asm volatile ("nop");
-        const now = microsSinceBoot();
+        const now = micros_since_boot();
         if (now - spin_start_time >= present_wait_time_limit) {
             present_timeout_events +%= 1;
             if ((present_timeout_events & 0x3f) == 0x01) {
@@ -1445,14 +1442,14 @@ pub fn present() void {
     // Switch draw buffer immediately so cart can render next frame while
     // Core 0 flushes the published one.
     draw_buffer_index = if (draw_buffer_index == 0) 1 else 0;
-    updateDrawBufferPointer();
-    resetDirtyRect();
+    update_draw_buffer_pointer();
+    reset_dirty_rect();
 
     // Keep backward compatibility in case kernel only supports v1 ready.
     _ = FRAMEBUFFER_READY;
 }
 
-fn computeDirtyRectLegacyFallback() ?struct { x: u16, y: u16, w: u16, h: u16 } {
+fn compute_dirty_recxt_legacy_fallback() ?struct { x: u16, y: u16, w: u16, h: u16 } {
     const cur = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
     const prev = if (draw_buffer_index == 0) framebuffer1 else framebuffer0;
 

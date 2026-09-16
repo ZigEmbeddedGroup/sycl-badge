@@ -140,8 +140,8 @@ fn overlapSquare(ax: i32, ay: i32, as: i32, bx: i32, by: i32, bs: i32) bool {
 }
 
 fn fillScreen(color: cart.DisplayColor) void {
-    cart.markDirtyRect(0, 0, WIDTH, HEIGHT);
-    const px = cart.Pixel.fromColor(color);
+    cart.mark_dirty_rect(0, 0, WIDTH, HEIGHT);
+    const px = cart.Pixel.from_color(color);
     for (cart.framebuffer) |*col| {
         @memset(col, px);
     }
@@ -156,12 +156,12 @@ fn fillRect(x: i32, y: i32, w: i32, h: i32, color: cart.DisplayColor) void {
     const y1 = clamp(y + h, 0, HEIGHT);
     if (x0 >= x1 or y0 >= y1) return;
 
-    const px = cart.Pixel.fromColor(color);
+    const px = cart.Pixel.from_color(color);
     var xx: i32 = x0;
     while (xx < x1) : (xx += 1) {
         @memset(cart.framebuffer[@intCast(xx)][@intCast(y0)..@intCast(y1)], px);
     }
-    cart.markDirtyRect(x0, y0, x1 - x0, y1 - y0);
+    cart.mark_dirty_rect(x0, y0, x1 - x0, y1 - y0);
 }
 
 fn spawnPellet(i: usize) void {
@@ -433,7 +433,7 @@ fn drawScene() void {
         const y1 = clamp(py + ps, 0, HEIGHT);
         if (x0 >= x1 or y0 >= y1) continue;
 
-        const pixel = cart.Pixel.fromColor(Col.pellet);
+        const pixel = cart.Pixel.from_color(Col.pellet);
         var xx: i32 = x0;
         while (xx < x1) : (xx += 1) {
             @memset(cart.framebuffer[@intCast(xx)][@intCast(y0)..@intCast(y1)], pixel);
@@ -444,7 +444,7 @@ fn drawScene() void {
         dirty_max_y = @max(dirty_max_y, y1);
     }
     if (dirty_max_x > dirty_min_x) {
-        cart.markDirtyRect(dirty_min_x, dirty_min_y, dirty_max_x - dirty_min_x, dirty_max_y - dirty_min_y);
+        cart.mark_dirty_rect(dirty_min_x, dirty_min_y, dirty_max_x - dirty_min_x, dirty_max_y - dirty_min_y);
     }
 
     for (bots) |b| {

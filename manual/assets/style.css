@@ -405,12 +405,14 @@ h3 {
   margin: var(--line-height) 0;
 }
 
+
+
 h4 {}
 
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: calc(var(--line-height) * -0.5) 0 calc(var(--line-height) * 1.5);
+  margin-top: 1em;
   padding: 0;
   border: 1.5px solid black;
 }
@@ -893,4 +895,15 @@ h4 a,
 h5 a,
 h6 a {
     text-decoration: none;
+}
+
+h3 a code {
+    font-style: normal;
+    font-weight: 600;
+    font-size: 1.25em;
+    font-family: var(--font-family);
+}
+
+.doc-entry {
+    margin-bottom: 3em;
 }

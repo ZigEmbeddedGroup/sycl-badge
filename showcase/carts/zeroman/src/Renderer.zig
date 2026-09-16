@@ -53,7 +53,8 @@ pub const Sprite = struct {
     pub fn drawFromTo(sprite: anytype, src_rect: Rect, dst_rect: Rect) void {
         if (@TypeOf(sprite) == Texture) return;
 
-        const z = cart.zone("Sprite.draw", @src()); defer z.end();
+        const z = cart.zone("Sprite.draw", @src());
+        defer z.end();
 
         var src_x0: usize = @intCast(src_rect.x);
         const src_y0: usize = @intCast(src_rect.y);
@@ -69,7 +70,7 @@ pub const Sprite = struct {
                 const index = (y + src_y0) * sprite.width + (if (flip_x) @abs(src_rect.w) - 1 - x else x) + src_x0;
                 const color = sprite.colors[sprite.indices.get(index)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].setColor(color);
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].set_color(color);
             }
         }
     }
@@ -77,7 +78,8 @@ pub const Sprite = struct {
 
 pub const Tilemap = struct {
     pub fn draw(map: Texture, tiles: anytype, rect: Rect, tile_size: usize) void {
-        const z = cart.zone("Tilemap.draw", @src()); defer z.end();
+        const z = cart.zone("Tilemap.draw", @src());
+        defer z.end();
 
         const dst_x0 = rect.x - scroll.x;
         const dst_y0 = rect.y - scroll.y;
@@ -97,7 +99,7 @@ pub const Tilemap = struct {
                 const src_y = (tile_index / 16) * tile_size + (y % tile_size);
                 const color = tiles.colors[tiles.indices.get(src_y * tiles.width + src_x)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].setColor(color);
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].set_color(color);
             }
         }
     }
@@ -106,7 +108,8 @@ pub const Tilemap = struct {
 pub fn init() void {}
 
 pub fn clear() void {
-    const z = cart.fn_zone(@src()); defer z.end();
+    const z = cart.fn_zone(@src());
+    defer z.end();
 
     cart.rect(.{
         .x = 0,

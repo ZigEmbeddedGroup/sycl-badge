@@ -183,7 +183,7 @@ fn noisy(freq: f32, len: f32, vol: u8, channel: u8) void {
         .duration = @intFromFloat(@max(len - 0.04, 0.0) * 60),
         .volume = vol,
         .flags = .{
-            .channel = @enumFromInt(channel),
+            .channel = @fromBackingInt(@intCast(channel)),
         },
     });
 }
@@ -745,6 +745,6 @@ fn draw_game() void {
 
 fn set_background() void {
     for (cart.framebuffer) |*col| {
-        @memset(col, cart.Pixel.fromColor(rgb565(black)));
+        @memset(col, cart.Pixel.from_color(rgb565(black)));
     }
 }

@@ -8,17 +8,13 @@ const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
 const rom = @import("../drivers/rom.zig");
 const rtt = @import("../drivers/rtt.zig");
-const mailbox = @import("../ipc/mailbox.zig");
-const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
 const multicore = @import("multicore.zig");
 const fps_overlay = @import("fps_overlay.zig");
-const badge = microzig.board;
 
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
-const MAX_ARGS = 8; // Maximum number of command arguments
 const PROMPT = "SYCL> "; // Text shown before input
 const MAX_HISTORY = 10; // Number of commands to remember
 
@@ -156,7 +152,7 @@ const commands = [_]Command{
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
-    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
+    .{ .name = "reboot", .description = "Restart the system (reboot [bootsel])", .handler = cmdReboot, .completion_provider = rebootCompletions },
 };
 
 // Unified Console Output (sends to USB CDC)
@@ -1061,7 +1057,16 @@ fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
+    if (iter.next()) |target| {
+        if (std.mem.eql(u8, target, "bootsel")) {
+            cmdRebootBootSel(iter);
+            return;
+        }
+        printf("Unknown reboot target: {s}\r\n", .{target});
+        println("Usage: reboot [bootsel]");
+        return;
+    }
+
     println("\r\nRebooting system...\r\n");
 
     // Small delay to allow message to be sent

@@ -21,6 +21,17 @@ var angle: f32 = 0;
 
 pub fn start() void {
     angle = 0;
+
+    // We are going to update one pixel per frame,
+    // so there's no tearing to be worried about.
+    cart.set_vsync_disabled();
+
+    // We are going to manually apply updates for
+    // two consecutive frames, so we don't need
+    // .copy_forward. Since vsync is disabled,
+    // we want to use the dirty rect to get the
+    // fastest LCD update possible.
+    cart.set_double_buffer_mode(.no_copy_dirty_rect);
 }
 
 pub fn update() void {

@@ -355,7 +355,15 @@ fn eatTone(blob: *const Blob) void {
 
 pub fn start() void {
     cart.trace("blobs:start");
+
+    // Enable vsync but tune the framerate to match the app timing
+    cart.set_vsync_dynamic();
+
+    // Have the OS clear every frame as it's sending it out to the screen
+    cart.set_double_buffer_mode(.{ .clear_full_frame = colors.bg1 });
+
     initStartMenuMusic();
+
     cart.trace("blobs:start-done");
 }
 
@@ -412,21 +420,8 @@ fn isButtonTriggered(
     }
 }
 
-fn clear() void {
-    cart.rect(.{
-        .x = 0,
-        .y = 0,
-        .width = cart.screen_width,
-        .height = cart.screen_height,
-        .fill_color = colors.bg1,
-    });
-}
-
 pub fn update() void {
     cart.trace("blobs:update");
-    cart.trace("blobs:pre-clear");
-    clear();
-    cart.trace("blobs:post-clear");
     switch (global.mode) {
         .start_menu => updateStartMenu(&global.mode.start_menu),
         .settings => updateSettingsMode(&global.mode.settings),

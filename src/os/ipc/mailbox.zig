@@ -59,7 +59,7 @@ pub fn clear() void {
 }
 
 /// Data shared between the cart API and the OS
-pub const shared_data: *volatile cart_api.CartIPCData = @ptrFromInt(0x20020004);
+pub const shared_data: *volatile cart_api.CartIPCData = @ptrFromInt(0x20020000);
 
 /// Message type constants for common operations
 pub const MessageType = struct {
@@ -83,7 +83,7 @@ pub const MessageType = struct {
     // CART_EXECUTE: payload contains entry point address (lower 24 bits)
     // For full 32-bit entry point, use shared memory
     pub const CART_EXECUTE: u8 = 0x20; // Execute cart at entry point
-    pub const CartExecute = packed struct (u32) {
+    pub const CartExecute = packed struct(u32) {
         /// Offset of the vector table or cart descriptor.
         /// If XIP is true, this is the offset from cart_xip_start
         /// to the vector table.

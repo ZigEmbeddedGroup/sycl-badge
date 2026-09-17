@@ -93,13 +93,6 @@ fn clamp(v: i32, lo: i32, hi: i32) i32 {
     return v;
 }
 
-fn fillScreen(color: cart.DisplayColor) void {
-    const px = cart.Pixel.from_color(color);
-    for (cart.framebuffer) |*col| {
-        @memset(col, px);
-    }
-}
-
 fn fillRect(x: i32, y: i32, w: i32, h: i32, color: cart.DisplayColor) void {
     if (w <= 0 or h <= 0) return;
 
@@ -367,8 +360,6 @@ fn u8fmt(v: u8, buf: *[16]u8) []const u8 {
 }
 
 fn drawGame() void {
-    fillScreen(Col.bg);
-
     // Ship body
     fillRect(player.x, player.y, 9, 8, Col.ship);
     fillRect(player.x - 2, player.y + 2, 2, 4, Col.ship);
@@ -422,7 +413,6 @@ fn tickGameOver() void {
 }
 
 fn drawIntro() void {
-    fillScreen(Col.bg);
     cart.text(.{ .str = "SPACE SHOOTER V2", .x = 20, .y = 40, .text_color = Col.text });
     cart.text(.{ .str = "OS Compatible", .x = 30, .y = 52, .text_color = Col.text_dim });
 
@@ -432,7 +422,6 @@ fn drawIntro() void {
 }
 
 fn drawGameOver() void {
-    fillScreen(Col.bg);
     cart.text(.{ .str = "GAME OVER", .x = 44, .y = 48, .text_color = Col.enemy_hit });
 
     var buf: [24]u8 = undefined;
@@ -450,6 +439,12 @@ pub fn start() void {
     mode = .intro;
     intro_a_released = false;
     intro_blink = 0;
+
+    // Enable vsync, but sync refresh rate to the app update time.
+    cart.set_vsync_dynamic();
+
+    // Use the OS to clear the framebuffer every frame
+    cart.set_double_buffer_mode(.{ .clear_full_frame = Col.bg });
 }
 
 pub fn update() void {

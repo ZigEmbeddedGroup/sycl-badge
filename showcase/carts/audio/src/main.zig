@@ -98,6 +98,15 @@ var volume: f32 = 1.0;
 
 pub fn start() void {
     change_time = cart.micros_since_boot() + micros_per_note;
+
+    // Set Vsync for 60 FPS
+    cart.set_vsync_enabled(1000.0 / 60.0);
+
+    // Don't copy changes from one buffer to the next,
+    // we will overwrite everything important every frame.
+    // "everything important" is smaller than the whole
+    // frame, so we also track a dirty rect.
+    cart.set_double_buffer_mode(.no_copy_dirty_rect);
 }
 
 var was_down = false;

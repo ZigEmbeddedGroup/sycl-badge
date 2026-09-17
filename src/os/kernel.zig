@@ -92,8 +92,8 @@ var cart_count: usize = 0; // Total number of carts
 var draw_index: usize = 0; // Current cart being drawn
 var list_top_index: usize = 0; // First visible cart index in menu list
 
-const CART_LIST_Y_START: u16 = 14;
-const CART_LIST_ROW_HEIGHT: u16 = 10;
+const CART_LIST_Y_START: i16 = 14;
+const CART_LIST_ROW_HEIGHT: i16 = 10;
 const CART_LIST_VISIBLE_ROWS: usize = 11;
 
 // Cart name storage for running selected cart
@@ -105,16 +105,23 @@ var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
 var brightness: u10 = 512;
 
-var ready_fb_state: terry.core0.TrackedStateMachine(enum {
-    not_ready,
-    ready_rect,
-    ready_whole,
-    transferring,
+var screen_wait_for: terry.core0.TrackedStateMachine(enum {
+    cart,
+    lcd,
+    vsync,
+    data_transfer,
     draw_debug,
 }) = undefined;
 
 var ready_framebuffer: []const u16 = undefined;
-var ready_fb_dirty_rect: [4]u16 = undefined;
+var ready_fb_dirty_rect: cart_api.Rect8 = undefined;
+
+const VsyncState = union(enum) {
+    disable: void,
+    enable: f32,
+};
+
+var pending_vsync_setting: ?VsyncState = null;
 
 // This function uses FP registers. If inlined into microzig_main, it will save FP registers in the preamble
 // before the FP unit is initialized, causing a fault.
@@ -128,7 +135,7 @@ pub noinline fn main() !void {
         .late_wait_for_tracy_time = LATE_TRACY_WAIT_TIME_US,
     });
 
-    ready_fb_state.register("kernel.ready_fb_state", .not_ready, @src());
+    screen_wait_for.register("kernel.screen_wait_for", .cart, @src());
 
     last_buttons = read_buttons();
 
@@ -162,6 +169,13 @@ pub noinline fn main() !void {
         // Check for both .ready and .running states (cart is active from load until stop)
         const cart_state = loader.getState();
         var cart_running = (cart_state == .running) or (cart_state == .ready);
+
+        // Check if the cart exited naturally, clean up cart state, and switch back to cart list
+        if (!cart_running and !cart_display_active) {
+            @branchHint(.unlikely);
+            console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
+            reset_after_cart();
+        }
 
         // Poll buttons
         const buttons = read_buttons();
@@ -207,23 +221,6 @@ pub noinline fn main() !void {
             @branchHint(.unlikely);
             // Cart just started running - stop updating display
             cart_display_active = false;
-        } else if (!cart_running and !cart_display_active) {
-            @branchHint(.unlikely);
-            // Cart stopped naturally (not via stop button) - reset hardware and restore display.
-            btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
-            console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
-            lcd.stopDMA();
-            fps_overlay.reset_for_cart();
-            ready_fb_state.set_state(.not_ready, @src());
-            // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
-            gpio.resetCartHardware();
-            // Abort any DMA transfers the cart may have left running.
-            dma.abortCartChannels();
-            cart_display_active = true;
-            // Re-sync all button states so any buttons still held when the cart
-            // exited are consumed and won't immediately re-trigger menu actions.
-            refreshCartDisplay();
-            last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
 
         // Periodically check if cart list changed (only when display is active)
@@ -283,7 +280,7 @@ fn tick_cart_select(pressed: Controls) void {
         fps_overlay.tick_os();
     }
 
-    if (fps_overlay.is_drawing() and !lcd.isBusy()) {
+    if (fps_overlay.is_drawing() and !lcd.is_busy()) {
         fps_overlay.submit_lcd_work();
     }
 }
@@ -327,22 +324,27 @@ fn tick_cart_mailbox(buttons: Controls) void {
     }
 
     // Dispatch async LCD work
-    if (!lcd.isBusy()) {
-        find_lcd_work: switch (ready_fb_state.state) {
-            .not_ready => {},
-            .ready_rect => {
-                const rect = ready_fb_dirty_rect;
-                lcd.writeCartBufferRect(ready_framebuffer, rect[0], rect[1], rect[2], rect[3]);
-                ready_fb_state.set_state(.transferring, @src());
+    if (!lcd.is_busy()) {
+        find_lcd_work: switch (screen_wait_for.state) {
+            .cart => {},
+            .lcd => {
+                if (pending_vsync_setting) |setting| switch (setting) {
+                    .disable => lcd.disable_vsync(),
+                    .enable => |frame_ms| lcd.enable_vsync(frame_ms),
+                };
+                pending_vsync_setting = null;
+
+                lcd.write_cart_buffer(ready_framebuffer, ready_fb_dirty_rect);
+                if (lcd.is_waiting_for_vsync()) {
+                    screen_wait_for.set_state(.vsync, @src());
+                } else {
+                    screen_wait_for.set_state(.data_transfer, @src());
+                }
             },
-            .ready_whole => {
-                lcd.writeCartBuffer(ready_framebuffer);
-                ready_fb_state.set_state(.transferring, @src());
-            },
-            .transferring => {
+            .vsync, .data_transfer => {
                 // Transfer finished, the frame buffer is safe for the app to write
                 //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                ready_fb_state.set_state(.draw_debug, @src());
+                screen_wait_for.set_state(.draw_debug, @src());
                 continue :find_lcd_work .draw_debug;
             },
             .draw_debug => {
@@ -350,10 +352,16 @@ fn tick_cart_mailbox(buttons: Controls) void {
                     fps_overlay.submit_lcd_work();
                 } else {
                     mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
-                    ready_fb_state.set_state(.not_ready, @src());
+                    screen_wait_for.set_state(.cart, @src());
                 }
             },
         }
+    } else if (screen_wait_for.state == .vsync and !lcd.is_waiting_for_vsync()) {
+        // We can't set states from interrupts, so we need to poll
+        // to record this state change in tracy.
+        // The vsync state is technically unnecessary, it's just
+        // for reporting data to the user via tracy.
+        screen_wait_for.set_state(.data_transfer, @src());
     }
 }
 
@@ -374,36 +382,45 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
     } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
         mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
     {
-        const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
-            @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
-        else
-            0;
         const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
-        const has_dirty_rect: bool = is_v2 and
-            (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
+
+        const flags: cart_api.PresentFlags = if (is_v2) @bitCast(msg) else .{
+            .framebuffer_index = 0,
+            .has_dirty_rect = false,
+            .vsync_updated = false,
+            .clear_frame = false,
+            .tag = comptime mailbox.MessageType.getType(mailbox.MessageType.FRAMEBUFFER_READY),
+        };
+
+        if (flags.vsync_updated) {
+            const vsync_flags = mailbox.shared_data.vsync_flags;
+            const frame_ms = mailbox.shared_data.vsync_frame_ms;
+            if (vsync_flags == 0) {
+                pending_vsync_setting = .disable;
+            } else {
+                pending_vsync_setting = .{ .enable = frame_ms };
+            }
+        }
+
+        if (flags.clear_frame) {
+            const clear_color = mailbox.shared_data.clear_color;
+            // TODO OS fast clear for frame
+            _ = clear_color;
+        }
 
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();
-        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[fb_index]));
-        if (has_dirty_rect) {
-            const rx: u16 = mailbox.shared_data.dirty_rect_x;
-            const ry: u16 = mailbox.shared_data.dirty_rect_y;
-            const rw: u16 = mailbox.shared_data.dirty_rect_w;
-            const rh: u16 = mailbox.shared_data.dirty_rect_h;
-
-            // Fallback to full-frame if rect metadata is invalid.
-            if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
-                ready_fb_dirty_rect = .{ rx, ry, rw, rh };
-                ready_fb_state.set_state(.ready_rect, @src());
-            } else {
-                ready_fb_state.set_state(.ready_whole, @src());
-            }
-        } else if (!is_v2) {
+        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[flags.framebuffer_index]));
+        ready_fb_dirty_rect = .all;
+        screen_wait_for.set_state(.lcd, @src());
+        if (flags.has_dirty_rect) {
+            const raw_rect = mailbox.shared_data.dirty_rect;
+            ready_fb_dirty_rect = .clip_absolute(u8, .{ raw_rect.min_x, raw_rect.min_y, raw_rect.max_x, raw_rect.max_y });
+        } else if (is_v2) {
             // Legacy carts always imply full-frame updates.
-            ready_fb_state.set_state(.ready_whole, @src());
-        } else {
-            // No visual change this frame: skip LCD transfer.
-            ready_fb_state.set_state(.transferring, @src());
+            // But v2 carts can specify an empty frame by sending
+            // no dirty rect.
+            ready_fb_dirty_rect = .none;
         }
     } else if (msg == mailbox.MessageType.SYNC_TIME_REQ_CLR) {
         sync_time.* = true;
@@ -413,10 +430,14 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
 
 fn stop_active_cart() void {
     console.println("[BTN] START+SELECT (STOP) pressed");
+    reset_after_cart();
+}
+
+fn reset_after_cart() void {
     console.println("[STOP] 1: halting Core 1");
     multicore.haltCore1();
-    console.println("[STOP] 2: stopDMA");
-    lcd.stopDMA();
+    console.println("[STOP] 2: lcd.reset");
+    lcd.reset();
     console.println("[STOP] 3a: resetCartBuzzer");
     audio.reset();
     console.println("[STOP] 3b: resetCartPWM");
@@ -438,7 +459,8 @@ fn stop_active_cart() void {
     // Mark cart as stopped and restore state before reinit
     cart_display_active = true;
     btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
-    ready_fb_state.set_state(.not_ready, @src());
+    screen_wait_for.set_state(.cart, @src());
+    pending_vsync_setting = null;
     console.println("[STOP] 8: refreshCartDisplay");
     refreshCartDisplay();
     last_cart_hash = computeCartHash();
@@ -487,7 +509,6 @@ fn refreshCartDisplay() void {
     const z = terry.core0.fn_zone(@src());
     defer z.end();
 
-    lcd.set_backlight(brightness);
     lcd.fillScreen(lcd.BLACK);
 
     // Header
@@ -529,7 +550,7 @@ fn refreshCartDisplay() void {
         lcd.drawString(146, CART_LIST_Y_START, "^", lcd.CYAN, lcd.BLACK, 1);
     }
     if (cart_count > list_top_index + CART_LIST_VISIBLE_ROWS) {
-        const bottom_y = CART_LIST_Y_START + @as(u16, @intCast((CART_LIST_VISIBLE_ROWS - 1) * CART_LIST_ROW_HEIGHT));
+        const bottom_y = CART_LIST_Y_START + @as(i16, @intCast((CART_LIST_VISIBLE_ROWS - 1) * CART_LIST_ROW_HEIGHT));
         lcd.drawString(146, bottom_y, "v", lcd.CYAN, lcd.BLACK, 1);
     }
 
@@ -553,6 +574,8 @@ fn refreshCartDisplay() void {
     }
 
     fps_overlay.redraw();
+
+    lcd.set_backlight(brightness);
 }
 
 /// Callback to count carts
@@ -685,7 +708,7 @@ fn displayCart(name: []const u8, size: u32) void {
 
     if (draw_index >= list_top_index and draw_index < list_top_index + CART_LIST_VISIBLE_ROWS) {
         const row = draw_index - list_top_index;
-        const y = CART_LIST_Y_START + @as(u16, @intCast(row)) * CART_LIST_ROW_HEIGHT;
+        const y = CART_LIST_Y_START + @as(i16, @intCast(row)) * CART_LIST_ROW_HEIGHT;
         const color = if (draw_index == cursor_index) lcd.YELLOW else lcd.WHITE;
         lcd.drawString(0, y, text, color, lcd.BLACK, 1);
     }

@@ -10,6 +10,7 @@ const std = @import("std");
 
 pub const interrupts: microzig.InterruptOptions = .{
     .DMA_IRQ_0 = .{ .c = lcd.interrupt_DMA_0 },
+    .IO_IRQ_BANK0 = .{ .c = interrupt_IO_BANK0 },
     .HardFault = fault("HardFault"),
     .MemManageFault = fault("MemManageFault"),
     .BusFault = fault("BusFault"),
@@ -19,6 +20,16 @@ pub const interrupts: microzig.InterruptOptions = .{
 
 pub fn init() void {
     int.enable(.DMA_IRQ_0);
+    int.enable(.IO_IRQ_BANK0);
+}
+
+fn interrupt_IO_BANK0() callconv(.c) void {
+    var it: microzig.hal.gpio.IrqEventIter = .{};
+    while (it.next()) |trigger| {
+        if (trigger.pin == microzig.board.LCD_TE) {
+            lcd.interrupt_te(trigger.events);
+        }
+    }
 }
 
 fn fault(comptime name: []const u8) microzig.interrupt.Handler {
@@ -47,7 +58,7 @@ fn print_fault_data() void {
     if (mmfsr.MLSPERR == 1)
         std.log.err("- A MemManage fault occurred during floating-point lazy state preservation", .{});
     if (mmfsr.MMARVALID == 1)
-        std.log.err("- MMAR holds a valid fault address", .{});
+        std.log.err("- MMFAR holds a valid fault address: 0x{X:0>8}", .{cpu.peripherals.scb.MMFAR});
 
     const bfsr = cfsr.BFSR;
     if (bfsr.instruction_bus_error)
@@ -63,7 +74,7 @@ fn print_fault_data() void {
     if (bfsr.fpu_lazy_state_preservation_fault)
         std.log.err("- FPU Lazy State Preservation Fault", .{});
     if (bfsr.busfault_address_register_valid)
-        std.log.err("- BusFault Address Register Valid: 0x{X}", .{cpu.peripherals.scb.BFAR});
+        std.log.err("- BusFault Address Register Valid: 0x{X:0>8}", .{cpu.peripherals.scb.BFAR});
 
     const ufsr = cfsr.UFSR;
     if (ufsr.undefined_instruction)

@@ -357,10 +357,10 @@ pub fn start() void {
     cart.trace("blobs:start");
 
     // Enable vsync but tune the framerate to match the app timing
-    cart.setVsyncDynamic();
+    cart.set_vsync_dynamic();
 
     // Have the OS clear every frame as it's sending it out to the screen
-    cart.setDoubleBufferMode(.{ .clear_full_frame = colors.bg1 });
+    cart.set_double_buffer_mode(.{ .clear_full_frame = colors.bg1 });
 
     initStartMenuMusic();
 

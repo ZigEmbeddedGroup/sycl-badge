@@ -137,19 +137,19 @@ pub fn os_align_cycles() void {
 
 var vsync_updated: bool = false;
 
-pub fn setVsyncDisabled() void {
+pub fn set_vsync_disabled() void {
     ipc_data.vsync_flags = 0;
     vsync_updated = true;
 }
 
-pub fn setVsyncEnabled(target_frame_ms: f32) void {
+pub fn set_vsync_enabled(target_frame_ms: f32) void {
     ipc_data.vsync_frame_ms = target_frame_ms;
     ipc_data.vsync_flags = 1;
     vsync_updated = true;
 }
 
-pub fn setVsyncDynamic() void {
-    setVsyncEnabled(0);
+pub fn set_vsync_dynamic() void {
+    set_vsync_enabled(0);
 }
 
 pub const DoubleBufferMode = union(enum) {
@@ -190,7 +190,7 @@ var double_buffer_mode: DoubleBufferMode = .copy_forward;
 /// The new mode will be applied for the next frame.
 /// N.B. If switching from clear_full_frame mode to copy_forward mode,
 /// both the clear and the copy will happen, in that order.
-pub fn setDoubleBufferMode(mode: DoubleBufferMode) void {
+pub fn set_double_buffer_mode(mode: DoubleBufferMode) void {
     double_buffer_mode = mode;
     has_set_double_buffer_mode = true;
 }
@@ -1536,7 +1536,7 @@ pub fn present() void {
     }
 
     // Some carts don't properly set up the dirty rect.
-    // If a cart never calls setDoubleBufferMode, we
+    // If a cart never calls set_double_buffer_mode, we
     // assume it is unaware of the dirty rect, and
     // compute it internally instead.
     if (!has_set_double_buffer_mode and !dirty_rect.has_area()) {

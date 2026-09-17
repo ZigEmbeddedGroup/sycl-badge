@@ -209,10 +209,10 @@ pub fn start() void {
     mode = .{ .start_menu = .{} };
 
     // Set the OS to use VSync at 60 FPS, to avoid running too fast.
-    cart.setVsyncEnabled(1000.0 / 60.0);
+    cart.set_vsync_enabled(1000.0 / 60.0);
 
     // Have the OS clear every frame as it's sending it out to the screen
-    cart.setDoubleBufferMode(.{ .clear_full_frame = Col.bg });
+    cart.set_double_buffer_mode(.{ .clear_full_frame = Col.bg });
 }
 
 const Button = enum {

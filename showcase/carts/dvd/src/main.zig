@@ -7,7 +7,7 @@ comptime {
 
 pub fn start() void {
     // Run at 60 FPS with vsync
-    cart.setVsyncEnabled(1000.0 / 60.0);
+    cart.set_vsync_enabled(1000.0 / 60.0);
 }
 
 var dvd_hue: f32 = 0;

@@ -21,10 +21,10 @@ pub fn start() void {
     // This cart draws only part of the screen, but it draws
     // that entire part every frame, so we don't need to copy
     // changes forward, but we do want to track a dirty rect.
-    cart.setDoubleBufferMode(.no_copy_dirty_rect);
+    cart.set_double_buffer_mode(.no_copy_dirty_rect);
 
     // Set vsync for 60 FPS
-    cart.setVsyncEnabled(1000.0 / 60.0);
+    cart.set_vsync_enabled(1000.0 / 60.0);
 
     tx = cart.screen_width / 2 - total_width;
     ty = cart.screen_height / 2 - total_height;

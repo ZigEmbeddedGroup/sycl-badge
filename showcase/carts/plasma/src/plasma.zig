@@ -7,10 +7,10 @@ comptime {
 
 pub fn start() void {
     // Set VSync for 60 FPS
-    cart.setVsyncEnabled(1000.0 / 60.0);
+    cart.set_vsync_enabled(1000.0 / 60.0);
 
     // We write the whole frame, every frame.
-    cart.setDoubleBufferMode(.no_copy_full_frame);
+    cart.set_double_buffer_mode(.no_copy_full_frame);
 }
 
 pub fn update() void {

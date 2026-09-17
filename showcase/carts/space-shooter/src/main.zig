@@ -156,10 +156,10 @@ pub fn start() void {
     };
 
     // Enable vsync but tune the framerate to be as fast as possible for the app timing
-    cart.setVsyncDynamic();
+    cart.set_vsync_dynamic();
 
     // Use the OS to clear every frame to black before it gets to the cart
-    cart.setDoubleBufferMode(.{ .clear_full_frame = rgb565(black) });
+    cart.set_double_buffer_mode(.{ .clear_full_frame = rgb565(black) });
 }
 
 fn tick_stars() void {

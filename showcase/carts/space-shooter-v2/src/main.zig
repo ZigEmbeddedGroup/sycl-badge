@@ -441,10 +441,10 @@ pub fn start() void {
     intro_blink = 0;
 
     // Enable vsync, but sync refresh rate to the app update time.
-    cart.setVsyncDynamic();
+    cart.set_vsync_dynamic();
 
     // Use the OS to clear the framebuffer every frame
-    cart.setDoubleBufferMode(.{ .clear_full_frame = Col.bg });
+    cart.set_double_buffer_mode(.{ .clear_full_frame = Col.bg });
 }
 
 pub fn update() void {

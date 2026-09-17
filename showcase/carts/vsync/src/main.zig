@@ -18,10 +18,10 @@ pub fn start() void {
 
     // Update the whole screen every frame, without copying
     // changes between frames.
-    cart.setDoubleBufferMode(.no_copy_full_frame);
+    cart.set_double_buffer_mode(.no_copy_full_frame);
 
     // Start with vsync disabled
-    cart.setVsyncDisabled();
+    cart.set_vsync_disabled();
 
     // Set the two buffers to all black and all white. Tearing lines will show clearly in the LCD.
     @memset(@as(*[cart.screen_width * cart.screen_height]u16, @ptrCast(cart.framebuffer)), 0);
@@ -49,9 +49,9 @@ pub fn update() void {
 
     if (changed) {
         if (target_ms == min_ms) {
-            cart.setVsyncDisabled();
+            cart.set_vsync_disabled();
         } else {
-            cart.setVsyncEnabled(target_ms);
+            cart.set_vsync_enabled(target_ms);
         }
 
         dirty_frames = 2;

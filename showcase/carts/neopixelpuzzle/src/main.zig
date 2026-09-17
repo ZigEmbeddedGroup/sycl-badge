@@ -88,10 +88,10 @@ pub fn start() void {
     clear();
 
     // Set vsync to the slowest clock setting to save power
-    cart.setVsyncEnabled(18.0);
+    cart.set_vsync_enabled(18.0);
 
     // Set the double buffer mode to the cheapest possible
-    cart.setDoubleBufferMode(.no_copy_dirty_rect);
+    cart.set_double_buffer_mode(.no_copy_dirty_rect);
 }
 
 pub fn update() void {

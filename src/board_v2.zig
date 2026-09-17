@@ -2,6 +2,7 @@
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const gpio = hal.gpio;
+const Pio = hal.pio.Pio;
 
 // Export font for use by drivers
 pub const font = @import("font.zig");
@@ -62,6 +63,9 @@ pub const button_select = gpio.num(38); // SELECT1
 
 // Alias for compatibility with existing demos
 pub const A5_D13 = led_pin;
+
+pub const i2s_pio: Pio = .pio0;
+pub const neopixel_pio: Pio = .pio1;
 
 // Voltage divider for testing hardware revision
 // see drivers/rev.zig for details.

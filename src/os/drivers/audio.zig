@@ -187,7 +187,7 @@ const rev1 = struct {
         sd_mode_n.set_direction(.out);
         sd_mode_n.put(1);
 
-        i2s = I2S.init(.pio0, .{
+        i2s = I2S.init(board.i2s_pio, .{
             .clock_config = hal.clock_config,
             .clk_pin = bclk,
             .word_select_pin = lrclk,

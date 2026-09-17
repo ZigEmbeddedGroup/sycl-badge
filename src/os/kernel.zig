@@ -13,6 +13,7 @@ const audio = @import("drivers/audio.zig");
 const dma = @import("drivers/dma.zig");
 const rev = @import("drivers/rev.zig");
 const rtt = @import("drivers/rtt.zig");
+const neopixel = @import("drivers/neopixel.zig");
 const console = @import("system/console.zig");
 const init = @import("system/init.zig");
 const fps_overlay = @import("system/fps_overlay.zig");
@@ -161,6 +162,8 @@ pub noinline fn main() !void {
         fps_overlay.poll();
 
         i2c.poll();
+
+        neopixel.poll();
 
         // Process console input
         console.processInput();
@@ -408,6 +411,9 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
             _ = clear_color;
         }
 
+        // For now, push neopixels on every present.
+        neopixel.set_neopixels(@ptrCast(&mailbox.shared_data.neopixels));
+
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();
         ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[flags.framebuffer_index]));
@@ -445,7 +451,7 @@ fn reset_after_cart() void {
     console.println("[STOP] 3c: resetCartPIO");
     gpio.resetCartPIO();
     console.println("[STOP] 3d: resetCartNeopixels");
-    gpio.resetCartNeopixels();
+    neopixel.reset();
     console.println("[STOP] 3e: resetCartLED");
     gpio.resetCartLED();
     console.println("[STOP] 3f: initButtons");
@@ -663,6 +669,7 @@ fn runSelectedCart() void {
     // rather than all-zero (which broke metalgear-timer and spaceshooter).
     mailbox.shared_data.controls = read_buttons();
     @memset(std.mem.asBytes(&mailbox.shared_data.framebuffers), 0);
+    @memset(std.mem.asBytes(&mailbox.shared_data.neopixels), 0);
     terry.client.prepare_for_cart();
 
     // Execute the cart

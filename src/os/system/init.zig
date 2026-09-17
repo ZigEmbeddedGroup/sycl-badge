@@ -18,6 +18,7 @@ const rtt = @import("../drivers/rtt.zig");
 const terry = @import("../system/terry.zig");
 const uart = @import("../drivers/uart.zig");
 const i2c = @import("../drivers/i2c.zig");
+const neopixel = @import("../drivers/neopixel.zig");
 
 // System imports
 const console = @import("console.zig");
@@ -164,6 +165,8 @@ pub fn init(config: InitConfig) !void {
     audio.init();
 
     i2c.init();
+
+    neopixel.init();
 
     // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.

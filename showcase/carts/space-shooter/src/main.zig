@@ -154,6 +154,12 @@ pub fn start() void {
         .cooldown = 0,
         .score = 0,
     };
+
+    // Enable vsync but tune the framerate to be as fast as possible for the app timing
+    cart.setVsyncDynamic();
+
+    // Use the OS to clear every frame to black before it gets to the cart
+    cart.setDoubleBufferMode(.{ .clear_full_frame = rgb565(black) });
 }
 
 fn tick_stars() void {
@@ -646,7 +652,6 @@ pub fn update() void {
         quietMode = true;
     }
     if (gameState == .intro) {
-        set_background();
         tick_stars();
         draw_stars();
         draw_intro_text();
@@ -664,7 +669,6 @@ pub fn update() void {
             }
         }
     } else if (gameState == .game_over) {
-        set_background();
         tick_stars();
         draw_stars();
         const gameOver = "GAME OVER";
@@ -734,17 +738,10 @@ fn tick_game() void {
 }
 
 fn draw_game() void {
-    set_background();
     draw_stars();
     draw_enemies();
     draw_player();
     draw_bullets();
     draw_level();
     draw_banner();
-}
-
-fn set_background() void {
-    for (cart.framebuffer) |*col| {
-        @memset(col, cart.Pixel.from_color(rgb565(black)));
-    }
 }

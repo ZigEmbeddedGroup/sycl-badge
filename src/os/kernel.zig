@@ -114,7 +114,14 @@ var screen_wait_for: terry.core0.TrackedStateMachine(enum {
 }) = undefined;
 
 var ready_framebuffer: []const u16 = undefined;
-var ready_fb_dirty_rect: lcd.Rect8 = undefined;
+var ready_fb_dirty_rect: cart_api.Rect8 = undefined;
+
+const VsyncState = union(enum) {
+    disable: void,
+    enable: f32,
+};
+
+var pending_vsync_setting: ?VsyncState = null;
 
 // This function uses FP registers. If inlined into microzig_main, it will save FP registers in the preamble
 // before the FP unit is initialized, causing a fault.
@@ -163,6 +170,13 @@ pub noinline fn main() !void {
         const cart_state = loader.getState();
         var cart_running = (cart_state == .running) or (cart_state == .ready);
 
+        // Check if the cart exited naturally, clean up cart state, and switch back to cart list
+        if (!cart_running and !cart_display_active) {
+            @branchHint(.unlikely);
+            console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
+            reset_after_cart();
+        }
+
         // Poll buttons
         const buttons = read_buttons();
         const changed: Controls = @bitCast(@as(u16, @bitCast(buttons)) ^ @as(u16, @bitCast(last_buttons)));
@@ -207,23 +221,6 @@ pub noinline fn main() !void {
             @branchHint(.unlikely);
             // Cart just started running - stop updating display
             cart_display_active = false;
-        } else if (!cart_running and !cart_display_active) {
-            @branchHint(.unlikely);
-            // Cart stopped naturally (not via stop button) - reset hardware and restore display.
-            btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
-            console.printf("[CART] natural stop: state={}, restoring display\r\n", .{loader.getState()});
-            lcd.reset();
-            fps_overlay.reset_for_cart();
-            screen_wait_for.set_state(.cart, @src());
-            // Reset buzzer, PWM, PIO, neopixel/LED outputs, and button pins.
-            gpio.resetCartHardware();
-            // Abort any DMA transfers the cart may have left running.
-            dma.abortCartChannels();
-            cart_display_active = true;
-            // Re-sync all button states so any buttons still held when the cart
-            // exited are consumed and won't immediately re-trigger menu actions.
-            refreshCartDisplay();
-            last_cart_hash = computeCartHash(); // Update hash to prevent duplicate refresh
         }
 
         // Periodically check if cart list changed (only when display is active)
@@ -331,8 +328,18 @@ fn tick_cart_mailbox(buttons: Controls) void {
         find_lcd_work: switch (screen_wait_for.state) {
             .cart => {},
             .lcd => {
+                if (pending_vsync_setting) |setting| switch (setting) {
+                    .disable => lcd.disable_vsync(),
+                    .enable => |frame_ms| lcd.enable_vsync(frame_ms),
+                };
+                pending_vsync_setting = null;
+
                 lcd.write_cart_buffer(ready_framebuffer, ready_fb_dirty_rect);
-                screen_wait_for.set_state(if (lcd.is_waiting_for_vsync()) .vsync else .data_transfer, @src());
+                if (lcd.is_waiting_for_vsync()) {
+                    screen_wait_for.set_state(.vsync, @src());
+                } else {
+                    screen_wait_for.set_state(.data_transfer, @src());
+                }
             },
             .vsync, .data_transfer => {
                 // Transfer finished, the frame buffer is safe for the app to write
@@ -375,29 +382,40 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
     } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
         mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
     {
-        const fb_index: usize = if (mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
-            @intCast(mailbox.MessageType.getPayload(msg) & 0x1)
-        else
-            0;
         const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
-        const has_dirty_rect: bool = is_v2 and
-            (mailbox.MessageType.getPayload(msg) & 0x2) != 0;
+
+        const flags: cart_api.PresentFlags = if (is_v2) @bitCast(msg) else .{
+            .framebuffer_index = 0,
+            .has_dirty_rect = false,
+            .vsync_updated = false,
+            .clear_frame = false,
+            .tag = comptime mailbox.MessageType.getType(mailbox.MessageType.FRAMEBUFFER_READY),
+        };
+
+        if (flags.vsync_updated) {
+            const vsync_flags = mailbox.shared_data.vsync_flags;
+            const frame_ms = mailbox.shared_data.vsync_frame_ms;
+            if (vsync_flags == 0) {
+                pending_vsync_setting = .disable;
+            } else {
+                pending_vsync_setting = .{ .enable = frame_ms };
+            }
+        }
+
+        if (flags.clear_frame) {
+            const clear_color = mailbox.shared_data.clear_color;
+            // TODO OS fast clear for frame
+            _ = clear_color;
+        }
 
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();
-        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[fb_index]));
+        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[flags.framebuffer_index]));
         ready_fb_dirty_rect = .all;
         screen_wait_for.set_state(.lcd, @src());
-        if (has_dirty_rect) {
-            const rx: i16 = @intCast(mailbox.shared_data.dirty_rect_x);
-            const ry: i16 = @intCast(mailbox.shared_data.dirty_rect_y);
-            const rw: i16 = @intCast(mailbox.shared_data.dirty_rect_w);
-            const rh: i16 = @intCast(mailbox.shared_data.dirty_rect_h);
-
-            // Fallback to full-frame if rect metadata is invalid.
-            if (!(rw == 0 or rh == 0 or rx >= 160 or ry >= 128)) {
-                ready_fb_dirty_rect = .clip_relative(.{ rx, ry, rw, rh });
-            }
+        if (flags.has_dirty_rect) {
+            const raw_rect = mailbox.shared_data.dirty_rect;
+            ready_fb_dirty_rect = .clip_absolute(u8, .{ raw_rect.min_x, raw_rect.min_y, raw_rect.max_x, raw_rect.max_y });
         } else if (is_v2) {
             // Legacy carts always imply full-frame updates.
             // But v2 carts can specify an empty frame by sending
@@ -412,6 +430,10 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
 
 fn stop_active_cart() void {
     console.println("[BTN] START+SELECT (STOP) pressed");
+    reset_after_cart();
+}
+
+fn reset_after_cart() void {
     console.println("[STOP] 1: halting Core 1");
     multicore.haltCore1();
     console.println("[STOP] 2: lcd.reset");
@@ -438,6 +460,7 @@ fn stop_active_cart() void {
     cart_display_active = true;
     btn_diag_cart_was_running = false; // reset so next cart launch emits "cart started"
     screen_wait_for.set_state(.cart, @src());
+    pending_vsync_setting = null;
     console.println("[STOP] 8: refreshCartDisplay");
     refreshCartDisplay();
     last_cart_hash = computeCartHash();

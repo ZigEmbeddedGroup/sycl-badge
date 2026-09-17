@@ -5,7 +5,10 @@ comptime {
     cart.export_start_code();
 }
 
-pub fn start() void {}
+pub fn start() void {
+    // Run at 60 FPS with vsync
+    cart.setVsyncEnabled(1000.0 / 60.0);
+}
 
 var dvd_hue: f32 = 0;
 var dvd_x: isize = 0;

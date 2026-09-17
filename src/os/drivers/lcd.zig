@@ -11,6 +11,9 @@ const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
+const cart_api = @import("../cart/api.zig");
+
+const Rect8 = cart_api.Rect8;
 
 const log = std.log.scoped(.lcd);
 
@@ -350,58 +353,6 @@ pub const Color16 = packed struct(u16) {
             .g = @truncate(g >> 2),
             .b = @truncate(b >> 3),
         };
-    }
-};
-
-// An absolute AABB Rect 2D clipped to the screen
-pub const Rect8 = struct {
-    min_x: u8, // inclusive
-    min_y: u8, // inclusive
-    max_x: u8, // exclusive
-    max_y: u8, // exclusive
-
-    pub const all: Rect8 = .{
-        .min_x = 0,
-        .min_y = 0,
-        .max_x = width,
-        .max_y = height,
-    };
-
-    pub const none: Rect8 = .{
-        .min_x = width,
-        .min_y = height,
-        .max_x = 0,
-        .max_y = 0,
-    };
-
-    pub fn clip_absolute(abs: [4]i16) Rect8 {
-        return .{
-            .min_x = @intCast(@max(0, @min(width, abs[0]))),
-            .min_y = @intCast(@max(0, @min(height, abs[1]))),
-            .max_x = @intCast(@max(0, @min(width, abs[2]))),
-            .max_y = @intCast(@max(0, @min(height, abs[3]))),
-        };
-    }
-
-    pub fn clip_relative(rel: [4]i16) Rect8 {
-        return .clip_absolute(.{ rel[0], rel[1], rel[0] + rel[2], rel[1] + rel[3] });
-    }
-
-    pub fn has_area(rect: Rect8) bool {
-        return rect.max_x > rect.min_x and rect.max_y > rect.min_y;
-    }
-
-    pub fn transposed(rect: Rect8) Rect8 {
-        return .{
-            .min_x = rect.min_y,
-            .min_y = rect.min_x,
-            .max_x = rect.max_y,
-            .max_y = rect.max_x,
-        };
-    }
-
-    pub fn format(self: Rect8, writer: *std.io.Writer) !void {
-        try writer.print("{{ ({d}, {d}), ({d}, {d}) }}", .{ self.min_x, self.min_y, self.max_x, self.max_y });
     }
 };
 
@@ -763,7 +714,7 @@ fn set_window(raw_rect: Rect8, orientation: DataOrientation) void {
 }
 
 pub fn drawPixel(x: i16, y: i16, color: Color16) void {
-    const rect: Rect8 = .clip_relative(.{ x, y, 1, 1 });
+    const rect: Rect8 = .clip_relative(i16, .{ x, y, 1, 1 });
     if (!rect.has_area()) return;
 
     ensure_ready();
@@ -777,7 +728,7 @@ pub fn fillScreen(color: Color16) void {
 }
 
 pub fn fillRect(x: i16, y: i16, w: i16, h: i16, color: Color16) void {
-    const rect: Rect8 = .clip_relative(.{ x, y, w, h });
+    const rect: Rect8 = .clip_relative(i16, .{ x, y, w, h });
     if (!rect.has_area()) return;
 
     const z = terry.core0.fn_zone_cond(@src(), w * h > 16);
@@ -837,7 +788,7 @@ pub fn drawChar(x: i16, y: i16, char: u8, color: Color16, bg_color: Color16, siz
 
     // Draw the character bitmap
     if (size == 1) {
-        const rect: Rect8 = .clip_relative(.{ x, y, 8, 8 });
+        const rect: Rect8 = .clip_relative(i16, .{ x, y, 8, 8 });
         if (!rect.has_area()) return;
 
         const start_col: u8 = @intCast(@max(0, -x));
@@ -892,7 +843,7 @@ pub fn drawString(x: i16, y: i16, text: []const u8, color: Color16, bg_color: Co
 }
 
 pub noinline fn drawImageClipped(x: i16, y: i16, w: i16, h: i16, data: [*]const Color16, pitch: u32) void {
-    const rect: Rect8 = .clip_relative(.{ x, y, w, h });
+    const rect: Rect8 = .clip_relative(i16, .{ x, y, w, h });
     if (!rect.has_area()) return;
 
     const start_col: u8 = @intCast(@max(0, -x));

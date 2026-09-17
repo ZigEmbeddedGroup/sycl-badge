@@ -139,14 +139,6 @@ fn overlapSquare(ax: i32, ay: i32, as: i32, bx: i32, by: i32, bs: i32) bool {
     return ax < b_right and a_right > bx and ay < b_bottom and a_bottom > by;
 }
 
-fn fillScreen(color: cart.DisplayColor) void {
-    cart.mark_dirty_rect(0, 0, WIDTH, HEIGHT);
-    const px = cart.Pixel.from_color(color);
-    for (cart.framebuffer) |*col| {
-        @memset(col, px);
-    }
-}
-
 fn fillRect(x: i32, y: i32, w: i32, h: i32, color: cart.DisplayColor) void {
     if (w <= 0 or h <= 0) return;
 
@@ -215,6 +207,12 @@ fn resetGame() void {
 
 pub fn start() void {
     mode = .{ .start_menu = .{} };
+
+    // Set the OS to use VSync at 60 FPS, to avoid running too fast.
+    cart.setVsyncEnabled(1000.0 / 60.0);
+
+    // Have the OS clear every frame as it's sending it out to the screen
+    cart.setDoubleBufferMode(.{ .clear_full_frame = Col.bg });
 }
 
 const Button = enum {
@@ -413,7 +411,6 @@ fn drawHud() void {
 }
 
 fn drawScene() void {
-    fillScreen(Col.bg);
     drawHud();
 
     var dirty_min_x: i32 = WIDTH;
@@ -521,7 +518,6 @@ fn updatePlayMode(play: *Play) void {
 
 fn updateStartMenu(start_menu: *StartMenu) void {
     _ = start_menu;
-    fillScreen(Col.bg);
     textCenter("BLOBS V2", 24, Col.player);
     textCenter("Press A to Start", 108, Col.pellet);
 
@@ -532,7 +528,6 @@ fn updateStartMenu(start_menu: *StartMenu) void {
 }
 
 fn updateSettingsMode(settings: *Settings) void {
-    fillScreen(Col.bg);
     textCenter("Settings", 30, Col.player);
     textCenter("Return to Game", 56, if (settings.selection == .return_to_game) Col.pellet else Col.hud_on);
     textCenter("New Game", 70, if (settings.selection == .new_game) Col.pellet else Col.hud_on);
@@ -557,14 +552,6 @@ fn updateSettingsMode(settings: *Settings) void {
 }
 
 pub fn update() void {
-    cart.tone(.{
-        .frequency = 2700,
-        .duration = 60 * 60 * 60,
-        .volume = 1000, // no opt on hardware
-        .flags = .{
-            .channel = .pulse1,
-        },
-    });
     switch (mode) {
         .start_menu => updateStartMenu(&mode.start_menu),
         .play => updatePlayMode(&mode.play),

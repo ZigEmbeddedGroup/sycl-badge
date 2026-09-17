@@ -135,6 +135,66 @@ pub fn os_align_cycles() void {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
+var vsync_updated: bool = false;
+
+pub fn setVsyncDisabled() void {
+    ipc_data.vsync_flags = 0;
+    vsync_updated = true;
+}
+
+pub fn setVsyncEnabled(target_frame_ms: f32) void {
+    ipc_data.vsync_frame_ms = target_frame_ms;
+    ipc_data.vsync_flags = 1;
+    vsync_updated = true;
+}
+
+pub fn setVsyncDynamic() void {
+    setVsyncEnabled(0);
+}
+
+pub const DoubleBufferMode = union(enum) {
+    /// In "copy forward" mode, changes made to the backbuffer
+    /// are automatically copied to the new backbuffer on present.
+    /// This allows apps to perform incremental updates to their
+    /// frame. The copy itself costs 0.07-0.12 mS depending on
+    /// hardware contention. The cart API tracks a dirty rect
+    /// to perform incremental updates on screen.
+    copy_forward: void,
+
+    /// In "no copy dirty rect" mode, changes made to the backbuffer
+    /// are not copied forward, but a dirty rect is tracked. In this
+    /// mode, the app must perform incremental updates against the
+    /// frame *two frames before*. This is because the
+    no_copy_dirty_rect: void,
+
+    /// In "no copy full frame" mode, changes made to the backbuffer
+    /// are not copied forward, and the entire LCD screen is updated
+    /// every frame. This is the fastest option if your app will overwrite
+    /// the entire framebuffer every frame.
+    no_copy_full_frame: void,
+
+    /// In "clear full frame" mode, the backbuffer is cleared before
+    /// every frame. This clear happens inside the OS while data is
+    /// being copied to the screen, and has no performance cost
+    /// for the app.
+    /// TODO This is not implemented yet, for now it's a slow clear
+    /// on the app core.
+    clear_full_frame: DisplayColor,
+};
+
+var has_set_double_buffer_mode: bool = false;
+var double_buffer_mode: DoubleBufferMode = .copy_forward;
+
+/// Change the double buffering mode. See DoubleBufferMode for
+/// options. The default is .copy_forward.
+/// The new mode will be applied for the next frame.
+/// N.B. If switching from clear_full_frame mode to copy_forward mode,
+/// both the clear and the copy will happen, in that order.
+pub fn setDoubleBufferMode(mode: DoubleBufferMode) void {
+    double_buffer_mode = mode;
+    has_set_double_buffer_mode = true;
+}
+
 /// RGB888, true color
 pub const NeopixelColor = extern struct { g: u8, r: u8, b: u8 };
 
@@ -146,6 +206,17 @@ pub const DisplayColor = packed struct(u16) {
     g: u6,
     /// 0-31
     b: u5,
+
+    /// Convert from a 32-bit RGB value to a DisplayColor.
+    /// The value should be 0x00RRGGBB. For example,
+    /// .rgb(0x7F00FF) is purple.
+    pub fn rgb(value: u32) DisplayColor {
+        return .{
+            .r = @truncate(value >> 19),
+            .g = @truncate(value >> 10),
+            .b = @truncate(value >> 3),
+        };
+    }
 
     pub const Optional = enum(i32) {
         none = -1,
@@ -204,43 +275,73 @@ pub const Controls = packed struct(u16) {
 // the framebuffer back to DMA it to the LCD. The cart (Core 1) reads inputs
 // and writes pixels. Using process_ram avoids colliding with kernel_ram
 // (0x20000000) where the OS keeps its own data structures.
-const base = if (is_wasm) 4 else 0x20020004;
+const base = 0x20020000;
+// zig fmt: off
 pub const CartIPCData = extern struct {
-    // Starting offset is 4
-    controls: Controls, // 4..6
-    light_level: u16, // 6..8
-    neopixels: [5]NeopixelColor, // 8..x17 bytes
-    _pad1: [5]u8, // x17..x1C
-    user_led: bool, // x1C..x1D
-    _pad2: u8, // x1D..x1E
-    battery_level: u16, // x1E..x20
-    framebuffers: [2][screen_width][screen_height]Pixel, // x20..xA020, xA020..x14020
-    trace_buf: [0x80]u8, // x14020..x140A0
-    tone_freq: f32, // x140A0..x140A4
-    tone_duration: f32, // x140A4..x140A8
-    dirty_rect_x: u16, // x140A8..x140AA
-    dirty_rect_y: u16, // x140AA..x140AC
-    dirty_rect_w: u16, // x140AC..x140AE
-    dirty_rect_h: u16, // x140AE..x140B0
-    tone_volume: f32, // x140B0..x140B4
-    tone_flags: u32, // x140B4..x140B8
-    global_volume: f32, // x140B8..x140BC
-    _pad3: u32, // x140BC..x140C0
-    tracy_ring: [tracy_buffer_size]u8, // x140C0..x150C0
-    tracy_read_pos: u32, // x150C0..x150C4
-    _pad4: [3]u32, // x150C4..x150D0, tracy_read_pos needs its own granule
-    tracy_write_ctrl: u32, // x150D0..x150D4
-    _pad5: [3]u32, // x150D4..x150E0, tracy_write_ctrl needs its own granule
-    tracy_spinlock: u32, // x150E0..x150E4
-    _pad6: [3]u32, // x150E4..x150F0, tracy_spinlock gets its own granule
+    framebuffers: [2][screen_width][screen_height]Pixel, // x0..xA000, xA000..x14000
+    tracy_ring: [tracy_buffer_size]u8, // x14000..x15000
+    trace_buf: [0x80]u8,               // x15000..x15080
+    neopixels: [5]NeopixelColor,       // x15080..x1508F
+    _pad1: u8 = 0,                     // x1508F..x15090
+
+    controls: Controls,                // x15090..x15092
+    light_level: u16,                  // x15092..x15094
+
+    user_led: bool,                    // x15094..x15095
+    _pad2: u8 = 0,                     // x15095..x15096
+    battery_level: u16,                // x15096..x15098
+
+    dirty_rect: Rect8,                 // x15098..x1509C
+
+    tone_freq: f32,                    // x1509C..x150A0
+    tone_duration: f32,                // x150A0..x150A4
+    tone_volume: f32,                  // x150A4..x150A8
+    tone_flags: u32,                   // x150A8..x150AC
+    global_volume: f32,                // x150AC..x150B0
+
+    tracy_read_pos: u32,               // x150B0..x150B4, align(16)
+    _pad3: [3]u32 = @splat(0),         // x150B4..x150C0, tracy_read_pos gets its own granule
+    tracy_write_ctrl: u32,             // x150C0..x150C4, align(16)
+    _pad4: [3]u32 = @splat(0),         // x150C4..x150D0, tracy_write_ctrl gets its own granule
+    tracy_spinlock: u32,               // x150D0..x150D4, align(16)
+    _pad5: [3]u32 = @splat(0),         // x150D4..x150E0, tracy_spinlock gets its own granule
+
+    vsync_flags: u32,                  // x150E0..x150E4
+    vsync_frame_ms: f32,               // x150E4..x150E8
+    clear_color: Pixel,                // x150E8..x150EA
+    _pad6: u16 = 0,                    // x150EA..x150EC
 
     comptime {
         // cart_xip.ld reserves 0x15100 bytes for IPC data.
         // If it grows more than that, the linker script needs to be updated.
-        std.debug.assert(4 + @sizeOf(CartIPCData) <= 0x15100);
+        std.debug.assert(@sizeOf(CartIPCData) <= 0x15100);
     }
 };
-const ipc_data: *volatile CartIPCData = @ptrFromInt(base);
+// zig fmt: on
+
+var wasm_ipc_data: CartIPCData align(0x2000) = .{
+    .framebuffers = @splat(@splat(@splat(@bitCast(@as(u16, 0))))),
+    .tracy_ring = undefined,
+    .trace_buf = @splat(0),
+    .neopixels = @splat(.{ .r = 0, .g = 0, .b = 0 }),
+    .controls = @bitCast(@as(u16, 0)),
+    .light_level = 0,
+    .user_led = false,
+    .battery_level = 100,
+    .dirty_rect = undefined,
+    .tone_freq = undefined,
+    .tone_duration = undefined,
+    .tone_volume = undefined,
+    .tone_flags = undefined,
+    .global_volume = undefined,
+    .tracy_read_pos = 0,
+    .tracy_write_ctrl = 0,
+    .tracy_spinlock = 0,
+    .vsync_flags = 0,
+    .vsync_frame_ms = 0,
+    .clear_color = @bitCast(@as(u16, 0)),
+};
+const ipc_data: *align(0x2000) volatile CartIPCData = if (is_wasm) &wasm_ipc_data else @ptrFromInt(base);
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
 pub const controls: *const volatile Controls = &ipc_data.controls;
@@ -248,10 +349,10 @@ pub const light_level: *volatile u12 = @ptrCast(&ipc_data.light_level);
 pub const neopixels: *volatile [5]NeopixelColor = &ipc_data.neopixels;
 pub const user_led: *volatile bool = &ipc_data.user_led;
 pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
-const framebuffer0: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[0]);
-const framebuffer1: *[screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[1]);
-pub var framebuffer: *[screen_width][screen_height]Pixel = framebuffer0;
-pub var frontbuffer: *[screen_width][screen_height]Pixel = framebuffer1;
+const framebuffer0: *align(0x2000) [screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[0]);
+const framebuffer1: *align(0x2000) [screen_width][screen_height]Pixel = @volatileCast(&ipc_data.framebuffers[1]);
+pub var framebuffer: *align(0x2000) [screen_width][screen_height]Pixel = framebuffer0;
+pub var frontbuffer: *align(0x2000) [screen_width][screen_height]Pixel = framebuffer1;
 const tracy_ring: [*]u8 = @volatileCast(&ipc_data.tracy_ring);
 const tracy_atomic_write_ctrl: *u32 = @volatileCast(&ipc_data.tracy_write_ctrl);
 const tracy_atomic_read_pos: *u32 = @volatileCast(&ipc_data.tracy_read_pos);
@@ -263,51 +364,72 @@ var present_timeout_events: u32 = 0;
 
 const present_wait_time_limit: u32 = 500_000; // 0.5 seconds
 
-var dirty_any: bool = false;
-var dirty_min_x: u16 = 0;
-var dirty_min_y: u16 = 0;
-var dirty_max_x: u16 = 0;
-var dirty_max_y: u16 = 0;
+// An absolute AABB Rect 2D clipped to the screen
+pub const Rect8 = extern struct {
+    min_x: u8, // inclusive
+    min_y: u8, // inclusive
+    max_x: u8, // exclusive
+    max_y: u8, // exclusive
 
-fn updateDrawBufferPointer() void {
-    framebuffer, frontbuffer = if (draw_buffer_index == 0) .{ framebuffer0, framebuffer1 } else .{ framebuffer1, framebuffer1 };
-}
+    pub const all: Rect8 = .{
+        .min_x = 0,
+        .min_y = 0,
+        .max_x = screen_width,
+        .max_y = screen_height,
+    };
 
-fn reset_dirty_rect() void {
-    dirty_any = false;
-    dirty_min_x = 0;
-    dirty_min_y = 0;
-    dirty_max_x = 0;
-    dirty_max_y = 0;
+    pub const none: Rect8 = .{
+        .min_x = screen_width,
+        .min_y = screen_height,
+        .max_x = 0,
+        .max_y = 0,
+    };
+
+    pub fn clip_absolute(comptime Int: type, abs: [4]Int) Rect8 {
+        return .{
+            .min_x = @intCast(@max(0, @min(screen_width, abs[0]))),
+            .min_y = @intCast(@max(0, @min(screen_height, abs[1]))),
+            .max_x = @intCast(@max(0, @min(screen_width, abs[2]))),
+            .max_y = @intCast(@max(0, @min(screen_height, abs[3]))),
+        };
+    }
+
+    pub fn clip_relative(comptime Int: type, rel: [4]Int) Rect8 {
+        return .clip_absolute(Int, .{ rel[0], rel[1], rel[0] +| rel[2], rel[1] +| rel[3] });
+    }
+
+    pub fn contain(a: Rect8, b: Rect8) Rect8 {
+        return .{
+            .min_x = @min(a.min_x, b.min_x),
+            .min_y = @min(a.min_y, b.min_y),
+            .max_x = @max(a.max_x, b.max_x),
+            .max_y = @max(a.max_y, b.max_y),
+        };
+    }
+
+    pub fn has_area(r: Rect8) bool {
+        return r.max_x > r.min_x and r.max_y > r.min_y;
+    }
+
+    pub fn transposed(r: Rect8) Rect8 {
+        return .{
+            .min_x = r.min_y,
+            .min_y = r.min_x,
+            .max_x = r.max_y,
+            .max_y = r.max_x,
+        };
+    }
+};
+
+var prev_dirty_rect: Rect8 = .none;
+var dirty_rect: Rect8 = .all;
+
+fn update_draw_buffer_pointer() void {
+    framebuffer, frontbuffer = if (draw_buffer_index == 0) .{ framebuffer0, framebuffer1 } else .{ framebuffer1, framebuffer0 };
 }
 
 pub fn mark_dirty_rect(x: i32, y: i32, w: i32, h: i32) void {
-    if (w <= 0 or h <= 0) return;
-
-    const x0 = @max(x, 0);
-    const y0 = @max(y, 0);
-    const x1 = @min(x +| w, @as(i32, @intCast(screen_width)));
-    const y1 = @min(y +| h, @as(i32, @intCast(screen_height)));
-    if (x0 >= x1 or y0 >= y1) return;
-
-    const ux0: u16 = @intCast(x0);
-    const uy0: u16 = @intCast(y0);
-    const ux1: u16 = @intCast(x1 - 1);
-    const uy1: u16 = @intCast(y1 - 1);
-
-    if (!dirty_any) {
-        dirty_any = true;
-        dirty_min_x = ux0;
-        dirty_min_y = uy0;
-        dirty_max_x = ux1;
-        dirty_max_y = uy1;
-        return;
-    }
-
-    if (ux0 < dirty_min_x) dirty_min_x = ux0;
-    if (uy0 < dirty_min_y) dirty_min_y = uy0;
-    if (ux1 > dirty_max_x) dirty_max_x = ux1;
-    if (uy1 > dirty_max_y) dirty_max_y = uy1;
+    dirty_rect = .contain(dirty_rect, .clip_relative(i32, .{ x, y, w, h }));
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
@@ -780,6 +902,10 @@ pub fn vline(options: StraightLineOptions) void {
         mark_dirty_rect(options.x, options.y, 1, @intCast(end_y - options.y));
         @memset(framebuffer[@intCast(options.x)][@max(options.y, 0)..@intCast(@min(end_y, screen_height))], pixel);
     }
+}
+
+pub fn framebufferIndex() u1 {
+    return draw_buffer_index;
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
@@ -1345,6 +1471,17 @@ pub fn trace(x: []const u8) void {
     }
 }
 
+pub const PresentFlags = packed struct(u32) {
+    const FRAMEBUFFER_READY_V2: u8 = 0x28; // see os/ipc/mailbox.zig
+
+    framebuffer_index: u1,
+    has_dirty_rect: bool,
+    vsync_updated: bool,
+    clear_frame: bool,
+    _reserved: u20 = 0,
+    tag: u8 = FRAMEBUFFER_READY_V2,
+};
+
 /// Signal Core 0 that the framebuffer is ready and wait for the
 /// LCD flush to complete before returning.
 ///
@@ -1365,8 +1502,6 @@ pub fn present() void {
     const FIFO_VLD: u32 = 1 << 0; // read-FIFO valid (data available)
 
     // Message constants — must match mailbox.MessageType values in the OS.
-    const FRAMEBUFFER_READY: u32 = 0x25000001;
-    const FRAMEBUFFER_READY_V2: u8 = 0x28;
     const FRAMEBUFFER_DONE: u32 = 0x25000002;
 
     // Drain completion messages to release the in-flight slot.
@@ -1400,29 +1535,28 @@ pub fn present() void {
         }
     }
 
-    // Publish the completed draw buffer.
-    // payload bit0 = buffer index, bit1 = dirty-rect present.
-    var payload: u32 = draw_buffer_index;
-    if (dirty_any) {
-        ipc_data.dirty_rect_x = dirty_min_x;
-        ipc_data.dirty_rect_y = dirty_min_y;
-        ipc_data.dirty_rect_w = dirty_max_x - dirty_min_x + 1;
-        ipc_data.dirty_rect_h = dirty_max_y - dirty_min_y + 1;
-        payload |= 0x2;
-    } else if (compute_dirty_recxt_legacy_fallback()) |r| {
-        ipc_data.dirty_rect_x = r.x;
-        ipc_data.dirty_rect_y = r.y;
-        ipc_data.dirty_rect_w = r.w;
-        ipc_data.dirty_rect_h = r.h;
-        payload |= 0x2;
+    // Some carts don't properly set up the dirty rect.
+    // If a cart never calls setDoubleBufferMode, we
+    // assume it is unaware of the dirty rect, and
+    // compute it internally instead.
+    if (!has_set_double_buffer_mode and !dirty_rect.has_area()) {
+        dirty_rect = compute_dirty_rect_legacy_fallback();
     }
 
-    // Framebuffer is non-volatile to preserve hot loop perf.
-    // Make sure it was eventually written though, so the OS
-    // can see it.
-    std.mem.doNotOptimizeAway(framebuffer);
+    const message: PresentFlags = .{
+        .framebuffer_index = draw_buffer_index,
+        .has_dirty_rect = dirty_rect.has_area(),
+        .vsync_updated = vsync_updated,
+        .clear_frame = (double_buffer_mode == .clear_full_frame),
+    };
+    vsync_updated = false;
 
-    const ready_v2: u32 = (@as(u32, FRAMEBUFFER_READY_V2) << 24) | payload;
+    ipc_data.dirty_rect = dirty_rect;
+
+    if (double_buffer_mode == .clear_full_frame) {
+        ipc_data.clear_color = .from_color(double_buffer_mode.clear_full_frame);
+    }
+
     const spin_start_time = micros_since_boot();
     while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
         asm volatile ("nop");
@@ -1435,51 +1569,77 @@ pub fn present() void {
             return;
         }
     }
-    SIO_FIFO_WR.* = ready_v2;
+
+    // Ensure all framebuffer and IPC writes are available for the other core
+    asm volatile ("dmb" ::: .{ .memory = true });
+    // Send the message
+    SIO_FIFO_WR.* = @bitCast(message);
     // SEV to wake Core 0 in case it's in WFE.
     asm volatile ("sev");
 
     has_in_flight_frame = true;
+
+    prev_dirty_rect = dirty_rect;
+    switch (double_buffer_mode) {
+        .clear_full_frame => |color| {
+            // OS clears frame, just mark full frame as dirty
+            dirty_rect = .all;
+            // TODO If we do this in the OS, we can do it while the frame is being copied to
+            // the lcd, saving lots of time! For now though, just SIMD it.
+            const color_16: u16 = @bitCast(color);
+            const color_32: u32 = @as(u32, color_16) << 16 | color_16;
+            @memset(@as(*[screen_width * screen_height / 2]u32, @ptrCast(frontbuffer)), color_32);
+        },
+        .no_copy_dirty_rect => {
+            dirty_rect = .none;
+        },
+        .no_copy_full_frame => {
+            dirty_rect = .all;
+        },
+        .copy_forward => {
+            dirty_rect = .none;
+            // Do the copy
+            // TODO DMA would be twice as fast
+            const front_32 = @as(*[screen_width * screen_height / 2]u32, @ptrCast(frontbuffer));
+            const back_32 = @as(*[screen_width * screen_height / 2]u32, @ptrCast(framebuffer));
+            @memcpy(front_32, back_32);
+        },
+    }
+
     // Switch draw buffer immediately so cart can render next frame while
     // Core 0 flushes the published one.
-    draw_buffer_index = if (draw_buffer_index == 0) 1 else 0;
+    draw_buffer_index = 1 - draw_buffer_index;
     update_draw_buffer_pointer();
-    reset_dirty_rect();
-
-    // Keep backward compatibility in case kernel only supports v1 ready.
-    _ = FRAMEBUFFER_READY;
 }
 
-fn compute_dirty_recxt_legacy_fallback() ?struct { x: u16, y: u16, w: u16, h: u16 } {
-    const cur = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
-    const prev = if (draw_buffer_index == 0) framebuffer1 else framebuffer0;
+fn compute_dirty_rect_legacy_fallback() Rect8 {
+    const cur_raw = if (draw_buffer_index == 0) framebuffer0 else framebuffer1;
+    const prev_raw = if (draw_buffer_index == 0) framebuffer1 else framebuffer0;
 
-    var any = false;
-    var min_x: u32 = screen_width;
-    var min_y: u32 = screen_height;
-    var max_x: u32 = 0;
-    var max_y: u32 = 0;
+    const simd_len = @divExact(@sizeOf(u32), @sizeOf(Pixel));
+    const height_simd = @divExact(screen_height, simd_len);
+    const cur: *[screen_width][height_simd]u32 = @ptrCast(cur_raw);
+    const prev: *[screen_width][height_simd]u32 = @ptrCast(prev_raw);
 
-    var x: u32 = 0;
+    var dirty: Rect8 = .none;
+
+    var x: u8 = 0;
     while (x < screen_width) : (x += 1) {
-        var y: u32 = 0;
-        while (y < screen_height) : (y += 1) {
-            if (cur[x][y].bits != prev[x][y].bits) {
-                any = true;
-                if (x < min_x) min_x = x;
-                if (y < min_y) min_y = y;
-                if (x > max_x) max_x = x;
-                if (y > max_y) max_y = y;
+        var y: u8 = 0;
+        while (y < height_simd) : (y += 1) {
+            if (cur[x][y] != prev[x][y]) {
+                if (x < dirty.min_x) dirty.min_x = x;
+                if (y < dirty.min_y) dirty.min_y = y;
+                dirty.max_x = x + 1; // This is always greater, as x only increases
+                if (y + 1 > dirty.max_y) dirty.max_y = y + 1;
             }
         }
     }
 
-    if (!any) return null;
+    if (dirty.has_area()) {
+        dirty.min_y = dirty.min_y * simd_len;
+        dirty.max_y = dirty.max_y * simd_len;
+    }
 
-    return .{
-        .x = @intCast(min_x),
-        .y = @intCast(min_y),
-        .w = @intCast(max_x - min_x + 1),
-        .h = @intCast(max_y - min_y + 1),
-    };
+    return dirty;
 }

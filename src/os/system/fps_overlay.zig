@@ -7,6 +7,9 @@ const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
 const terry = @import("terry.zig");
 const log = std.log.scoped(.fps_overlay);
+const cart_api = @import("../cart/api.zig");
+
+const Rect8 = cart_api.Rect8;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -119,8 +122,6 @@ fn reset_debug_text() void {
     reserved_botright = .{};
 }
 
-const Rect8 = lcd.Rect8;
-
 var frame_count: usize = 0;
 
 pub fn clip_draw_rects(in_rect: Rect8, out_rects: *[5]Rect8) usize {
@@ -225,7 +226,7 @@ inline fn clip_corner(rects: *std.ArrayList(Rect8), corner: anytype) void {
 
 inline fn expand_corner(corner: anytype, rect: [4]i16) void {
     const Corner = @typeInfo(@TypeOf(corner)).pointer.child;
-    const rect8: Rect8 = .clip_relative(rect);
+    const rect8: Rect8 = .clip_relative(i16, rect);
     if (@hasField(Corner, "min_x")) {
         corner.min_x = @min(corner.min_x, rect8.min_x);
     }

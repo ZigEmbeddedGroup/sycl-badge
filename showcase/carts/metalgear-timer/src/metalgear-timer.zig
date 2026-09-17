@@ -15,24 +15,35 @@ var sx: usize = 1;
 var sy: usize = 1;
 var color: cart.DisplayColor = black;
 
+var last_time: u64 = 0;
+
 pub fn start() void {
-    r(0, 0, cart.screen_width, cart.screen_height);
+    // This cart draws only part of the screen, but it draws
+    // that entire part every frame, so we don't need to copy
+    // changes forward, but we do want to track a dirty rect.
+    cart.setDoubleBufferMode(.no_copy_dirty_rect);
+
+    // Set vsync for 60 FPS
+    cart.setVsyncEnabled(1000.0 / 60.0);
+
     tx = cart.screen_width / 2 - total_width;
     ty = cart.screen_height / 2 - total_height;
     sx = 2;
     sy = 2;
+
+    last_time = cart.micros_since_boot();
 }
 
 fn r(x: usize, y: usize, w: usize, h: usize) void {
     // TODO: use cart API once it actually works on hardware
-    if (false) {
-        // cart.rect(.{
-        //     .x = @intCast(tx + sx * x),
-        //     .y = @intCast(ty + sy * y),
-        //     .width = @intCast(sx * w),
-        //     .height = @intCast(sy * h),
-        //     .fill_color = color,
-        // });
+    if (true) {
+        cart.rect(.{
+            .x = @intCast(tx + sx * x),
+            .y = @intCast(ty + sy * y),
+            .width = @intCast(sx * w),
+            .height = @intCast(sy * h),
+            .fill_color = color,
+        });
     } else {
         // backup impl
         const x0 = tx + sx * x;
@@ -210,7 +221,7 @@ fn digit(x: usize, y: usize, num: usize) void {
     color = black;
 }
 
-var counter: usize = 0;
+var counter_us: usize = 0;
 
 fn text_lines() void {
     save();
@@ -226,7 +237,7 @@ fn text_lines() void {
         &.{ 0, 3, 4, 8, 14, 6, 21, 3 },
         &.{ 0, 1, 2, 9, 12, 4, 18, 4 },
     };
-    const max_char = counter / 20;
+    const max_char = counter_us / 200_000;
     const max_x = max_char % 24;
     const line1 = max_char / 24;
     var line0: usize = 0;
@@ -249,6 +260,10 @@ fn text_lines() void {
 }
 
 pub fn update() void {
+    const time = cart.micros_since_boot();
+    defer last_time = time;
+    const delta_us: u32 = @intCast(time - last_time);
+
     color = red;
     r(0, 0, total_width, 1);
     r(0, 11, total_width, total_height - 11);
@@ -261,10 +276,10 @@ pub fn update() void {
     alert_jap();
     text_lines();
     r(6, 29, 55, 2);
-    counter += 17;
-    if (counter > 9999) counter = 9999;
-    if (cart.controls.start) counter = 0;
-    const num = 9999 - counter;
+    counter_us += delta_us;
+    if (counter_us > 99_990_000) counter_us = 99_990_000;
+    if (cart.controls.start) counter_us = 0;
+    const num = (99_990_000 - counter_us) / 10_000;
     digit(8, 33, num / 1000);
     digit(20, 33, (num / 100) % 10);
     r(32, 47, 3, 2);

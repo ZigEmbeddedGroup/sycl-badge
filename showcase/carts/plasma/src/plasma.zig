@@ -5,7 +5,13 @@ comptime {
     cart.export_start_code();
 }
 
-pub fn start() void {}
+pub fn start() void {
+    // Set VSync for 60 FPS
+    cart.setVsyncEnabled(1000.0 / 60.0);
+
+    // We write the whole frame, every frame.
+    cart.setDoubleBufferMode(.no_copy_full_frame);
+}
 
 pub fn update() void {
     updatePlasma();

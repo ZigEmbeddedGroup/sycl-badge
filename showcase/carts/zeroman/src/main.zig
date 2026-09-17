@@ -485,6 +485,13 @@ fn drawRoom(room: Room, room_tex: Renderer.Texture, door1_h: u8, door2_h: u8) vo
 }
 
 pub fn start() void {
+    // Update the whole screen every frame, without copying
+    // changes between frames.
+    cart.setDoubleBufferMode(.no_copy_full_frame);
+
+    // Target 60 FPS with vsync
+    cart.setVsyncEnabled(1000.0 / 60.0);
+
     game_data.reset();
 }
 

@@ -8,7 +8,7 @@ const mailbox = @import("ipc/mailbox.zig");
 const loader = @import("loader/loader.zig");
 const storage = @import("loader/storage.zig");
 const shared_mem = @import("ipc/shared_mem.zig");
-const cd = @import("cart/cart_descriptor.zig");
+const abi = @import("cart/os_abi.zig");
 
 // Use panic handler from system
 pub const panic = @import("system/panic.zig").panic;
@@ -216,15 +216,15 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
         jumpToCart(initial_sp, entry_point);
     } else {
         const header: [*]u32 = @ptrFromInt(cart_ram_start + exec.offset);
-        if (header[0] != cd.CART_MAGIC) {
+        if (header[0] != abi.CART_MAGIC) {
             mailbox.send(mailbox.MessageType.CART_CRASHED);
             return;
         }
         const initial_stack = cart_ram_end;
         var entry_point: u32 = 0;
         switch (header[1]) {
-            cd.CART_VERSION_V1 => {
-                const descriptor: *const cd.CartDescriptorTable_v1 = @ptrCast(header);
+            abi.CART_VERSION_V1 => {
+                const descriptor: *const abi.CartDescriptorTable_v1 = @ptrCast(header);
                 // BSS has been cleared already by the loader
                 entry_point = @intFromPtr(descriptor.entry_point);
             },

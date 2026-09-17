@@ -21,8 +21,8 @@ const loader = @import("loader/loader.zig");
 const multicore = @import("system/multicore.zig");
 const terry = @import("system/terry.zig");
 const mailbox = @import("ipc/mailbox.zig");
-const cart_api = @import("cart/api.zig");
-const Controls = cart_api.Controls;
+const abi = @import("cart/os_abi.zig");
+const Controls = abi.Controls;
 const i2c = @import("drivers/i2c.zig");
 
 // Use panic handler from system
@@ -114,7 +114,7 @@ var screen_wait_for: terry.core0.TrackedStateMachine(enum {
 }) = undefined;
 
 var ready_framebuffer: []const u16 = undefined;
-var ready_fb_dirty_rect: cart_api.Rect8 = undefined;
+var ready_fb_dirty_rect: abi.Rect8 = undefined;
 
 const VsyncState = union(enum) {
     disable: void,
@@ -384,7 +384,7 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
     {
         const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
 
-        const flags: cart_api.PresentFlags = if (is_v2) @bitCast(msg) else .{
+        const flags: abi.PresentFlags = if (is_v2) @bitCast(msg) else .{
             .framebuffer_index = 0,
             .has_dirty_rect = false,
             .vsync_updated = false,

@@ -78,8 +78,9 @@ pub fn core0_thread_id() u32 {
 // TODO send events to update this thread name to match the name
 // of whatever cart is running.
 const cart_thread_id_ptr = terry.external_string("Core 1 (Cart)");
-fn cart_thread_id() u32 { return @intFromPtr(cart_thread_id_ptr); }
-
+fn cart_thread_id() u32 {
+    return @intFromPtr(cart_thread_id_ptr);
+}
 
 pub var core0_thread_ref_time: i64 = 0;
 pub var has_core0_thread_context: bool = false;
@@ -1244,7 +1245,8 @@ pub fn poll() void {
 }
 
 noinline fn handle_server_query(query: *const q.ServerQueryPacket) void {
-    const z = terry.core0.fn_zone(@src()); defer z.end();
+    const z = terry.core0.fn_zone(@src());
+    defer z.end();
 
     logf("TERRY: server query: {s}\n", .{@tagName(query.type)});
 
@@ -1452,10 +1454,10 @@ fn send_empty(ty: q.Type, pending_ty: PendingPacket) void {
 }
 
 const ipc_data = @import("../ipc/mailbox.zig").shared_data;
-const cart_api = @import("../cart/api.zig");
-const TracyAtomicWriteCtrl = cart_api.TracyAtomicWriteCtrl;
-const cart_ring_size = cart_api.tracy_buffer_size;
-const cart_ring_mask = cart_ring_size-1;
+const abi = @import("../cart/os_abi.zig");
+const TracyAtomicWriteCtrl = abi.TracyAtomicWriteCtrl;
+const cart_ring_size = abi.tracy_buffer_size;
+const cart_ring_mask = cart_ring_size - 1;
 // Debug: x/[len]xb 0x200340C0
 const cart_ring: *[cart_ring_size]u8 = @volatileCast(&ipc_data.tracy_ring);
 // Debug: watch *(u32*)0x200350C4
@@ -1498,7 +1500,7 @@ pub fn prepare_for_cart() void {
     };
     @atomicStore(u32, cart_atomic_write_ctrl, @bitCast(initial_write_control), .release);
     @atomicStore(u32, cart_atomic_read_pos, 0, .seq_cst);
-    cart_api.spin_lock_release(cart_spinlock);
+    abi.spin_lock_release(cart_spinlock);
 }
 
 fn send_core1_assume_available(layout: WireLayout, data_len: usize) void {
@@ -1510,9 +1512,9 @@ fn send_core1_assume_available(layout: WireLayout, data_len: usize) void {
     const first_len = @min(data_len, cart_ring_size - read_pos);
     const thread_ctx = q.packet(.ThreadContext, .{ .thread = cart_thread_id() });
     cursor.write_assume_available(std.mem.asBytes(&thread_ctx));
-    cursor.write_assume_available(cart_ring[read_pos..read_pos+first_len]);
+    cursor.write_assume_available(cart_ring[read_pos .. read_pos + first_len]);
     if (first_len < data_len) {
-        cursor.write_assume_available(cart_ring[0..data_len - first_len]);
+        cursor.write_assume_available(cart_ring[0 .. data_len - first_len]);
     }
     cursor.commit();
 
@@ -1554,8 +1556,8 @@ fn send_core1_queue() bool {
     // mask meaning that we will insert a thread context. We must now split packets on this boundary.
     var write_ctrl: TracyAtomicWriteCtrl = undefined;
     {
-        cart_api.spin_lock_acquire(cart_spinlock);
-        defer cart_api.spin_lock_release(cart_spinlock);
+        abi.spin_lock_acquire(cart_spinlock);
+        defer abi.spin_lock_release(cart_spinlock);
 
         write_ctrl = @bitCast(@as(*volatile u32, cart_atomic_write_ctrl).*);
         write_ctrl.has_thread_ctx = false;

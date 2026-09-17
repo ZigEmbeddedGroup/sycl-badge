@@ -4,7 +4,7 @@ const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const timer = @import("../drivers/timer.zig");
-const cart_api = @import("../cart/api.zig");
+const abi = @import("../cart/os_abi.zig");
 
 const fifo = hal.multicore.fifo;
 
@@ -59,7 +59,7 @@ pub fn clear() void {
 }
 
 /// Data shared between the cart API and the OS
-pub const shared_data: *volatile cart_api.CartIPCData = @ptrFromInt(0x20020000);
+pub const shared_data = abi.ipc_data;
 
 /// Message type constants for common operations
 pub const MessageType = struct {

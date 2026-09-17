@@ -11,9 +11,9 @@ const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
-const cart_api = @import("../cart/api.zig");
+const abi = @import("../cart/os_abi.zig");
 
-const Rect8 = cart_api.Rect8;
+const Rect8 = abi.Rect8;
 
 const log = std.log.scoped(.lcd);
 

@@ -10,7 +10,7 @@ const terry = @import("../system/terry.zig");
 const multicore = @import("../system/multicore.zig");
 const log_scope = .loader;
 const log = std.log.scoped(log_scope);
-const cd = @import("../cart/cart_descriptor.zig");
+const abi = @import("../cart/os_abi.zig");
 const mailbox = @import("../ipc/mailbox.zig");
 
 /// Linker symbols for cart_xip region
@@ -393,9 +393,8 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!mailbox.MessageType
                 @memcpy(flash_write_buffer[0..remaining], payload[copy_len..]);
                 buffer_dirty = true;
             }
-        }
-        else if (block.header.target_addr >= cart_ram_start and
-                 block.header.target_addr + payload.len <= cart_ram_end)
+        } else if (block.header.target_addr >= cart_ram_start and
+            block.header.target_addr + payload.len <= cart_ram_end)
         {
             // If this RAM block was preceded by flash blocks, there is unwritten
             // flash data in the cart's memory space. The cart memory might overwrite
@@ -413,7 +412,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!mailbox.MessageType
             if (ram_cart_descriptor == null) {
                 // See if we can find the cart descriptor
                 const data_as_u32 = std.mem.bytesAsSlice(u32, payload[0..std.mem.alignBackward(usize, payload.len, @alignOf(u32))]);
-                if (std.mem.indexOfScalar(u32, data_as_u32, cd.CART_MAGIC)) |index| {
+                if (std.mem.indexOfScalar(u32, data_as_u32, abi.CART_MAGIC)) |index| {
                     const byte_offset = index * @sizeOf(u32);
                     ram_cart_descriptor = @ptrFromInt(block.header.target_addr + byte_offset);
                 }
@@ -421,9 +420,7 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!mailbox.MessageType
 
             const ptr: [*]u8 = @ptrFromInt(block.header.target_addr);
             @memcpy(ptr, payload);
-        }
-        else
-        {
+        } else {
             return LoadError.AddressMismatch;
         }
     }
@@ -446,8 +443,8 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!mailbox.MessageType
     if (ram_cart_descriptor) |cart_descriptor| {
         // Verify the version
         switch (cart_descriptor[1]) {
-            cd.CART_VERSION_V1 => {
-                const descriptor: *cd.CartDescriptorTable_v1 = @ptrCast(cart_descriptor);
+            abi.CART_VERSION_V1 => {
+                const descriptor: *abi.CartDescriptorTable_v1 = @ptrCast(cart_descriptor);
                 const bss_start = @intFromPtr(descriptor.bss_start);
                 const bss_end = @intFromPtr(descriptor.bss_end);
                 const entry_point = @intFromPtr(descriptor.entry_point);
@@ -457,13 +454,13 @@ fn loadUF2FromStorage(cart_info: storage.CartInfo) LoadError!mailbox.MessageType
                     bss_start > bss_end or
                     !(entry_point >= cart_ram_start and entry_point < cart_ram_end or
                         entry_point >= cart_xip_start and entry_point < cart_xip_end) or
-                        entry_point & 1 == 0) // entry_point must be thumb
+                    entry_point & 1 == 0) // entry_point must be thumb
                 {
                     return LoadError.AddressMismatch;
                 }
 
                 // Clear BSS
-                const bss = @as([*]u8, @ptrFromInt(bss_start))[0..bss_end - bss_start];
+                const bss = @as([*]u8, @ptrFromInt(bss_start))[0 .. bss_end - bss_start];
                 @memset(bss, 0);
 
                 // Flush store pipe

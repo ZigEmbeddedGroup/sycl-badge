@@ -7,9 +7,9 @@ const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
 const terry = @import("terry.zig");
 const log = std.log.scoped(.fps_overlay);
-const cart_api = @import("../cart/api.zig");
+const abi = @import("../cart/os_abi.zig");
 
-const Rect8 = cart_api.Rect8;
+const Rect8 = abi.Rect8;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 

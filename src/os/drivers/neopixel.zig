@@ -99,10 +99,28 @@ noinline fn do_write_pixels() linksection(".data") void {
     ptr.* = pixel_data[3];
 }
 
-pub fn set_neopixels(data: *volatile [4]u32) void {
-    inline for (&pixel_data, data) |*px, d| {
-        px.* = @byteSwap(d);
-    }
+pub fn set_neopixels(noalias data: *const [4]u32) void {
+    // The neopixels from the cart are left-to-right,
+    // but we set them right-to-left.
+    // This is some black magic to reverse the order.
+    const data0 = @byteSwap(data[0]);
+    const data1 = @byteSwap(data[1]);
+    const data2 = @byteSwap(data[2]);
+    const data3 = @byteSwap(data[3]);
+
+    const word_pixel_data: [*]volatile u32 = &pixel_data;
+    const half_pixel_data: [*]volatile u16 = @ptrCast(&pixel_data);
+    const byte_pixel_data: [*]volatile u8 = @ptrCast(&pixel_data);
+    word_pixel_data[0] = data3;
+    byte_pixel_data[0] = @truncate(data2 >> 16);
+    half_pixel_data[2] = @truncate(data1);
+    half_pixel_data[3] = @truncate(data2);
+    word_pixel_data[2] = data1;
+    half_pixel_data[4] = @intCast(data1 >> 16);
+    byte_pixel_data[10] = @truncate(data0);
+    byte_pixel_data[11] = @truncate(data2 >> 24);
+    word_pixel_data[3] = data0 & 0xFFFFFF00;
+
     pixels_dirty = true;
 }
 

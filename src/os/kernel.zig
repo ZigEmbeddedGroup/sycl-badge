@@ -412,7 +412,9 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
         }
 
         // For now, push neopixels on every present.
-        neopixel.set_neopixels(@ptrCast(&mailbox.shared_data.neopixels));
+        const neopixel_words_ptr: *volatile [4]u32 = @ptrCast(&mailbox.shared_data.neopixels);
+        const neopixel_words = neopixel_words_ptr.*;
+        neopixel.set_neopixels(&neopixel_words);
 
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();

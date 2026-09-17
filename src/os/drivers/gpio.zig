@@ -2,8 +2,6 @@ const std = @import("std");
 const microzig = @import("microzig");
 const hal = microzig.hal;
 const board = microzig.board;
-const timer = @import("timer.zig");
-const audio = @import("audio.zig");
 
 // Re-export microzig types and funcs
 pub const Pin = hal.gpio.Pin;
@@ -131,78 +129,6 @@ pub fn isButtonReleased(pin: Pin) bool {
     return read(pin) == 0; // Active-high: released = 0 (low)
 }
 
-/// Bit-bang a WS2812B all-black (zero) frame onto the neopixel data line.
-///
-/// Transmits 5 pixels × 3 bytes × 8 bits = 120 consecutive "0" code-words
-/// using the WS2812B NRZ protocol, then holds the line low for ≥300 µs so
-/// the strip latches and all LEDs turn off.
-///
-/// Core 0 owns the USB stack so we cannot disable interrupts for the full
-/// bit-bang window without risking a USB ISR panic.  Instead we send three
-/// redundant passes with generous latch gaps; at least one clean frame will
-/// reach the strip even if a USB interrupt corrupts a single pass.
-fn clearNeopixels() linksection(".data") void {
-    const PIN_MASK: u32 = 1 << 15;
-
-    const IO_BANK0_GPIO15_CTRL: *volatile u32 = @ptrFromInt(0x4002807C);
-    const GPIO_OE_SET: *volatile u32 = @ptrFromInt(0xD0000038);
-    const GPIO_OUT_SET: *volatile u32 = @ptrFromInt(0xD0000018);
-    const GPIO_OUT_CLR: *volatile u32 = @ptrFromInt(0xD0000020);
-
-    IO_BANK0_GPIO15_CTRL.* = 5; // FUNC_SIO
-    GPIO_OE_SET.* = PIN_MASK;
-    microzig.cpu.dsb();
-
-    // Extended pre-transmission reset so the strip sees a clean latch
-    // even if the data line was left in an arbitrary state by the cart.
-    GPIO_OUT_CLR.* = PIN_MASK;
-    timer.sleep_us(300);
-
-    // Three passes with extended latch gaps for reliability.
-    var pass: u32 = 0;
-    while (pass < 3) : (pass += 1) {
-        var bit: u32 = 0;
-        while (bit < 120) : (bit += 1) {
-            GPIO_OUT_SET.* = PIN_MASK;
-            // T0H ~300-400ns (tuned for 150 MHz RP2350)
-            var t: u32 = 0;
-            while (t < 15) : (t += 1) {
-                asm volatile ("nop");
-            }
-            GPIO_OUT_CLR.* = PIN_MASK;
-            // T0L ~800-900ns
-            t = 0;
-            while (t < 42) : (t += 1) {
-                asm volatile ("nop");
-            }
-        }
-        GPIO_OUT_CLR.* = PIN_MASK;
-        timer.sleep_us(300);
-    }
-}
-
-/// Reset all hardware to a safe state after a cart stops.
-///
-/// This must be called (on Core 0) after Core 1 has been halted so that any
-/// peripherals the cart left in an active state are silenced/disabled before
-/// the OS resumes normal operation.  Specifically it:
-///   • Silences the buzzer (disables the PWM tone and de-asserts SPKR_EN).
-///   • Disables every PWM slice (carts may drive LEDs or servos via PWM).
-///   • Disables all PIO state-machine groups (carts use PIO for neopixels,
-///     custom protocols, etc.).
-///   • Transmits an all-black WS2812B frame to clear all 5 neopixels.
-///   • Drives the debug LED low.
-///   • Reconfigures all button/joystick pins as pull-up inputs so they are
-///     readable by the kernel again.
-pub fn resetCartHardware() void {
-    audio.reset();
-    resetCartPWM();
-    resetCartPIO();
-    resetCartNeopixels();
-    resetCartLED();
-    initButtons();
-}
-
 /// Step 2: Disable all 12 PWM slices (RP2350)
 ///
 /// Uses raw register access instead of hal.pwm.Slice because the HAL's Slice
@@ -233,11 +159,6 @@ pub fn resetCartPIO() void {
     // PIO0_CTRL.* = PIO0_CTRL.* & ~@as(u32, 0xF);
     // PIO1_CTRL.* = PIO1_CTRL.* & ~@as(u32, 0xF);
     // PIO2_CTRL.* = PIO2_CTRL.* & ~@as(u32, 0xF);
-}
-
-/// Step 4: Clear neopixels via WS2812B protocol
-pub fn resetCartNeopixels() void {
-    clearNeopixels();
 }
 
 /// Step 5: Drive debug LED off

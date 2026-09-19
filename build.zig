@@ -81,6 +81,18 @@ pub fn build(b: *Build) void {
     mb.install_firmware(kernel, .{ .format = .elf });
     mb.install_firmware(kernel, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 
+    // Storage wipe firmware: erases the romfs and cart_xip flash regions so a
+    // subsequent sycl-os flash boots with no carts loaded. Does NOT install
+    // the OS itself — flash sycl-os-kernel afterwards.
+    const storage_wipe_fw = mb.add_firmware(.{
+        .name = "sycl-storage-wipe",
+        .optimize = .ReleaseSmall,
+        .root_source_file = builder.path("src/os/storage_wipe.zig"),
+        .target = badge_v2_target,
+    });
+    mb.install_firmware(storage_wipe_fw, .{ .format = .elf });
+    mb.install_firmware(storage_wipe_fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+
     // Build test XIP cart (runs on Core 1 with cart_runtime - no microzig)
     add_microzig_cart(b, &dep, .{
         .name = "lcd-test",

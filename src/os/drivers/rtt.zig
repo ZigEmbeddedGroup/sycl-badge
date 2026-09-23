@@ -6,7 +6,7 @@ const rtt = @import("microzig_rtt.zig");
 const rtt_instance = rtt.RTT(.{
     .up_channels = &.{
         .{ .name = "TracySend", .buffer_size = tracy_send_size, .mode = .BlockIfFull },
-        .{ .name = "Logger", .buffer_size = 2048, .mode = .NoBlockSkip },
+        .{ .name = "Logger", .buffer_size = 2048, .mode = .BlockIfFull },
     },
     .down_channels = &.{
         .{ .name = "TracyRecv", .buffer_size = 256, .mode = .BlockIfFull },

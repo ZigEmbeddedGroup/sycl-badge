@@ -52,7 +52,6 @@ fn ep_idx(ep: Endpoint) usize {
 
 fn endpoint_control(ep: Endpoint) *volatile EndpointControl {
     assert(ep.num != .ep0, .{});
-    // TODO: this is not how it works.
     return &ep_ctrls[ep_idx(ep)];
 }
 
@@ -70,14 +69,13 @@ const descriptors: setup.Descriptors = blk: {
 
     const manufacturer = builder.add_single("Zig Embedded Group");
     const product = builder.add_single("SYCL Badge V2");
-    const serial = builder.add_single("serial number");
+    const serial = builder.add_single("1337C0DE12");
     const config_name = builder.add_single("default");
     const interface_name = builder.add_single("SYCL Badge Cart Storage");
 
     const device = descriptor.Device{
         .bcd_usb = .v2_00,
-        // Let the OS figure things out by looking at the interfaces
-        .device_triple = .unspecified,
+        .device_triple = .from(.Miscellaneous, @fromBackingInt(2), @fromBackingInt(1)),
         .max_packet_size0 = max_packet_size,
         .vendor = .from(1234),
         .product = .from(1234),
@@ -90,8 +88,6 @@ const descriptors: setup.Descriptors = blk: {
         .num_configurations = 1,
     };
 
-    const const_builder = builder.finish();
-
     const msc_interface = descriptor.Interface{
         .interface_number = 0,
         .alternate_setting = 0,
@@ -103,16 +99,34 @@ const descriptors: setup.Descriptors = blk: {
     const bulk_in_ep: descriptor.Endpoint = .bulk(.{ .dir = .in, .num = .ep1 }, max_packet_size);
     const bulk_out_ep: descriptor.Endpoint = .bulk(.{ .dir = .out, .num = .ep1 }, max_packet_size);
 
+    const cdc_descriptors: cdc.Descriptors = .init(.{
+        .itf_notifi = 1,
+        .itf_data = 2,
+        .function_name = builder.add_single("SYCL Badge Logs"),
+        .itf_notifi_name = builder.add_single("asdf"),
+        .itf_data_name = builder.add_single("data name"),
+        .max_packet_size = max_packet_size,
+        .ep_notifi = .{ .dir = .in, .num = .ep2 },
+        .ep_bulk_in = .{ .dir = .in, .num = .ep3 },
+        .ep_bulk_out = .{ .dir = .out, .num = .ep3 },
+    });
+
     const config = descriptor.Configuration{
-        .total_length = .from(@sizeOf(descriptor.Configuration) + @sizeOf(descriptor.Interface) + (2 * @sizeOf(descriptor.Endpoint))),
-        .num_interfaces = 1,
+        .total_length = .from(@sizeOf(descriptor.Configuration) + @sizeOf(descriptor.Interface) + (2 * @sizeOf(descriptor.Endpoint)) + cdc_descriptors.to_bytes().len),
+        .num_interfaces = 3,
         .configuration_value = 1,
         .configuration_s = config_name,
         .attributes = .{ .self_powered = false },
         .max_current = .from_ma(350),
     };
 
-    const config_payload = std.mem.asBytes(&config) ++ std.mem.asBytes(&msc_interface) ++ std.mem.asBytes(&bulk_in_ep) ++ std.mem.asBytes(&bulk_out_ep);
+    const config_payload = std.mem.asBytes(&config) ++
+        std.mem.asBytes(&msc_interface) ++
+        std.mem.asBytes(&bulk_in_ep) ++
+        std.mem.asBytes(&bulk_out_ep) ++
+        cdc_descriptors.to_bytes();
+
+    const const_builder = builder.finish();
     break :blk setup.Descriptors{
         .device = &device,
         .string = const_builder.to_descriptor(),
@@ -124,10 +138,10 @@ const SetupProcessor = setup.RequestPacketProcessor(.{
     .max_packet_size = max_packet_size,
     .max_transfer_size = max_packet_size,
     .callbacks = .{
-        .queue_packet = queue_packet,
-        .queue_receive = queue_receive,
+        .queue_packet = setup_queue_packet,
+        .queue_receive = setup_queue_receive,
         .set_address = set_address,
-        .get_buffer = get_buffer,
+        .get_buffer = setup_get_buffer,
         .clear_endpoint_halt = clear_endpoint_halt,
         .stall = stall,
     },
@@ -138,6 +152,16 @@ fn get_max_lun(_: ?*anyopaque) u4 {
 }
 
 fn bulk_only_mass_storage_reset(_: ?*anyopaque) void {}
+
+const cdc = @import("usb/cdc.zig");
+
+const CDC_Driver = cdc.Driver(SetupProcessor, .{
+    .max_packet_size = max_packet_size,
+    .callbacks = .{
+        .queue_receive = serial_queue_receive,
+        .get_buffer = serial_get_buffer,
+    },
+});
 
 const MSC_Driver = @import("usb/msc.zig").MSC_Driver(SetupProcessor, .{
     .max_packet_size = max_packet_size,
@@ -154,6 +178,7 @@ const MSC_Driver = @import("usb/msc.zig").MSC_Driver(SetupProcessor, .{
 
 var setup_processor: SetupProcessor = undefined;
 var msc_driver: MSC_Driver = undefined;
+var serial_driver: CDC_Driver = undefined;
 
 fn in_buf_ready() bool {
     const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
@@ -202,11 +227,13 @@ pub fn init() !void {
     });
 
     msc_driver.init(null);
-    setup_processor = .init(.{
+    serial_driver.init();
+    setup_processor.init(.{
         .descriptors = descriptors,
         .handlers = .{
             .interface = &.{
                 .{ .num = 0, .ctx = &msc_driver, .handler = MSC_Driver.setup_handler },
+                .{ .num = 1, .ctx = &serial_driver, .handler = CDC_Driver.setup_handler },
             },
         },
     });
@@ -292,12 +319,11 @@ fn msc_disarm_endpoints() void {
     rp2xxx.hw.clear_alias(&USB.BUFF_STATUS).write(.{ .EP1_IN = 1, .EP1_OUT = 1 });
 }
 
-fn queue_packet(data: []const u8, pid: setup.PID) void {
-    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
-    //assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
+fn setup_queue_packet(data: []const u8, pid: setup.PID) void {
     assert(data.len <= 64, .{});
+    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
 
-    log.debug("queue_packet: len={} pid={}", .{ data.len, pid });
+    log.debug("setup_queue_packet: len={} pid={}", .{ data.len, pid });
     const dest: [*]u8 = @ptrFromInt(dpram_addr + 0x100);
     @memcpy(dest[0..data.len], data);
 
@@ -346,8 +372,24 @@ fn msc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
     });
 }
 
-fn get_buffer() []const u8 {
-    return "";
+fn setup_get_buffer(dir: types.Dir) []const u8 {
+    const buf_info = buffer_control(.{ .dir = dir, .num = .ep0 }).read();
+    const ptr: [*]const u8 = @ptrFromInt(dpram_addr + 0x100);
+    const data = ptr[0..buf_info.LENGTH_0];
+    log.info("get_buffer: dir={} FULL={} AVAIL={} LEN={} PID={} data={X}", .{
+        dir, buf_info.FULL_0, buf_info.AVAILABLE_0, buf_info.LENGTH_0, buf_info.PID_0, data,
+    });
+    return data;
+}
+
+fn serial_get_buffer(dir: types.Dir) []const u8 {
+    const buf_info = buffer_control(.{ .dir = dir, .num = .ep3 }).read();
+    const ptr: [*]const u8 = @ptrFromInt(dpram_addr + 0x180 + 128);
+    const data = ptr[0..buf_info.LENGTH_0];
+    log.info("get_buffer: dir={} FULL={} AVAIL={} LEN={} PID={} data={X}", .{
+        dir, buf_info.FULL_0, buf_info.AVAILABLE_0, buf_info.LENGTH_0, buf_info.PID_0, data,
+    });
+    return data;
 }
 
 fn msc_get_buffer() []const u8 {
@@ -356,14 +398,16 @@ fn msc_get_buffer() []const u8 {
     return ptr[0..buf_ctrl.read().LENGTH_0];
 }
 
-fn queue_receive() void {
+fn setup_queue_receive() void {
+    const pid: endpoint.PacketIdentifier = .DATA1;
+    log.debug("setup_queue_receive: pid={}", .{pid});
+
     const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep0 });
 
-    log.debug("queue_receive", .{});
-
+    // TODO: should last be set?
     buf_ctrl.write(.{
-        .LENGTH_0 = 0,
-        .PID_0 = 0,
+        .LENGTH_0 = max_packet_size,
+        .PID_0 = @backingInt(pid),
         .FULL_0 = 0,
         .LAST_0 = 1,
     });
@@ -380,10 +424,17 @@ fn queue_receive() void {
 }
 
 fn msc_queue_receive(pid: endpoint.PacketIdentifier) void {
-    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
-
     log.debug("queue_msc_receive: pid={}", .{pid});
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
+    queue_receive(buf_ctrl, pid);
+}
 
+fn serial_queue_receive(pid: endpoint.PacketIdentifier) void {
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep3 });
+    queue_receive(buf_ctrl, pid);
+}
+
+fn queue_receive(buf_ctrl: *volatile BufferControl, pid: endpoint.PacketIdentifier) void {
     buf_ctrl.write(.{
         .LENGTH_0 = max_packet_size,
         .PID_0 = @backingInt(pid),
@@ -432,8 +483,27 @@ fn setup_endpoints() void {
 
     msc_queue_receive(.DATA0);
 
-    // EP2 IN AND OUT: CDC
+    // EP3 IN AND OUT: CDC
+    const ep3_in = endpoint_control(.{ .num = .ep3, .dir = .in });
+    const ep3_out = endpoint_control(.{ .num = .ep3, .dir = .out });
 
+    ep3_in.write(.{
+        .BUFFER_ADDRESS = allocate_buffer(&buffer_offset_current),
+        .ENDPOINT_TYPE = .bulk,
+        .INTERRUPT_PER_BUFF = 1,
+        .DOUBLE_BUFFERED = 0,
+        .ENABLE = 1,
+    });
+
+    ep3_out.write(.{
+        .BUFFER_ADDRESS = allocate_buffer(&buffer_offset_current),
+        .ENDPOINT_TYPE = .bulk,
+        .INTERRUPT_PER_BUFF = 1,
+        .DOUBLE_BUFFERED = 0,
+        .ENABLE = 1,
+    });
+
+    serial_queue_receive(.DATA0);
 }
 
 pub fn poll() void {
@@ -477,6 +547,16 @@ pub fn poll() void {
             msc_driver.out_ready();
             clear.write(.{ .EP1_OUT = 1 });
         }
+
+        if (buff_status.EP3_IN == 1) {
+            serial_driver.in_ready();
+            clear.write(.{ .EP3_IN = 1 });
+        }
+
+        if (buff_status.EP3_OUT == 1) {
+            serial_driver.out_ready();
+            clear.write(.{ .EP3_OUT = 1 });
+        }
     }
 
     if (interrupts.SETUP_REQ == 1) {
@@ -489,6 +569,7 @@ pub fn poll() void {
 
     setup_processor.poll();
     msc_driver.poll();
+    serial_driver.poll();
 }
 
 /// Send data over USB (non-blocking with retry limit)
@@ -545,16 +626,6 @@ pub fn available() usize {
     //return drivers.serial.available();
     return 0;
 }
-
-/// Process USB events (MUST be called frequently from main loop!)
-/// This is critical for USB to work - call as often as possible
-/// Handles enumeration, control requests, and data transfers
-//pub fn poll() void {
-//usb_device.poll(&usb_controller);
-//const drivers = usb_controller.drivers() orelse return;
-//_ = drivers;
-// Very Big TODO: handle stuff for drivers
-//}
 
 fn log_state() void {
     log.debug("SIE_CTRL: {}", .{USB.SIE_CTRL.read()});

@@ -244,7 +244,12 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
             self.set_state(.awaiting_cbw);
         }
 
-        pub fn setup_handler(setup_processor: *SetupProcessor, ctx: ?*anyopaque, pkt: *const types.SetupPacket) void {
+        pub fn setup_handler(
+            setup_processor: *SetupProcessor,
+            ctx: ?*anyopaque,
+            pkt: *const types.SetupPacket,
+            _: ?[]const u8,
+        ) void {
             const self: *@This() = @ptrCast(@alignCast(ctx.?));
             const class_request: *const ClassRequest = @ptrCast(pkt);
             switch (class_request.*) {

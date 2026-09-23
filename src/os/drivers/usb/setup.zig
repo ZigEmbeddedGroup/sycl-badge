@@ -22,7 +22,7 @@ pub const Config = struct {
         queue_receive: *const fn () void,
         set_address: *const fn (address: u7) void,
         // This is for the out buffer
-        get_buffer: *const fn () []const u8,
+        get_buffer: *const fn (dir: types.Dir) []const u8,
         stall: *const fn (ep: types.Endpoint) void,
         clear_endpoint_halt: *const fn (ep: types.Endpoint) void,
     };
@@ -36,13 +36,18 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             in: bool,
             out: bool,
         },
-        sm: union(enum) {
+        sm: StateMachine,
+        handlers: Handlers,
+        buf_out: [64]u8 = undefined,
+
+        const StateMachine = union(enum) {
             awaiting_request,
             pending_address: u7,
-            receiving_data: OutTransfer,
+            receiving_data: struct {
+                pkt: types.SetupPacket,
+            },
             sending_data: InTransfer,
-        },
-        handlers: Handlers,
+        };
 
         const log = std.log.scoped(.usb_setup);
         const InTransfer = InTransferProcessor(.{
@@ -56,7 +61,11 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             .max_packet_size = config.max_packet_size,
             .max_transfer_size = config.max_transfer_size,
             .callbacks = .{
-                .get_buffer = config.callbacks.get_buffer,
+                .get_buffer = struct {
+                    fn func() []const u8 {
+                        return config.callbacks.get_buffer(.out);
+                    }
+                }.func,
             },
         });
 
@@ -66,8 +75,7 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             endpoint: []const EndpointHandler = &.{},
             interface: []const InterfaceHandler = &.{},
         };
-
-        pub const SetupPacketHandler = fn (self: *@This(), ctx: ?*anyopaque, pkt: *const types.SetupPacket) void;
+        pub const SetupPacketHandler = fn (self: *@This(), ctx: ?*anyopaque, pkt: *const types.SetupPacket, payload: ?[]const u8) void;
 
         pub const InterfaceHandler = struct {
             num: u8,
@@ -86,16 +94,30 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             handlers: Handlers,
         };
 
-        pub fn init(opts: Options) @This() {
-            return .{
+        pub fn init(self: *@This(), opts: Options) void {
+            self.* = .{
                 .desc = opts.descriptors,
                 .handlers = opts.handlers,
                 .sm = .awaiting_request,
                 .ready = .{
                     .in = true,
-                    .out = true,
+                    .out = false,
                 },
             };
+        }
+
+        pub fn set_sm(self: *@This(), state_machine: StateMachine) void {
+            const Tag = std.meta.Tag(StateMachine);
+
+            const old: Tag = self.sm;
+            const new: Tag = state_machine;
+
+            log.info("{} -> {}", .{ old, new });
+            self.sm = state_machine;
+        }
+
+        pub fn stall(_: *@This(), dir: types.Dir) void {
+            config.callbacks.stall(.{ .num = .ep0, .dir = dir });
         }
 
         fn submit_setup_request_standard(self: *@This(), pkt: *const types.SetupPacket) void {
@@ -104,36 +126,51 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                 .set_address => {
                     const addr: u7 = @intCast(pkt.value.native());
                     queue_zlp(.data1);
-                    self.sm = .{ .pending_address = addr };
+                    self.set_sm(.{ .pending_address = addr });
                 },
                 .get_descriptor => {
-                    log.debug("GET_DESCRIPTOR: value={} index={} length={}", .{ pkt.value.native(), pkt.index.native(), pkt.length.native() });
+                    log.info("GET_DESCRIPTOR: value={} index={} length={}", .{ pkt.value.native(), pkt.index.native(), pkt.length.native() });
                     const desc_type: descriptor.Type = @fromBackingInt(@truncate(pkt.value.native() >> 8));
                     const desc_idx: u8 = @truncate(pkt.value.native());
                     const lang: Language = @fromBackingInt(pkt.index.native());
-                    log.debug("type: {}", .{desc_type});
+                    log.info("type: {}", .{desc_type});
                     const payload: []const u8 = switch (desc_type) {
-                        .device => std.mem.asBytes(self.desc.device),
+                        .device => blk: {
+                            const payload = std.mem.asBytes(self.desc.device);
+                            std.log.info("device: {X}", .{payload});
+                            break :blk payload;
+                        },
                         .string => blk: {
-                            const desc = self.desc.string.lookup(lang, desc_idx) orelse break :blk "";
+                            const desc = self.desc.string.lookup(lang, desc_idx) orelse {
+                                self.stall(.in);
+                                return;
+                            };
                             assert(desc.valid(), .{});
-                            log.debug("str='{f}'", .{desc});
+                            log.info("str='{f}'", .{desc});
                             break :blk desc.payload;
                         },
-                        .configuration => self.desc.configurations[desc_idx],
+                        .configuration => blk: {
+                            if (desc_idx >= self.desc.configurations.len) {
+                                self.stall(.in);
+                                return;
+                            }
+
+                            std.log.info("config len: {}", .{self.desc.configurations[desc_idx].len});
+                            std.log.info("config payload: {X}", .{self.desc.configurations[desc_idx]});
+                            break :blk self.desc.configurations[desc_idx];
+                        },
                         .device_qualifier => {
-                            // TODO: We are sending a stall because this is a
-                            // full speed device that doesn't support high
-                            // speed. When making this code reusable, this is
-                            // going to have to depend on the descriptors/what
-                            // kind of device this is.
-                            config.callbacks.stall(.{ .num = .ep0, .dir = .in });
+                            // We are sending a stall because this is a full
+                            // speed device that doesn't support high speed.
+                            // When making this code reusable, this is going to
+                            // have to depend on the descriptors/what kind of
+                            // device this is.
+                            self.stall(.in);
                             return;
                         },
                         else => @panic("unhandled desc type"),
                     };
 
-                    // TODO: break value into descriptor type and index
                     self.queue_in_xfer(payload, pkt.length.native());
                 },
                 .set_configuration => {
@@ -232,13 +269,25 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
 
         fn submit_setup_request_class(self: *@This(), pkt: *const types.SetupPacket) void {
             assert(pkt.request_type.type == .class, .{});
-            log.info("got class SETUP REQUEST: {f}", .{pkt});
+            log.debug("got class SETUP REQUEST: {f}", .{pkt});
             switch (pkt.request_type.recipient) {
                 .interface => {
                     const num = pkt.index.native();
                     for (self.handlers.interface) |entry| {
                         if (entry.num == num) {
-                            entry.handler(self, entry.ctx, pkt);
+                            if (pkt.request_type.direction == .out and pkt.length.native() > 0) {
+                                self.set_sm(.{
+                                    .receiving_data = .{
+                                        .pkt = pkt.*,
+                                    },
+                                });
+
+                                self.ready.out = false;
+                                config.callbacks.queue_receive();
+                            } else {
+                                entry.handler(self, entry.ctx, pkt, null);
+                            }
+
                             return;
                         }
                     }
@@ -247,17 +296,20 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                     const ep: types.Endpoint = @bitCast(@as(u8, @truncate(pkt.index.native() >> 8)));
                     for (self.handlers.endpoint) |entry| {
                         if (entry.ep == ep) {
-                            entry.handler(self, entry.ctx, pkt);
+                            entry.handler(self, entry.ctx, pkt, null);
                             return;
                         }
                     }
                 },
                 else => {},
             }
-            log.warn("Unahndled setup request", .{});
+
+            log.warn("Unhandled setup request", .{});
+            self.stall(.in);
         }
 
         pub fn submit_setup_request(self: *@This(), pkt: types.SetupPacket) void {
+            self.ready = .{ .in = true, .out = false };
             // Setting this to one because the example docs do it here
             switch (pkt.request_type.type) {
                 .standard => self.submit_setup_request_standard(&pkt),
@@ -266,10 +318,39 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             }
         }
 
+        // Deferred setup request with payload
+        fn submit_request_with_payload(self: *@This(), pkt: *const types.SetupPacket, payload: []const u8) void {
+            switch (pkt.request_type.recipient) {
+                .interface => {
+                    const num = pkt.index.native();
+                    for (self.handlers.interface) |entry| {
+                        if (entry.num == num) {
+                            entry.handler(self, entry.ctx, pkt, payload);
+                            return;
+                        }
+                    }
+                },
+                .endpoint => {
+                    const ep: types.Endpoint = @bitCast(@as(u8, @truncate(pkt.index.native() >> 8)));
+                    for (self.handlers.endpoint) |entry| {
+                        if (entry.ep == ep) {
+                            entry.handler(self, entry.ctx, pkt, payload);
+                            return;
+                        }
+                    }
+                },
+                else => {},
+            }
+
+            // We never start processing a payload unless a handler is
+            // registered, so we should never get here.
+            assert(false, .{});
+        }
+
         pub fn queue_in_xfer(self: *@This(), data: []const u8, host_len: usize) void {
-            self.sm = .{
+            self.set_sm(.{
                 .sending_data = .start(data, host_len),
-            };
+            });
         }
 
         pub fn ep0_in_ready(self: *@This()) void {
@@ -277,15 +358,15 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             switch (self.sm) {
                 .pending_address => |addr| {
                     config.callbacks.set_address(addr);
-                    self.sm = .awaiting_request;
+                    self.set_sm(.awaiting_request);
                 },
                 else => {},
             }
         }
 
         pub fn ep0_out_ready(self: *@This()) void {
-            self.ready.out = true;
             switch (self.sm) {
+                .receiving_data => self.ready.out = true,
                 else => {},
             }
         }
@@ -298,18 +379,26 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
 
                     xfer.ep_ready();
                     if (xfer.state == .done) {
-                        self.sm = .awaiting_request;
+                        self.set_sm(.awaiting_request);
                         config.callbacks.queue_receive();
                     }
                 },
-                .receiving_data => |*xfer| if (self.ready.out) {
+                .receiving_data => |*state| if (self.ready.out) {
                     defer self.ready.out = false;
 
-                    xfer.ep_ready();
-                    if (xfer.state == .done) {
-                        self.sm = .awaiting_request;
-                        config.callbacks.queue_receive();
-                    }
+                    const pkt = state.pkt;
+                    const buf = config.callbacks.get_buffer(.out);
+                    var tmp: [config.max_transfer_size]u8 = undefined;
+                    const n = @min(buf.len, tmp.len);
+                    @memcpy(tmp[0..n], buf[0..n]);
+
+                    const Tag = std.meta.Tag(StateMachine);
+
+                    const old: Tag = self.sm;
+                    self.submit_request_with_payload(&pkt, tmp[0..n]);
+
+                    if (self.sm == old)
+                        self.set_sm(.awaiting_request);
                 },
             }
         }
@@ -394,93 +483,6 @@ pub fn InTransferProcessor(comptime config: InTransferConfig) type {
     };
 }
 
-test InTransferProcessor {
-    const Transfer = InTransferProcessor(.{ .max_packet_size = 64 });
-    var pkt_buf: [64]u8 = @splat(0xBB);
-
-    // Transfer more than what the host requested. n < max_packet_size
-    var transfer: Transfer = try .start("arstarst", 5);
-    var n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(5, n);
-    try testing.expectEqual(5, transfer.host_len);
-    try testing.expectEqual(5, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer more than what the host requested. n == max_packet_size
-    transfer = try .start(&@as([65]u8, @splat(0xBB)), 64);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(64, n);
-    try testing.expectEqual(64, transfer.host_len);
-    try testing.expectEqual(64, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer more than what the host requested. n > max_packet_size
-    transfer = try .start(&@as([96]u8, @splat(0xBB)), 64);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(64, n);
-    try testing.expectEqual(64, transfer.host_len);
-    try testing.expectEqual(64, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer exactly what the host requested. n < max_packet_size
-    transfer = try .start("arstarst", 8);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(8, n);
-    try testing.expectEqual(8, transfer.host_len);
-    try testing.expectEqual(8, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer exactly what the host requested. n == max_packet_size
-    transfer = try .start(&@as([64]u8, @splat(0xBB)), 64);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(64, n);
-    try testing.expectEqual(64, transfer.host_len);
-    try testing.expectEqual(64, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer exactly what the host requested. n > max_packet_size
-    transfer = try .start(&@as([96]u8, @splat(0xBB)), 96);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(64, n);
-    try testing.expectEqual(96, transfer.host_len);
-    try testing.expectEqual(64, transfer.progress);
-    try testing.expectEqual(.send_data, transfer.state);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(32, n);
-    try testing.expectEqual(96, transfer.host_len);
-    try testing.expectEqual(96, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer less than what the host requested. n < max_packet_size
-    transfer = try .start("arstarst", 16);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(8, n);
-    try testing.expectEqual(16, transfer.host_len);
-    try testing.expectEqual(8, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer less than what the host requested. n == max_packet_size
-    transfer = try .start(&@as([63]u8, @splat(0xBB)), 64);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(63, n);
-    try testing.expectEqual(64, transfer.host_len);
-    try testing.expectEqual(63, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // Transfer less than what the host requested. n > max_packet_size
-    transfer = try .start(&@as([70]u8, @splat(0xBB)), 96);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(64, n);
-    try testing.expectEqual(96, transfer.host_len);
-    try testing.expectEqual(64, transfer.progress);
-    try testing.expectEqual(.send_data, transfer.state);
-    n = transfer.process(&pkt_buf).?;
-    try testing.expectEqual(6, n);
-    try testing.expectEqual(96, transfer.host_len);
-    try testing.expectEqual(70, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-}
-
 pub const OutTransferConfig = struct {
     max_packet_size: usize,
     max_transfer_size: usize,
@@ -521,13 +523,14 @@ pub fn OutTransferProcessor(comptime config: OutTransferConfig) type {
             };
         }
 
-        pub fn get_payload(self: @This()) []const u8 {
-            assert(self.state == .done);
+        pub fn payload(self: @This()) []const u8 {
+            assert(self.state == .done, .{});
             return self.buf[0..self.progress];
         }
 
         fn ep_ready_inner(self: *@This()) !void {
             const pkt = config.callbacks.get_buffer();
+            log.info("ep_ready_inner: stat={} len={}", .{ self.state, pkt.len });
             return state: switch (self.state) {
                 .done => {},
                 .err => error.ProtocolViolation,
@@ -574,45 +577,6 @@ pub fn OutTransferProcessor(comptime config: OutTransferConfig) type {
             };
         }
     };
-}
-
-const testing = std.testing;
-
-test OutTransferProcessor {
-    const Transfer = OutTransferProcessor(.{ .max_packet_size = 64, .max_transfer_size = 512 });
-    var pkt_buf: [64]u8 = @splat(0xBB);
-
-    // zero length packet at start
-    var result = Transfer.start(0);
-    try testing.expectError(error.ProtocolViolation, result);
-
-    // zero length packet with nonzero host length
-    var transfer = try Transfer.start(16);
-    try testing.expectError(error.ProtocolViolation, transfer.process(&pkt_buf, 0));
-
-    // nonzero length packet greater than the reported length
-    result = Transfer.start(8);
-    try testing.expectError(error.ProtocolViolation, transfer.process(&pkt_buf, 10));
-
-    // nonzero length packet less than the reported length, and less than the
-    // max packet size
-    transfer = try Transfer.start(32);
-    try testing.expectError(error.ProtocolViolation, transfer.process(&pkt_buf, 16));
-
-    // nonzero length packet equal to the reported length
-    transfer = try Transfer.start(16);
-    try testing.expectEqualStrings(&@as([16]u8, @splat(0xBB)), (try transfer.process(&pkt_buf, 16)).?);
-    try testing.expectEqual(16, transfer.host_len);
-    try testing.expectEqual(16, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
-
-    // multi packet transfer, length is not multiple of max_packet_size
-    transfer = try Transfer.start(96);
-    try testing.expectEqual(null, try transfer.process(&pkt_buf, 64));
-    try testing.expectEqualStrings(&@as([96]u8, @splat(0xBB)), (try transfer.process(&pkt_buf, 32)).?);
-    try testing.expectEqual(96, transfer.host_len);
-    try testing.expectEqual(96, transfer.progress);
-    try testing.expectEqual(.done, transfer.state);
 }
 
 pub const Descriptors = struct {

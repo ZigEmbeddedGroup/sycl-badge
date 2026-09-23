@@ -1,16 +1,29 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const is_wasm = switch (builtin.target.cpu.arch) {
-    .wasm32, .wasm64 => true,
-    else => false,
+/// Whether the app is being built for the simulator or
+/// for the device. Apps can switch on this to perform
+/// non-standard debug checks. WARNING: Using this may
+/// create behavior differences between the simulator
+/// and the device.
+pub const is_simulator = switch (builtin.os.tag) {
+    .freestanding => false,
+    else => true,
 };
 
-pub const platform = if (is_wasm)
-    @import("platform_wasm.zig")
+/// The raw platform implementation. WARNING: Using this
+/// may create behavior differences between the simulator
+/// and the device.
+pub const platform = if (is_simulator)
+    @import("platform_simulator.zig")
 else
     @import("platform_cart_ram.zig");
 
+/// Exports the code to interface with the platform on
+/// startup. All carts must call this, either at comptime
+/// or at runtime. On device, this exports the cart descriptor
+/// table that will be used by the OS to load the app.
+/// For the simulator, this exports functions to link against.
 pub fn export_start_code() void {
     platform.export_start_code();
 }
@@ -51,33 +64,8 @@ pub const DisplayColor = packed struct(u16) {
     }
 };
 
-pub const Pixel = packed struct(u16) {
-    bits: u16,
-
-    pub fn from_color(color: DisplayColor) Pixel {
-        if (is_wasm) {
-            // WASM/simulator: standard RGB565 big-endian (matches old behavior)
-            return .{ .bits = @byteSwap(@as(u16, @bitCast(color))) };
-        } else {
-            return @bitCast(color);
-        }
-    }
-
-    pub fn to_color(pixel: Pixel) DisplayColor {
-        if (is_wasm) {
-            return @bitCast(@byteSwap(pixel.bits));
-        } else {
-            return @bitCast(pixel);
-        }
-    }
-
-    pub fn set_color(pixel: *Pixel, color: DisplayColor) void {
-        pixel.* = from_color(color);
-    }
-};
-
 pub const framebuffer_alignment = 0x2000;
-pub const Framebuffer = [screen_width][screen_height]Pixel;
+pub const Framebuffer = [screen_width][screen_height]DisplayColor;
 pub const FramebufferPtr = *align(framebuffer_alignment) Framebuffer;
 
 pub const Controls = packed struct(u16) {
@@ -161,11 +149,12 @@ pub fn micros_since_boot() u64 {
 }
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
-pub const controls: *const volatile Controls = platform.controls;
-pub const light_level: *volatile u12 = platform.light_level;
 pub const neopixels: *volatile [5]NeopixelColor = platform.neopixels;
 pub const user_led: *volatile bool = platform.user_led;
-pub const battery_level: *volatile u12 = platform.battery_level;
+
+pub const controls: *const volatile Controls = platform.controls;
+pub const light_level: *const volatile u12 = platform.light_level;
+pub const battery_level: *const volatile u12 = platform.battery_level;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
@@ -174,15 +163,15 @@ pub const battery_level: *volatile u12 = platform.battery_level;
 // └───────────────────────────────────────────────────────────────────────────┘
 
 pub fn set_vsync_disabled() void {
-    if (!is_wasm) platform.set_vsync_disabled();
+    if (!is_simulator) platform.set_vsync_disabled();
 }
 
 pub fn set_vsync_enabled(target_frame_ms: f32) void {
-    if (!is_wasm) platform.set_vsync_enabled(target_frame_ms);
+    if (!is_simulator) platform.set_vsync_enabled(target_frame_ms);
 }
 
 pub fn set_vsync_dynamic() void {
-    if (!is_wasm) platform.set_vsync_dynamic();
+    if (!is_simulator) platform.set_vsync_dynamic();
 }
 
 pub const DoubleBufferMode = union(enum) {
@@ -296,7 +285,7 @@ fn compute_dirty_rect_legacy_fallback() Rect8 {
     const cur_raw = framebuffer;
     const prev_raw = frontbuffer;
 
-    const simd_len = @divExact(@sizeOf(u32), @sizeOf(Pixel));
+    const simd_len = @divExact(@sizeOf(u32), @sizeOf(DisplayColor));
     const height_simd = @divExact(screen_height, simd_len);
     const cur: *[screen_width][height_simd]u32 = @ptrCast(cur_raw);
     const prev: *[screen_width][height_simd]u32 = @ptrCast(prev_raw);
@@ -352,7 +341,7 @@ pub const BlitOptions = struct {
     flags: Flags = .{},
 };
 
-fn clip_pixel(x: i32, y: i32, pixel: Pixel) void {
+fn clip_pixel(x: i32, y: i32, pixel: DisplayColor) void {
     if (x < 0 or x >= screen_width) return;
     if (y < 0 or y >= screen_height) return;
     framebuffer[@intCast(x)][@intCast(y)] = pixel;
@@ -396,10 +385,10 @@ pub fn blit(options: BlitOptions) void {
             const sx = options.src_x + @as(u32, @intCast(if (flip_x) signed_width - signed_x - 1 else signed_x));
             const sy = options.src_y + @as(u32, @intCast(if (flags.flip_y) signed_height - signed_y - 1 else signed_y));
 
-            // Use clip_pixel and Pixel.from_color so any out-of-bounds tx/ty are safely
+            // Use clip_pixel so any out-of-bounds tx/ty are safely
             // discarded instead of causing a hard fault when indexing the framebuffer.
             if (tx < screen_width and ty < screen_height) {
-                framebuffer[tx][ty] = Pixel.from_color(options.sprite[sy * stride + sx]);
+                framebuffer[tx][ty] = options.sprite[sy * stride + sx];
             }
         }
     }
@@ -420,7 +409,7 @@ pub fn line(options: LineOptions) void {
     var y0 = options.y1;
     const x1 = options.x2;
     const y1 = options.y2;
-    const pixel = Pixel.from_color(options.color);
+    const pixel = options.color;
 
     const dx: i32 = @intCast(@abs(x1 - x0));
     const sx: i32 = if (x0 < x1) 1 else -1;
@@ -476,7 +465,7 @@ pub fn oval(options: OvalOptions) void {
 
         if (min_x >= max_x or min_y >= max_y) return;
 
-        const fill_pixel = Pixel.from_color(options.fill_color.?);
+        const fill_pixel = options.fill_color.?;
         for (framebuffer[min_x..max_x]) |*col| {
             @memset(col[min_y..max_y], fill_pixel);
         }
@@ -507,7 +496,7 @@ pub fn oval(options: OvalOptions) void {
     a = 8 * a2;
     b1 = 8 * b2;
 
-    const stroke_pixel = if (options.stroke_color) |sc| Pixel.from_color(sc) else null;
+    const stroke_pixel = options.stroke_color;
 
     while (true) {
         if (stroke_pixel) |sp| {
@@ -582,7 +571,7 @@ pub fn rect(options: RectOptions) void {
     mark_dirty_rect(options.x, options.y, @intCast(end_x - options.x), @intCast(end_y - options.y));
 
     if (stroke_color) |sc| {
-        const stroke_pixel = Pixel.from_color(sc);
+        const stroke_pixel = sc;
         if (min_x < max_x and min_y < max_y) {
             @memset(framebuffer[min_x][min_y..max_y], stroke_pixel);
             if (max_x > min_x + 1) {
@@ -596,7 +585,7 @@ pub fn rect(options: RectOptions) void {
             }
         }
         if (fill_color) |fc| {
-            const fill_pixel = Pixel.from_color(fc);
+            const fill_pixel = fc;
             if (max_x > min_x + 2 and max_y > min_y + 2) {
                 for (framebuffer[min_x + 1 .. max_x - 1]) |*col| {
                     @memset(col[min_y + 1 .. max_y - 1], fill_pixel);
@@ -604,7 +593,7 @@ pub fn rect(options: RectOptions) void {
             }
         }
     } else if (fill_color) |fc| {
-        const fill_pixel = Pixel.from_color(fc);
+        const fill_pixel = fc;
         for (framebuffer[min_x..max_x]) |*col| @memset(col[min_y..max_y], fill_pixel);
     }
 }
@@ -624,8 +613,8 @@ pub fn text(options: TextOptions) void {
     // Accessed here (not at file scope) so that @import("board") is only resolved
     // for native builds — WASM builds take the branch above and never reach this.
     const font_data = @import("board").font.font;
-    const text_pixel: ?Pixel = if (options.text_color) |c| Pixel.from_color(c) else null;
-    const bg_pixel: ?Pixel = if (options.background_color) |c| Pixel.from_color(c) else null;
+    const text_pixel = options.text_color;
+    const bg_pixel = options.background_color;
     const scale = @max(options.scale, 1);
     const scale_usize: usize = @intCast(scale);
     const line_step: i32 = @as(i32, @intCast(@as(u32, 8) * scale));
@@ -699,7 +688,7 @@ pub fn hline(options: StraightLineOptions) void {
     if (options.len == 0 or options.y < 0 or options.y >= screen_height or options.x >= screen_width) return;
     const end_x = options.x +| @min(options.len, std.math.maxInt(i32));
     if (end_x <= 0) return;
-    const pixel = Pixel.from_color(options.color);
+    const pixel = options.color;
     mark_dirty_rect(options.x, options.y, @intCast(end_x - options.x), 1);
     const start_x: usize = @intCast(@max(options.x, 0));
     const end_x_clamped: usize = @intCast(@min(end_x, screen_width));
@@ -714,7 +703,7 @@ pub fn vline(options: StraightLineOptions) void {
     if (options.len == 0 or options.x < 0 or options.x >= screen_width or options.y >= screen_height) return;
     const end_y = options.y +| @min(options.len, std.math.maxInt(i32));
     if (end_y <= 0) return;
-    const pixel = Pixel.from_color(options.color);
+    const pixel = options.color;
     mark_dirty_rect(options.x, options.y, 1, @intCast(end_y - options.y));
     @memset(framebuffer[@intCast(options.x)][@max(options.y, 0)..@intCast(@min(end_y, screen_height))], pixel);
 }
@@ -834,7 +823,7 @@ pub const flash_page_count = 8000;
 /// Attempts to fill `dst`, returns the amount of bytes actually read.
 /// NOTE: No dedicated cart save-data flash region exists yet; returns 0.
 pub inline fn read_flash(offset: u32, dst: []u8) u32 {
-    if (is_wasm) {
+    if (is_simulator) {
         return struct {
             extern fn read_flash(offset: u32, dst: [*]u8, len: u32) u32;
         }.read_flash(offset, dst.ptr, dst.len);
@@ -846,7 +835,7 @@ pub inline fn read_flash(offset: u32, dst: []u8) u32 {
 
 /// NOTE: No dedicated cart save-data flash region exists yet; this is a no-op stub.
 pub inline fn write_flash_page(page: u16, src: [flash_page_size]u8) void {
-    if (is_wasm) {
+    if (is_simulator) {
         struct {
             extern fn write_flash_page(page: u32, src: [*]const u8) void;
         }.write_flash_page(page, &src);
@@ -867,7 +856,7 @@ pub const Zone = struct {
     active: bool,
 
     pub inline fn end(z: Zone) void {
-        if (is_wasm or !z.active) return;
+        if (is_simulator or !z.active) return;
 
         platform.outline_zone_end(platform.cycles(), true);
     }
@@ -896,7 +885,7 @@ pub inline fn zone_cond(comptime name: ?[:0]const u8, comptime loc: std.builtin.
 }
 pub inline fn zone_color_cond(comptime name: ?[:0]const u8, comptime loc: std.builtin.SourceLocation, comptime color: u32, active: bool) Zone {
     // TODO on-demand check connection ID
-    if (is_wasm or !active) return .inactive;
+    if (is_simulator or !active) return .inactive;
 
     const src_loc = platform.external_source_location(name, loc, color);
     return .{ .active = platform.outline_zone_begin_static(platform.cycles(), true, src_loc) };

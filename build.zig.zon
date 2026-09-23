@@ -18,5 +18,9 @@
             .url = "git+https://github.com/SpexGuy/zigimg?ref=sycl_badge#9db3abb43ad18dd45512d83d812816dc8840b7e1",
             .hash = "zigimg-0.1.0-8_eo2tTaFwBecfCKenltx5ud0R_0jZwzC84RQGM-xkpM",
         },
+        .sdl = .{
+            .url = "git+https://github.com/MasonRemaley/SDL3.git?ref=zig-0.17.0#94ea547ead4f47a3019c09d632902ffe07a2e0dc",
+            .hash = "sdl-1.0.1+3.4.14-i4QD0RyzqQCu9_b_dkChOIw4bSA2sXxczkw6TuIOmGh6",
+        },
     },
 }

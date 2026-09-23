@@ -56,7 +56,7 @@ fn updatePlasma() void {
     for (cart.framebuffer, &plasma_buffer) |*fb_col, *plasma_col| {
         for (fb_col, plasma_col) |*fb_pix, *plasma_pix| {
             plasma_pix.* +%= 2;
-            fb_pix.set_color(hue_colors[plasma_pix.*]);
+            fb_pix.* = hue_colors[plasma_pix.*];
         }
     }
 }

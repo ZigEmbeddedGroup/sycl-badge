@@ -13,9 +13,8 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     // trace message before the cart freezes.
     // Use a low-power wait on ARM, plain spin on other targets (e.g. WASM).
     while (true) {
-        switch (comptime @import("builtin").cpu.arch) {
-            .wasm32, .wasm64 => {},
-            else => asm volatile ("wfe"),
+        if (!cart.is_simulator) {
+            asm volatile ("wfe");
         }
     }
 }

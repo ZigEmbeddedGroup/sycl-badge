@@ -14,6 +14,28 @@ pub fn build(b: *Build) void {
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
+    const native_target = b.resolveTargetQuery(.{});
+    const sdl = b.dependency("sdl", .{
+        .optimize = .ReleaseSafe,
+        .target = native_target,
+    });
+    const simulator_glue = b.addLibrary(.{
+        .name = "simulator_glue",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/simulator/main.zig"),
+            .target = native_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{
+                .{ .name = "sdl3", .module = sdl.module("sdl3") },
+                .{ .name = "sim_abi", .module = b.createModule(.{
+                    .root_source_file = b.path("src/os/cart/sim_abi.zig"),
+                }) },
+                .{ .name = "zigimg", .module = b.dependency("zigimg", .{}).module("zigimg") },
+            },
+        }),
+    });
+    b.installArtifact(simulator_glue);
+
     // Badge V2 (RP2354B) target setup
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, b);
 
@@ -93,6 +115,11 @@ pub fn build(b: *Build) void {
         .name = "vsync",
         .optimize = .ReleaseSmall,
         .root_source_file = b.path("showcase/carts/vsync/src/main.zig"),
+    });
+    add_os_cart(b, &dep, .{
+        .name = "neopixel-test",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("showcase/carts/neopixel-test/main.zig"),
     });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -225,34 +252,31 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
     mb.install_firmware(fw, .{ .format = .elf });
     mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
 
-    // WASM build for the web simulator.
-    // api.zig detects is_wasm at comptime and switches to WASM extern imports,
-    // so no board/microzig dependency is needed here.
-    const wasm_target = b.resolveTargetQuery(.{
-        .cpu_arch = .wasm32,
-        .os_tag = .freestanding,
-    });
+    // native build for the simulator, for debugging.
+    // api.zig detects freestanding at comptime to determine which platform to use.
+    const native_target = b.resolveTargetQuery(.{});
 
     // This is hacky as hell, but necessary since the root module specifies the build target.
-    const wasm_module = b.allocator.create(Build.Module) catch @panic("oom");
-    wasm_module.* = fw.exe.root_module.*;
-    wasm_module.resolved_target = wasm_target;
+    const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
+    sim_module.* = fw.exe.root_module.*;
+    sim_module.resolved_target = native_target;
 
-    const wasm = b.addExecutable(.{
-        .name = options.name,
-        .root_module = wasm_module,
+    const sim_obj = b.addLibrary(.{
+        .name = b.fmt("{s}_module", .{options.name}),
+        .root_module = sim_module,
     });
-    wasm.entry = .disabled;
-    wasm.import_memory = true;
-    wasm.initial_memory = 64 * 65536;
-    wasm.max_memory = 64 * 65536;
-    wasm.stack_size = 14752;
-    wasm.global_base = 160 * 128 * 2 + 0x1e;
-    wasm.rdynamic = true;
-    b.installArtifact(wasm);
+
+    const sim = b.addExecutable(.{
+        .name = options.name,
+        .root_module = b.createModule(.{ .target = native_target }),
+    });
+    sim.root_module.linkLibrary(dep.artifact("simulator_glue"));
+    sim.root_module.linkLibrary(sim_obj);
+
+    b.installArtifact(sim);
 
     if (asset_step) |step| {
-        wasm.step.dependOn(step);
+        sim.step.dependOn(step);
         fw.exe.step.dependOn(step);
     }
 }

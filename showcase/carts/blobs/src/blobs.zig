@@ -145,9 +145,8 @@ pub fn panic(
     // the trace message above.
     // Use a low-power wait on ARM, plain spin on other targets (e.g. WASM).
     while (true) {
-        switch (comptime @import("builtin").cpu.arch) {
-            .wasm32, .wasm64 => {},
-            else => asm volatile ("wfe"),
+        if (!cart.is_simulator) {
+            asm volatile ("wfe");
         }
     }
 }

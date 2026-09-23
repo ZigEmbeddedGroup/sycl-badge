@@ -148,7 +148,7 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
     ipc_data.dirty_rect = dirty_rect;
 
     if (clear_color) |color| {
-        ipc_data.clear_color = .from_color(color);
+        ipc_data.clear_color = color;
     }
 
     const spin_start_time = micros_since_boot();

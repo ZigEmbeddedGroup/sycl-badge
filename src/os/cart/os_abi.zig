@@ -1,3 +1,6 @@
+//! This file contains data layouts that are used by both the cart
+//! and the OS for cross-communication. The two must be kept in sync!
+
 const std = @import("std");
 const api = @import("api.zig");
 
@@ -21,7 +24,7 @@ pub const CartDescriptorTable_v1 = extern struct {
 pub const CART_VERSION_CURRENT = CART_VERSION_V1;
 pub const CartDescriptorTable = CartDescriptorTable_v1;
 
-pub const Pixel = api.Pixel;
+pub const DisplayColor = api.DisplayColor;
 pub const NeopixelColor = api.NeopixelColor;
 pub const Controls = api.Controls;
 pub const Rect8 = api.Rect8;
@@ -36,7 +39,7 @@ pub const tracy_buffer_size = 4096;
 const base = 0x20020000;
 // zig fmt: off
 pub const CartIPCData = extern struct {
-    framebuffers: [2][api.screen_width][api.screen_height]Pixel, // x0..xA000, xA000..x14000
+    framebuffers: [2][api.screen_width][api.screen_height]DisplayColor, // x0..xA000, xA000..x14000
     tracy_ring: [tracy_buffer_size]u8, // x14000..x15000
     trace_buf: [0x80]u8,               // x15000..x15080
     neopixels: [5]NeopixelColor,       // x15080..x1508F
@@ -66,7 +69,7 @@ pub const CartIPCData = extern struct {
 
     vsync_flags: u32,                  // x150E0..x150E4
     vsync_frame_ms: f32,               // x150E4..x150E8
-    clear_color: Pixel,                // x150E8..x150EA
+    clear_color: DisplayColor,         // x150E8..x150EA
     _pad6: u16 = 0,                    // x150EA..x150EC
 
     comptime {

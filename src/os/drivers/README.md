@@ -9,7 +9,7 @@ Hardware-facing drivers for the OS kernel are defined in this folder.
 - [timer.zig](timer.zig): timing primitives
 - [dma.zig](dma.zig): DMA channel control used by display and other flows
 - [usb.zig](usb.zig): USB runtime integration
-- [usb_msc.zig](usb_msc.zig): mass-storage support
+- [usb/msc.zig](usb/msc.zig): mass-storage support
 - [rom.zig](rom.zig): RP ROM call wrappers and helpers
 
 ## Driver Ownership

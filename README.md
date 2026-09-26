@@ -25,3 +25,5 @@ Build outputs are installed under `zig-out/firmware`.
 ## Documentation
 
 The SYCL Badge V2 User Manual can be found [here](https://zigembeddedgroup.github.io/sycl-badge/).
+
+Carts can also be written in Rust, see [rust/README.md](rust/README.md).

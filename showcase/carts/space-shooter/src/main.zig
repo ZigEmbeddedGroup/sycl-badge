@@ -13,9 +13,8 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     // trace message before the cart freezes.
     // Use a low-power wait on ARM, plain spin on other targets (e.g. WASM).
     while (true) {
-        switch (comptime @import("builtin").cpu.arch) {
-            .wasm32, .wasm64 => {},
-            else => asm volatile ("wfe"),
+        if (!cart.is_simulator) {
+            asm volatile ("wfe");
         }
     }
 }
@@ -132,6 +131,7 @@ const MaxHealth: u8 = 5;
 const PlayerWidth = 8;
 const MaxBullets = 100;
 var bullets: [MaxBullets]Bullet = undefined;
+var mixer: cart.mixer.Mixer(.{}) = .{};
 
 pub fn start() void {
     rand = std.Random.DefaultPrng.init(5831);
@@ -160,6 +160,8 @@ pub fn start() void {
 
     // Use the OS to clear every frame to black before it gets to the cart
     cart.set_double_buffer_mode(.{ .clear_full_frame = rgb565(black) });
+
+    mixer.start_audio();
 }
 
 fn tick_stars() void {
@@ -184,9 +186,9 @@ fn draw_stars() void {
 
 fn noisy(freq: f32, len: f32, vol: u8, channel: u8) void {
     if (quietMode) return;
-    cart.tone(.{
-        .frequency = @intFromFloat(freq + 0.5),
-        .duration = @intFromFloat(@max(len - 0.04, 0.0) * 60),
+    mixer.tone(.{
+        .frequency = .hz(@intFromFloat(freq + 0.5)),
+        .duration = .seconds(len - 0.04),
         .volume = vol,
         .flags = .{
             .channel = @fromBackingInt(@intCast(channel)),
@@ -724,6 +726,8 @@ pub fn update() void {
         }
         draw_game();
     }
+
+    mixer.update();
 }
 
 fn tick_game() void {

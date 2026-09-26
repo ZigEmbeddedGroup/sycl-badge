@@ -58,10 +58,7 @@ pub fn clear() void {
     while (fifo.read()) |_| {}
 }
 
-/// Data shared between the cart API and the OS
-pub const shared_data = abi.ipc_data;
-
-/// Message type constants for common operations
+/// Message type constants for core 1 loader operations
 pub const MessageType = struct {
     // Core control messages
     pub const CORE_READY: Message = 0x00000001; // Core 1 signals it's initialized and ready
@@ -107,43 +104,7 @@ pub const MessageType = struct {
     pub const CART_LOAD: u8 = 0x11;
     pub const CART_STOP: u8 = 0x12;
 
-    // Framebuffer sync messages (new-API carts)
-    // Core 1 sends FRAMEBUFFER_READY after finishing a frame.
-    // Core 0 flushes the shared-RAM framebuffer to the LCD, then
-    // replies with FRAMEBUFFER_DONE so Core 1 knows it can start
-    // writing the next frame without tearing.
-    pub const FRAMEBUFFER_READY: Message = 0x25000001;
-    pub const FRAMEBUFFER_DONE: Message = 0x25000002;
-
-    // Async/double-buffer framebuffer present (type + payload)
-    // Message type: 0x28
-    // payload bit 0 = buffer index (0 or 1)
-    // payload bit 1 = dirty-rect present (1 = use CART_DIRTY_RECT_*)
-    pub const FRAMEBUFFER_READY_V2: u8 = 0x28;
-
-    /// Cart trace (debug) messages: type 0x26, payload = length.
-    /// Cart writes string to CART_TRACE_BUF before sending.
-    /// Located at 0x20034020 (immediately after two framebuffers:
-    /// 0x20020020 + 2 * 0xA000).
-    /// The cart linker script reserves 0x20034020–0x200340FF for IPC buffers so
-    /// cart globals never alias these addresses.
-    pub const CART_TRACE: u8 = 0x26;
-
-    /// Cart tone (buzzer) messages: type 0x27.
-    /// Cart writes freq (u32) and duration (u32) to CART_TONE_* before sending.
-    /// Duration is in 60ths of a second (same as ToneOptions); kernel converts to ms.
-    pub const CART_TONE: u8 = 0x27;
-
-    /// Cart volume update: type 0x29
-    /// Cart writes global volume before sending
-    pub const CART_VOLUME: u8 = 0x29;
-
-    pub const SYNC_TIME_REQ_CLR: u32 = 0x2a000001;
-    pub const SYNC_TIME_ACK_CLR: u32 = 0x2a000002;
-    pub const SYNC_TIME_REQ_TIME: u32 = 0x2a000003;
-
-    // Application messages (user-defined range: 0x30000000 - 0xFFFFFFFF)
-    pub const APP_BASE: Message = 0x30000000;
+    // For more messages sent from the running cart, see cart/os_abi.zig
 
     /// Create a custom message type with payload
     /// Usage: MessageType.withPayload(0x01, 0x12345678) -> 0x0112345678

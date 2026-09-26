@@ -70,7 +70,7 @@ pub const Sprite = struct {
                 const index = (y + src_y0) * sprite.width + (if (flip_x) @abs(src_rect.w) - 1 - x else x) + src_x0;
                 const color = sprite.colors[sprite.indices.get(index)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].set_color(color);
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)] = color;
             }
         }
     }
@@ -99,7 +99,7 @@ pub const Tilemap = struct {
                 const src_y = (tile_index / 16) * tile_size + (y % tile_size);
                 const color = tiles.colors[tiles.indices.get(src_y * tiles.width + src_x)];
                 if (color.r == 31 and color.g == 0 and color.b == 31) continue;
-                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)].set_color(color);
+                cart.framebuffer[@intCast(dst_x)][@intCast(dst_y)] = color;
             }
         }
     }

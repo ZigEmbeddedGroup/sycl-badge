@@ -95,45 +95,33 @@ pub fn set_vsync_dynamic() void {
 }
 
 pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, clear_color: ?cart_api.DisplayColor) void {
-    // RP2350 SIO FIFO registers (same address on both cores, core-local view)
-    const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
-    const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
-    const SIO_FIFO_RD: *volatile u32 = @ptrFromInt(0xD0000058);
-
-    const FIFO_RDY: u32 = 1 << 1; // write-FIFO ready (space available)
-    const FIFO_VLD: u32 = 1 << 0; // read-FIFO valid (data available)
-
-    // Message constants — must match mailbox.MessageType values in the OS.
-    const FRAMEBUFFER_DONE: u32 = 0x25000002;
-
     // Drain completion messages to release the in-flight slot.
-    while (SIO_FIFO_ST.* & FIFO_VLD != 0) {
-        const reply = SIO_FIFO_RD.*;
-        if (reply == FRAMEBUFFER_DONE) {
-            has_in_flight_frame = false;
-        }
+    while (fifo_try_recv()) |msg| {
+        handle_os_message(msg);
     }
 
     if (has_in_flight_frame) {
+        @branchHint(.unlikely); // Not actually unlikely, but we want the other
+        // path to be fast, and this path can be slow.
         const spin_start_time = micros_since_boot();
-        while (has_in_flight_frame) {
-            while (SIO_FIFO_ST.* & FIFO_VLD == 0) {
-                asm volatile ("nop");
-                const now = micros_since_boot();
-                if (now - spin_start_time >= present_wait_time_limit) {
-                    // Stop waiting rather than deadlocking Core 1 forever.
-                    present_timeout_events +%= 1;
-                    // Keep trace volume low: log only occasionally.
-                    if ((present_timeout_events & 0x3f) == 0x01) {
-                        trace("[PRESENT] timeout waiting FRAMEBUFFER_DONE");
-                    }
-                    return;
+        while (true) {
+            if (fifo_try_recv()) |msg| {
+                handle_os_message(msg);
+                if (!has_in_flight_frame) break;
+            }
+
+            const now = micros_since_boot();
+            if (now - spin_start_time >= present_wait_time_limit) {
+                // Stop waiting rather than deadlocking Core 1 forever.
+                present_timeout_events +%= 1;
+                // Keep trace volume low: log only occasionally.
+                if ((present_timeout_events & 0x3f) == 0x01) {
+                    trace("[PRESENT] timeout waiting FRAMEBUFFER_DONE");
                 }
+                return;
             }
-            const reply = SIO_FIFO_RD.*;
-            if (reply == FRAMEBUFFER_DONE) {
-                has_in_flight_frame = false;
-            }
+
+            busy_wait();
         }
     }
 
@@ -148,28 +136,13 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
     ipc_data.dirty_rect = dirty_rect;
 
     if (clear_color) |color| {
-        ipc_data.clear_color = .from_color(color);
-    }
-
-    const spin_start_time = micros_since_boot();
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
-        asm volatile ("nop");
-        const now = micros_since_boot();
-        if (now - spin_start_time >= present_wait_time_limit) {
-            present_timeout_events +%= 1;
-            if ((present_timeout_events & 0x3f) == 0x01) {
-                trace("[PRESENT] timeout waiting FIFO_RDY");
-            }
-            return;
-        }
+        ipc_data.clear_color = color;
     }
 
     // Ensure all framebuffer and IPC writes are available for the other core
     asm volatile ("dmb" ::: .{ .memory = true });
     // Send the message
-    SIO_FIFO_WR.* = @bitCast(message);
-    // SEV to wake Core 0 in case it's in WFE.
-    asm volatile ("sev");
+    fifo_send(@bitCast(message));
 
     has_in_flight_frame = true;
 }
@@ -180,36 +153,81 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-pub fn tone2(options: cart_api.Tone2Options) void {
-    const CART_TONE: u32 = 0x27000000;
-    const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
-    const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
-    const FIFO_RDY: u32 = 1 << 1;
-
-    ipc_data.tone_freq = options.frequency;
-    ipc_data.tone_duration = options.duration;
-    ipc_data.tone_volume = options.volume;
-    ipc_data.tone_flags = @bitCast(options.flags);
-
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
-    SIO_FIFO_WR.* = CART_TONE;
-    asm volatile ("sev");
-}
-
 /// Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually
 /// linear scale from about -50dB to 0dB adjustment from the maximum
 /// speaker volume.
 pub fn set_global_volume(volume: f32) void {
-    const CART_VOLUME: u32 = 0x29000000;
-    const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
-    const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
-    const FIFO_RDY: u32 = 1 << 1;
-
     ipc_data.global_volume = volume;
 
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) asm volatile ("nop");
-    SIO_FIFO_WR.* = CART_VOLUME;
-    asm volatile ("sev");
+    asm volatile ("dmb" ::: .{ .memory = true });
+
+    fifo_send(abi.CART_VOLUME);
+}
+
+var audio_running = false;
+
+pub fn audio_set_buffer(comptime T: type, buffer: []align(8) T) void {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
+
+    if (audio_running) {
+        fifo_send(abi.CART_STOP_AUDIO);
+        while (audio_running) {
+            if (fifo_try_recv()) |msg| {
+                handle_os_message(msg);
+            }
+        }
+    }
+
+    ipc_data.audio_buffer_ptr = if (buffer.len > 0) buffer.ptr else null;
+    ipc_data.audio_buffer_len = @intCast(buffer.len);
+    ipc_data.audio_buffer_tail = 0;
+    ipc_data.audio_buffer_head = 0;
+
+    asm volatile ("dmb" ::: .{ .memory = true });
+
+    if (buffer.len > 0) {
+        audio_running = true;
+        fifo_send(abi.CART_START_AUDIO);
+    } else {
+        audio_running = false;
+    }
+}
+
+pub fn audio_get_buffer(comptime T: type) ?[]T {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
+
+    if (ipc_data.audio_buffer_ptr) |ptr| {
+        const byte_ptr: [*]T = @ptrCast(ptr);
+        const tail = ipc_data.audio_buffer_tail;
+        const head = ipc_data.audio_buffer_head;
+
+        if (tail <= head) {
+            const slice = byte_ptr[head .. ipc_data.audio_buffer_len - @intFromBool(tail == 0)];
+            return if (slice.len == 0) null else slice;
+        } else if (tail > head + 1) {
+            return byte_ptr[head .. tail - 1];
+        }
+    }
+    return null;
+}
+
+pub fn audio_submit_samples(num: usize) void {
+    std.debug.assert(ipc_data.audio_buffer_ptr != null); // audio_set_buffer must have been called
+    const len = ipc_data.audio_buffer_len;
+    const tail = ipc_data.audio_buffer_tail;
+    const head = ipc_data.audio_buffer_head;
+    const available = if (tail <= head) len - 1 - (head - tail) else tail - head - 1;
+    std.debug.assert(len <= available); // audio_submit_samples called with more than could be filled from audio_get_buffer
+    var new_head = head + @as(u32, @intCast(num));
+    while (new_head >= len) {
+        new_head -= len;
+    }
+    asm volatile ("dmb" ::: .{ .memory = true });
+    ipc_data.audio_buffer_head = new_head;
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
@@ -243,47 +261,31 @@ pub fn cycles() i64 {
 /// function must wait until the OS is ready to synchronize timing, which could
 /// take several milliseconds in the worst case.
 noinline fn os_align_cycles() void {
-    // RP2350 SIO FIFO registers (same address on both cores, core-local view)
-    const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
-    const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
-    const SIO_FIFO_RD: *volatile u32 = @ptrFromInt(0xD0000058);
-
-    const FIFO_RDY: u32 = 1 << 1; // write-FIFO ready (space available)
-    const FIFO_VLD: u32 = 1 << 0; // read-FIFO valid (data available)
-
-    // Message constants — must match mailbox.MessageType values in the OS.
-    const SYNC_TIME_REQ_CLR: u32 = 0x2a000001;
-    const SYNC_TIME_ACK_CLR: u32 = 0x2a000002;
-    const SYNC_TIME_REQ_TIME: u32 = 0x2a000003;
-
     // Clear OS FIFO
-    while (SIO_FIFO_ST.* & FIFO_VLD != 0) {
-        _ = SIO_FIFO_RD.*;
+    while (fifo_try_recv()) |msg| {
+        handle_os_message(msg);
     }
 
     // Tell OS to clear its fifo
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) {}
-    SIO_FIFO_WR.* = SYNC_TIME_REQ_CLR;
+    fifo_send(abi.SYNC_TIME_REQ_CLR);
 
     // Wait for OS to acknowledge clearing its fifo
     while (true) {
-        while (SIO_FIFO_ST.* & FIFO_VLD == 0) {}
-        if (SIO_FIFO_RD.* == SYNC_TIME_ACK_CLR) break;
+        const msg = fifo_recv();
+        if (msg == abi.SYNC_TIME_ACK_CLR) break;
+
+        handle_os_message(msg);
     }
 
     // Send time request for immediate processing
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) {}
-    SIO_FIFO_WR.* = SYNC_TIME_REQ_TIME;
+    fifo_send_fast(abi.SYNC_TIME_REQ_TIME);
 
     // Read cycle count at approx same time as other core
     const DWT_CYCCNT: *volatile u32 = @ptrFromInt(0xe0001004);
     const cycles_low = DWT_CYCCNT.*;
 
-    while (SIO_FIFO_ST.* & FIFO_VLD == 0) {}
-    const time_high = SIO_FIFO_RD.*;
-
-    while (SIO_FIFO_ST.* & FIFO_VLD == 0) {}
-    const time_low = SIO_FIFO_RD.*;
+    const time_high = fifo_recv();
+    const time_low = fifo_recv();
 
     const target_time: i64 = @bitCast(@as(u64, time_high) << 32 | time_low);
     cycles_offset = target_time - cycles_low;
@@ -533,21 +535,73 @@ pub fn rand() u32 {
 }
 
 pub fn trace(x: []const u8) void {
-    const TRACE_BUF_SIZE: usize = 128;
-    const CART_TRACE: u8 = 0x26;
-    const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
-    const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
-    const FIFO_RDY: u32 = 1 << 1;
+    const TRACE_BUF_SIZE: usize = ipc_data.trace_buf.len;
 
     const len: u24 = @intCast(@min(x.len, TRACE_BUF_SIZE - 1));
     const buf: [*]volatile u8 = &ipc_data.trace_buf;
     for (x[0..len], 0..) |c, i| buf[i] = c;
     buf[len] = 0;
 
-    const msg: u32 = (@as(u32, CART_TRACE) << 24) | len;
-    while (SIO_FIFO_ST.* & FIFO_RDY == 0) {
-        asm volatile ("nop");
+    const msg: u32 = (@as(u32, abi.CART_TRACE) << 24) | len;
+    fifo_send(msg);
+}
+
+// RP2350 SIO FIFO registers (same address on both cores, core-local view)
+const SIO_FIFO_ST: *volatile u32 = @ptrFromInt(0xD0000050);
+const SIO_FIFO_WR: *volatile u32 = @ptrFromInt(0xD0000054);
+const SIO_FIFO_RD: *volatile u32 = @ptrFromInt(0xD0000058);
+
+const FIFO_RDY: u32 = 1 << 1; // write-FIFO ready (space available)
+const FIFO_VLD: u32 = 1 << 0; // read-FIFO valid (data available)
+
+// Send a message to the OS. May block up to a few hundred uS
+// waiting for the OS to clear its queue. Note that this
+// function may drain messages from the OS as well. If you
+// are expecting a particular protocol and you know that the
+// OS is not going to fill its fifo, use fifo_send_fast instead.
+fn fifo_send(msg: u32) void {
+    while (true) {
+        const status = SIO_FIFO_ST.*;
+        if (status & FIFO_RDY != 0) {
+            @branchHint(.likely);
+            break;
+        }
+        // To avoid a potential deadlock where both
+        // cores are waiting on a full queue, drain
+        // messages while trying to send.
+        if (status & FIFO_VLD != 0) {
+            handle_os_message(SIO_FIFO_RD.*);
+        }
     }
     SIO_FIFO_WR.* = msg;
     asm volatile ("sev");
+}
+
+inline fn fifo_send_fast(msg: u32) void {
+    while (SIO_FIFO_ST.* & FIFO_RDY == 0) {}
+    SIO_FIFO_WR.* = msg;
+}
+
+fn fifo_recv() u32 {
+    while (SIO_FIFO_ST.* & FIFO_VLD == 0) {}
+    return SIO_FIFO_RD.*;
+}
+
+fn fifo_try_recv() ?u32 {
+    if (SIO_FIFO_ST.* & FIFO_VLD == 0) return null;
+    return SIO_FIFO_RD.*;
+}
+
+fn handle_os_message(msg: u32) void {
+    if (msg == abi.FRAMEBUFFER_DONE) {
+        has_in_flight_frame = false;
+    }
+    if (msg == abi.OS_ACK_STOP_AUDIO) {
+        audio_running = false;
+    }
+}
+
+fn busy_wait() void {
+    // If we need to do something like servicing audio while waiting for
+    // vsync, we could add that here.
 }

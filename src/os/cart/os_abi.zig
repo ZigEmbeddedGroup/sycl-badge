@@ -1,3 +1,6 @@
+//! This file contains data layouts that are used by both the cart
+//! and the OS for cross-communication. The two must be kept in sync!
+
 const std = @import("std");
 const api = @import("api.zig");
 
@@ -21,7 +24,7 @@ pub const CartDescriptorTable_v1 = extern struct {
 pub const CART_VERSION_CURRENT = CART_VERSION_V1;
 pub const CartDescriptorTable = CartDescriptorTable_v1;
 
-pub const Pixel = api.Pixel;
+pub const DisplayColor = api.DisplayColor;
 pub const NeopixelColor = api.NeopixelColor;
 pub const Controls = api.Controls;
 pub const Rect8 = api.Rect8;
@@ -36,7 +39,7 @@ pub const tracy_buffer_size = 4096;
 const base = 0x20020000;
 // zig fmt: off
 pub const CartIPCData = extern struct {
-    framebuffers: [2][api.screen_width][api.screen_height]Pixel, // x0..xA000, xA000..x14000
+    framebuffers: [2][api.screen_width][api.screen_height]DisplayColor, // x0..xA000, xA000..x14000
     tracy_ring: [tracy_buffer_size]u8, // x14000..x15000
     trace_buf: [0x80]u8,               // x15000..x15080
     neopixels: [5]NeopixelColor,       // x15080..x1508F
@@ -51,10 +54,10 @@ pub const CartIPCData = extern struct {
 
     dirty_rect: Rect8,                 // x15098..x1509C
 
-    tone_freq: f32,                    // x1509C..x150A0
-    tone_duration: f32,                // x150A0..x150A4
-    tone_volume: f32,                  // x150A4..x150A8
-    tone_flags: u32,                   // x150A8..x150AC
+    audio_buffer_ptr: ?*anyopaque,     // x1509C..x150A0
+    audio_buffer_len: u32,             // x150A0..x150A4
+    audio_buffer_head: u32,            // x150A4..x150A8
+    audio_buffer_tail: u32,            // x150A8..x150AC
     global_volume: f32,                // x150AC..x150B0
 
     tracy_read_pos: u32,               // x150B0..x150B4, align(16)
@@ -66,7 +69,7 @@ pub const CartIPCData = extern struct {
 
     vsync_flags: u32,                  // x150E0..x150E4
     vsync_frame_ms: f32,               // x150E4..x150E8
-    clear_color: Pixel,                // x150E8..x150EA
+    clear_color: DisplayColor,         // x150E8..x150EA
     _pad6: u16 = 0,                    // x150EA..x150EC
 
     comptime {
@@ -79,9 +82,33 @@ pub const CartIPCData = extern struct {
 
 pub const ipc_data: *align(0x2000) volatile CartIPCData = @ptrFromInt(base);
 
-pub const PresentFlags = packed struct(u32) {
-    const FRAMEBUFFER_READY_V2: u8 = 0x28; // see os/ipc/mailbox.zig
+// Mailbox messages
+// zig fmt: off
+/// Cart trace (debug) messages: type 0x26, payload = length.
+/// Cart writes string to ipc_data.trace_buf before sending.
+pub const CART_TRACE           : u8 = 0x26;
 
+// Framebuffer sync messages (new-API carts)
+// Core 1 sends FRAMEBUFFER_READY after finishing a frame.
+// Core 0 flushes the shared-RAM framebuffer to the LCD, then
+// replies with FRAMEBUFFER_DONE so Core 1 knows it can start
+// writing the next frame without tearing.
+pub const FRAMEBUFFER_READY    : u32 = 0x25000001;
+pub const FRAMEBUFFER_DONE     : u32 = 0x25000002;
+/// See PresentFlags below
+pub const FRAMEBUFFER_READY_V2 : u8 = 0x28;
+
+pub const CART_VOLUME          : u32 = 0x29000000;
+pub const CART_STOP_AUDIO      : u32 = 0x29000001;
+pub const CART_START_AUDIO     : u32 = 0x29000002;
+pub const OS_ACK_STOP_AUDIO    : u32 = 0x29000003;
+
+pub const SYNC_TIME_REQ_CLR    : u32 = 0x2a000001;
+pub const SYNC_TIME_ACK_CLR    : u32 = 0x2a000002;
+pub const SYNC_TIME_REQ_TIME   : u32 = 0x2a000003;
+// zig fmt: on
+
+pub const PresentFlags = packed struct(u32) {
     framebuffer_index: u1,
     has_dirty_rect: bool,
     vsync_updated: bool,

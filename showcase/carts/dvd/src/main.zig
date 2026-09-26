@@ -67,11 +67,11 @@ pub fn drawDvd(sprite: anytype, pos_x: usize, pos_y: usize, color: Rgb) void {
             const dst_y = pos_y + y;
             const index = y * sprite.width + x;
             const src = sprite.colors[sprite.indices.get(index)];
-            cart.framebuffer[dst_x][dst_y] = .from_color(.{
+            cart.framebuffer[dst_x][dst_y] = .{
                 .r = @intFromFloat(@as(f32, @floatFromInt(src.r)) * color.r),
                 .g = @intFromFloat(@as(f32, @floatFromInt(src.g)) * color.g),
                 .b = @intFromFloat(@as(f32, @floatFromInt(src.b)) * color.b),
-            });
+            };
         }
     }
 }

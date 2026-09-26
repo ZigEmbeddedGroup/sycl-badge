@@ -1,47 +1,49 @@
-/// USB device driver
-/// Barebones CDC implementation wrapping microzig USB HAL
-/// For loading programs via USB CDC (virtual serial port)
+//! USB device driver
+//!
+//! The badge is a composite device: mass storage on interface 0 (EP1) for the
+//! cart drive, and a CDC ACM serial port on interfaces 1 and 2 (EP2 data, EP3
+//! notifications) for the kernel console.
 const std = @import("std");
 const microzig = @import("microzig");
 const assert = microzig.assert;
 const rp2xxx = microzig.hal;
-const mmio = microzig.mmio;
 const core = microzig.core;
 const descriptor = core.usb.descriptor;
 const types = core.usb.types;
-const TransferType = types.TransferType;
-const SetupPacket = types.SetupPacket;
 const Endpoint = types.Endpoint;
 const USB = microzig.chip.peripherals.USB;
 const USB_DPRAM = microzig.chip.peripherals.USB_DPRAM;
+const SIO = microzig.chip.peripherals.SIO;
 const EndpointType = microzig.chip.types.peripherals.USB_DPRAM.EndpointType;
 const BufferControl = @FieldType(microzig.chip.types.peripherals.USB_DPRAM, "EP0_IN_BUFFER_CONTROL");
 const EndpointControl = @FieldType(microzig.chip.types.peripherals.USB_DPRAM, "EP1_IN_CONTROL");
 
 const setup = @import("usb/setup.zig");
+const cdc = @import("usb/cdc.zig");
 const timer = @import("timer.zig");
-const storage = @import("../loader/storage.zig");
 const endpoint = @import("usb/endpoint.zig");
 
 const log = std.log.scoped(.usb_device);
 
-const AssumeOptions = struct {};
-
-fn endpoint_type_from_transfer_type(xfer: TransferType) EndpointType {
-    return switch (xfer) {
-        .control => .control,
-        .isochronous => .isochronous,
-        .bulk => .bulk,
-        .interrupt => .interrupt,
-    };
-}
-
 const max_packet_size = 64;
 const dpram_addr = @intFromPtr(USB_DPRAM);
 const dpram_size = 4096;
-const dpram_buffer_start_offset = 0x180;
 const ep_ctrls: *volatile [32]EndpointControl = @ptrFromInt(dpram_addr + 0x00);
 const buff_ctrls: *volatile [32]BufferControl = @ptrFromInt(dpram_addr + 0x80);
+
+// DPRAM data buffers. The hardware fixes the EP0 buffer at 0x100 and shares it
+// between both directions. Every other buffer holds one packet.
+const ep0_buffer = 0x100;
+const msc_in_buffer = 0x180;
+const msc_out_buffer = 0x1C0;
+const cdc_in_buffer = 0x200;
+const cdc_out_buffer = 0x240;
+const cdc_notification_buffer = 0x280;
+
+// Interface numbers, class requests carry them in wIndex
+const msc_interface_num = 0;
+const cdc_comm_interface_num = 1;
+const cdc_data_interface_num = 2;
 
 fn ep_idx(ep: Endpoint) usize {
     return (2 * @backingInt(ep.num)) + @as(usize, switch (ep.dir) {
@@ -72,12 +74,13 @@ const descriptors: setup.Descriptors = blk: {
     const product = builder.add_single("SYCL Badge V2");
     const serial = builder.add_single("serial number");
     const config_name = builder.add_single("default");
-    const interface_name = builder.add_single("SYCL Badge Cart Storage");
+    const msc_name = builder.add_single("SYCL Badge Cart Storage");
+    const cdc_name = builder.add_single("SYCL Badge Console");
 
     const device = descriptor.Device{
         .bcd_usb = .v2_00,
-        // Let the OS figure things out by looking at the interfaces
-        .device_triple = .unspecified,
+        // Composite device with an interface association descriptor
+        .device_triple = .{ .class = .Miscellaneous, .subclass = 0x02, .protocol = 0x01 },
         .max_packet_size0 = max_packet_size,
         .vendor = .from(1234),
         .product = .from(1234),
@@ -92,27 +95,85 @@ const descriptors: setup.Descriptors = blk: {
 
     const const_builder = builder.finish();
 
+    // Interface 0: mass storage for carts
     const msc_interface = descriptor.Interface{
-        .interface_number = 0,
+        .interface_number = msc_interface_num,
         .alternate_setting = 0,
         .num_endpoints = 2,
         .interface_triple = .from(.MassStorage, .SCSI, .BulkOnly),
-        .interface_s = interface_name,
+        .interface_s = msc_name,
     };
+    const msc_in_ep: descriptor.Endpoint = .bulk(.{ .dir = .in, .num = .ep1 }, max_packet_size);
+    const msc_out_ep: descriptor.Endpoint = .bulk(.{ .dir = .out, .num = .ep1 }, max_packet_size);
 
-    const bulk_in_ep: descriptor.Endpoint = .bulk(.{ .dir = .in, .num = .ep1 }, max_packet_size);
-    const bulk_out_ep: descriptor.Endpoint = .bulk(.{ .dir = .out, .num = .ep1 }, max_packet_size);
+    // Interfaces 1 and 2: CDC ACM serial console
+    const cdc_association = descriptor.InterfaceAssociation{
+        .first_interface = cdc_comm_interface_num,
+        .interface_count = 2,
+        .function_class = @backingInt(types.ClassSubclassProtocol.ClassCode.CDC),
+        .function_subclass = @backingInt(types.ClassSubclassProtocol.Subclass.CDC.Abstract),
+        .function_protocol = @backingInt(types.ClassSubclassProtocol.Protocol.CDC.NoneRequired),
+        .function = cdc_name,
+    };
+    const cdc_comm_interface = descriptor.Interface{
+        .interface_number = cdc_comm_interface_num,
+        .alternate_setting = 0,
+        .num_endpoints = 1,
+        .interface_triple = .from(.CDC, .Abstract, .NoneRequired),
+        .interface_s = cdc_name,
+    };
+    const cdc_header = descriptor.cdc.Header{};
+    const cdc_call_management = descriptor.cdc.CallManagement{
+        .capabilities = .none,
+        .data_interface = cdc_data_interface_num,
+    };
+    const cdc_acm = descriptor.cdc.AbstractControlModel{
+        .capabilities = .{
+            .comm_feature = false,
+            .line_coding = true,
+            .send_break = false,
+            .network_connection = false,
+        },
+    };
+    const cdc_union = descriptor.cdc.Union{
+        .master_interface = cdc_comm_interface_num,
+        .slave_interface_0 = cdc_data_interface_num,
+    };
+    const cdc_notification_ep: descriptor.Endpoint = .interrupt(.{ .dir = .in, .num = .ep3 }, 8, 16);
+    const cdc_data_interface = descriptor.Interface{
+        .interface_number = cdc_data_interface_num,
+        .alternate_setting = 0,
+        .num_endpoints = 2,
+        .interface_triple = .{ .class = .CDC_Data, .subclass = 0x00, .protocol = 0x00 },
+        .interface_s = cdc_name,
+    };
+    const cdc_in_ep: descriptor.Endpoint = .bulk(.{ .dir = .in, .num = .ep2 }, max_packet_size);
+    const cdc_out_ep: descriptor.Endpoint = .bulk(.{ .dir = .out, .num = .ep2 }, max_packet_size);
+
+    const function_descriptors = std.mem.asBytes(&msc_interface) ++
+        std.mem.asBytes(&msc_in_ep) ++
+        std.mem.asBytes(&msc_out_ep) ++
+        std.mem.asBytes(&cdc_association) ++
+        std.mem.asBytes(&cdc_comm_interface) ++
+        std.mem.asBytes(&cdc_header) ++
+        std.mem.asBytes(&cdc_call_management) ++
+        std.mem.asBytes(&cdc_acm) ++
+        std.mem.asBytes(&cdc_union) ++
+        std.mem.asBytes(&cdc_notification_ep) ++
+        std.mem.asBytes(&cdc_data_interface) ++
+        std.mem.asBytes(&cdc_in_ep) ++
+        std.mem.asBytes(&cdc_out_ep);
 
     const config = descriptor.Configuration{
-        .total_length = .from(@sizeOf(descriptor.Configuration) + @sizeOf(descriptor.Interface) + (2 * @sizeOf(descriptor.Endpoint))),
-        .num_interfaces = 1,
+        .total_length = .from(@sizeOf(descriptor.Configuration) + function_descriptors.len),
+        .num_interfaces = 3,
         .configuration_value = 1,
         .configuration_s = config_name,
         .attributes = .{ .self_powered = false },
         .max_current = .from_ma(350),
     };
 
-    const config_payload = std.mem.asBytes(&config) ++ std.mem.asBytes(&msc_interface) ++ std.mem.asBytes(&bulk_in_ep) ++ std.mem.asBytes(&bulk_out_ep);
+    const config_payload = std.mem.asBytes(&config) ++ function_descriptors;
     break :blk setup.Descriptors{
         .device = &device,
         .string = const_builder.to_descriptor(),
@@ -152,16 +213,25 @@ const MSC_Driver = @import("usb/msc.zig").MSC_Driver(SetupProcessor, .{
     },
 });
 
+const CDC_Driver = cdc.CDC_Driver(SetupProcessor, .{
+    .max_packet_size = max_packet_size,
+    .callbacks = .{
+        .queue_packet = cdc_queue_packet,
+        .queue_receive = cdc_queue_receive,
+        .get_buffer = cdc_get_buffer,
+        .disarm_endpoints = cdc_disarm_endpoints,
+    },
+});
+
 var setup_processor: SetupProcessor = undefined;
 var msc_driver: MSC_Driver = undefined;
+var cdc_driver: CDC_Driver = undefined;
 
-fn in_buf_ready() bool {
-    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
-    return buf_ctrl.read().AVAILABLE_0 == 0;
-}
+/// True while `poll` runs, `send` and `receive` must not re-enter it
+var in_poll = false;
 
 /// Initialize the USB device
-/// Sets up the USB in device mode for CDC (virtual serial port)
+/// Sets up the USB in device mode with mass storage and a CDC serial console
 /// Returns error if initialization fails
 pub fn init() !void {
     log.info("Resetting USBCTRL", .{});
@@ -202,16 +272,19 @@ pub fn init() !void {
     });
 
     msc_driver.init(null);
+    cdc_driver.init();
     setup_processor = .init(.{
         .descriptors = descriptors,
         .handlers = .{
             .interface = &.{
-                .{ .num = 0, .ctx = &msc_driver, .handler = MSC_Driver.setup_handler },
+                .{ .num = msc_interface_num, .ctx = &msc_driver, .handler = MSC_Driver.setup_handler },
+                .{ .num = cdc_comm_interface_num, .ctx = &cdc_driver, .handler = CDC_Driver.setup_handler },
             },
         },
     });
 
     setup_endpoints();
+    cdc_driver.reset();
 
     connect();
     msc_driver.in_ready();
@@ -235,11 +308,7 @@ fn stall(ep: types.Endpoint) void {
             .LAST_0 = 1,
         });
 
-        asm volatile (
-            \\ nop
-            \\ nop
-            \\ nop
-        );
+        buffer_control_delay();
 
         buf_ctrl.modify(.{ .AVAILABLE_0 = 1 });
         return;
@@ -250,8 +319,39 @@ fn stall(ep: types.Endpoint) void {
 }
 
 fn clear_endpoint_halt(ep: types.Endpoint) void {
-    _ = ep;
-    msc_driver.reset();
+    switch (ep.num) {
+        .ep1 => msc_driver.reset(),
+        .ep2 => cdc_driver.reset(),
+        else => {},
+    }
+}
+
+/// Aborts the transfer armed on `ep` so its buffer can be written again
+fn abort_endpoint(ep: Endpoint) void {
+    switch (ep.num) {
+        inline .ep1, .ep2, .ep3 => |num| switch (ep.dir) {
+            inline .in, .out => |dir| {
+                const field = comptime std.fmt.comptimePrint("EP{d}_{s}", .{
+                    @backingInt(num),
+                    switch (dir) {
+                        .in => "IN",
+                        .out => "OUT",
+                    },
+                });
+
+                var abort: @TypeOf(USB.EP_ABORT.read()) = .{};
+                @field(abort, field) = 1;
+                USB.EP_ABORT.write(abort);
+                while (@field(USB.EP_ABORT_DONE.read(), field) == 0) {}
+
+                var done: @TypeOf(USB.EP_ABORT_DONE.read()) = .{};
+                @field(done, field) = 1;
+                rp2xxx.hw.clear_alias(&USB.EP_ABORT_DONE).write(done);
+                USB.EP_ABORT.write(.{});
+            },
+        },
+        else => @panic("abort_endpoint: unsupported endpoint"),
+    }
 }
 
 fn disarm_endpoint(ep: Endpoint) void {
@@ -259,19 +359,7 @@ fn disarm_endpoint(ep: Endpoint) void {
     const buf_ctrl = buffer_control(ep);
 
     if (buf_ctrl.read().AVAILABLE_0 == 1) {
-        switch (ep.dir) {
-            .in => {
-                USB.EP_ABORT.write(.{ .EP1_IN = 1 });
-                while (USB.EP_ABORT_DONE.read().EP1_IN == 0) {}
-                rp2xxx.hw.clear_alias(&USB.EP_ABORT_DONE).write(.{ .EP1_IN = 1 });
-            },
-            .out => {
-                USB.EP_ABORT.write(.{ .EP1_OUT = 1 });
-                while (USB.EP_ABORT_DONE.read().EP1_OUT == 0) {}
-                rp2xxx.hw.clear_alias(&USB.EP_ABORT_DONE).write(.{ .EP1_OUT = 1 });
-            },
-        }
-        USB.EP_ABORT.write(.{});
+        abort_endpoint(ep);
     }
 
     buf_ctrl.write(.{ .STALL = 0 });
@@ -292,40 +380,31 @@ fn msc_disarm_endpoints() void {
     rp2xxx.hw.clear_alias(&USB.BUFF_STATUS).write(.{ .EP1_IN = 1, .EP1_OUT = 1 });
 }
 
-fn queue_packet(data: []const u8, pid: setup.PID) void {
-    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
-    //assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
-    assert(data.len <= 64, .{});
+fn cdc_disarm_endpoints() void {
+    disarm_endpoint(.{ .dir = .in, .num = .ep2 });
+    disarm_endpoint(.{ .dir = .out, .num = .ep2 });
 
-    log.debug("queue_packet: len={} pid={}", .{ data.len, pid });
-    const dest: [*]u8 = @ptrFromInt(dpram_addr + 0x100);
-    @memcpy(dest[0..data.len], data);
+    // drop abandoned buffers
+    rp2xxx.hw.clear_alias(&USB.BUFF_STATUS).write(.{ .EP2_IN = 1, .EP2_OUT = 1 });
+}
 
-    buf_ctrl.write(.{
-        .LENGTH_0 = @intCast(data.len),
-        .PID_0 = @backingInt(pid),
-        .FULL_0 = 1,
-        .LAST_0 = 1,
-    });
-
+/// The buffer control register needs a few cycles between writing the packet
+/// fields and setting AVAILABLE
+inline fn buffer_control_delay() void {
     asm volatile (
         \\ nop
         \\ nop
         \\ nop
     );
-
-    buf_ctrl.modify(.{
-        .AVAILABLE_0 = 1,
-    });
 }
 
-fn msc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
-    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep1 });
+/// Queues one IN packet on a non-control endpoint
+fn queue_in_packet(ep_num: Endpoint.Num, buffer_offset: u16, data: []const u8, pid: endpoint.PacketIdentifier) void {
+    const buf_ctrl = buffer_control(.{ .dir = .in, .num = ep_num });
     assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
-    assert(data.len <= 64, .{});
+    assert(data.len <= max_packet_size, .{});
 
-    log.debug("queue_msc_packet: len={} pid={}", .{ data.len, pid });
-    const dest: [*]u8 = @ptrFromInt(dpram_addr + 0x180);
+    const dest: [*]u8 = @ptrFromInt(dpram_addr + buffer_offset);
     @memcpy(dest[0..data.len], data);
 
     buf_ctrl.write(.{
@@ -335,54 +414,16 @@ fn msc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
         .LAST_0 = 1,
     });
 
-    asm volatile (
-        \\ nop
-        \\ nop
-        \\ nop
-    );
+    buffer_control_delay();
 
     buf_ctrl.modify(.{
         .AVAILABLE_0 = 1,
     });
 }
 
-fn get_buffer() []const u8 {
-    return "";
-}
-
-fn msc_get_buffer() []const u8 {
-    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
-    const ptr: [*]const u8 = @ptrFromInt(dpram_addr + 0x180 + 64);
-    return ptr[0..buf_ctrl.read().LENGTH_0];
-}
-
-fn queue_receive() void {
-    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep0 });
-
-    log.debug("queue_receive", .{});
-
-    buf_ctrl.write(.{
-        .LENGTH_0 = 0,
-        .PID_0 = 0,
-        .FULL_0 = 0,
-        .LAST_0 = 1,
-    });
-
-    asm volatile (
-        \\ nop
-        \\ nop
-        \\ nop
-    );
-
-    buf_ctrl.modify(.{
-        .AVAILABLE_0 = 1,
-    });
-}
-
-fn msc_queue_receive(pid: endpoint.PacketIdentifier) void {
-    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep1 });
-
-    log.debug("queue_msc_receive: pid={}", .{pid});
+/// Arms a non-control OUT endpoint to receive one packet
+fn queue_out_packet(ep_num: Endpoint.Num, pid: endpoint.PacketIdentifier) void {
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = ep_num });
 
     buf_ctrl.write(.{
         .LENGTH_0 = max_packet_size,
@@ -391,52 +432,129 @@ fn msc_queue_receive(pid: endpoint.PacketIdentifier) void {
         .LAST_0 = 1,
     });
 
-    asm volatile (
-        \\ nop
-        \\ nop
-        \\ nop
-    );
+    buffer_control_delay();
 
     buf_ctrl.modify(.{
         .AVAILABLE_0 = 1,
     });
 }
 
-fn allocate_buffer(offset: *u16) u16 {
-    defer offset.* += max_packet_size;
-    return offset.*;
+/// Payload of the packet that a non-control OUT endpoint last received
+fn received_packet(ep_num: Endpoint.Num, buffer_offset: u16) []const u8 {
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = ep_num });
+    const ptr: [*]const u8 = @ptrFromInt(dpram_addr + buffer_offset);
+    return ptr[0..buf_ctrl.read().LENGTH_0];
+}
+
+fn queue_packet(data: []const u8, pid: setup.PID) void {
+    const buf_ctrl = buffer_control(.{ .dir = .in, .num = .ep0 });
+    //assert(buf_ctrl.read().AVAILABLE_0 == 0, .{});
+    assert(data.len <= 64, .{});
+
+    log.debug("queue_packet: len={} pid={}", .{ data.len, pid });
+    const dest: [*]u8 = @ptrFromInt(dpram_addr + ep0_buffer);
+    @memcpy(dest[0..data.len], data);
+
+    buf_ctrl.write(.{
+        .LENGTH_0 = @intCast(data.len),
+        .PID_0 = @backingInt(pid),
+        .FULL_0 = 1,
+        .LAST_0 = 1,
+    });
+
+    buffer_control_delay();
+
+    buf_ctrl.modify(.{
+        .AVAILABLE_0 = 1,
+    });
+}
+
+fn get_buffer() []const u8 {
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep0 });
+    const ptr: [*]const u8 = @ptrFromInt(dpram_addr + ep0_buffer);
+    return ptr[0..buf_ctrl.read().LENGTH_0];
+}
+
+fn queue_receive() void {
+    const buf_ctrl = buffer_control(.{ .dir = .out, .num = .ep0 });
+
+    log.debug("queue_receive", .{});
+
+    // Accept a full packet: either the zero length status stage of a control
+    // IN transfer, or the single packet data stage of a control OUT request.
+    // Both are DATA1.
+    buf_ctrl.write(.{
+        .LENGTH_0 = max_packet_size,
+        .PID_0 = 1,
+        .FULL_0 = 0,
+        .LAST_0 = 1,
+    });
+
+    buffer_control_delay();
+
+    buf_ctrl.modify(.{
+        .AVAILABLE_0 = 1,
+    });
+}
+
+fn msc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
+    log.debug("queue_msc_packet: len={} pid={}", .{ data.len, pid });
+    queue_in_packet(.ep1, msc_in_buffer, data, pid);
+}
+
+fn msc_get_buffer() []const u8 {
+    return received_packet(.ep1, msc_out_buffer);
+}
+
+fn msc_queue_receive(pid: endpoint.PacketIdentifier) void {
+    log.debug("queue_msc_receive: pid={}", .{pid});
+    queue_out_packet(.ep1, pid);
+}
+
+fn cdc_queue_packet(data: []const u8, pid: endpoint.PacketIdentifier) void {
+    log.debug("queue_cdc_packet: len={} pid={}", .{ data.len, pid });
+    queue_in_packet(.ep2, cdc_in_buffer, data, pid);
+}
+
+fn cdc_get_buffer() []const u8 {
+    return received_packet(.ep2, cdc_out_buffer);
+}
+
+fn cdc_queue_receive(pid: endpoint.PacketIdentifier) void {
+    log.debug("queue_cdc_receive: pid={}", .{pid});
+    queue_out_packet(.ep2, pid);
+}
+
+fn configure_endpoint(ep: Endpoint, ep_type: EndpointType, buffer_offset: u16) void {
+    endpoint_control(ep).write(.{
+        .BUFFER_ADDRESS = buffer_offset,
+        .ENDPOINT_TYPE = ep_type,
+        .INTERRUPT_PER_BUFF = 1,
+        .DOUBLE_BUFFERED = 0,
+        .ENABLE = 1,
+    });
 }
 
 fn setup_endpoints() void {
-    var buffer_offset_current: u16 = dpram_buffer_start_offset;
-
-    // EP1 IN and OUT: MSC
-    const ep1_in = endpoint_control(.{ .num = .ep1, .dir = .in });
-    const ep1_out = endpoint_control(.{ .num = .ep1, .dir = .out });
-
-    ep1_in.write(.{
-        .BUFFER_ADDRESS = allocate_buffer(&buffer_offset_current),
-        .ENDPOINT_TYPE = .bulk,
-        .INTERRUPT_PER_BUFF = 1,
-        .DOUBLE_BUFFERED = 0,
-        .ENABLE = 1,
-    });
-
-    ep1_out.write(.{
-        .BUFFER_ADDRESS = allocate_buffer(&buffer_offset_current),
-        .ENDPOINT_TYPE = .bulk,
-        .INTERRUPT_PER_BUFF = 1,
-        .DOUBLE_BUFFERED = 0,
-        .ENABLE = 1,
-    });
-
+    // EP1 IN and OUT: mass storage
+    configure_endpoint(.{ .num = .ep1, .dir = .in }, .bulk, msc_in_buffer);
+    configure_endpoint(.{ .num = .ep1, .dir = .out }, .bulk, msc_out_buffer);
     msc_queue_receive(.DATA0);
 
-    // EP2 IN AND OUT: CDC
+    // EP2 IN and OUT: CDC data, the CDC driver arms the OUT side in reset
+    configure_endpoint(.{ .num = .ep2, .dir = .in }, .bulk, cdc_in_buffer);
+    configure_endpoint(.{ .num = .ep2, .dir = .out }, .bulk, cdc_out_buffer);
 
+    // EP3 IN: CDC notifications. Enabled so the controller answers the host's
+    // polls with NAK, but never armed: the console has nothing to notify.
+    configure_endpoint(.{ .num = .ep3, .dir = .in }, .interrupt, cdc_notification_buffer);
 }
 
 pub fn poll() void {
+    if (in_poll) return;
+    in_poll = true;
+    defer in_poll = false;
+
     const interrupts = USB.INTS.read();
 
     if (interrupts.BUS_RESET == 1) {
@@ -444,6 +562,7 @@ pub fn poll() void {
         USB.ADDR_ENDP.write(.{ .ADDRESS = 0 });
 
         msc_driver.reset();
+        cdc_driver.reset();
 
         // TODO: use clear alias?
         USB.SIE_STATUS.write(.{ .BUS_RESET = 1 });
@@ -477,6 +596,16 @@ pub fn poll() void {
             msc_driver.out_ready();
             clear.write(.{ .EP1_OUT = 1 });
         }
+
+        if (buff_status.EP2_IN == 1) {
+            cdc_driver.in_ready();
+            clear.write(.{ .EP2_IN = 1 });
+        }
+
+        if (buff_status.EP2_OUT == 1) {
+            cdc_driver.out_ready();
+            clear.write(.{ .EP2_OUT = 1 });
+        }
     }
 
     if (interrupts.SETUP_REQ == 1) {
@@ -489,72 +618,36 @@ pub fn poll() void {
 
     setup_processor.poll();
     msc_driver.poll();
+    cdc_driver.poll();
 }
 
-/// Send data over USB (non-blocking with retry limit)
-/// Returns true if successful
+/// Sends console output to the host. Output waits in a buffer until a terminal
+/// opens the port. While a terminal is connected this waits up to 100 ms for
+/// room, then drops the rest. Returns true if every byte was queued.
 pub fn send(data: []const u8) bool {
-    _ = data;
-    //const drivers = usb_controller.drivers() orelse return false;
+    // The USB peripheral belongs to core 0
+    if (SIO.CPUID.raw != 0) return false;
 
-    //var tx: []const u8 = data;
-    //while (tx.len > 0) {
-    //    tx = tx[drivers.serial.write(tx)..];
-    //    usb_device.poll(&usb_controller);
-    //}
-    //// Short messages are not sent right away; instead, they accumulate in a buffer, so we have to force a flush to send them
-    //while (!drivers.serial.flush())
-    //    usb_device.poll(&usb_controller);
-
+    var rest = data[cdc_driver.write(data)..];
+    const deadline = timer.millis() + 100;
+    while (rest.len > 0) {
+        if (!cdc_driver.connected() or in_poll or timer.millis() > deadline) return false;
+        poll();
+        rest = rest[cdc_driver.write(rest)..];
+    }
     return true;
 }
 
-/// Receive data from USB (non-blocking with timeout)
-/// Returns number of bytes actually received
+/// Receives console input from the host. Waits up to `timeout_ms` for the
+/// first byte. Returns the number of bytes written to `buffer`.
 pub fn receive(buffer: []u8, timeout_ms: u32) usize {
-    _ = buffer;
-    _ = timeout_ms;
-    return 0;
-    //const drivers = usb_controller.drivers() orelse return 0;
-
-    //const start = time.get_time_since_boot().to_us();
-    //const timeout_us = timeout_ms * 1000;
-
-    //var rx_len: usize = 0;
-    //while (true) {
-    //    const len = drivers.serial.read(buffer[rx_len..]);
-    //    rx_len += len;
-    //    if (len == 0)
-    //        break;
-
-    //    // Check timeout
-    //    const elapsed = time.get_time_since_boot().to_us() - start;
-    //    if (elapsed >= timeout_us)
-    //        break;
-
-    //    usb_device.poll(&usb_controller);
-    //}
-
-    //return rx_len;
+    const deadline = timer.millis() + timeout_ms;
+    while (true) {
+        const n = cdc_driver.read(buffer);
+        if (n > 0 or in_poll or timer.millis() >= deadline) return n;
+        poll();
+    }
 }
-
-/// Check if data is available to read
-/// Returns number of bytes in RX buffer
-pub fn available() usize {
-    //const drivers = usb_controller.drivers() orelse return 0;
-    //return drivers.serial.available();
-    return 0;
-}
-
-/// Process USB events (MUST be called frequently from main loop!)
-/// This is critical for USB to work - call as often as possible
-/// Handles enumeration, control requests, and data transfers
-//pub fn poll() void {
-//usb_device.poll(&usb_controller);
-//const drivers = usb_controller.drivers() orelse return;
-//_ = drivers;
-// Very Big TODO: handle stuff for drivers
-//}
 
 fn log_state() void {
     log.debug("SIE_CTRL: {}", .{USB.SIE_CTRL.read()});
@@ -577,39 +670,7 @@ pub fn disconnect() void {
     USB.SIE_CTRL.modify(.{ .PULLUP_EN = 0 });
 }
 
-// Buffer for formatted printing (max 2KB)
-//var print_buffer: [2048]u8 = undefined;
-
-/// Send formatted string over USB with full printf-style formatting
-///
-/// Supports all Zig format specifiers:
-/// - {} or {any}     - Default formatting for any type
-/// - {d}            - Decimal integer
-/// - {x}            - Lowercase hexadecimal
-/// - {X}            - Uppercase hexadecimal
-/// - {o}            - Octal
-/// - {b}            - Binary
-/// - {c}            - Character
-/// - {s}            - String/slice
-/// - {e}            - Lowercase scientific notation
-/// - {E}            - Uppercase scientific notation
-/// - {[precision]}  - Decimal precision (e.g., {d:4} for width 4)
-///
-/// Examples:
-///   printf("Number: {d}\r\n", .{42})           -> "Number: 42"
-///   printf("Hex: 0x{x:0>4}\r\n", .{255})       -> "Hex: 0x00ff"
-///   printf("String: {s}\r\n", .{"hello"})      -> "String: hello"
-///   printf("Mixed: {} and {d}\r\n", .{1, 2})   -> "Mixed: 1 and 2"
-///
-/// Returns true if successful, false if buffer overflow or send failed
-pub fn printf(comptime fmt: []const u8, args: anytype) bool {
-    _ = fmt;
-    _ = args;
-    //const text = std.fmt.bufPrint(&print_buffer, fmt, args) catch return false;
-    //return send(text);
-}
-
 test {
-    //_ = @import("usb/setup.zig");
     _ = @import("usb/endpoint.zig");
+    _ = @import("usb/cdc.zig");
 }

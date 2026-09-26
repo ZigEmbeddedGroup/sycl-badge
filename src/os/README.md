@@ -40,6 +40,10 @@ The OS intercepts button input for system operations. Carts receive updated butt
   - Prevents accidental exit since Start may be used by carts
   - Halts Core 1, resets all hardware (buzzer, PWM, display, etc.), and restores the menu display
 
+## Console
+
+The kernel console is a USB CDC ACM serial port next to the cart drive. It needs no host driver: Linux names it `/dev/ttyACM*`, macOS `/dev/cu.usbmodem*`, and Windows a `COM` port. Line settings do not matter. Type `help` for the command list.
+
 ## Build Notes
 
 OS kernel artifacts are configured in [../../build.zig](../../build.zig) through `add_os`.

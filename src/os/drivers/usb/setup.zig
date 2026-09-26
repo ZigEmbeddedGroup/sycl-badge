@@ -39,7 +39,10 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
         sm: union(enum) {
             awaiting_request,
             pending_address: u7,
-            receiving_data: OutTransfer,
+            receiving_data: struct {
+                xfer: OutTransfer,
+                completion: OutCompletion,
+            },
             sending_data: InTransfer,
         },
         handlers: Handlers,
@@ -81,6 +84,12 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             handler: *const SetupPacketHandler,
         };
 
+        /// Runs once the data stage of a control OUT request has arrived.
+        pub const OutCompletion = struct {
+            ctx: ?*anyopaque,
+            handler: *const fn (ctx: ?*anyopaque, payload: []const u8) void,
+        };
+
         pub const Options = struct {
             descriptors: Descriptors,
             handlers: Handlers,
@@ -93,7 +102,7 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                 .sm = .awaiting_request,
                 .ready = .{
                     .in = true,
-                    .out = true,
+                    .out = false,
                 },
             };
         }
@@ -272,6 +281,28 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
             };
         }
 
+        /// Receives the data stage of a control OUT request. `completion`
+        /// runs with the payload once all `host_len` bytes have arrived, then
+        /// the status stage (a zero length IN packet) is sent.
+        pub fn queue_out_xfer(self: *@This(), host_len: usize, completion: OutCompletion) void {
+            const xfer = OutTransfer.start(host_len) catch {
+                self.stall_ep0();
+                return;
+            };
+            self.sm = .{
+                .receiving_data = .{
+                    .xfer = xfer,
+                    .completion = completion,
+                },
+            };
+        }
+
+        /// Rejects the current request.
+        pub fn stall_ep0(self: *@This()) void {
+            config.callbacks.stall(.{ .num = .ep0, .dir = .in });
+            self.sm = .awaiting_request;
+        }
+
         pub fn ep0_in_ready(self: *@This()) void {
             self.ready.in = true;
             switch (self.sm) {
@@ -284,9 +315,20 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
         }
 
         pub fn ep0_out_ready(self: *@This()) void {
-            self.ready.out = true;
             switch (self.sm) {
-                else => {},
+                .receiving_data => self.ready.out = true,
+                else => {
+                    // Outside of a data stage, a zero length packet is the
+                    // status stage of a control IN transfer: consume it and
+                    // arm the endpoint again. A packet with data is the data
+                    // stage of a control OUT request whose SETUP packet has
+                    // not been processed yet, so keep it for `poll`.
+                    if (config.callbacks.get_buffer().len == 0) {
+                        config.callbacks.queue_receive();
+                    } else {
+                        self.ready.out = true;
+                    }
+                },
             }
         }
 
@@ -302,13 +344,22 @@ pub fn RequestPacketProcessor(comptime config: Config) type {
                         config.callbacks.queue_receive();
                     }
                 },
-                .receiving_data => |*xfer| if (self.ready.out) {
+                .receiving_data => |*state| if (self.ready.out) {
                     defer self.ready.out = false;
 
-                    xfer.ep_ready();
-                    if (xfer.state == .done) {
-                        self.sm = .awaiting_request;
-                        config.callbacks.queue_receive();
+                    state.xfer.ep_ready();
+                    switch (state.xfer.state) {
+                        .receiving_data => config.callbacks.queue_receive(),
+                        .done => {
+                            state.completion.handler(state.completion.ctx, state.xfer.get_payload());
+                            // Status stage: a zero length IN packet
+                            self.sm = .{ .sending_data = .start("", 0) };
+                        },
+                        .err => {
+                            log.warn("control OUT data stage failed", .{});
+                            self.stall_ep0();
+                            config.callbacks.queue_receive();
+                        },
                     }
                 },
             }
@@ -521,8 +572,8 @@ pub fn OutTransferProcessor(comptime config: OutTransferConfig) type {
             };
         }
 
-        pub fn get_payload(self: @This()) []const u8 {
-            assert(self.state == .done);
+        pub fn get_payload(self: *const @This()) []const u8 {
+            assert(self.state == .done, .{});
             return self.buf[0..self.progress];
         }
 

@@ -3,6 +3,8 @@ const Build = std.Build;
 
 const microzig = @import("microzig");
 
+const simulator_core_optimize: std.builtin.Optimize = .ReleaseSafe;
+
 const MicroBuild = microzig.MicroBuild(.{
     .samd51 = true,
     .rp2xxx = true,
@@ -19,12 +21,12 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSafe,
         .target = native_target,
     });
-    const simulator_glue = b.addLibrary(.{
-        .name = "simulator_glue",
+    const simulator_core = b.addLibrary(.{
+        .name = "simulator_core",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/simulator/main.zig"),
             .target = native_target,
-            .optimize = .ReleaseSafe,
+            .optimize = simulator_core_optimize,
             .imports = &.{
                 .{ .name = "sdl3", .module = sdl.module("sdl3") },
                 .{ .name = "sim_abi", .module = b.createModule(.{
@@ -34,7 +36,7 @@ pub fn build(b: *Build) void {
             },
         }),
     });
-    b.installArtifact(simulator_glue);
+    b.installArtifact(simulator_core);
 
     // Badge V2 (RP2354B) target setup
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, b);
@@ -270,7 +272,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .name = options.name,
         .root_module = b.createModule(.{ .target = native_target }),
     });
-    sim.root_module.linkLibrary(dep.artifact("simulator_glue"));
+    sim.root_module.linkLibrary(dep.artifact("simulator_core"));
     sim.root_module.linkLibrary(sim_obj);
 
     b.installArtifact(sim);

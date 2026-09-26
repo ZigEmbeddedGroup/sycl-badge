@@ -291,7 +291,7 @@ fn tick_cart_select(pressed: Controls) void {
 fn tick_cart_mailbox(buttons: Controls) void {
     // Keep ipc_controls updated every iteration so carts always read fresh
     // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
-    mailbox.shared_data.controls = buttons;
+    abi.ipc_data.controls = buttons;
 
     // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
     // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
@@ -346,7 +346,7 @@ fn tick_cart_mailbox(buttons: Controls) void {
             },
             .vsync, .data_transfer => {
                 // Transfer finished, the frame buffer is safe for the app to write
-                //mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                //mailbox.send(abi.FRAMEBUFFER_DONE);
                 screen_wait_for.set_state(.draw_debug, @src());
                 continue :find_lcd_work .draw_debug;
             },
@@ -354,7 +354,7 @@ fn tick_cart_mailbox(buttons: Controls) void {
                 if (fps_overlay.is_drawing()) {
                     fps_overlay.submit_lcd_work();
                 } else {
-                    mailbox.send(mailbox.MessageType.FRAMEBUFFER_DONE);
+                    mailbox.send(abi.FRAMEBUFFER_DONE);
                     screen_wait_for.set_state(.cart, @src());
                 }
             },
@@ -369,35 +369,34 @@ fn tick_cart_mailbox(buttons: Controls) void {
 }
 
 fn handle_cart_message(msg: u32, sync_time: *bool) void {
-    if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TRACE) {
-        const len: usize = @min(mailbox.MessageType.getPayload(msg), mailbox.shared_data.trace_buf.len - 1);
-        const buf: [*]const u8 = @volatileCast(&mailbox.shared_data.trace_buf);
+    if (mailbox.MessageType.getType(msg) == abi.CART_TRACE) {
+        const len: usize = @min(mailbox.MessageType.getPayload(msg), abi.ipc_data.trace_buf.len - 1);
+        const buf: [*]const u8 = @volatileCast(&abi.ipc_data.trace_buf);
         console.printf("[CART] {s}\r\n", .{buf[0..len]});
-    } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_TONE) {
-        const freq: f32 = mailbox.shared_data.tone_freq;
-        const duration_sec: f32 = mailbox.shared_data.tone_duration;
-        const volume = mailbox.shared_data.tone_volume;
-        const flags = mailbox.shared_data.tone_flags;
-        audio.tone(freq, duration_sec, volume, flags);
-    } else if (mailbox.MessageType.getType(msg) == mailbox.MessageType.CART_VOLUME) {
-        const volume = mailbox.shared_data.global_volume;
+    } else if (msg == abi.CART_VOLUME) {
+        const volume = abi.ipc_data.global_volume;
         audio.set_global_volume(volume);
-    } else if (msg == mailbox.MessageType.FRAMEBUFFER_READY or
-        mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2)
+    } else if (msg == abi.CART_STOP_AUDIO) {
+        mailbox.send(abi.OS_ACK_STOP_AUDIO);
+        audio.stop_buffered();
+    } else if (msg == abi.CART_START_AUDIO) {
+        audio.start_buffered();
+    } else if (msg == abi.FRAMEBUFFER_READY or
+        mailbox.MessageType.getType(msg) == abi.FRAMEBUFFER_READY_V2)
     {
-        const is_v2: bool = mailbox.MessageType.getType(msg) == mailbox.MessageType.FRAMEBUFFER_READY_V2;
+        const is_v2: bool = mailbox.MessageType.getType(msg) == abi.FRAMEBUFFER_READY_V2;
 
         const flags: abi.PresentFlags = if (is_v2) @bitCast(msg) else .{
             .framebuffer_index = 0,
             .has_dirty_rect = false,
             .vsync_updated = false,
             .clear_frame = false,
-            .tag = comptime mailbox.MessageType.getType(mailbox.MessageType.FRAMEBUFFER_READY),
+            .tag = comptime mailbox.MessageType.getType(abi.FRAMEBUFFER_READY),
         };
 
         if (flags.vsync_updated) {
-            const vsync_flags = mailbox.shared_data.vsync_flags;
-            const frame_ms = mailbox.shared_data.vsync_frame_ms;
+            const vsync_flags = abi.ipc_data.vsync_flags;
+            const frame_ms = abi.ipc_data.vsync_frame_ms;
             if (vsync_flags == 0) {
                 pending_vsync_setting = .disable;
             } else {
@@ -406,23 +405,23 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
         }
 
         if (flags.clear_frame) {
-            const clear_color = mailbox.shared_data.clear_color;
+            const clear_color = abi.ipc_data.clear_color;
             // TODO OS fast clear for frame
             _ = clear_color;
         }
 
         // For now, push neopixels on every present.
-        const neopixel_words_ptr: *volatile [4]u32 = @ptrCast(&mailbox.shared_data.neopixels);
+        const neopixel_words_ptr: *volatile [4]u32 = @ptrCast(&abi.ipc_data.neopixels);
         const neopixel_words = neopixel_words_ptr.*;
         neopixel.set_neopixels(&neopixel_words);
 
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();
-        ready_framebuffer = @ptrCast(@volatileCast(&mailbox.shared_data.framebuffers[flags.framebuffer_index]));
+        ready_framebuffer = @ptrCast(@volatileCast(&abi.ipc_data.framebuffers[flags.framebuffer_index]));
         ready_fb_dirty_rect = .all;
         screen_wait_for.set_state(.lcd, @src());
         if (flags.has_dirty_rect) {
-            const raw_rect = mailbox.shared_data.dirty_rect;
+            const raw_rect = abi.ipc_data.dirty_rect;
             ready_fb_dirty_rect = .clip_absolute(u8, .{ raw_rect.min_x, raw_rect.min_y, raw_rect.max_x, raw_rect.max_y });
         } else if (is_v2) {
             // Legacy carts always imply full-frame updates.
@@ -430,7 +429,7 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
             // no dirty rect.
             ready_fb_dirty_rect = .none;
         }
-    } else if (msg == mailbox.MessageType.SYNC_TIME_REQ_CLR) {
+    } else if (msg == abi.SYNC_TIME_REQ_CLR) {
         sync_time.* = true;
     }
     // Other messages (e.g. CART_FINISHED) handled by loader state machine.
@@ -479,7 +478,7 @@ fn sync_cart_time() void {
     const cs = microzig.interrupt.enter_critical_section();
     defer cs.leave();
 
-    mailbox.send(mailbox.MessageType.SYNC_TIME_ACK_CLR);
+    mailbox.send(abi.SYNC_TIME_ACK_CLR);
 
     const msg = while (true) {
         if (mailbox.tryReceive()) |msg| break msg;
@@ -489,7 +488,7 @@ fn sync_cart_time() void {
     mailbox.send(@intCast(time >> 32));
     mailbox.send(@truncate(time));
 
-    std.debug.assert(msg == mailbox.MessageType.SYNC_TIME_REQ_TIME);
+    std.debug.assert(msg == abi.SYNC_TIME_REQ_TIME);
 }
 
 /// Compute a simple hash of cart list to detect changes
@@ -669,9 +668,9 @@ fn runSelectedCart() void {
     // Write current button state before cart's first frame.
     // Carts read at start of update(); this ensures frame 0 sees real buttons
     // rather than all-zero (which broke metalgear-timer and spaceshooter).
-    mailbox.shared_data.controls = read_buttons();
-    @memset(std.mem.asBytes(&mailbox.shared_data.framebuffers), 0);
-    @memset(std.mem.asBytes(&mailbox.shared_data.neopixels), 0);
+    abi.ipc_data.controls = read_buttons();
+    @memset(std.mem.asBytes(&abi.ipc_data.framebuffers), 0);
+    @memset(std.mem.asBytes(&abi.ipc_data.neopixels), 0);
     terry.client.prepare_for_cart();
 
     // Execute the cart

@@ -54,10 +54,10 @@ pub const CartIPCData = extern struct {
 
     dirty_rect: Rect8,                 // x15098..x1509C
 
-    tone_freq: f32,                    // x1509C..x150A0
-    tone_duration: f32,                // x150A0..x150A4
-    tone_volume: f32,                  // x150A4..x150A8
-    tone_flags: u32,                   // x150A8..x150AC
+    audio_buffer_ptr: ?*anyopaque,     // x1509C..x150A0
+    audio_buffer_len: u32,             // x150A0..x150A4
+    audio_buffer_head: u32,            // x150A4..x150A8
+    audio_buffer_tail: u32,            // x150A8..x150AC
     global_volume: f32,                // x150AC..x150B0
 
     tracy_read_pos: u32,               // x150B0..x150B4, align(16)
@@ -82,9 +82,33 @@ pub const CartIPCData = extern struct {
 
 pub const ipc_data: *align(0x2000) volatile CartIPCData = @ptrFromInt(base);
 
-pub const PresentFlags = packed struct(u32) {
-    const FRAMEBUFFER_READY_V2: u8 = 0x28; // see os/ipc/mailbox.zig
+// Mailbox messages
+// zig fmt: off
+/// Cart trace (debug) messages: type 0x26, payload = length.
+/// Cart writes string to ipc_data.trace_buf before sending.
+pub const CART_TRACE           : u8 = 0x26;
 
+// Framebuffer sync messages (new-API carts)
+// Core 1 sends FRAMEBUFFER_READY after finishing a frame.
+// Core 0 flushes the shared-RAM framebuffer to the LCD, then
+// replies with FRAMEBUFFER_DONE so Core 1 knows it can start
+// writing the next frame without tearing.
+pub const FRAMEBUFFER_READY    : u32 = 0x25000001;
+pub const FRAMEBUFFER_DONE     : u32 = 0x25000002;
+/// See PresentFlags below
+pub const FRAMEBUFFER_READY_V2 : u8 = 0x28;
+
+pub const CART_VOLUME          : u32 = 0x29000000;
+pub const CART_STOP_AUDIO      : u32 = 0x29000001;
+pub const CART_START_AUDIO     : u32 = 0x29000002;
+pub const OS_ACK_STOP_AUDIO    : u32 = 0x29000003;
+
+pub const SYNC_TIME_REQ_CLR    : u32 = 0x2a000001;
+pub const SYNC_TIME_ACK_CLR    : u32 = 0x2a000002;
+pub const SYNC_TIME_REQ_TIME   : u32 = 0x2a000003;
+// zig fmt: on
+
+pub const PresentFlags = packed struct(u32) {
     framebuffer_index: u1,
     has_dirty_rect: bool,
     vsync_updated: bool,

@@ -1453,18 +1453,17 @@ fn send_empty(ty: q.Type, pending_ty: PendingPacket) void {
     logf("TERRY: send_empty .{s} => .{s}\n", .{ @tagName(ty), @tagName(pending_packet_type) });
 }
 
-const ipc_data = @import("../ipc/mailbox.zig").shared_data;
 const abi = @import("../cart/os_abi.zig");
 const TracyAtomicWriteCtrl = abi.TracyAtomicWriteCtrl;
 const cart_ring_size = abi.tracy_buffer_size;
 const cart_ring_mask = cart_ring_size - 1;
 // Debug: x/[len]xb 0x200340C0
-const cart_ring: *[cart_ring_size]u8 = @volatileCast(&ipc_data.tracy_ring);
+const cart_ring: *[cart_ring_size]u8 = @volatileCast(&abi.ipc_data.tracy_ring);
 // Debug: watch *(u32*)0x200350C4
-const cart_atomic_write_ctrl: *u32 = @volatileCast(&ipc_data.tracy_write_ctrl);
+const cart_atomic_write_ctrl: *u32 = @volatileCast(&abi.ipc_data.tracy_write_ctrl);
 // Debug: watch *(u32*)0x200350C0
-const cart_atomic_read_pos: *u32 = @volatileCast(&ipc_data.tracy_read_pos);
-const cart_spinlock: *u32 = @volatileCast(&ipc_data.tracy_spinlock);
+const cart_atomic_read_pos: *u32 = @volatileCast(&abi.ipc_data.tracy_read_pos);
+const cart_spinlock: *u32 = @volatileCast(&abi.ipc_data.tracy_spinlock);
 var cart_reserved_size: u32 = 0;
 var cart_pending_read_size: u32 = 0;
 

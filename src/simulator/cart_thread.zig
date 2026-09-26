@@ -55,6 +55,50 @@ pub fn sim_thread_clear_flags(flags: u32) void {
     cart_flags_updated.signal(root.io);
 }
 
+pub fn sim_thread_consume_audio(buf: []u8) usize {
+    var written: u32 = 0;
+    const ptr = if (simulator_io_block.audio_buffer_ptr) |ptr| @as([*]u8, @ptrCast(ptr)) else {
+        return 0;
+    };
+    const len = simulator_io_block.audio_buffer_len;
+    const tail = @atomicLoad(u32, &simulator_io_block.audio_buffer_tail, .unordered);
+    const head = @atomicLoad(u32, &simulator_io_block.audio_buffer_head, .acquire);
+    if (tail == head) {
+        return 0;
+    }
+
+    if (tail <= head) {
+        written = @min(buf.len, head - tail);
+        @memcpy(buf[0..written], ptr + tail);
+        @atomicStore(u32, &simulator_io_block.audio_buffer_tail, tail + written, .release);
+    } else if (tail + buf.len <= len) {
+        written = @intCast(buf.len);
+        @memcpy(buf[0..written], ptr + tail);
+        const new_tail = if (tail + buf.len == len) 0 else tail + buf.len;
+        @atomicStore(u32, &simulator_io_block.audio_buffer_tail, @intCast(new_tail), .release);
+    } else {
+        written = len - tail;
+        @memcpy(buf[0..written], ptr + tail);
+        const remain = @min(head, buf.len - written);
+        if (remain > 0) {
+            @memcpy(buf[written..][0..remain], ptr);
+            written += remain;
+        }
+        @atomicStore(u32, &simulator_io_block.audio_buffer_tail, remain, .release);
+    }
+
+    return written;
+}
+
+pub fn sim_thread_get_volume() ?f32 {
+    if (sim_thread_check_flags(abi.FLAG_AUDIO_VOLUME)) {
+        const volume = simulator_io_block.audio_volume;
+        sim_thread_clear_flags(abi.FLAG_AUDIO_VOLUME);
+        return volume;
+    }
+    return null;
+}
+
 pub const FramebufferData = struct {
     framebuffer: *abi.Framebuffer,
     dirty_rect: abi.Rect8,

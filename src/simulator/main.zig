@@ -12,10 +12,22 @@ var window: ?*sdl.SDL_Window = null;
 var renderer: ?*sdl.SDL_Renderer = null;
 var app_texture: ?*sdl.SDL_Texture = null;
 
+var debug_audio_mode: enum {
+    none,
+    app_audio,
+    mixed_audio,
+} = .none;
+
 var running = true;
 
 pub var gpa: std.mem.Allocator = undefined;
 pub var io: std.Io = undefined;
+
+pub fn panic(_: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
+    while (true) {
+        @breakpoint();
+    }
+}
 
 var raw_keyboard_state: []const bool = &.{};
 
@@ -108,15 +120,105 @@ fn update_cart_controls() void {
     cart.sim_thread_update_controls(controls);
 }
 
+const v_width = 1920;
+const v_height = 1080;
+
+const audio_width_samples = 1764 * 5;
+const audio_height_rows = 25 / 5;
+const audio_row_height = @as(comptime_float, @floatFromInt(v_height)) / @as(comptime_float, audio_height_rows);
+const audio_span = 0.9 * audio_row_height;
+var audio_points: [audio_width_samples * audio_height_rows]sdl.SDL_FPoint = undefined;
+var audio_cursor: struct {
+    row_pos: u32 = 0,
+    row_base: f32 = audio_row_height,
+    array_idx: u32 = 0,
+
+    fn write(c: *@This(), val_01: f32) void {
+        audio_points[c.array_idx].y = c.row_base - val_01 * audio_span;
+
+        c.array_idx += 1;
+        if (c.array_idx == audio_points.len) {
+            c.* = .{};
+        } else {
+            c.row_pos += 1;
+            if (c.row_pos == audio_width_samples) {
+                c.row_pos = 0;
+                c.row_base += audio_row_height;
+            }
+        }
+    }
+} = .{};
+
+fn init_audio_points() void {
+    var ptr: [*]sdl.SDL_FPoint = &audio_points;
+    var row_pos: f32 = audio_row_height - 0.5 * audio_span;
+    for (0..audio_height_rows) |_| {
+        for (0..audio_width_samples) |samp| {
+            const samp_pos = @as(f32, @floatFromInt(samp)) * (@as(comptime_float, @floatFromInt(v_width)) / @as(comptime_float, @floatFromInt(audio_width_samples)));
+            ptr[samp] = fpoint(samp_pos, row_pos);
+        }
+        row_pos += audio_row_height;
+        ptr += audio_width_samples;
+    }
+}
+
+fn update_audio_points(comptime T: type, samples: []const T) void {
+    for (samples) |samp| {
+        const samp_01 = switch (T) {
+            u8 => @as(f32, @floatFromInt(samp)) / 255.0,
+            i16 => @as(f32, @floatFromInt(@as(u16, @bitCast(samp)) ^ 0x8000)) / @as(f32, @floatFromInt((1 << 16) - 1)),
+            else => @compileError("Unsupported type: " ++ @typeName(T)),
+        };
+        audio_cursor.write(samp_01);
+    }
+}
+
+fn render_audio_points() void {
+    // Yellow audio lines
+    var ptr: [*]const sdl.SDL_FPoint = &audio_points;
+    _ = sdl.SDL_SetRenderDrawColorFloat(renderer, 1.0, 1.0, 0.0, sdl.SDL_ALPHA_OPAQUE_FLOAT);
+    for (0..audio_height_rows) |_| {
+        _ = sdl.SDL_RenderLines(renderer, ptr, audio_width_samples);
+        ptr += audio_width_samples;
+    }
+
+    _ = sdl.SDL_SetRenderDrawColorFloat(renderer, 0.1, 0.1, 0.1, sdl.SDL_ALPHA_OPAQUE_FLOAT);
+    for (0..audio_height_rows) |row| {
+        const row_f: f32 = @floatFromInt(row);
+        const min = (row_f + 1.0) * audio_row_height;
+        const max = min - audio_span;
+        _ = sdl.SDL_RenderLine(renderer, 0, min + 1.0, v_width, min + 1.0);
+        _ = sdl.SDL_RenderLine(renderer, 0, max - 1.0, v_width, max - 1.0);
+    }
+}
+
+var global_volume: f32 = 1.0;
+var vol_amplitude: f32 = 1.0;
+
+// Note: This must be kept in sync with the implementation in drivers/audio.zig
+fn calc_perceptually_linear_amplitude_for_volume(volume: f32) f32 {
+    // This exponential scale never quite hits zero, so force it to.
+    if (volume <= 0.0) return 0.0;
+    // Adjust the volume on a log scale for perceptual linearity
+    // Total range of 50 dB between min and max volume
+    const clipped_vol = @max(0.0, @min(1.0, volume));
+    const db_range = -50.0;
+    const exp_range = db_range / 20.0 * @log(10.0);
+    const vol_adjust_exp = exp_range * (1.0 - clipped_vol);
+    return @exp(vol_adjust_exp);
+}
+
 pub fn main(init: std.process.Init) !void {
     gpa = init.gpa;
     io = init.io;
+
+    init_audio_points();
 
     if (!sdl.SDL_SetAppMetadata("Example Renderer Clear", "1.0", "com.example.renderer-clear")) {
         std.debug.panic("SDL_SetAppMetadata failed: {s}\n", .{sdl.SDL_GetError()});
     }
 
-    if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
+    if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO | sdl.SDL_INIT_AUDIO)) {
         std.debug.panic("SDL_Init failed: {s}\n", .{sdl.SDL_GetError()});
     }
     defer sdl.SDL_Quit();
@@ -124,7 +226,7 @@ pub fn main(init: std.process.Init) !void {
     if (!sdl.SDL_CreateWindowAndRenderer("SYCL 2026 Badge Simulator", 640 * 2, 480 * 2, sdl.SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         std.debug.panic("SDL_CreateWindowAndRenderer failed: {s}", .{sdl.SDL_GetError()});
     }
-    if (!sdl.SDL_SetRenderLogicalPresentation(renderer, 1920, 1080, sdl.SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
+    if (!sdl.SDL_SetRenderLogicalPresentation(renderer, v_width, v_height, sdl.SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
         std.debug.panic("SDL_SetRenderLogicalPresentation failed: {s}", .{sdl.SDL_GetError()});
     }
 
@@ -163,6 +265,18 @@ pub fn main(init: std.process.Init) !void {
     }
     //sdl.SDL_DestroySurface(sim_bg_surface);
 
+    const audio_spec: sdl.SDL_AudioSpec = .{
+        .format = sdl.SDL_AUDIO_S16,
+        .channels = 1,
+        .freq = 44100,
+    };
+    const audio_stream = sdl.SDL_OpenAudioDeviceStream(sdl.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, null, null);
+    if (audio_stream == null) {
+        std.debug.panic("SDL_OpenAudioDeviceStream failed: {s}, audio will be disabled.", .{sdl.SDL_GetError()});
+    }
+    var audio_running = false;
+    var audio_needs_resume = false;
+
     while (running) {
         if (cart.sim_thread_check_cart_stopped()) {
             running = false;
@@ -192,6 +306,77 @@ pub fn main(init: std.process.Init) !void {
         }
 
         update_cart_controls();
+
+        // TODO graceful shutdown, wait for audio to drain.
+        if (cart.sim_thread_check_flags(abi.FLAG_STOP_AUDIO)) {
+            cart.sim_thread_clear_flags(abi.FLAG_STOP_AUDIO);
+            if (audio_running) {
+                audio_running = false;
+                if (audio_stream != null) {
+                    _ = sdl.SDL_PauseAudioStreamDevice(audio_stream);
+                    _ = sdl.SDL_ClearAudioStream(audio_stream);
+                }
+            }
+        }
+
+        if (cart.sim_thread_check_flags(abi.FLAG_START_AUDIO)) {
+            cart.sim_thread_clear_flags(abi.FLAG_START_AUDIO);
+            if (!audio_running) {
+                audio_running = true;
+                audio_needs_resume = true;
+            }
+        }
+
+        if (cart.sim_thread_get_volume()) |new_volume| {
+            global_volume = @max(0.0, @min(new_volume, 1.0));
+            vol_amplitude = calc_perceptually_linear_amplitude_for_volume(new_volume);
+        }
+
+        // service audio, ensure at least 3 frames of data
+        const min_audio_samples = 3 * 44100 / 60;
+        if (audio_running) {
+            const queued = @max(0, sdl.SDL_GetAudioStreamQueued(audio_stream));
+            if (queued < min_audio_samples) {
+                const chunk_size = 512;
+                const to_fill = std.mem.alignForward(usize, min_audio_samples - @as(usize, @intCast(queued)), chunk_size);
+
+                const vol_mult: u32 = @intFromFloat(@as(f64, 0x00_FF_FF_FF) * vol_amplitude);
+                const vol_add: u32 = @bitCast(-%@as(i32, @bitCast(@as(u32, @intFromFloat(@as(f64, 0x7FFF_FFFF) * vol_amplitude)))));
+
+                var filled: u32 = 0;
+                while (filled < to_fill) {
+                    var buf: [chunk_size]u8 = undefined;
+                    var mixed_buf: [chunk_size]i16 = undefined;
+                    const samples = cart.sim_thread_consume_audio(&buf);
+
+                    if (debug_audio_mode == .app_audio) {
+                        update_audio_points(u8, buf[0..samples]);
+                    }
+
+                    // Mix the audio using the volume scalar
+                    for (0..samples) |i| {
+                        mixed_buf[i] = @bitCast(@as(u16, @intCast((buf[i] * vol_mult +% vol_add) >> 16)));
+                    }
+
+                    if (debug_audio_mode == .mixed_audio) {
+                        update_audio_points(i16, mixed_buf[0..samples]);
+                    }
+
+                    _ = sdl.SDL_PutAudioStreamData(audio_stream, &mixed_buf, @intCast(samples * @sizeOf(u16)));
+                    filled += @intCast(samples);
+                    if (samples < chunk_size) break;
+                }
+
+                if (audio_needs_resume and @as(usize, @intCast(queued)) + filled >= min_audio_samples) {
+                    _ = sdl.SDL_ResumeAudioStreamDevice(audio_stream);
+                    audio_needs_resume = false;
+                }
+                _ = sdl.SDL_FlushAudioStream(audio_stream);
+            } else if (audio_needs_resume) {
+                _ = sdl.SDL_ResumeAudioStreamDevice(audio_stream);
+                audio_needs_resume = false;
+            }
+        }
 
         if (cart.sim_thread_acquire_framebuffer()) |info| {
             defer cart.sim_thread_release_framebuffer();
@@ -245,6 +430,10 @@ pub fn main(init: std.process.Init) !void {
         const app_screen_topright = fpoint(742, 686);
         const app_screen_botleft = fpoint(1253, 275);
         _ = sdl.SDL_RenderTextureAffine(renderer, app_texture, null, &app_screen_topleft, &app_screen_topright, &app_screen_botleft);
+
+        if (debug_audio_mode != .none) {
+            render_audio_points();
+        }
 
         // put the newly-cleared rendering on the screen.
         _ = sdl.SDL_RenderPresent(renderer);

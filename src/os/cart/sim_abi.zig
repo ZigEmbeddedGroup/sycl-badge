@@ -29,6 +29,10 @@ pub const SimulatorIO = extern struct {
     dirty_rect: Rect8,
     clear_color: DisplayColor,
     framebuffer_index: u8,
+    audio_buffer_ptr: ?*anyopaque,
+    audio_buffer_len: u32,
+    audio_buffer_tail: u32,
+    audio_buffer_head: u32,
     audio_volume: f32,
 
     api: *const SimulatorAPI,
@@ -37,3 +41,5 @@ pub const SimulatorIO = extern struct {
 pub const FLAG_PRESENT_METADATA = 1 << 0;
 pub const FLAG_PRESENT_FRAME = 1 << 1;
 pub const FLAG_AUDIO_VOLUME = 1 << 2;
+pub const FLAG_START_AUDIO = 1 << 3;
+pub const FLAG_STOP_AUDIO = 1 << 4;

@@ -1,6 +1,6 @@
 const std = @import("std");
 const cart = @import("cart-api");
-//const startlogo = @import("startlogo.zig");
+const startlogo = @import("startlogo.zig");
 const music = @import("music.zig");
 const Tone = music.Tone;
 const colors = @import("colors.zig");
@@ -61,7 +61,7 @@ const MultiTone = struct {
     loop: bool,
     tones: []const Tone,
     volume: u32,
-    flags: cart.ToneOptions.Flags,
+    flags: cart.mixer.ToneOptions.Flags,
     current_tone: usize = 0,
     current_tone_frame: u32 = 0,
 };
@@ -161,6 +161,41 @@ const angle_speed: f32 = @as(f32, std.math.pi) / @as(f32, 40);
 const tau = std.math.tau;
 
 var points_buf: [5000]XY(i32) = undefined;
+
+// Quick and dirty spatial partition
+const chunk_add_x: i32 = arena_half_width_pt;
+const chunk_add_y: i32 = arena_half_height_pt;
+const chunk_shift_bits: u5 = 11;
+const chunk_mask: u32 = (1 << chunk_shift_bits) - 1;
+// extra + 1 here because the point can be equal to arena_helf_width_pt on either end
+const num_chunks_x = (2 * @as(u32, arena_half_width_pt) + 1 + chunk_mask) >> chunk_shift_bits;
+const num_chunks_y = (2 * @as(u32, arena_half_height_pt) + 1 + chunk_mask) >> chunk_shift_bits;
+
+const end_of_bucket: u16 = 0xFFFF;
+var points_buckets: [num_chunks_y][num_chunks_x]u16 = undefined;
+var points_next_in_bucket: [points_buf.len]u16 = undefined;
+
+fn pointToBucket(point: XY(i32)) XY(u32) {
+    const x_positive: u32 = @intCast(@max(0, @min(arena_half_width_pt, point.x) + chunk_add_x));
+    const y_positive: u32 = @intCast(@max(0, @min(arena_half_height_pt, point.y) + chunk_add_y));
+    const x_bin = x_positive >> chunk_shift_bits;
+    const y_bin = y_positive >> chunk_shift_bits;
+    std.debug.assert(x_positive < num_chunks_x);
+    std.debug.assert(y_positive < num_chunks_y);
+    return .{ .x = x_bin, .y = y_bin };
+}
+
+fn bucketsForBlob(blob_center: XY(i32), blob_radius: i32) [2]XY(u32) {
+    const min = pointToBucket(.{
+        .x = blob_center.x - blob_radius,
+        .y = blob_center.y - blob_radius,
+    });
+    const max = pointToBucket(.{
+        .x = blob_center.x + blob_radius,
+        .y = blob_center.y + blob_radius,
+    });
+    return .{ min, max };
+}
 
 // returns a random f32 in the range [0,1) (includes 0 but not 1)
 // it uses (byte_count*8) bits of granualarity
@@ -271,7 +306,13 @@ fn calcDistance(a: XY(i32), b: XY(i32)) f32 {
     const diff_x: f32 = @floatFromInt(a.x - b.x);
     const diff_y: f32 = @floatFromInt(a.y - b.y);
     const dist = std.math.sqrt(diff_x * diff_x + diff_y * diff_y);
-    if (dist < 0) @panic("codebug");
+    return dist;
+}
+
+fn calcDistanceSq(a: XY(i32), b: XY(i32)) f32 {
+    const diff_x: f32 = @floatFromInt(a.x - b.x);
+    const diff_y: f32 = @floatFromInt(a.y - b.y);
+    const dist = diff_x * diff_x + diff_y * diff_y;
     return dist;
 }
 
@@ -281,7 +322,7 @@ const max_eat_blob_volume = 40;
 
 const VolPan = struct {
     volume: u32,
-    pan: cart.ToneOptions.Flags.Panning,
+    pan: cart.mixer.ToneOptions.Flags.Panning,
 
     pub fn fromPoint(pt: XY(i32), max_volume: u32) VolPan {
         const my_blob = global.myBlob();
@@ -321,6 +362,8 @@ fn eatBlobTone(eater: *const Blob) void {
     global.multitones_count += 1;
 }
 
+var mixer: cart.mixer.Mixer(.{}) = .{};
+
 const eat_tone_duration = 5;
 fn eatTone(blob: *const Blob) void {
     // don't cut off the player's eat tone
@@ -341,9 +384,9 @@ fn eatTone(blob: *const Blob) void {
         .volume = max_eat_nibble_volume,
         .pan = .stereo,
     } else VolPan.fromPoint(blob.pos_pt, max_eat_nibble_volume);
-    cart.tone(.{
-        .frequency = freq_arg,
-        .duration = eat_tone_duration,
+    mixer.tone(.{
+        .frequency = .{ .bits = freq_arg },
+        .duration = .ticks(eat_tone_duration),
         .volume = vp.volume,
         .flags = .{
             .panning = vp.pan,
@@ -353,17 +396,20 @@ fn eatTone(blob: *const Blob) void {
 }
 
 pub fn start() void {
-    cart.trace("blobs:start");
-
     // Enable vsync but tune the framerate to match the app timing
     cart.set_vsync_dynamic();
 
     // Have the OS clear every frame as it's sending it out to the screen
     cart.set_double_buffer_mode(.{ .clear_full_frame = colors.bg1 });
 
+    mixer.set_audio_tick(.{
+        .callback = &audioTick,
+        .samples_per_tick = @divExact(44100, 60),
+    });
+
     initStartMenuMusic();
 
-    cart.trace("blobs:start-done");
+    mixer.start_audio();
 }
 
 fn initStartMenuMusic() void {
@@ -420,46 +466,62 @@ fn isButtonTriggered(
 }
 
 pub fn update() void {
-    cart.trace("blobs:update");
     switch (global.mode) {
         .start_menu => updateStartMenu(&global.mode.start_menu),
         .settings => updateSettingsMode(&global.mode.settings),
         .play => updatePlayMode(&global.mode.play),
     }
+    mixer.update();
 }
 
 fn updateStartMenu(start_menu: *StartMenu) void {
     // TODO: play cool music
     global.rand_seed +%= 1;
-    cart.trace("blobs:pre-blit");
-    // TEMP: replace logo blit with a simple filled rect to isolate crashes
-    cart.rect(.{
-        .x = 20,
-        .y = 10,
-        .width = 120,
-        .height = 60,
-        .fill_color = colors.bg2,
+    cart.blit(.{
+        .sprite = &startlogo.blobs,
+        .x = (160 - startlogo.blobs_width) / 2,
+        .y = 3,
+        .width = startlogo.blobs_width,
+        .height = startlogo.blobs_height,
+        .flags = .{},
     });
-    cart.trace("blobs:post-blit");
-    cart.trace("blobs:skip-text-tone");
+    textCenter("Controls:", 65, colors.bg2);
+    cart.text(.{
+        .str = "Direction: \x84 \x85",
+        .x = 25,
+        .y = 76,
+        .text_color = colors.bg2,
+    });
+    cart.text(.{
+        .str = "Dash: \x81",
+        .x = 25,
+        .y = 89,
+        .text_color = colors.bg2,
+    });
+    cart.text(.{
+        .str = "Menu: \x80",
+        .x = 25,
+        .y = 102,
+        .text_color = colors.bg2,
+    });
+    textCenter("Press \x80 to start", 118, colors.fg2);
 
-    cart.trace("blobs:pre-btn");
-    if (!isButtonTriggered(.a, &start_menu.button1_released)) {
-        cart.trace("blobs:btn-no");
+    if (!isButtonTriggered(.a, &start_menu.button1_released))
         return;
-    }
-    cart.trace("blobs:btn-yes");
 
     log("random seed: {}", .{global.rand_seed});
-    cart.trace("blobs:after-seed-log");
 
     global.rand = std.Random.DefaultPrng.init(global.rand_seed);
-    cart.trace("blobs:after-prng");
 
-    for (&points_buf) |*pt| {
-        pt.* = getRandomPoint();
+    for (&points_buckets) |*row| {
+        @memset(row, end_of_bucket);
     }
-    cart.trace("blobs:after-points");
+    for (&points_buf, 0..) |*pt, i| {
+        pt.* = getRandomPoint();
+        const bucket = pointToBucket(pt.*);
+        points_next_in_bucket[i] = points_buckets[bucket.y][bucket.x];
+        points_buckets[bucket.y][bucket.x] = @intCast(i);
+    }
 
     for (&global.blobs, 0..) |*blob, i| {
         const is_potential_player = (i < 4);
@@ -472,22 +534,18 @@ fn updateStartMenu(start_menu: *StartMenu) void {
             .digesting = 0,
         };
     }
-    cart.trace("blobs:after-blobs");
 
     for (&global.ai_controls) |*c| {
         c.* = .none;
     }
-    cart.trace("blobs:after-ai");
 
     global.multitones_count = 0;
-    cart.trace("blobs:after-mtones");
 
     global.mode = Mode{
         .play = .{
             .intro_frame = 0, // do show intro frame
         },
     };
-    cart.trace("blobs:after-mode");
 }
 
 fn updateSettingsMode(settings: *Settings) void {
@@ -550,6 +608,17 @@ fn textCenter(str: []const u8, y: i32, fg: Color) void {
     });
 }
 
+fn audioTick() void {
+    tickMultitones();
+
+    if (global.my_eat_tone_frame) |*f| {
+        f.* = f.* + 1;
+        if (f.* >= eat_tone_duration) {
+            global.my_eat_tone_frame = null;
+        }
+    }
+}
+
 fn tickMultitones() void {
     var mt_index: usize = 0;
     while (mt_index < global.multitones_count) {
@@ -577,7 +646,12 @@ fn tickMultitones() void {
             const t = &mt.tones[mt.current_tone];
             if (t.frequency != 0) {
                 //log("playing tone freq {} dur {} vol {}", .{t.frequency, t.duration, t.volume});
-                cart.tone(.{ .frequency = t.frequency, .duration = t.duration, .volume = mt.volume, .flags = mt.flags });
+                mixer.tone(.{
+                    .frequency = .{ .bits = t.frequency },
+                    .duration = @fromBackingInt(t.duration),
+                    .volume = mt.volume,
+                    .flags = mt.flags,
+                });
             }
         }
         mt_index += 1;
@@ -585,8 +659,6 @@ fn tickMultitones() void {
 }
 
 fn updatePlayMode(play: *Play) void {
-    cart.trace("blobs:play-enter");
-
     // check if the user wants to enter the settings
     if (isButtonTriggered(.a, &play.button1_released)) {
         // NOTE: this will invalidate `play` so we
@@ -595,19 +667,6 @@ fn updatePlayMode(play: *Play) void {
         return;
     }
 
-    cart.trace("blobs:play-after-btn");
-
-    tickMultitones();
-    cart.trace("blobs:play-after-tones");
-
-    if (global.my_eat_tone_frame) |*f| {
-        f.* = f.* + 1;
-        if (f.* >= eat_tone_duration) {
-            global.my_eat_tone_frame = null;
-        }
-    }
-    cart.trace("blobs:play-after-eat-frame");
-
     for (0..4) |player_index| {
         updateAngle(&global.blobs[player_index], getControl(
             cart.controls.left,
@@ -615,8 +674,8 @@ fn updatePlayMode(play: *Play) void {
         ));
         global.blobs[player_index].dashing = cart.controls.b;
     }
-    cart.trace("blobs:play-after-players");
 
+    const ai_zone = cart.zone("Blob AI", @src());
     for (global.blobs[4..], 0..) |*blob, i| {
         if (blob.mass == 0) continue;
         const control_ref = &global.ai_controls[i];
@@ -641,9 +700,10 @@ fn updatePlayMode(play: *Play) void {
         }
         updateAngle(blob, control_ref.*);
     }
-    cart.trace("blobs:play-after-ai-move");
+    ai_zone.end();
 
     // blobs digest
+    const digest_zone = cart.zone("Blob Digest", @src());
     for (&global.blobs) |*blob| {
         if (blob.digesting != 0) {
             if (blob.mass == 0) @panic("codebug");
@@ -652,13 +712,14 @@ fn updatePlayMode(play: *Play) void {
             blob.digesting -= digest;
         }
     }
-    cart.trace("blobs:play-after-digest");
+    digest_zone.end();
 
     var sines: [global.blobs.len]f32 = undefined;
     var cosines: [global.blobs.len]f32 = undefined;
     var radiuses: [global.blobs.len]i32 = undefined;
 
     // move blobs
+    const move_zone = cart.zone("Blob Move", @src());
     for (&global.blobs, 0..) |*blob, i| {
         if (blob.mass == 0) continue;
 
@@ -682,9 +743,10 @@ fn updatePlayMode(play: *Play) void {
             .y = clamp(i32, blob.pos_pt.y + diff_y, min_y, max_y),
         };
     }
-    cart.trace("blobs:play-after-move");
+    move_zone.end();
 
     // TODO: this *might* need some optimization?
+    const eat_blob_zone = cart.zone("Eat Blobs", @src());
     for (&global.blobs, 0..) |*blob, blob_index| {
         if (blob.mass == 0) continue;
         for (global.blobs[blob_index + 1 ..], blob_index + 1..) |*other_blob, other_blob_index| {
@@ -708,25 +770,76 @@ fn updatePlayMode(play: *Play) void {
             blobs.eaten.digesting = 0; // important!
         }
     }
-    cart.trace("blobs:play-after-eat-blobs");
+    eat_blob_zone.end();
 
     // eat nibbles
+    const eat_nibble_zone = cart.zone("Eat Nibbles", @src());
     for (&global.blobs, 0..) |*blob, blob_index| {
         if (blob.mass == 0) continue;
-        for (&points_buf) |*pt| {
-            const dist = calcDistance(pt.*, blob.pos_pt);
-            if (dist >= @as(f32, @floatFromInt(radiuses[blob_index]))) continue;
 
-            //log("eat point {}!", .{i});
+        // Reference implementation:
+        // for (&points_buf) |*pt| {
+        //     const dist = calcDistance(pt.*, blob.pos_pt);
+        //     if (dist >= radiuses[blob_index]) continue;
+        //
+        //     //log("eat point {}!", .{i});
+        //     eatTone(blob);
+        //     blob.mass += 1;
+        //
+        //     // replace with new random nibble
+        //     pt.* = getRandomPoint();
+        // }
+
+        const radius_int = radiuses[blob_index];
+        const radius_flt = @as(f32, @floatFromInt(radius_int));
+        const radius_sq = radius_flt * radius_flt;
+        const blob_pos = blob.pos_pt;
+        // Iterate over buckets the blob may intersect
+        const buckets = bucketsForBlob(blob_pos, radius_int);
+        var points_to_replace: u16 = end_of_bucket;
+        for (buckets[0].y..buckets[1].y + 1) |bucket_y| {
+            for (buckets[0].x..buckets[1].x + 1) |bucket_x| {
+                var p_prev = &points_buckets[bucket_y][bucket_x];
+                while (p_prev.* != end_of_bucket) {
+                    const pt_idx = p_prev.*;
+                    const dist = calcDistanceSq(points_buf[pt_idx], blob_pos);
+                    if (dist >= radius_sq) {
+                        p_prev = &points_next_in_bucket[pt_idx];
+                    } else {
+                        // Unlink the point
+                        p_prev.* = points_next_in_bucket[pt_idx];
+                        // Link the point to remake
+                        points_next_in_bucket[pt_idx] = points_to_replace;
+                        points_to_replace = @intCast(pt_idx);
+                    }
+                }
+            }
+        }
+
+        // Replace any eaten points
+        var num_eaten: i32 = 0;
+        var next_pt = points_to_replace;
+        while (next_pt != end_of_bucket) {
+            const pt_idx = next_pt;
+            next_pt = points_next_in_bucket[pt_idx];
+
+            points_buf[pt_idx] = getRandomPoint();
+            const bucket = pointToBucket(points_buf[pt_idx]);
+            points_next_in_bucket[pt_idx] = points_buckets[bucket.y][bucket.x];
+            points_buckets[bucket.y][bucket.x] = pt_idx;
+
+            num_eaten += 1;
+        }
+
+        // Eat the points
+        blob.mass += num_eaten;
+        if (num_eaten > 0) {
             eatTone(blob);
-            blob.mass += 1;
-
-            // replace with new random nibble
-            pt.* = getRandomPoint();
         }
     }
-    cart.trace("blobs:play-after-eat-nibbles");
+    eat_nibble_zone.end();
 
+    const update_camera_zone = cart.zone("Update Camera", @src());
     const my_blob = global.myBlob();
     const my_player = play.myPlayer();
     const points_per_pixel: i32 = blk: {
@@ -784,11 +897,15 @@ fn updatePlayMode(play: *Play) void {
             ),
         };
     };
+    update_camera_zone.end();
 
+    const draw_grid_zone = cart.zone("Draw Grid", @src());
     drawBars(points_per_pixel, camera_center_pt.x, .x);
     drawBars(points_per_pixel, camera_center_pt.y, .y);
+    draw_grid_zone.end();
 
     // draw dots
+    const draw_dots_zone = cart.zone("Draw Dots", @src());
     for (&points_buf) |*pt| {
         const px = ptToPx(points_per_pixel, camera_center_pt, pt.*);
         cart.rect(.{
@@ -799,8 +916,10 @@ fn updatePlayMode(play: *Play) void {
             .stroke_color = colors.fg2,
         });
     }
+    draw_dots_zone.end();
 
     // draw the blobs
+    const draw_blobs_zone = cart.zone("Draw Blobs", @src());
     for (&global.blobs, 0..) |*blob, blob_index| {
         if (blob.mass == 0) continue;
         const px = ptToPx(points_per_pixel, camera_center_pt, .{
@@ -835,6 +954,7 @@ fn updatePlayMode(play: *Play) void {
             .stroke_color = colors.fg2,
         });
     }
+    draw_blobs_zone.end();
     //
     //    const draw_mass = false;
     //    if (draw_mass) {
@@ -852,6 +972,9 @@ fn updatePlayMode(play: *Play) void {
 
     // draw arena border
     {
+        const draw_border_zone = cart.zone("Draw Border", @src());
+        defer draw_border_zone.end();
+
         const top_left = ptToPx(points_per_pixel, camera_center_pt, .{
             .x = -arena_half_width_pt,
             .y = -arena_half_height_pt,
@@ -870,6 +993,9 @@ fn updatePlayMode(play: *Play) void {
     }
 
     if (play.intro_frame) |*frame| {
+        const draw_intro_zone = cart.zone("Draw Intro", @src());
+        defer draw_intro_zone.end();
+
         frame.* += 1;
         // 3 seconds
         if (frame.* == 3 * 60) {

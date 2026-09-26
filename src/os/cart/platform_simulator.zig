@@ -69,31 +69,62 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-pub fn tone2(options: cart_api.Tone2Options) void {
-    // TODO: Update sim to handle new tone api
-    _ = options;
-    // const adj_duration: u32 = if (options.duration == -1)
-    //     std.math.maxInt(u32)
-    // else
-    //     @intFromFloat(@round(options.duration * 60.0));
-    // struct {
-    //     extern fn tone(frequency: u32, duration: u32, volume: u32, flags: u32) void;
-    // }.tone(
-    //     @intFromFloat(@round(options.frequency)),
-    //     adj_duration,
-    //     @intFromFloat(@round(options.volume * 100.0)),
-    //     0,
-    // );
+pub fn set_global_volume(volume: f32) void {
+    simulator_io_block.api.wait_for_flags(abi.FLAG_AUDIO_VOLUME);
+    simulator_io_block.audio_volume = volume;
+    simulator_io_block.api.set_flags(abi.FLAG_AUDIO_VOLUME);
 }
 
-pub fn set_global_volume(volume: f32) void {
-    // TODO sim volume
-    _ = volume;
-    // simulator_io_block.api.wait_for_flags(abi.FLAG_AUDIO_VOLUME);
+pub fn audio_set_buffer(comptime T: type, buffer: []align(8) T) void {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
 
-    // simulator_io_block.audio_volume = volume;
+    simulator_io_block.api.set_flags(abi.FLAG_STOP_AUDIO);
+    simulator_io_block.api.wait_for_flags(abi.FLAG_STOP_AUDIO);
 
-    // simulator_io_block.api.set_flags(abi.FLAG_AUDIO_VOLUME);
+    simulator_io_block.audio_buffer_ptr = if (buffer.len > 0) buffer.ptr else null;
+    simulator_io_block.audio_buffer_len = @intCast(buffer.len);
+    @atomicStore(u32, &simulator_io_block.audio_buffer_tail, 0, .seq_cst);
+    @atomicStore(u32, &simulator_io_block.audio_buffer_head, 0, .seq_cst);
+
+    if (buffer.len > 0) {
+        simulator_io_block.api.set_flags(abi.FLAG_START_AUDIO);
+    }
+}
+
+pub fn audio_get_buffer(comptime T: type) ?[]T {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
+
+    if (simulator_io_block.audio_buffer_ptr) |ptr| {
+        const byte_ptr: [*]T = @ptrCast(ptr);
+        const tail = @atomicLoad(u32, &simulator_io_block.audio_buffer_tail, .acquire);
+        const head = @atomicLoad(u32, &simulator_io_block.audio_buffer_head, .unordered);
+
+        if (tail <= head) {
+            const slice = byte_ptr[head .. simulator_io_block.audio_buffer_len - @intFromBool(tail == 0)];
+            return if (slice.len == 0) null else slice;
+        } else if (tail > head + 1) {
+            return byte_ptr[head .. tail - 1];
+        }
+    }
+    return null;
+}
+
+pub fn audio_submit_samples(num: usize) void {
+    std.debug.assert(simulator_io_block.audio_buffer_ptr != null); // audio_set_buffer must have been called
+    const len = simulator_io_block.audio_buffer_len;
+    const tail = @atomicLoad(u32, &simulator_io_block.audio_buffer_tail, .acquire);
+    const head = @atomicLoad(u32, &simulator_io_block.audio_buffer_head, .unordered);
+    const available = if (tail <= head) len - 1 - (head - tail) else tail - head - 1;
+    std.debug.assert(len <= available); // audio_submit_samples called with more than could be filled from audio_get_buffer
+    var new_head = head + @as(u32, @intCast(num));
+    while (new_head >= len) {
+        new_head -= len;
+    }
+    @atomicStore(u32, &simulator_io_block.audio_buffer_head, new_head, .release);
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
@@ -105,5 +136,6 @@ pub fn set_global_volume(volume: f32) void {
 pub extern fn rand() u32;
 
 pub fn trace(x: []const u8) void {
-    std.debug.print("[cart]: {s}\n", .{x});
+    _ = x;
+    //std.debug.print("[cart]: {s}\n", .{x});
 }

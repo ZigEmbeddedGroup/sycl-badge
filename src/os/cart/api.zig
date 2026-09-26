@@ -714,101 +714,74 @@ pub fn vline(options: StraightLineOptions) void {
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
 
-/// Deprecated, Mostly unsupported on Badge v2. Use Tone2Options and tone2() instead.
-pub const ToneOptions = struct {
-    pub const Flags = packed struct(u32) {
-        pub const Channel = enum(u2) {
-            pulse1,
-            pulse2,
-            triangle,
-            noise,
-        };
+/// mixer provides a simple audio mixer with two square wave channels, one triangle
+/// wave channel, and one noise channel. See blobs or space_shooter for examples.
+pub const mixer = @import("mixer.zig");
 
-        pub const DutyCycle = enum(u2) {
-            @"1/8",
-            @"1/4",
-            @"1/2",
-            @"3/4",
-        };
-
-        pub const Panning = enum(u2) {
-            stereo,
-            left,
-            right,
-        };
-
-        channel: Channel,
-        /// `duty_cycle` is only used when `channel` is set to `pulse1` or `pulse2`
-        duty_cycle: DutyCycle = .@"1/8",
-        panning: Panning = .stereo,
-        padding: u26 = undefined,
-    };
-
-    frequency: u32,
-    duration: u32,
-    volume: u32,
-    flags: Flags,
-};
-
-/// Deprecated, Mostly unsupported on Badge v2. Use tone2() instead.
-pub inline fn tone(options: ToneOptions) void {
-    tone2(.{
-        .frequency = @floatFromInt(options.frequency),
-        .duration = @as(f32, @floatFromInt(options.duration)) * (1.0 / 60.0),
-        .volume = @as(f32, @floatFromInt(options.duration)) * 0.01,
-        .flags = .{
-            .shape = switch (options.flags.channel) {
-                .triangle => .triangle,
-                else => .square,
-            },
-        },
-    });
-}
-
-pub const Tone2Options = struct {
-    // Use this value to stop playing audio
-    pub const stop: Tone2Options = .{ .frequency = 0.0 };
-
-    pub const Shape = enum(u3) {
-        square, // ---___---___, clarinet-ish
-        triangle, // /\/\/\/\, flute-ish
-        sawtooth, // |\|\|\|\, violin-ish
-        sine, // u^u^u^
-        major, // Major chord with frequency as the fundamental
-        minor, // Minor chord with frequency as the fundamental
-    };
-
-    pub const Flags = packed struct(u32) {
-        /// Type of wave to play
-        shape: Shape = .square,
-        padding: u29 = undefined,
-    };
-
-    /// Frequency of the tone, in Hz. If set to 0.0, audio is stopped.
-    frequency: f32,
-
-    /// Duration in seconds. A duration of exactly -1.0 means infinite.
-    duration: f32 = -1.0,
-
-    /// Volume, 0-1, perceptually linear scale
-    volume: f32 = 1.0,
-
-    /// Wave shape and other parameters
-    flags: Flags = .{},
-};
-
-/// Plays a sound tone via the hardware buzzer.
-/// Cancels any other audio that might be playing.
-/// On native: sends CART_TONE IPC to kernel; kernel plays via gpio.buzzer.
-pub fn tone2(options: Tone2Options) void {
-    platform.tone2(options);
-}
+pub const audio_sample_rate = 44100;
 
 /// Adjust the volume of all audio, 0.0 - 1.0. This is a perceptually
 /// linear scale from about -50dB to 0dB adjustment from the maximum
-/// speaker volume.
+/// speaker volume. This value can also be changed by the player from the
+/// OS menu.
 pub fn set_global_volume(volume: f32) void {
     platform.set_global_volume(volume);
+}
+
+/// Set a buffer to use for streaming audio. This buffer will be managed
+/// as a ring buffer for communication between the app and the OS.
+/// Use audio_get_buffer to get slices to fill with samples.
+/// For now only u8 samples are supported.
+///
+/// See mixer.zig for example usage.
+pub fn audio_set_buffer(comptime T: type, buffer: []align(8) T) void {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
+    platform.audio_set_buffer(T, buffer);
+}
+
+/// Get a buffer to fill with samples. This can only be used after
+/// audio_set_buffer has been called to initialize audio.
+/// Returns the next buffer of samples to be filled. After filling
+/// the samples, the user should call audio_submit_samples() with
+/// the number of valid samples. If this returns null, the audio
+/// buffer is full and the app must wait for the OS to catch up.
+///
+/// Because the underlying buffer is a ring, this function may
+/// not return the entire empty area. If you fill this buffer
+/// and would like to submit more samples, call audio_submit_samples
+/// to mark the buffer as full, and then audio_get_buffer again
+/// to see if there is more space to fill. See mixer.zig for an example.
+///
+/// Note that this function *does not* mark the returned buffer as
+/// filled. You must call audio_submit_samples() after writing
+/// samples. Calling this function twice without calling
+/// audio_submit_samples will return the same buffer twice.
+pub fn audio_get_buffer(comptime T: type) ?[]T {
+    if (T != u8) {
+        @compileError("Only u8 samples are currently supported.");
+    }
+    return platform.audio_get_buffer(T);
+}
+
+/// Used with audio_get_buffer to submit samples to the OS.
+/// Call audio_get_buffer to get a buffer, and then audio_submit_samples
+/// after filling it in. You don't need to fill the entire buffer.
+/// If you only want to buffer a limited amount of audio,
+pub fn audio_submit_samples(num_samples: usize) void {
+    platform.audio_submit_samples(num_samples);
+}
+
+/// Get the number of samples which have been submitted but have
+/// not yet been consumed by the OS.
+/// This is an approximate measure of the latency between newly
+/// submitted samples and the speaker.
+/// Note that samples are consumed in large batches, so this
+/// function will not smoothly count down and should
+/// not be used as a timer.
+pub fn audio_get_queued_samples() u32 {
+    return platform.audio_get_queued_samples();
 }
 
 // ┌───────────────────────────────────────────────────────────────────────────┐

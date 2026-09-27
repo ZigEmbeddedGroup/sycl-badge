@@ -172,7 +172,7 @@ fn executeCart(exec: mailbox.MessageType.CartExecute) void {
     const cart_xip_start = getCartXipStart();
     const cart_xip_end = getCartXipEnd();
     const cart_ram_start = getCartRamStart();
-    const cart_shared_ram_end = cart_ram_start + 4 + @sizeOf(@TypeOf(mailbox.shared_data.*));
+    const cart_shared_ram_end = cart_ram_start + @sizeOf(abi.CartIPCData);
     const cart_ram_end = getCartRamEnd();
     if (exec.xip) {
         const vector_table_addr = cart_xip_start + exec.offset;

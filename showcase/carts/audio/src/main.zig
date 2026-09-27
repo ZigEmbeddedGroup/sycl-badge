@@ -78,23 +78,96 @@ const major_scale_uses_sharps: [12]bool = .{
     true, // B major
 };
 
-const wave_shapes = [_]cart.Tone2Options.Shape{
-    .square,
-    .triangle,
-    .sawtooth,
+const WaveShape = enum {
+    square,
+    triangle,
+    sawtooth,
+    sine,
+
+    pub const num = @typeInfo(@This()).@"enum".field_names.len;
 };
-var active_wave_shape: u32 = 0;
+
+var active_wave_shape: WaveShape = .square;
 
 var fundamental: u32 = 48;
 var scale_pos: u32 = major.len;
 var global_frame_num: u32 = 0;
-var short: bool = false;
 
 const micros_per_note: u64 = 500_000; // 0.5 second per note
 var change_time: u64 = 0;
 var last_abs_time: u64 = 0;
 
 var volume: f32 = 1.0;
+
+// Buffer two frames of audio
+var audio_sample_buf: [2 * cart.audio_sample_rate / 60]u8 align(8) = undefined;
+var audio_active: bool = false;
+var audio_phase: u32 = 0;
+var delta_phase: u32 = 0;
+
+fn update_audio() void {
+    while (cart.audio_get_buffer(u8)) |buf| {
+        mix_audio(buf);
+        cart.audio_submit_samples(buf.len);
+    }
+}
+
+fn mix_audio(buf: []u8) void {
+    if (!audio_active) {
+        @memset(buf, 0x7F);
+        return;
+    }
+
+    switch (active_wave_shape) {
+        .square => for (buf) |*sample| {
+            sample.* = if (audio_phase & 0x8000_0000 != 0) 0xFF else 0x00;
+            audio_phase +%= delta_phase;
+        },
+        .sawtooth => for (buf) |*sample| {
+            sample.* = @intCast(audio_phase >> 24);
+            audio_phase +%= delta_phase;
+        },
+        .triangle => for (buf) |*sample| {
+            // Similar to abs, but negative values are also shifted by 1, giving a more even
+            // triangle that avoids 0x8000_0000 as a possible value
+            const tri_val = if (audio_phase & 0x8000_0000 != 0) ~audio_phase else audio_phase;
+            sample.* = @intCast(tri_val >> 23);
+            audio_phase +%= delta_phase;
+        },
+        .sine => for (buf) |*sample| {
+            sample.* = @intCast(fast_sin(audio_phase) >> 24);
+            audio_phase +%= delta_phase;
+        },
+    }
+}
+
+// Approximated fixed-point sinewave, modified
+// from https://www.coranac.com/2009/07/sines/
+// Input is 0x00000000 - 0xFFFFFFFF representing
+// one full rotation. Output is 0x00000000 for -1
+// to 0xFFFFFFFF for 1
+fn fast_sin(val: u32) u32 {
+    // S(x) = x * ( (3<<p) - (x*x>>r) ) >> s
+    // n : Q-pos for quarter circle             13
+    // A : Q-pos for output                     12
+    // p : Q-pos for parentheses intermediate   15
+    // r = 2n-p                                 11
+    // s = A-1-p-n                              17
+
+    const qN = 13;
+    const qP = 16;
+    const qR = 2 * qN - qP;
+
+    var x: i32 = @bitCast(val);
+
+    if ((x ^ (x << 1)) < 0) // test for quadrant 1 or 2
+        x = @as(i32, @bitCast(@as(u32, 1 << 31))) -% x;
+
+    x = x >> 17;
+
+    const sin_val = (x << 1) * ((3 << qP) - 1 - (x * x >> qR));
+    return @as(u32, @bitCast(sin_val)) ^ 0x8000_0000;
+}
 
 pub fn start() void {
     change_time = cart.micros_since_boot() + micros_per_note;
@@ -107,6 +180,8 @@ pub fn start() void {
     // "everything important" is smaller than the whole
     // frame, so we also track a dirty rect.
     cart.set_double_buffer_mode(.no_copy_dirty_rect);
+
+    cart.audio_set_buffer(u8, &audio_sample_buf);
 }
 
 var was_down = false;
@@ -169,9 +244,10 @@ pub fn update() void {
                 note_changed = true;
             },
             .shape => {
-                active_wave_shape += 1;
-                if (active_wave_shape >= wave_shapes.len) {
-                    active_wave_shape = 0;
+                if (@as(usize, @backingInt(active_wave_shape)) + 1 == WaveShape.num) {
+                    active_wave_shape = @fromBackingInt(0);
+                } else {
+                    active_wave_shape = @fromBackingInt(@backingInt(active_wave_shape) + 1);
                 }
                 note_changed = true;
             },
@@ -188,10 +264,11 @@ pub fn update() void {
                 note_changed = true;
             },
             .shape => {
-                if (active_wave_shape == 0) {
-                    active_wave_shape = wave_shapes.len;
+                if (@as(usize, @backingInt(active_wave_shape)) == 0) {
+                    active_wave_shape = @fromBackingInt(@intCast(WaveShape.num - 1));
+                } else {
+                    active_wave_shape = @fromBackingInt(@backingInt(active_wave_shape) - 1);
                 }
-                active_wave_shape -= 1;
                 note_changed = true;
             },
         }
@@ -208,21 +285,17 @@ pub fn update() void {
             change_time += micros_per_note;
             if (scale_pos >= major.len) {
                 scale_pos = 0;
-                short = !short;
             } else {
                 scale_pos += 1;
             }
         }
 
         if (scale_pos >= major.len) {
-            cart.tone2(.stop);
+            audio_active = false;
         } else {
-            cart.tone2(.{
-                .frequency = freqFromMidi(@floatFromInt(fundamental + major[scale_pos])),
-                .volume = 1.0,
-                .duration = if (short) 0.25 else -1.0,
-                .flags = .{ .shape = wave_shapes[active_wave_shape] },
-            });
+            audio_active = true;
+            const frequency = freqFromMidi(@floatFromInt(fundamental + major[scale_pos]));
+            delta_phase = @intFromFloat(@as(f64, 0x1_0000_0000) * @as(f64, frequency) / @as(f64, cart.audio_sample_rate));
         }
     }
 
@@ -315,11 +388,13 @@ pub fn update() void {
     });
 
     // Draw the wave shape
-    const wave_name = std.fmt.bufPrint(&buf, ".{s}", .{@tagName(wave_shapes[active_wave_shape])}) catch "Err";
+    const wave_name = std.fmt.bufPrint(&buf, ".{s}", .{@tagName(active_wave_shape)}) catch "Err";
     cart.text(.{
         .str = wave_name,
         .x = @intCast(HW - wave_name.len * 4),
         .y = volume_bot + 2,
         .text_color = if (selected_param == .shape) yellow else white,
     });
+
+    update_audio();
 }

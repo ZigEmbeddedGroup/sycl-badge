@@ -61,14 +61,6 @@ const rev0 = struct {
     /// Separate PWM slice used for wave timing control
     const audio_timing_slice: pwm.Slice = @fromBackingInt(@intCast(5));
 
-    // Needs to be aligned for DMA source
-    var square_cc_vals: [2]u32 align(8) = undefined;
-    const square_wave_sample: AudioSample = .{
-        .samples_per_fundamental = 2,
-        .wrap_values_bits = 1,
-        .sample_buf = &square_cc_vals,
-    };
-
     fn init() void {
         // Enable pin: SIO output, start disabled
         board.rev0.audio.buzzer_enable.set_function(.sio);
@@ -101,18 +93,6 @@ const rev0 = struct {
         buzzer_pwm_slice.disable();
         audio_timing_slice.disable();
         board.rev0.audio.buzzer_pwm.put(0);
-    }
-
-    fn update_square_wave_levels() void {
-        const midpoint = @as(f32, @floatFromInt(audio_levels)) / 2;
-        const amplitude = midpoint * vol_amplitude;
-
-        // Square wave
-        // Use round and floor to allow amplitudes with an odd number of divisions
-        const min_f: f32 = @max(0.0, @min(@round(midpoint - amplitude), audio_levels));
-        const max_f: f32 = @max(0.0, @min(@floor(midpoint + amplitude), audio_levels));
-        square_cc_vals[0] = @as(u32, @intFromFloat(min_f)) << 16;
-        square_cc_vals[1] = @as(u32, @intFromFloat(max_f)) << 16;
     }
 
     fn set_timing_PWM_hz(hz: f32) !void {
@@ -235,14 +215,10 @@ const max_sample_rate = 44100;
 const initial_global_volume = 1.0;
 
 var global_volume: f32 = initial_global_volume;
-var tone_volume: f32 = 1.0;
 var vol_amplitude: f32 = calc_perceptually_linear_amplitude_for_volume(initial_global_volume);
 
 var sound_type: terry.core0.TrackedStateMachine(enum {
     off,
-    square,
-    triangle,
-    sawtooth,
     sample,
 }) = undefined;
 
@@ -255,87 +231,61 @@ const MixState = enum {
 var mix_idx: u32 = 0;
 var mix_state: terry.core0.TrackedStateMachine(MixState) = undefined;
 
-var period_per_sample: f32 = 0;
-var phase: f32 = 0;
-fn mix_audio_square(comptime impl: type, noalias buf: []impl.Sample) void {
-    for (buf, 0..) |*sample, i| {
-        const f: f32 = @floatFromInt(i);
-        const samp_phase = phase + period_per_sample * f;
-        const fract_phase = samp_phase - @trunc(samp_phase);
-        const vol_adj = if (fract_phase < 0.5) vol_amplitude else -vol_amplitude;
-        sample.* = impl.encode_sample(vol_adj);
+fn mix_audio_samples(comptime impl: type, noalias samples: []const u8, noalias buf: []impl.Sample) linksection(".data") void {
+    const samp_mul = vol_amplitude * (2.0 / 255.0);
+    const samp_add = -vol_amplitude;
+    for (samples, buf) |in, *out| {
+        const in_f32: f32 = @floatFromInt(in);
+        const vol_adj = @mulAdd(f32, in_f32, samp_mul, samp_add);
+        out.* = impl.encode_sample(vol_adj);
     }
-    phase += @as(f32, @floatFromInt(buf.len)) * period_per_sample;
-    phase = phase - @trunc(phase);
 }
 
-fn mix_audio_sawtooth(comptime impl: type, noalias buf: []impl.Sample) void {
-    for (buf, 0..) |*sample, i| {
-        const f: f32 = @floatFromInt(i);
-        const samp_phase = phase + period_per_sample * f;
-        const value = (samp_phase - @trunc(samp_phase)) * 2.0 - 1.0;
-        const vol_adj = value * vol_amplitude;
-        sample.* = impl.encode_sample(vol_adj);
+noinline fn mix_buffer_samples(comptime impl: type, buffer: []impl.Sample) linksection(".data") bool {
+    switch (sound_type.state) {
+        .off => {}, // mixer shouldn't be in use
+        .sample => {
+            const abi = @import("../cart/os_abi.zig");
+            var mix_pos: usize = 0;
+            if (abi.ipc_data.audio_buffer_ptr) |raw_ptr| {
+                @branchHint(.likely);
+                const samp_ptr: [*]u8 = @ptrCast(raw_ptr);
+                const len = abi.ipc_data.audio_buffer_len;
+                const tail = abi.ipc_data.audio_buffer_tail;
+                const head = abi.ipc_data.audio_buffer_head;
+                if (tail <= head or tail + buffer.len < len) {
+                    const to_mix = if (tail <= head) @min(head - tail, buffer.len) else buffer.len;
+                    mix_audio_samples(impl, (samp_ptr + tail)[0..to_mix], buffer[0..to_mix]);
+                    mix_pos += to_mix;
+                    abi.ipc_data.audio_buffer_tail = tail + to_mix;
+                } else {
+                    const to_mix_1 = len - tail;
+                    mix_audio_samples(impl, (samp_ptr + tail)[0..to_mix_1], buffer[0..to_mix_1]);
+                    mix_pos += to_mix_1;
+
+                    const to_mix_2 = @min(head, buffer.len - mix_pos);
+                    mix_audio_samples(impl, samp_ptr[0..to_mix_2], buffer[mix_pos..][0..to_mix_2]);
+                    mix_pos += to_mix_2;
+                    abi.ipc_data.audio_buffer_tail = to_mix_2;
+                }
+            }
+            if (mix_pos < buffer.len) {
+                @memset(buffer[mix_pos..], comptime impl.encode_sample(0.0));
+            }
+        },
     }
-    phase += @as(f32, @floatFromInt(buf.len)) * period_per_sample;
-    phase = phase - @trunc(phase);
+    return true;
 }
 
-fn mix_audio_triangle(comptime impl: type, noalias buf: []impl.Sample) void {
-    for (buf, 0..) |*sample, i| {
-        const f: f32 = @floatFromInt(i);
-        const samp_phase = phase + period_per_sample * f;
-        const saw_val = (samp_phase - @trunc(samp_phase)) * 2.0 - 1.0;
-        const tri_val = @abs(saw_val) * 2.0 - 1.0;
-        const vol_adj = tri_val * vol_amplitude;
-        sample.* = impl.encode_sample(vol_adj);
-    }
-    phase += @as(f32, @floatFromInt(buf.len)) * period_per_sample;
-    phase = phase - @trunc(phase);
-}
-
-var mixes_remaining: ?u32 = 0;
-var final_mix_samples: u32 = 0;
 fn mix_buffer(buffer: *align(64) [dma_buf_size]u32) bool {
-    const samples_to_mix = if (mixes_remaining) |*rem| blk: {
-        if (rem.* > 1) {
-            rem.* -= 1;
-            break :blk dma_buf_size;
-        } else if (rem.* == 1) {
-            rem.* = 0;
-            break :blk final_mix_samples;
-        } else {
-            break :blk 0;
-        }
-    } else dma_buf_size;
-
     const more_buffers = if (@backingInt(rev.revision) < 1)
-        mix_buffer_samples(rev0, @as([*]rev0.Sample, @ptrCast(buffer))[0..dma_buf_size], samples_to_mix)
+        mix_buffer_samples(rev0, @as([*]rev0.Sample, @ptrCast(buffer))[0..dma_buf_size])
     else
-        mix_buffer_samples(rev1, @as([*]rev1.Sample, @ptrCast(buffer))[0..dma_buf_size], samples_to_mix);
+        mix_buffer_samples(rev1, @as([*]rev1.Sample, @ptrCast(buffer))[0..dma_buf_size]);
 
     asm volatile ("dmb" ::: .{ .memory = true });
 
     return more_buffers;
-}
-
-noinline fn mix_buffer_samples(comptime impl: type, buffer: []impl.Sample, samples_to_mix: u32) bool {
-    switch (sound_type.state) {
-        .off => {}, // mixer shouldn't be in use
-        .square => mix_audio_square(impl, buffer[0..samples_to_mix]),
-        .sawtooth => mix_audio_sawtooth(impl, buffer[0..samples_to_mix]),
-        .triangle => mix_audio_triangle(impl, buffer[0..samples_to_mix]),
-        .sample => {
-            // TODO sample mixing
-        },
-    }
-
-    if (samples_to_mix < buffer.len) {
-        @memset(buffer[samples_to_mix..], comptime impl.encode_sample(0.0));
-        return false;
-    }
-
-    return true;
 }
 
 /// Initialise buzzer hardware.
@@ -364,10 +314,6 @@ pub fn set_global_volume(in_vol: f32) void {
     if (global_volume != vol) {
         global_volume = vol;
         update_derived_volume();
-
-        if (sound_type.state == .square and rev.revision == .r0) {
-            rev0.update_square_wave_levels();
-        }
 
         if (sound_type.state != .off) {
             set_enabled(global_volume != 0.0);
@@ -422,82 +368,22 @@ fn calc_perceptually_linear_amplitude_for_volume(volume: f32) f32 {
 }
 
 fn update_derived_volume() void {
-    const volume = global_volume * tone_volume;
-    vol_amplitude = calc_perceptually_linear_amplitude_for_volume(volume);
+    vol_amplitude = calc_perceptually_linear_amplitude_for_volume(global_volume);
+}
+
+pub fn stop_buffered() void {
+    stop();
 }
 
 /// Start a continuous tone at `freq_hz`.
 /// Passing 0 is equivalent to calling `stop()`.
 /// The speaker enable pin is asserted automatically.
-pub fn tone(freq_hz: f32, duration_sec: f32, volume: f32, flags: u32) void {
-    board.led_pin.put(0);
+pub fn start_buffered() void {
+    begin_stop_DMA();
 
-    if (freq_hz == 0 or volume <= 0 or (duration_sec != -1.0 and duration_sec <= 0.0)) {
-        stop();
-        return;
-    }
+    sound_type.set_state(.sample, @src());
 
-    // When transitioning between two different tones which
-    // both use the mixer, we don't need to stop and start DMA.
-    // We can just leave everything running, and let the mixer
-    // pick up the updated parameters the next time it runs.
-    const sample_sel = flags & 0x7;
-    const needs_dma_reset = switch (sample_sel) {
-        0 => rev.revision == .r0 or mix_state.state != .running,
-        else => mix_state.state != .running,
-    };
-
-    if (needs_dma_reset) {
-        begin_stop_DMA();
-    }
-
-    if (volume != tone_volume) {
-        tone_volume = volume;
-        update_derived_volume();
-    }
-
-    if (sample_sel == 0 and rev.revision == .r0) {
-        rev0.update_square_wave_levels();
-        setup_audio_sample_DMA(duration_sec, freq_hz, rev0.square_wave_sample) catch {
-            // This frequency is too slow for us to reproduce, and also probably
-            // too slow to hear, so just stop audio.
-            stop();
-            return;
-        };
-    } else {
-        period_per_sample = freq_hz / max_sample_rate;
-        switch (sample_sel) {
-            0 => sound_type.set_state(.square, @src()),
-            1 => sound_type.set_state(.triangle, @src()),
-            2 => sound_type.set_state(.sawtooth, @src()),
-            else => {
-                stop();
-                return;
-            },
-        }
-
-        if (duration_sec >= 0) {
-            // This can be large enough that we lose precision.
-            // The following operations are designed to keep as
-            // much precision as possible without using more than
-            // 32 bits.
-            const total_samples_flt = @as(f64, duration_sec) * @as(f64, max_sample_rate);
-            const total_samples_64: u64 = @intFromFloat(total_samples_flt);
-            const total_mixes_64 = (total_samples_64 + dma_buf_size - 1) / dma_buf_size;
-            const final_samples: u32 = @intCast(total_samples_64 % dma_buf_size);
-            // If the number of mixes overflows a u32, that's hundreds of days.
-            // Just call it infinite at that point.
-            mixes_remaining = if (total_mixes_64 > ~@as(u32, 0)) null else @intCast(total_mixes_64);
-            final_mix_samples = if (final_samples == 0) dma_buf_size else final_samples;
-        } else {
-            mixes_remaining = null;
-            final_mix_samples = dma_buf_size;
-        }
-
-        if (needs_dma_reset) {
-            setup_ping_pong_DMA() catch unreachable;
-        }
-    }
+    setup_ping_pong_DMA() catch unreachable;
 
     // Then came. The Noise.
     if (rev.revision == .r0) {
@@ -520,63 +406,6 @@ fn dma_params() DMA_Params {
         rev0.dma_params()
     else
         rev1.dma_params();
-}
-
-const AudioSample = struct {
-    samples_per_fundamental: f32,
-    wrap_values_bits: u32,
-    sample_buf: [*]const u32,
-};
-
-fn setup_audio_sample_DMA(duration_sec: f32, frequency: f32, sample: AudioSample) !void {
-    if (@backingInt(rev.revision) >= 1)
-        return error.NotSupported;
-
-    const sample_hz = frequency * sample.samples_per_fundamental;
-
-    try rev0.set_timing_PWM_hz(sample_hz);
-
-    finish_stop_DMA();
-
-    // Configure DMA ch1 to update the duty cycle
-    // for pin 9 every time the timing slice wraps,
-    // switching between the low part and the high
-    // part of the square wave.
-    DMA.CH1_READ_ADDR.write(.{ .CH1_READ_ADDR = @intFromPtr(sample.sample_buf) });
-    // TODO get_registers() doesn't exist until future versions
-    //DMA.CH1_WRITE_ADDR.write(.{ .CH1_WRITE_ADDR = @intFromPtr(&buzzer_pwm_slice.get_registers().cc) });
-    DMA.CH1_WRITE_ADDR.write(.{ .CH1_WRITE_ADDR = @intFromPtr(&PWM.CH4_CC) });
-    if (duration_sec == -1.0) {
-        DMA.CH1_TRANS_COUNT.write(.{
-            .MODE = .ENDLESS,
-            .COUNT = 1,
-        });
-    } else {
-        const dma_count: u32 = @intFromFloat(@round(duration_sec * sample_hz));
-        DMA.CH1_TRANS_COUNT.write(.{
-            .MODE = .NORMAL, // Count down and stop
-            .COUNT = @intCast(dma_count),
-        });
-    }
-
-    const params = dma_params();
-    const RingEnum = @TypeOf(std.mem.zeroes(@TypeOf(DMA.CH1_CTRL_TRIG).underlying_type).RING_SIZE);
-    DMA.CH1_CTRL_TRIG.modify(.{
-        .SNIFF_EN = 0,
-        .BSWAP = 0,
-        .IRQ_QUIET = 1, // No interrupts
-        .TREQ_SEL = params.treq,
-        .CHAIN_TO = 1, // Chain to self, meaning disable
-        .RING_SEL = 0, // Wrap reads
-        .RING_SIZE = @as(RingEnum, @fromBackingInt(@intCast(sample.wrap_values_bits + 2))), // Wrap every 2 values / 8 bytes
-        .INCR_WRITE_REV = 0,
-        .INCR_WRITE = 0,
-        .INCR_READ_REV = 0,
-        .INCR_READ = 1, // Increment read address
-        .DATA_SIZE = params.data_size,
-        .HIGH_PRIORITY = 1, // Audio is high priority, delays are audible
-        .EN = 1,
-    });
 }
 
 fn setup_ping_pong_DMA() !void {
@@ -673,129 +502,9 @@ pub fn stop() void {
 pub fn reset() void {
     stop();
     global_volume = initial_global_volume;
-    tone_volume = 1.0;
     vol_amplitude = comptime calc_perceptually_linear_amplitude_for_volume(initial_global_volume);
 }
 
 const log2_dma_buf_size: u32 = 9; // 512 samples, about 12 mS of audio at 44.1kHz
 const dma_buf_size: u32 = 1 << log2_dma_buf_size;
 var audio_dma_buf: [2][dma_buf_size]u32 align(dma_buf_size * @sizeOf(u32)) = undefined;
-
-pub const FrequencyRatio = packed struct(u16) {
-    int: u8,
-    frac: u8 = 0,
-};
-
-/// The oscillator takes advantage of integer overflow to represent radians as
-/// you rotate about a circle. It assumes 32-bit architecture so that maximum
-/// precision is achieved with minimum runtime cost.
-///
-/// The sample rate is known at compile time, and the frequency can be changed
-/// at runtime.
-const Oscillator = struct {
-    phase: u32 = 0,
-    delta: u32 = 0,
-
-    const Self = @This();
-
-    pub fn init(frequency: u32) Self {
-        return Self{
-            .phase = 0,
-            .delta = calculate_delta(frequency),
-        };
-    }
-
-    pub fn reset(self: *Self) void {
-        self.phase = 0;
-        self.delta = 0;
-    }
-
-    fn calculate_delta(frequency: u32) u32 {
-        return @as(u32, @intCast((@as(u64, 0x100000000) * frequency) / max_sample_rate));
-    }
-
-    pub fn tick(self: *Self) void {
-        self.phase +%= self.delta;
-    }
-
-    pub fn tick_modulate(self: *Self, comptime T: type, input: T, ratio: FrequencyRatio) void {
-        // TODO: calculate Accumulator
-        const base = @as(i64, @intCast(self.delta)) * input;
-        const mod_delta = ((base * ratio.int) >> @bitSizeOf(T)) +
-            ((base * ratio.frac) >> (@bitSizeOf(T) + 8));
-        // TODO: will have truncated bits I think
-        if (mod_delta < 0)
-            self.phase -%= @as(u32, @intCast(-mod_delta))
-        else
-            self.phase +%= @as(u32, @intCast(mod_delta));
-    }
-
-    pub fn set_frequency(self: *Self, frequency: u32) void {
-        self.delta = calculate_delta(frequency);
-    }
-
-    /// at compile time,
-    pub fn set_frequency_float(self: *Self, comptime frequency: f32) void {
-        self.delta = comptime phase_delta_from_float(max_sample_rate, frequency);
-    }
-
-    fn phase_delta_from_float(frequency: f64) u32 {
-        return @as(
-            u32,
-            @intFromFloat(frequency / @as(f64, @floatFromInt(max_sample_rate)) * std.math.pow(f64, 2, 32)),
-        );
-    }
-
-    pub fn to_sawtooth(self: Self, comptime T: type) T {
-        const UnsignedSample = @Int(.unsigned, @bitSizeOf(T));
-        return @as(T, @bitCast(@as(
-            UnsignedSample,
-            @truncate(self.phase >> 32 - @bitSizeOf(T)),
-        )));
-    }
-
-    pub fn to_square(self: Self, comptime T: type) T {
-        return if (self.delta != 0)
-            if (self.phase > (std.math.maxInt(u32) / 2))
-                std.math.maxInt(T)
-            else
-                std.math.minInt(T)
-        else
-            0;
-    }
-
-    pub fn to_sine(self: Self, comptime T: type) T {
-        const lut = comptime blk: {
-            const samples = 64;
-
-            assert(std.math.isPowerOfTwo(samples), .{});
-            var ret: [samples]T = undefined;
-            const radian_delta = (2.0 * std.math.pi) / @as(comptime_float, @floatFromInt(samples));
-
-            for (0..samples) |i|
-                ret[i] = @as(T, @intFromFloat(@as(f64, @floatFromInt(std.math.maxInt(T))) * @sin(@as(f64, @floatFromInt(i)) * radian_delta)));
-
-            break :blk ret;
-        };
-
-        const lut_bits = comptime std.math.log2(lut.len);
-        const LutIndex = @Int(.unsigned, lut_bits);
-        const x_span = comptime 1 << (32 - lut_bits);
-
-        const y0_index: LutIndex = @as(LutIndex, @intCast(self.phase >> @as(u5, 32 - lut_bits)));
-        const y1_index = y0_index +% 1;
-
-        const y0 = lut[y0_index];
-        const y1 = lut[y1_index];
-
-        const x0 = @as(u32, y0_index) * x_span;
-
-        const y_span = y1 - y0;
-
-        const x_delta = @as(i32, @intCast(self.phase - x0));
-        // TODO: fix overflow here
-        const y = y0 + @divFloor(std.math.mulWide(i32, x_delta, y_span), x_span);
-
-        return @as(T, @intCast(y));
-    }
-};

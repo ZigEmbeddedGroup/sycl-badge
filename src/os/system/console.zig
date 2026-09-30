@@ -77,7 +77,7 @@ fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
-fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn gpio_completions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{ "read", "write", "toggle", "list" };
@@ -86,7 +86,7 @@ fn gpioCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     return &[_][]const u8{};
 }
 
-fn rebootCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn reboot_completions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{"bootsel"};
@@ -102,7 +102,7 @@ var cart_name_storage: [MAX_CART_COMPLETIONS][MAX_CART_NAME_LEN]u8 = undefined;
 var cart_name_slices: [MAX_CART_COMPLETIONS][]const u8 = undefined;
 var cart_name_count: usize = 0;
 
-fn refreshCartNames() void {
+fn refresh_cart_names() void {
     cart_name_count = 0;
     storage.listCarts(struct {
         fn visit(name: []const u8, size: u32) void {
@@ -116,7 +116,7 @@ fn refreshCartNames() void {
     }.visit);
 }
 
-fn overlayCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn overlay_completions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{"fps"};
@@ -129,7 +129,7 @@ fn overlayCompletions(arg_index: usize, partial: []const u8) []const []const u8 
     return &[_][]const u8{};
 }
 
-fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn cart_completions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{ "list", "run", "stop", "status", "exec", "info", "delete", "wipeall" };
@@ -137,7 +137,7 @@ fn cartCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
     }
     if (arg_index == 1) {
         // Return cart names for "cart run <name>", "cart info <name>", etc.
-        refreshCartNames();
+        refresh_cart_names();
         return cart_name_slices[0..cart_name_count];
     }
     return &[_][]const u8{};
@@ -149,10 +149,10 @@ const commands = [_]Command{
     .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
     .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
     .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
-    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpioCompletions },
+    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpio_completions },
     .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cartCompletions },
-    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlayCompletions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cart_completions },
+    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlay_completions },
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
@@ -213,7 +213,7 @@ pub fn init() void {
 
 /// Input Processing
 /// Call this frequently from kernel
-pub fn processInput() void {
+pub fn poll() void {
     var rx_buffer: [64]u8 = undefined;
 
     // Try to receive data from USB (non-blocking)
@@ -222,11 +222,11 @@ pub fn processInput() void {
 
     // Process each received character
     for (rx_buffer[0..bytes_read]) |byte| {
-        processChar(byte);
+        process_char(byte);
     }
 }
 
-fn processChar(char: u8) void {
+fn process_char(char: u8) void {
     // Handle escape sequences (arrow keys, etc.)
     switch (escape_state) {
         .normal => {

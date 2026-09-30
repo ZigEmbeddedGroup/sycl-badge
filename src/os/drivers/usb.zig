@@ -681,6 +681,6 @@ pub fn printf(comptime fmt: []const u8, args: anytype) bool {
 }
 
 test {
-    //_ = @import("usb/setup.zig");
+    _ = @import("usb/setup.zig");
     _ = @import("usb/endpoint.zig");
 }

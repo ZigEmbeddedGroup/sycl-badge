@@ -171,7 +171,7 @@ pub noinline fn main() !void {
         adc.poll();
 
         // Process console input
-        console.processInput();
+        console.poll();
 
         // Check if cart is running - controls both button handling and display updates
         // Check for both .ready and .running states (cart is active from load until stop)

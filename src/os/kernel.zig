@@ -124,6 +124,8 @@ const VsyncState = union(enum) {
 
 var pending_vsync_setting: ?VsyncState = null;
 
+var force_fullscreen_refresh: bool = false;
+
 // This function uses FP registers. If inlined into microzig_main, it will save FP registers in the preamble
 // before the FP unit is initialized, causing a fault.
 pub noinline fn main() !void {
@@ -209,6 +211,9 @@ pub noinline fn main() !void {
         // Joystick click toggles FPS overlay at any time (cart running or not)
         if (pressed.click) {
             const new_state = !fps_overlay.isEnabled();
+            if (!new_state) {
+                force_fullscreen_refresh = true;
+            }
             fps_overlay.setEnabled(new_state);
             console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
         }
@@ -229,12 +234,13 @@ pub noinline fn main() !void {
         // Periodically check if cart list changed (only when display is active)
         if (cart_display_active) {
             const now = timer.micros();
-            if (now >= next_cart_check) {
+            if (now >= next_cart_check or force_fullscreen_refresh) {
                 @branchHint(.unlikely);
 
                 const current_hash = computeCartHash();
-                if (current_hash != last_cart_hash) {
+                if (current_hash != last_cart_hash or force_fullscreen_refresh) {
                     refreshCartDisplay();
+                    force_fullscreen_refresh = false;
                     last_cart_hash = current_hash;
                 }
                 next_cart_check = now + CART_CHECK_INTERVAL;
@@ -337,7 +343,10 @@ fn tick_cart_mailbox(buttons: Controls) void {
                 };
                 pending_vsync_setting = null;
 
-                lcd.write_cart_buffer(ready_framebuffer, ready_fb_dirty_rect);
+                const rect: abi.Rect8 = if (force_fullscreen_refresh) .all else ready_fb_dirty_rect;
+                lcd.write_cart_buffer(ready_framebuffer, rect);
+                force_fullscreen_refresh = false;
+
                 if (lcd.is_waiting_for_vsync()) {
                     screen_wait_for.set_state(.vsync, @src());
                 } else {

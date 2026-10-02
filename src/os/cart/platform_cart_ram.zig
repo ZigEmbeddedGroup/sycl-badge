@@ -147,6 +147,10 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
     has_in_flight_frame = true;
 }
 
+pub fn supports_os_clear() bool {
+    return ipc_data.os_flags.os_clear_supported;
+}
+
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Sound Functions                                                           │

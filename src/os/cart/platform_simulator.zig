@@ -63,6 +63,10 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
     simulator_io_block.api.set_flags(abi.FLAG_PRESENT_METADATA | abi.FLAG_PRESENT_FRAME);
 }
 
+pub fn supports_os_clear() bool {
+    return false;
+}
+
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │
 // │ Sound Functions                                                           │

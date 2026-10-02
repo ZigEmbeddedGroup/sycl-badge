@@ -299,6 +299,8 @@ pub fn setEnabled(on: bool) void {
     enabled = on;
     if (on) {
         last_frame_us = timer.micros();
+    } else {
+        reset_debug_text();
     }
 }
 

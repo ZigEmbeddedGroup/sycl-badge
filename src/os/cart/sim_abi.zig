@@ -7,6 +7,7 @@ pub const Framebuffer = api.Framebuffer;
 pub const DisplayColor = api.DisplayColor;
 pub const NeopixelColor = api.NeopixelColor;
 pub const Controls = api.Controls;
+pub const Unsigned12 = api.Unsigned12;
 pub const Rect8 = api.Rect8;
 
 pub const SimulatorAPI = extern struct {
@@ -22,8 +23,8 @@ pub const SimulatorIO = extern struct {
     neopixels: [5]NeopixelColor align(4),
     _pad: u8 = 0,
     controls: Controls = @bitCast(@as(u16, 0)),
-    light_level: u16,
-    battery_level: u16,
+    light_level: Unsigned12,
+    battery_level: u8,
     user_led: bool = false,
     sim_running: bool,
     dirty_rect: Rect8,

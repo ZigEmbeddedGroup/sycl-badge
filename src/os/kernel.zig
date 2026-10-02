@@ -5,6 +5,7 @@ const microzig = @import("microzig");
 const board = microzig.board;
 const rp2xxx = microzig.hal;
 
+const adc = @import("drivers/adc.zig");
 const usb = @import("drivers/usb.zig");
 const timer = @import("drivers/timer.zig");
 const lcd = @import("drivers/lcd.zig");
@@ -104,7 +105,6 @@ var cart_names: [MAX_CARTS][MAX_CART_NAME_LEN]u8 = undefined;
 var cart_name_lengths: [MAX_CARTS]usize = undefined;
 var collect_index: usize = 0;
 var cart_list_truncated: bool = false;
-var brightness: u10 = 512;
 
 var screen_wait_for: terry.core0.TrackedStateMachine(enum {
     cart,
@@ -167,6 +167,8 @@ pub noinline fn main() !void {
 
         neopixel.poll();
 
+        adc.poll();
+
         // Process console input
         console.processInput();
 
@@ -223,6 +225,14 @@ pub noinline fn main() !void {
             tick_cart_select(pressed);
         } else {
             tick_cart_mailbox(buttons);
+        }
+
+        {
+            const light_level: f32 = @floatFromInt(adc.light_level);
+            // LCD backlight brightness range is 0--1023. The calculation below isn't based on
+            // anything in particular, it just looks okay in practice.
+            const brightness: f32 = light_level / 4.0 + 300;
+            lcd.set_backlight(std.math.lossyCast(u10, @ceil(brightness)));
         }
 
         if (cart_running and cart_display_active) {
@@ -298,6 +308,8 @@ fn tick_cart_mailbox(buttons: Controls) void {
     // Keep ipc_controls updated every iteration so carts always read fresh
     // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
     abi.ipc_data.controls = buttons;
+    abi.ipc_data.light_level = .{ .val = adc.light_level };
+    abi.ipc_data.battery_level = adc.battery_level;
 
     // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
     // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
@@ -420,9 +432,20 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
         }
 
         // For now, push neopixels on every present.
-        const neopixel_words_ptr: *volatile [4]u32 = @ptrCast(&abi.ipc_data.neopixels);
-        const neopixel_words = neopixel_words_ptr.*;
-        neopixel.set_neopixels(&neopixel_words);
+        {
+            const light_level: f32 = @floatFromInt(adc.light_level);
+            // The calculation below isn't based on anything in particular, it just looks okay in
+            // practice.
+            const multiplier: f32 = (light_level * light_level / 100_000 + 8) / 255;
+
+            var neopixels align(4) = abi.ipc_data.neopixels;
+            for (&neopixels) |*p| {
+                p.r = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.r))));
+                p.g = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.g))));
+                p.b = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.b))));
+            }
+            neopixel.set_neopixels(@ptrCast(&neopixels));
+        }
 
         // Flush selected shared-RAM framebuffer.
         fps_overlay.tick_cart();
@@ -590,8 +613,6 @@ fn refreshCartDisplay() void {
     }
 
     fps_overlay.redraw();
-
-    lcd.set_backlight(brightness);
 }
 
 /// Callback to count carts
@@ -707,6 +728,8 @@ fn runSelectedCart() void {
 fn init_cart_ipc_data() void {
     @memset(std.mem.asBytes(abi.ipc_data), 0);
     abi.ipc_data.controls = read_buttons();
+    abi.ipc_data.light_level = .{ .val = adc.light_level };
+    abi.ipc_data.battery_level = adc.battery_level;
     terry.client.prepare_for_cart();
     abi.ipc_data.os_flags = .{
         .os_clear_supported = false, // TODO OS clear

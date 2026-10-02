@@ -81,6 +81,11 @@ pub const Controls = packed struct(u16) {
     _pad: u7 = 0,
 };
 
+pub const Unsigned12 = packed struct(u16) {
+    val: u12,
+    unused: u4 = 0,
+};
+
 // An absolute AABB Rect 2D clipped to the screen
 pub const Rect8 = extern struct {
     min_x: u8, // inclusive
@@ -153,8 +158,8 @@ pub const neopixels: *volatile [5]NeopixelColor = platform.neopixels;
 pub const user_led: *volatile bool = platform.user_led;
 
 pub const controls: *const volatile Controls = platform.controls;
-pub const light_level: *const volatile u12 = platform.light_level;
-pub const battery_level: *const volatile u12 = platform.battery_level;
+pub const light_level: *const volatile Unsigned12 = platform.light_level;
+pub const battery_level: *const volatile u8 = platform.battery_level;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │

@@ -72,13 +72,19 @@ pub const neopixel_pio: Pio = .pio1;
 pub const revision_pin = gpio.num(47);
 pub const revision_adc: hal.adc.Input = .ain7;
 
+pub const light_sensor_pin = gpio.num(46);
+pub const light_sensor_adc: hal.adc.Input = .ain6;
+
+pub const battery_level_pin = gpio.num(45);
+pub const battery_level_adc: hal.adc.Input = .ain5;
+
 // DMA channel allocation
 pub const lcd_dma_ch = 0;
 pub const audio_dma_ch_0 = 1;
 pub const audio_dma_ch_1 = 2;
 pub const min_cart_dma = 3;
 pub const max_cart_dma = 16;
-pub const cart_dma_mask = ((1<<max_cart_dma)-1) - ((1<<min_cart_dma)-1);
+pub const cart_dma_mask = ((1 << max_cart_dma) - 1) - ((1 << min_cart_dma) - 1);
 
 pub const rev0 = struct {
     pub const audio = struct {

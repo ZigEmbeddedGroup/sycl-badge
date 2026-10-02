@@ -2,6 +2,7 @@
 const std = @import("std");
 const microzig = @import("microzig");
 const badge = microzig.board;
+const adc = @import("../drivers/adc.zig");
 const lcd = @import("../drivers/lcd.zig");
 const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
@@ -103,7 +104,7 @@ var debug_texts: [max_debug_texts]DebugText = undefined;
 var num_debug_texts: usize = 0;
 
 var curr_debug_text: usize = 0;
-const debug_img_chars = 4;
+const debug_img_chars = 8;
 const debug_pitch = font_width * debug_img_chars;
 var debug_img: [debug_pitch * font_height]lcd.Color16 = undefined;
 
@@ -459,7 +460,7 @@ fn add_cart_debug_text() void {
     // Right-justify the FPS value in 3 characters
     const avg: u32 = frame_times.average();
     const fps_display = if (avg > 0) 1_000_000 / avg else 0;
-    var buf: [4]u8 = undefined;
+    var buf: [debug_img_chars]u8 = undefined;
     const fps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{fps_display}) catch "???";
     add_debug_text(
         .{ .text = fps_str, .x = lcd.width, .y = 0, .alignment = .right, .color = lcd.YELLOW },
@@ -509,7 +510,7 @@ fn add_os_debug_text() void {
         poll_max = 0;
     }
 
-    var buf: [4]u8 = undefined;
+    var buf: [debug_img_chars]u8 = undefined;
 
     const poll_max_avg = poll_max_history.average();
     const pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_avg}) catch "????";
@@ -541,19 +542,25 @@ fn add_os_debug_text() void {
         );
     }
 
+    const battery_str = std.fmt.bufPrint(&buf, "{d:.3} V", .{adc.battery_voltage}) catch "????";
+    add_debug_text(
+        .{ .text = battery_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE },
+        &reserved_botright,
+    );
+
     if (rev.debug) {
         // Revision strings
         const revision = rev.revision;
         const reading: u32 = rev.raw_reading;
         const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
         add_debug_text(
-            .{ .text = rev_str, .x = lcd.width, .y = lcd.height - 2 * font_height, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = rev_str, .x = lcd.width, .y = lcd.height - 3 * font_height, .alignment = .right, .color = lcd.WHITE },
             &reserved_botright,
         );
 
         const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
         add_debug_text(
-            .{ .text = read_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = read_str, .x = lcd.width, .y = lcd.height - 2 * font_height, .alignment = .right, .color = lcd.WHITE },
             &reserved_botright,
         );
     }

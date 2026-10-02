@@ -61,10 +61,10 @@ pub fn micros_since_boot() u64 {
 
 /// Volatile: kernel (Core 0) writes button state every frame; cart must read fresh each access.
 pub const controls: *const volatile cart_api.Controls = &ipc_data.controls;
-pub const light_level: *volatile u12 = @ptrCast(&ipc_data.light_level);
+pub const light_level: *const volatile cart_api.Unsigned12 = &ipc_data.light_level;
 pub const neopixels: *volatile [5]cart_api.NeopixelColor = &ipc_data.neopixels;
 pub const user_led: *volatile bool = &ipc_data.user_led;
-pub const battery_level: *volatile u12 = @ptrCast(&ipc_data.battery_level);
+pub const battery_level: *const volatile u8 = &ipc_data.battery_level;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │

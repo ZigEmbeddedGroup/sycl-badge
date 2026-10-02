@@ -128,8 +128,8 @@ pub fn sim_thread_release_framebuffer() void {
 fn cart_thread_func(_: ?*anyopaque) callconv(.c) i32 {
     // Init the IO Block
     @memset(std.mem.asBytes(&simulator_io_block), 0);
-    simulator_io_block.light_level = ~@as(u12, 0);
-    simulator_io_block.battery_level = ~@as(u12, 0);
+    simulator_io_block.light_level = .{ .val = std.math.maxInt(u12) };
+    simulator_io_block.battery_level = std.math.maxInt(u8);
     simulator_io_block.api = &sim_api;
 
     performance_period_us = 1_000_000.0 / @as(f64, @floatFromInt(sdl.SDL_GetPerformanceFrequency()));

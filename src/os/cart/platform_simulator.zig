@@ -40,8 +40,8 @@ pub const neopixels: *volatile [5]cart_api.NeopixelColor = &simulator_io_block.n
 pub const user_led: *volatile bool = &simulator_io_block.user_led;
 
 pub const controls: *const volatile cart_api.Controls = &simulator_io_block.controls;
-pub const light_level: *const volatile u12 = &simulator_io_block.light_level;
-pub const battery_level: *const volatile u12 = &simulator_io_block.battery_level;
+pub const light_level: *const volatile cart_api.Unsigned12 = &simulator_io_block.light_level;
+pub const battery_level: *const volatile u8 = &simulator_io_block.battery_level;
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
 // │                                                                           │

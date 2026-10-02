@@ -27,6 +27,7 @@ pub const CartDescriptorTable = CartDescriptorTable_v1;
 pub const DisplayColor = api.DisplayColor;
 pub const NeopixelColor = api.NeopixelColor;
 pub const Controls = api.Controls;
+pub const Unsigned12 = api.Unsigned12;
 pub const Rect8 = api.Rect8;
 
 pub const tracy_buffer_size = 4096;
@@ -46,11 +47,11 @@ pub const CartIPCData = extern struct {
     _pad1: u8 = 0,                     // x1508F..x15090
 
     controls: Controls,                // x15090..x15092
-    light_level: u16,                  // x15092..x15094
+    light_level: Unsigned12,           // x15092..x15094
 
     user_led: bool,                    // x15094..x15095
-    _pad2: u8 = 0,                     // x15095..x15096
-    battery_level: u16,                // x15096..x15098
+    battery_level: u8,                 // x15095..x15096
+    _pad2: [2]u8 = @splat(0),          // x15096..x15098
 
     dirty_rect: Rect8,                 // x15098..x1509C
 

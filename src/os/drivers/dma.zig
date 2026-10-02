@@ -77,10 +77,6 @@ pub fn initLCD(spi_instance_num: u1) void {
 
 /// Start DMA transfer
 pub fn startLCD(framebuffer: []const u16) void {
-    if (isLCDbusy()) {
-        microzig.board.led_pin.put(1);
-    }
-
     std.mem.doNotOptimizeAway(framebuffer);
 
     // Check that the interrupt is clear
@@ -108,10 +104,6 @@ pub fn startLCD(framebuffer: []const u16) void {
 /// The pattern data must live for at least as long as the DMA
 /// transfer.
 pub fn startLCDPattern(data: [*]const u16, low_bits: u32, total_words: u32) void {
-    if (isLCDbusy()) {
-        microzig.board.led_pin.put(1);
-    }
-
     std.mem.doNotOptimizeAway(data);
 
     // Check that the interrupt is clear

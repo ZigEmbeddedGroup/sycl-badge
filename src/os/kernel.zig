@@ -299,6 +299,8 @@ fn tick_cart_mailbox(buttons: Controls) void {
     // button state (fixes start/select recognition in spaceshooter, metalgear-timer).
     abi.ipc_data.controls = buttons;
 
+    gpio.setLED(abi.ipc_data.user_led);
+
     // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
     // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
     const now_us = timer.micros();

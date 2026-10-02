@@ -61,9 +61,6 @@ pub const button_b = gpio.num(7); // B1
 pub const button_start = gpio.num(5); // START1
 pub const button_select = gpio.num(38); // SELECT1
 
-// Alias for compatibility with existing demos
-pub const A5_D13 = led_pin;
-
 pub const i2s_pio: Pio = .pio0;
 pub const neopixel_pio: Pio = .pio1;
 

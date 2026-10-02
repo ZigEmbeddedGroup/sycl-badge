@@ -70,12 +70,19 @@ pub const CartIPCData = extern struct {
     vsync_flags: u32,                  // x150E0..x150E4
     vsync_frame_ms: f32,               // x150E4..x150E8
     clear_color: DisplayColor,         // x150E8..x150EA
-    _pad6: u16 = 0,                    // x150EA..x150EC
+    os_flags: packed struct (u16) {    // x150EA..x150EC
+        os_clear_supported: bool,
+        _reserved: u15 = 0,
+    },
+
+    cart_dma_channels: u16,            // x150EC..x150EE
+    _pad6: u16 = 0,                    // x150EE..x150F0
+    _reserved: [4]u32 = @splat(0),     // x150F0..x15100
 
     comptime {
         // cart_xip.ld reserves 0x15100 bytes for IPC data.
         // If it grows more than that, the linker script needs to be updated.
-        std.debug.assert(@sizeOf(CartIPCData) <= 0x15100);
+        std.debug.assert(@sizeOf(CartIPCData) == 0x15100);
     }
 };
 // zig fmt: on

@@ -677,10 +677,7 @@ fn runSelectedCart() void {
     // Write current button state before cart's first frame.
     // Carts read at start of update(); this ensures frame 0 sees real buttons
     // rather than all-zero (which broke metalgear-timer and spaceshooter).
-    abi.ipc_data.controls = read_buttons();
-    @memset(std.mem.asBytes(&abi.ipc_data.framebuffers), 0);
-    @memset(std.mem.asBytes(&abi.ipc_data.neopixels), 0);
-    terry.client.prepare_for_cart();
+    init_cart_ipc_data();
 
     // Execute the cart
     console.println("[BTN] calling executeCart...");
@@ -705,6 +702,16 @@ fn runSelectedCart() void {
         timer.sleep_ms(2000);
         refreshCartDisplay();
     }
+}
+
+fn init_cart_ipc_data() void {
+    @memset(std.mem.asBytes(abi.ipc_data), 0);
+    abi.ipc_data.controls = read_buttons();
+    terry.client.prepare_for_cart();
+    abi.ipc_data.os_flags = .{
+        .os_clear_supported = false, // TODO OS clear
+    };
+    abi.ipc_data.cart_dma_channels = board.cart_dma_mask;
 }
 
 /// Callback to display a cart entry on the LCD

@@ -163,10 +163,8 @@ pub fn abortCartChannels() void {
     // DMA base = 0x50000000, CHAN_ABORT offset = 0x444.
     const DMA_CHAN_ABORT: *volatile u32 = @ptrFromInt(0x50000444);
 
-    // Request abort for channels 3-15.
-    // Channel 0: LCD
-    // Channel 1-2: Audio
-    const cart_channel_mask: u32 = 0x0000_FFF8;
+    // Request abort for cart channels
+    const cart_channel_mask: u32 = microzig.board.cart_dma_mask;
     DMA_CHAN_ABORT.* = cart_channel_mask;
 
     // Wait until all requested aborts have been serviced (register clears).

@@ -254,9 +254,11 @@ pub fn present() void {
             dirty_rect = .all;
             // TODO If we do this in the OS, we can do it while the frame is being copied to
             // the lcd, saving lots of time! For now though, just SIMD it.
-            const color_16: u16 = @bitCast(color);
-            const color_32: u32 = @as(u32, color_16) << 16 | color_16;
-            @memset(@as(*[screen_width * screen_height / 2]u32, @ptrCast(frontbuffer)), color_32);
+            if (!platform.supports_os_clear()) {
+                const color_16: u16 = @bitCast(color);
+                const color_32: u32 = @as(u32, color_16) << 16 | color_16;
+                @memset(@as(*[screen_width * screen_height / 2]u32, @ptrCast(frontbuffer)), color_32);
+            }
         },
         .no_copy_dirty_rect => {
             dirty_rect = .none;

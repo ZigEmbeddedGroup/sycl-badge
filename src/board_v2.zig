@@ -72,6 +72,14 @@ pub const neopixel_pio: Pio = .pio1;
 pub const revision_pin = gpio.num(47);
 pub const revision_adc: hal.adc.Input = .ain7;
 
+// DMA channel allocation
+pub const lcd_dma_ch = 0;
+pub const audio_dma_ch_0 = 1;
+pub const audio_dma_ch_1 = 2;
+pub const min_cart_dma = 3;
+pub const max_cart_dma = 16;
+pub const cart_dma_mask = ((1<<max_cart_dma)-1) - ((1<<min_cart_dma)-1);
+
 pub const rev0 = struct {
     pub const audio = struct {
         // Buzzer / Speaker (CMT-7525-80-SMT-TR)

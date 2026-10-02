@@ -542,27 +542,35 @@ fn add_os_debug_text() void {
         );
     }
 
-    const battery_str = std.fmt.bufPrint(&buf, "{d:.3} V", .{adc.battery_voltage}) catch "????";
-    add_debug_text(
-        .{ .text = battery_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE },
-        &reserved_botright,
-    );
+    var botright_y: i16 = lcd.height - font_height;
+
+    if (adc.has_battery_pin()) {
+        const battery_str = std.fmt.bufPrint(&buf, "{d:.3} V", .{adc.battery_voltage}) catch "????";
+        add_debug_text(
+            .{ .text = battery_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE },
+            &reserved_botright,
+        );
+        botright_y -= font_height;
+    }
 
     if (rev.debug) {
         // Revision strings
         const revision = rev.revision;
         const reading: u32 = rev.raw_reading;
-        const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
-        add_debug_text(
-            .{ .text = rev_str, .x = lcd.width, .y = lcd.height - 3 * font_height, .alignment = .right, .color = lcd.WHITE },
-            &reserved_botright,
-        );
 
         const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
         add_debug_text(
-            .{ .text = read_str, .x = lcd.width, .y = lcd.height - 2 * font_height, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = read_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
             &reserved_botright,
         );
+        botright_y -= font_height;
+
+        const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
+        add_debug_text(
+            .{ .text = rev_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
+            &reserved_botright,
+        );
+        botright_y -= font_height;
     }
 }
 

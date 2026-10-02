@@ -8,11 +8,11 @@ const adc = microzig.hal.adc;
 // Based on the voltage reading from this pin, we can
 // determine the version of  the hardware.
 // Rev 0 has no connection - 0v with pull-down (< 235 ADC reading)
-// Rev 1 - 0.27v (235 - 430 ADC reading)
+// Rev 1 - 0.27v (235 - 350 ADC reading)
 // Add other revisions here
 const r0_max = 235;
-const r1_max = 430;
-const r2_max = 595;
+const r1_max = 350;
+const r2_max = 525;
 const num_retries: usize = 10;
 
 /// Set this to true to add the ADC value to the

@@ -311,6 +311,8 @@ fn tick_cart_mailbox(buttons: Controls) void {
     abi.ipc_data.light_level = .{ .val = adc.light_level };
     abi.ipc_data.battery_level = adc.battery_level;
 
+    gpio.setLED(abi.ipc_data.user_led);
+
     // Periodic diagnostic: print raw GPIO reads + processed button state over USB CDC.
     // Fires on first cart-running entry and then every BTN_DIAG_US microseconds.
     const now_us = timer.micros();

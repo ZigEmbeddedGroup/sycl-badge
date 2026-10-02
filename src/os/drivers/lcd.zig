@@ -138,8 +138,6 @@ fn start_next_dma() void {
     state.* = .flush_spi;
 }
 
-var int_running: bool = false;
-
 // Interrupt handler for the "tearing effect" pin.
 // Called on vsync when set_vsync_interrupt(true)
 // has been called.
@@ -160,11 +158,6 @@ pub fn interrupt_DMA_0() callconv(.c) void {
         // TODO this causes a double-end, figure out why. Probably missing volatile on some tracy state.
         //const z = terry.core0.zone_color_cond("INTERRUPT DMA_0 (LCD)", @src(), 0x00FF7F, terry.client.interrupt_trace_enabled); defer z.end();
 
-        if (int_running) {
-            board.led_pin.put(1);
-        }
-        int_running = true;
-
         var should_start_dma = false;
 
         handle_dma: switch (state.*) {
@@ -184,8 +177,6 @@ pub fn interrupt_DMA_0() callconv(.c) void {
             },
             .ready, .flush_spi => {},
         }
-
-        int_running = false;
 
         DMA.INTS0.write_raw(0b1);
 

@@ -58,6 +58,9 @@ const DataOrientation = enum {
 var _state: State = .ready;
 var state: *volatile State = &_state;
 
+var num_vsyncs: u32 = 0;
+var min_vsyncs: u32 = 0;
+
 var dma_buf: [*]const u16 = undefined;
 var dma_buf_pitch: usize = 0;
 var dma_rects: [5]Rect8 = undefined;
@@ -67,8 +70,6 @@ var curr_scanlines_left: usize = 0;
 var curr_scanline: [*]const u16 = undefined;
 var curr_scanline_width: usize = 0;
 var dma_orientation: DataOrientation = .row_major;
-
-var cart_vsync_enabled: bool = false;
 
 fn setup_dma_rects(buf: [*]const u16, buf_pitch: usize, num_rects: usize, orientation: DataOrientation) void {
     dma_buf = buf;
@@ -141,16 +142,22 @@ fn start_next_dma() void {
 // Interrupt handler for the "tearing effect" pin.
 // Called on vsync when set_vsync_interrupt(true)
 // has been called.
-pub fn interrupt_te(events: gpio.IrqEvents) void {
-    if (events.rise != 0 and state.* == .wait_vsync) {
-        state.* = .wait_dma;
-        start_next_dma();
-        set_vsync_interrupt(false);
+pub fn interrupt_te(events: gpio.IrqEvents) linksection(".data") void {
+    if (events.rise != 0) {
+        num_vsyncs += 1;
+        if (state.* == .wait_vsync and num_vsyncs >= min_vsyncs) {
+            num_vsyncs = 0;
+            state.* = .wait_dma;
+            start_next_dma();
+            if (min_vsyncs <= 1) {
+                set_vsync_interrupt(false);
+            }
+        }
     }
 }
 
 // Interrupt handler for DMA finished
-pub fn interrupt_DMA_0() callconv(.c) void {
+pub fn interrupt_DMA_0() linksection(".data") callconv(.c) void {
     const DMA = microzig.chip.peripherals.DMA;
     const flags = DMA.INTS0.raw;
 
@@ -639,16 +646,19 @@ fn set_target_framerate_for_vsync(raw_frame_ms: f32) void {
     ensure_ready();
 
     writeCommandWithData(.FRMCTR1, &.{ setting.clk_div, setting.vsync_porch });
+    min_vsyncs = setting.sub_frames;
 }
 
 pub fn disable_vsync() void {
     set_framerate_no_vsync();
-    cart_vsync_enabled = false;
+    min_vsyncs = 0;
 }
 
 pub fn enable_vsync(frame_ms: f32) void {
     set_target_framerate_for_vsync(frame_ms);
-    cart_vsync_enabled = true;
+    if (min_vsyncs > 1) {
+        set_vsync_interrupt(true);
+    }
 }
 
 pub fn set_backlight(level: u10) void {
@@ -863,7 +873,7 @@ pub noinline fn drawImageClipped(x: i16, y: i16, w: i16, h: i16, data: [*]const 
 /// right-side-up landscape MADCTL=0x60 used for normal UI rendering.
 pub fn write_cart_buffer(buffer: []const u16, rect: Rect8) void {
     const has_data = rect.has_area();
-    if (!has_data and !cart_vsync_enabled) return;
+    if (!has_data and min_vsyncs == 0) return;
 
     ensure_ready();
 
@@ -876,10 +886,12 @@ pub fn write_cart_buffer(buffer: []const u16, rect: Rect8) void {
         setup_dma_region(undefined, 1, 0, 0, .row_major);
     }
 
-    if (cart_vsync_enabled) {
+    if (min_vsyncs != 0) {
         asm volatile ("" ::: .{ .memory = true });
         state.* = .wait_vsync;
-        set_vsync_interrupt(true);
+        if (min_vsyncs == 1) {
+            set_vsync_interrupt(true);
+        }
     } else if (has_data) {
         start_next_dma();
     }

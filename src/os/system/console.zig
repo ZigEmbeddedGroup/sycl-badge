@@ -1113,7 +1113,7 @@ var menu_y_pos: i16 = 0;
 fn menuCartVisitor(name: []const u8, size: u32) void {
     _ = size;
     if (menu_y_pos < 220) { // Don't draw past screen bottom
-        lcd.drawString(20, menu_y_pos, name, lcd.GREEN, lcd.BLACK, 1);
+        lcd.drawString(20, menu_y_pos, name, .green, .black, 1);
         menu_y_pos += 12;
     }
 }
@@ -1137,9 +1137,9 @@ fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("Restoring menu...\r\n");
 
     // Clear screen and draw header
-    lcd.fillScreen(lcd.BLACK);
-    lcd.drawString(10, 20, "SYCL Badge OS", lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(10, 40, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+    lcd.fillScreen(.black);
+    lcd.drawString(10, 20, "SYCL Badge OS", .white, .black, 1);
+    lcd.drawString(10, 40, "Available Carts:", .cyan, .black, 1);
 
     // List available carts
     menu_y_pos = 60;
@@ -1160,35 +1160,35 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "red")) {
         println("\r\nFilling LCD with RED...");
-        lcd.clearScreen(lcd.RED);
+        lcd.clearScreen(.red);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "green")) {
         println("\r\nFilling LCD with GREEN...");
-        lcd.clearScreen(lcd.GREEN);
+        lcd.clearScreen(.green);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "blue")) {
         println("\r\nFilling LCD with BLUE...");
-        lcd.clearScreen(lcd.BLUE);
+        lcd.clearScreen(.blue);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "yellow")) {
         println("\r\nFilling LCD with YELLOW...");
-        lcd.clearScreen(lcd.YELLOW);
+        lcd.clearScreen(.yellow);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "cyan")) {
         println("\r\nFilling LCD with CYAN...");
-        lcd.clearScreen(lcd.CYAN);
+        lcd.clearScreen(.cyan);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "magenta")) {
         println("\r\nFilling LCD with MAGENTA...");
-        lcd.clearScreen(lcd.MAGENTA);
+        lcd.clearScreen(.magenta);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "white")) {
         println("\r\nFilling LCD with WHITE...");
-        lcd.clearScreen(lcd.WHITE);
+        lcd.clearScreen(.white);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "black")) {
         println("\r\nFilling LCD with BLACK...");
-        lcd.clearScreen(lcd.BLACK);
+        lcd.clearScreen(.black);
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "fps")) {
         println("\r\nRunning FPS benchmark...");
@@ -1202,7 +1202,7 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 // LCD FPS Benchmark
 fn lcdFpsBenchmark() void {
-    const colors = [_]lcd.Color16{ lcd.RED, lcd.GREEN, lcd.BLUE, lcd.YELLOW, lcd.CYAN, lcd.MAGENTA };
+    const colors = [_]lcd.Color16{ .red, .green, .blue, .yellow, .cyan, .magenta };
 
     println("\r\nMeasuring DMA-based screen fill perf...");
     println("Filling screen 100 times with diff colors...");
@@ -1270,7 +1270,7 @@ fn cmdOverlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 fn lsVisitor(name: []const u8, size: u32) void {
     ls_file_count += 1;
     printf("  {s}  ({d} bytes)\r\n", .{ name, size });
-    lcd.drawString(10, ls_lcd_y, name, lcd.GREEN, lcd.BLACK, 1);
+    lcd.drawString(10, ls_lcd_y, name, .green, .black, 1);
     ls_lcd_y += 15;
 }
 

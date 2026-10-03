@@ -6,7 +6,7 @@ Welcome to the SYCL badge repository.
 
 ### Prerequisites
 
-- Zig `0.17.0-dev.1936+5a625d5f3`
+- Zig `0.17.0`
 
 ### Build Firmware and Carts
 

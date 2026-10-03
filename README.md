@@ -20,7 +20,14 @@ This will create:
 - zig-out/firmware: Badge OS binary
 - zig-out/bin: Miscellaneous tools for the host computer
 
-### Add a cart to the Badge
+### Create your cart
+
+To make your own cart,
+1. Make a directory in `carts/` for your cart. Copying an existing cart is recommended, or copy `carts/empty-cart` for a minimal starting point.
+2. Add a call to `add_cart` in build.zig for your new cart
+3. Use `zig build` to build
+
+### Load a cart onto the Badge
 
 1. Plug in the badge over USB so it mounts as a mass storage drive.
 2. Copy a `.uf2` from `zig-out/carts` onto the badge drive.

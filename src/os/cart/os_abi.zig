@@ -78,7 +78,8 @@ pub const CartIPCData = extern struct {
 
     cart_dma_channels: u16,            // x150EC..x150EE
     _pad6: u16 = 0,                    // x150EE..x150F0
-    _reserved: [4]u32 = @splat(0),     // x150F0..x15100
+    app_time: u32,                     // x150F0..x150F4
+    _reserved: [3]u32 = @splat(0),     // x150F0..x15100
 
     comptime {
         // cart_xip.ld reserves 0x15100 bytes for IPC data.
@@ -121,7 +122,8 @@ pub const PresentFlags = packed struct(u32) {
     has_dirty_rect: bool,
     vsync_updated: bool,
     clear_frame: bool,
-    _reserved: u20 = 0,
+    has_app_time: bool,
+    _reserved: u19 = 0,
     tag: u8 = FRAMEBUFFER_READY_V2,
 };
 

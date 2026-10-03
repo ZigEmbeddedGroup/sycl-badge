@@ -31,7 +31,9 @@ export fn _start() callconv(.c) void {
     // Sync the timer with the other core for tracy
     os_align_cycles();
 
+    frame_start_time = @truncate(micros_since_boot());
     root.start();
+    frame_start_time = @truncate(micros_since_boot());
     while (true) {
         // Keep the cycle counter accurate
         // TODO we could record uS times around each cart call,
@@ -77,6 +79,7 @@ pub const framebuffers: [2]cart_api.FramebufferPtr = .{ @volatileCast(&ipc_data.
 var vsync_updated: bool = false;
 var has_in_flight_frame: bool = false;
 var present_timeout_events: u32 = 0;
+var frame_start_time: u32 = 0;
 const present_wait_time_limit: u32 = 500_000; // 0.5 seconds
 
 pub fn set_vsync_disabled() void {
@@ -95,6 +98,9 @@ pub fn set_vsync_dynamic() void {
 }
 
 pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, clear_color: ?cart_api.DisplayColor) void {
+    const frame_end_time: u32 = @truncate(micros_since_boot());
+    const frame_app_time = (frame_end_time -% frame_start_time);
+
     // Drain completion messages to release the in-flight slot.
     while (fifo_try_recv()) |msg| {
         handle_os_message(msg);
@@ -130,10 +136,12 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
         .has_dirty_rect = dirty_rect.has_area(),
         .vsync_updated = vsync_updated,
         .clear_frame = clear_color != null,
+        .has_app_time = true,
     };
     vsync_updated = false;
 
     ipc_data.dirty_rect = dirty_rect;
+    ipc_data.app_time = frame_app_time;
 
     if (clear_color) |color| {
         ipc_data.clear_color = color;
@@ -144,6 +152,7 @@ pub fn present_and_acquire(draw_buffer_index: u1, dirty_rect: cart_api.Rect8, cl
     // Send the message
     fifo_send(@bitCast(message));
 
+    frame_start_time = @truncate(micros_since_boot());
     has_in_flight_frame = true;
 }
 

@@ -67,6 +67,7 @@ fn AveragingBuffer(comptime T: type, comptime window: u32) type {
 }
 
 var frame_times: AveragingBuffer(u32, 8) = .{};
+var app_times: AveragingBuffer(u32, 8) = .{};
 var poll_max_history: AveragingBuffer(u32, 32) = .{};
 var poll_max: u32 = 0;
 var audio_mix_times: AveragingBuffer(u32, 8) = .{};
@@ -323,7 +324,7 @@ fn time_delta(from: u64, to: u64) u32 {
 
 /// Update the FPS measurement.  Call once per rendered frame (before render()).
 /// Returns the current smoothed FPS value.
-pub fn tick_cart() void {
+pub fn tick_cart(app_time_us: u32) void {
     const now = timer.micros();
 
     if (last_frame_us != 0) {
@@ -333,6 +334,8 @@ pub fn tick_cart() void {
             frame_times.submit(elapsed);
         }
     }
+
+    app_times.submit(app_time_us);
 
     last_frame_us = now;
 
@@ -422,7 +425,7 @@ pub fn poll() void {
             microzig.chip.peripherals.BUSCTRL.PERFCTR0.write_raw(0);
             microzig.chip.peripherals.BUSCTRL.PERFCTR1.write_raw(0);
         }
-        xip_hit_rate = if (xip_acc == 0) 0 else @intFromFloat(9999.0 * @as(f32, @floatFromInt(xip_hit)) / @as(f32, @floatFromInt(xip_acc)));
+        xip_hit_rate = if (xip_acc == 0) 0 else @intFromFloat(99999.0 * @as(f32, @floatFromInt(xip_hit)) / @as(f32, @floatFromInt(xip_acc)));
         const delta_cycles = cycles -% last_xip_sample_cycles;
         xip_stall_rate = if (delta_cycles == 0) 0 else @intFromFloat(9999.0 * @as(f32, @floatFromInt(xip_stall_0 + xip_stall_1)) / @as(f32, @floatFromInt(delta_cycles)));
 
@@ -448,6 +451,21 @@ pub fn submit_lcd_work() void {
     }
 }
 
+fn fmt_int(buf: []u8, val: u32) ![]const u8 {
+    @memset(buf, ' ');
+    buf[buf.len-1] = '0';
+    var remain = val;
+    for (0..buf.len) |i| {
+        const idx = buf.len - 1 - i;
+        buf[idx] = '0' + @as(u8, @intCast(remain % 10));
+        remain = remain / 10;
+        if (remain == 0) break;
+    }
+
+    if (remain != 0) return error.TooBig;
+    return buf;
+}
+
 /// Draw the FPS counter onto the top-right corner of the LCD.
 /// Call after the frame has been flushed to the display (after
 /// lcd.write_cart_buffer() or lcd.present()), while the SPI bus is idle,
@@ -461,9 +479,17 @@ fn add_cart_debug_text() void {
     const avg: u32 = frame_times.average();
     const fps_display = if (avg > 0) 1_000_000 / avg else 0;
     var buf: [debug_img_chars]u8 = undefined;
-    const fps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{fps_display}) catch "???";
+    const fps_str = fmt_int(buf[0..3], fps_display) catch "???";
     add_debug_text(
         .{ .text = fps_str, .x = lcd.width, .y = 0, .alignment = .right, .color = lcd.YELLOW },
+        &reserved_topright,
+    );
+
+    var app_time = app_times.average();
+    if (app_time == 0) app_time = avg;
+    const us_str = fmt_int(buf[0..6], app_time) catch "!!!!!!";
+    add_debug_text(
+        .{ .text = us_str, .x = lcd.width - 3*font_width, .y = 0, .alignment = .right, .color = lcd.CYAN },
         &reserved_topright,
     );
 
@@ -473,13 +499,15 @@ fn add_cart_debug_text() void {
     const audio_pct_avg = @as(u32, @intFromFloat(audio_percent.average() * 100));
     const audio_mix_avg = audio_mix_times.average();
     if (audio_pct_avg != 0 or audio_mix_avg != 0) {
-        const audio_avg_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{audio_pct_avg}) catch "!!!!";
+        var audio_avg_str = fmt_int(buf[0..3], audio_pct_avg) catch "!!!!";
+        buf[3] = '%';
+        audio_avg_str.len = 4;
         add_debug_text(
             .{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = lcd.GREEN },
             &reserved_topleft,
         );
 
-        const audio_time_str = std.fmt.bufPrint(&buf, "{d:>4}", .{audio_mix_avg}) catch "!!!!";
+        const audio_time_str = fmt_int(buf[0..4], audio_mix_avg) catch "!!!!";
         add_debug_text(
             .{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE },
             &reserved_topleft,
@@ -488,7 +516,9 @@ fn add_cart_debug_text() void {
 
     if (display_max_audio_delay != 0) {
         const poll_max_max = poll_max_history.max();
-        const audio_delay_str = std.fmt.bufPrint(&buf, "{d:>3}%", .{poll_max_max * 100 / display_max_audio_delay}) catch "!!!%";
+        var audio_delay_str = fmt_int(buf[0..3], poll_max_max * 100 / display_max_audio_delay) catch "!!!%";
+        buf[3] = '%';
+        audio_delay_str.len = 4;
         add_debug_text(
             .{ .text = audio_delay_str, .x = 4 * font_width, .y = 0, .alignment = .left, .color = lcd.RED },
             &reserved_topleft,
@@ -496,7 +526,7 @@ fn add_cart_debug_text() void {
     }
 
     if (display_max_audio != 0) {
-        const audio_max_str = std.fmt.bufPrint(&buf, "{d:>4}", .{display_max_audio}) catch "!!!!";
+        const audio_max_str = fmt_int(buf[0..4], display_max_audio) catch "!!!!";
         add_debug_text(
             .{ .text = audio_max_str, .x = 4 * font_width, .y = font_height, .alignment = .left, .color = lcd.RED },
             &reserved_topleft,
@@ -513,21 +543,21 @@ fn add_os_debug_text() void {
     var buf: [debug_img_chars]u8 = undefined;
 
     const poll_max_avg = poll_max_history.average();
-    const pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_avg}) catch "????";
+    const pps_str = fmt_int(buf[0..4], poll_max_avg) catch "????";
     add_debug_text(
         .{ .text = pps_str, .x = lcd.width, .y = font_height, .alignment = .right, .color = lcd.MAGENTA },
         &reserved_topright,
     );
 
     const poll_max_max = poll_max_history.max();
-    const max_pps_str = std.fmt.bufPrint(&buf, "{d:>4}", .{poll_max_max}) catch "????";
+    const max_pps_str = fmt_int(buf[0..5], poll_max_max) catch "?????";
     add_debug_text(
         .{ .text = max_pps_str, .x = @intCast(lcd.width - (4 * font_width)), .y = 8, .alignment = .right, .color = lcd.RED },
         &reserved_topright,
     );
 
     if (xip_hit_rate != 0) {
-        const xip_str = std.fmt.bufPrint(&buf, "{d:0>4}", .{xip_hit_rate}) catch "????";
+        const xip_str = fmt_int(buf[0..5], xip_hit_rate) catch "?????";
         add_debug_text(
             .{ .text = xip_str, .x = lcd.width, .y = 16, .alignment = .right, .color = lcd.GREEN },
             &reserved_topright,
@@ -535,9 +565,9 @@ fn add_os_debug_text() void {
     }
 
     if (xip_stall_rate != 0) {
-        const xip_str = std.fmt.bufPrint(&buf, "{d:0>4}", .{xip_stall_rate}) catch "????";
+        const xip_str = fmt_int(buf[0..4], xip_stall_rate) catch "????";
         add_debug_text(
-            .{ .text = xip_str, .x = lcd.width - (4 * font_width), .y = 16, .alignment = .right, .color = lcd.RED },
+            .{ .text = xip_str, .x = lcd.width - (5 * font_width), .y = 16, .alignment = .right, .color = lcd.RED },
             &reserved_topright,
         );
     }
@@ -558,14 +588,14 @@ fn add_os_debug_text() void {
         const revision = rev.revision;
         const reading: u32 = rev.raw_reading;
 
-        const read_str = std.fmt.bufPrint(&buf, "{d}", .{reading}) catch "!@*?";
+        const read_str = fmt_int(buf[0..4], reading) catch "!@*?";
         add_debug_text(
             .{ .text = read_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
             &reserved_botright,
         );
         botright_y -= font_height;
 
-        const rev_str = std.fmt.bufPrint(&buf, "{d}", .{revision}) catch "unkn";
+        const rev_str = fmt_int(buf[0..4], @backingInt(revision)) catch "unkn";
         add_debug_text(
             .{ .text = rev_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
             &reserved_botright,

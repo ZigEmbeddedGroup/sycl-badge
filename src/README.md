@@ -31,7 +31,6 @@ The repository currently contains three cart build styles:
 
 - [os](os): kernel, drivers, loader, IPC, and cart API
 - [cart](cart): cart runtime glue and standalone HAL
-- [badge-v1](badge-v1): legacy badge v1 firmware code
 - [board_v2.zig](board_v2.zig): board definition for v2
 - [font.zig](font.zig): bitmap font used by cart APIs
 

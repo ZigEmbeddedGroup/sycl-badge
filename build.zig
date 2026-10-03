@@ -219,7 +219,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .optimize = options.optimize,
         .root_source_file = options.root_source_file,
         .linker_script = .{
-            .file = dep.builder.path("src/cart/cart_ram.ld"),
+            .file = dep.builder.path("src/os/cart/badge_cart.ld"),
             .generate = .none,
             .assert_microzig_main = false,
         },

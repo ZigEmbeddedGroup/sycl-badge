@@ -17,7 +17,7 @@ pub const is_simulator = switch (builtin.os.tag) {
 pub const platform = if (is_simulator)
     @import("platform_simulator.zig")
 else
-    @import("platform_cart_ram.zig");
+    @import("platform_badge.zig");
 
 /// Exports the code to interface with the platform on
 /// startup. All carts must call this, either at comptime

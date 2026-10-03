@@ -171,6 +171,20 @@ pub fn build(b: *Build) void {
     calc_version_step.dependOn(&run_calc_version.step);
 
     b.installArtifact(calc_version);
+
+    const fuzzer = b.addExecutable(.{
+        .name = "fuzzer",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/os/fuzzer.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }),
+    });
+    b.installArtifact(fuzzer);
+
+    const fuzzer_run = b.addRunArtifact(fuzzer);
+    const fuzz = b.step("fuzz", "");
+    fuzz.dependOn(&fuzzer_run.step);
 }
 
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild, b: *Build) *microzig.Target {

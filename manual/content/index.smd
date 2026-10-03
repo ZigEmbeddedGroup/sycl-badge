@@ -121,6 +121,15 @@ source]($link.ref('building-from-source')) you need to:
 This will cause the drive to disappear and the Badge will reset, running your
 new OS firmware build.
 
+If you have a console connection to the Badge you can skip the buttons. The
+`reboot bootsel` console command restarts the Badge into the bootloader and the
+`RP2350` drive shows up. Over the USB serial port on Linux:
+
+```sh
+stty -F /dev/ttyACM0 raw
+printf 'reboot bootsel\r' > /dev/ttyACM0
+```
+
 # [Installing and Running `probe-rs`]($section.id('installing-and-running-probe-rs'))
 
 `probe-rs` or tools like it, such as OpenOCD, are not required for regular

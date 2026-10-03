@@ -15,24 +15,9 @@ jobs:
         with:
           version: v0.14.0
 
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@v4
-        with:
-            node-version: 20.x
-
       - name: Build manual
         working-directory: manual
         run: zine release
-
-      - name: Build simulator
-        working-directory: simulator
-        run: |
-          npm ci
-          npm run build
-          touch dist/.nojekyll
-
-      - name: Copy simulator to site
-        run: cp -a simulator/dist/* manual/public/simulator
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3

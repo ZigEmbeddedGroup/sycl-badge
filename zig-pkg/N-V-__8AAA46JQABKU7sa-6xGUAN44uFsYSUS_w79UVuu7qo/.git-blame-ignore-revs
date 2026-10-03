@@ -1,0 +1,4 @@
+# Use the following command to ignore the following commits in git blame:
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+77b9eb76369e27142b8be296b5f2eb1ca466272a # protocol: reindent wayland.xml

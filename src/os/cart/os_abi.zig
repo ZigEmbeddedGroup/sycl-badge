@@ -82,7 +82,7 @@ pub const CartIPCData = extern struct {
     _reserved: [3]u32 = @splat(0),     // x150F0..x15100
 
     comptime {
-        // cart_xip.ld reserves 0x15100 bytes for IPC data.
+        // badge_cart.ld reserves 0x15100 bytes for IPC data.
         // If it grows more than that, the linker script needs to be updated.
         std.debug.assert(@sizeOf(CartIPCData) == 0x15100);
     }

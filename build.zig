@@ -10,22 +10,24 @@ const MicroBuild = microzig.MicroBuild(.{
     .rp2xxx = true,
 });
 
+var simulator_target: std.Build.ResolvedTarget = undefined;
+
 pub fn build(b: *Build) void {
     const optimize = b.standardOptimizeOption(.{});
+    simulator_target = b.standardTargetOptions(.{});
 
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    const native_target = b.resolveTargetQuery(.{});
     const sdl = b.dependency("sdl", .{
         .optimize = .ReleaseSafe,
-        .target = native_target,
+        .target = simulator_target,
     });
     const simulator_core = b.addLibrary(.{
         .name = "simulator_core",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/simulator/main.zig"),
-            .target = native_target,
+            .target = simulator_target,
             .optimize = simulator_core_optimize,
             .imports = &.{
                 .{ .name = "sdl3", .module = sdl.module("sdl3") },
@@ -57,76 +59,85 @@ pub fn build(b: *Build) void {
     });
 
     // Install both ELF and UF2 formats
-    mb.install_firmware(kernel, .{ .format = .elf });
-    mb.install_firmware(kernel, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+    const install_uf2 = mb.add_install_firmware(kernel, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+    const install_elf = mb.add_install_firmware(kernel, .{ .format = .elf });
+    install_uf2.dir = .{ .custom = "firmware" };
+    install_elf.dir = .{ .custom = "firmware/debug" };
+    b.getInstallStep().dependOn(&install_uf2.step);
+    b.getInstallStep().dependOn(&install_elf.step);
 
     // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "lcd-text",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/lcd-text/src/main.zig"),
+        .root_source_file = b.path("carts/lcd-text/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "space-shooter",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/space-shooter/src/main.zig"),
+        .root_source_file = b.path("carts/space-shooter/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "blobs",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/blobs/src/blobs.zig"),
+        .root_source_file = b.path("carts/blobs/src/blobs.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "plasma",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/plasma/src/plasma.zig"),
+        .root_source_file = b.path("carts/plasma/src/plasma.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "metalgear-timer",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
+        .root_source_file = b.path("carts/metalgear-timer/src/metalgear-timer.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "neopixelpuzzle",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/neopixelpuzzle/src/main.zig"),
+        .root_source_file = b.path("carts/neopixelpuzzle/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "raytracer",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/raytracer/src/main.zig"),
+        .root_source_file = b.path("carts/raytracer/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "audio",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/audio/src/main.zig"),
+        .root_source_file = b.path("carts/audio/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "dvd",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/dvd/src/main.zig"),
-        .custom_builder = &@import("showcase/carts/dvd/build.zig").build_cart,
+        .root_source_file = b.path("carts/dvd/src/main.zig"),
+        .custom_builder = &@import("carts/dvd/build_assets.zig").build_cart,
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "zeroman",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/zeroman/src/main.zig"),
-        .custom_builder = @import("showcase/carts/zeroman/build.zig").build_cart,
+        .root_source_file = b.path("carts/zeroman/src/main.zig"),
+        .custom_builder = @import("carts/zeroman/build_assets.zig").build_cart,
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "vsync",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/vsync/src/main.zig"),
+        .root_source_file = b.path("carts/vsync/src/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "neopixel-test",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/neopixel-test/main.zig"),
+        .root_source_file = b.path("carts/neopixel-test/main.zig"),
     });
-    add_os_cart(b, &dep, .{
+    add_cart(b, &dep, .{
         .name = "sensors",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/sensors/main.zig"),
+        .root_source_file = b.path("carts/sensors/main.zig"),
+    });
+    add_cart(b, &dep, .{
+        .name = "empty-cart",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("carts/empty-cart/main.zig"),
     });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
@@ -194,7 +205,7 @@ pub const OsCartOptions = struct {
     custom_builder: ?*const fn (b: *Build, cart: *Build.Module, cart_api: *Build.Module, step: *Build.Step) void = null,
 };
 
-pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
+pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void {
     const mz_dep = dep.builder.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
@@ -219,7 +230,7 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .optimize = options.optimize,
         .root_source_file = options.root_source_file,
         .linker_script = .{
-            .file = dep.builder.path("src/cart/cart_ram.ld"),
+            .file = dep.builder.path("src/os/cart/badge_cart.ld"),
             .generate = .none,
             .assert_microzig_main = false,
         },
@@ -256,17 +267,20 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
         .root_source_file = b.path("src/os/system/tracy_protocol.zig"),
     }));
 
-    mb.install_firmware(fw, .{ .format = .elf });
-    mb.install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+    const install_uf2 = mb.add_install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });
+    const install_elf = mb.add_install_firmware(fw, .{ .format = .elf });
+    install_uf2.dir = .{ .custom = "carts" };
+    install_elf.dir = .{ .custom = "carts/debug" };
+    b.getInstallStep().dependOn(&install_uf2.step);
+    b.getInstallStep().dependOn(&install_elf.step);
 
     // native build for the simulator, for debugging.
     // api.zig detects freestanding at comptime to determine which platform to use.
-    const native_target = b.resolveTargetQuery(.{});
 
     // This is hacky as hell, but necessary since the root module specifies the build target.
     const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
     sim_module.* = fw.exe.root_module.*;
-    sim_module.resolved_target = native_target;
+    sim_module.resolved_target = simulator_target;
 
     const sim_obj = b.addLibrary(.{
         .name = b.fmt("{s}_module", .{options.name}),
@@ -275,12 +289,15 @@ pub fn add_os_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) vo
 
     const sim = b.addExecutable(.{
         .name = options.name,
-        .root_module = b.createModule(.{ .target = native_target }),
+        .root_module = b.createModule(.{ .target = simulator_target }),
     });
     sim.root_module.linkLibrary(dep.artifact("simulator_core"));
     sim.root_module.linkLibrary(sim_obj);
 
-    b.installArtifact(sim);
+    const sim_install = b.addInstallArtifact(sim, .{
+        .dest_dir = .{ .override = .{ .custom = "sim" } },
+    });
+    b.getInstallStep().dependOn(&sim_install.step);
 
     if (asset_step) |step| {
         sim.step.dependOn(step);

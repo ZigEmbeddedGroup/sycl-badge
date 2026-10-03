@@ -29,5 +29,5 @@ Carts typically export:
 
 Examples:
 
-- [../../../showcase/carts/lcd-text/src/main.zig](../../../showcase/carts/lcd-text/src/main.zig)
-- [../../../showcase/carts/plasma/src/plasma.zig](../../../showcase/carts/plasma/src/plasma.zig)
+- [../../../carts/lcd-text/src/main.zig](../../../carts/lcd-text/src/main.zig)
+- [../../../carts/plasma/src/plasma.zig](../../../carts/plasma/src/plasma.zig)

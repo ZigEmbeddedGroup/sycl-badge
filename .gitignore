@@ -1,9 +1,13 @@
 .zig-cache/
 zig-out/
-zig-pkg/
 .DS_Store
 .gdbinit
-zig-pkg
+
+# Ignore most packages, but check in wayland.
+# Zig needs to make a symlink to load this dependency,
+# which it can't do on windows, so we have to sideload it.
+/zig-pkg/*
+!/zig-pkg/N-V-__8AAA46JQABKU7sa-6xGUAN44uFsYSUS_w79UVuu7qo/
 
 kicad/#auto_saved_files#
 kicad/~SYCL Badge 2024.kicad_pcb.lck

@@ -11,6 +11,7 @@ const board = microzig.board;
 const font = board.font;
 const terry = @import("../system/terry.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
+const settings = @import("../system/settings.zig");
 const abi = @import("../cart/os_abi.zig");
 
 const Rect8 = abi.Rect8;
@@ -63,7 +64,7 @@ var min_vsyncs: u32 = 0;
 
 var dma_buf: [*]const u16 = undefined;
 var dma_buf_pitch: usize = 0;
-var dma_rects: [5]Rect8 = undefined;
+var dma_rects: [16]Rect8 = undefined;
 var num_dma_rects: usize = 0;
 var next_dma_rect: usize = 0;
 var curr_scanlines_left: usize = 0;
@@ -352,17 +353,17 @@ pub const Color16 = packed struct(u16) {
             .b = @truncate(b >> 3),
         };
     }
-};
 
-// Common colors (RGB565 format)
-pub const BLACK: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
-pub const WHITE: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x1F };
-pub const RED: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x00 };
-pub const GREEN: Color16 = .{ .r = 0x00, .g = 0x3F, .b = 0x00 };
-pub const BLUE: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x1F };
-pub const YELLOW: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x00 };
-pub const CYAN: Color16 = .{ .r = 0x00, .g = 0x3F, .b = 0x1F };
-pub const MAGENTA: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x1F };
+    // Common colors (RGB565 format)
+    pub const black: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x00 };
+    pub const white: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x1F };
+    pub const red: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x00 };
+    pub const green: Color16 = .{ .r = 0x00, .g = 0x3F, .b = 0x00 };
+    pub const blue: Color16 = .{ .r = 0x00, .g = 0x00, .b = 0x1F };
+    pub const yellow: Color16 = .{ .r = 0x1F, .g = 0x3F, .b = 0x00 };
+    pub const cyan: Color16 = .{ .r = 0x00, .g = 0x3F, .b = 0x1F };
+    pub const magenta: Color16 = .{ .r = 0x1F, .g = 0x00, .b = 0x1F };
+};
 
 /// Driver State
 var pins: Pins = undefined;
@@ -760,15 +761,15 @@ pub fn fillRect(x: i16, y: i16, w: i16, h: i16, color: Color16) void {
     end_data();
 }
 
-pub fn drawHLine(x: u16, y: u16, w: u16, color: Color16) void {
+pub fn drawHLine(x: i16, y: i16, w: i16, color: Color16) void {
     fillRect(x, y, w, 1, color);
 }
 
-pub fn drawVLine(x: u16, y: u16, h: u16, color: Color16) void {
+pub fn drawVLine(x: i16, y: i16, h: i16, color: Color16) void {
     fillRect(x, y, 1, h, color);
 }
 
-pub fn drawRect(x: u16, y: u16, w: u16, h: u16, color: Color16) void {
+pub fn drawRect(x: i16, y: i16, w: i16, h: i16, color: Color16) void {
     drawHLine(x, y, w, color);
     drawHLine(x, y + h - 1, w, color);
     drawVLine(x, y, h, color);
@@ -880,8 +881,31 @@ pub fn write_cart_buffer(buffer: []const u16, rect: Rect8) void {
     if (has_data) {
         writeCommandWithData(.MADCTL, &.{0x40});
 
-        const num_rects = fps_overlay.clip_draw_rects(rect, &dma_rects);
-        setup_dma_rects(buffer.ptr, height, num_rects, .col_major);
+        var clip_rects_buf: [5]Rect8 = undefined;
+        var clip_rects: std.ArrayList(Rect8) = .initBuffer(&clip_rects_buf);
+        fps_overlay.appendClipRects(&clip_rects); // up to 4
+        settings.appendClipRects(&clip_rects); // up to 1
+
+        const static = struct {
+            var frame_count: u32 = 0;
+        };
+        const dbg = static.frame_count % 1024 == 0;
+        static.frame_count += 1;
+
+        var out_rects: std.ArrayList(Rect8) = .initBuffer(&dma_rects);
+        out_rects.appendAssumeCapacity(rect);
+        for (clip_rects.items) |clip| {
+            if (dbg) log.info("clipping to {any}", .{clip});
+            clip.clipRects(&out_rects);
+            if (dbg) {
+                for (out_rects.items, 0..) |r, i| {
+                    log.info("[{d}] {any}", .{ i, r });
+                }
+            }
+        }
+
+        std.debug.assert(out_rects.items.ptr == &dma_rects);
+        setup_dma_rects(buffer.ptr, height, out_rects.items.len, .col_major);
     } else {
         setup_dma_region(undefined, 1, 0, 0, .row_major);
     }
@@ -901,7 +925,7 @@ pub fn write_cart_buffer(buffer: []const u16, rect: Rect8) void {
 pub fn testPattern() void {
     // Draw color bars
     const bar_height = height / 8;
-    const colors = [_]Color16{ RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE, BLACK };
+    const colors = [_]Color16{ .red, .green, .blue, .yellow, .cyan, .magenta, .white, .black };
 
     for (colors, 0..) |color, i| {
         fillRect(0, @intCast(i * bar_height), width, bar_height, color);
@@ -909,9 +933,9 @@ pub fn testPattern() void {
 }
 
 pub fn testText() void {
-    fillScreen(BLACK);
-    drawString(10, 10, "SYCL Badge OS", WHITE, BLACK, 2);
-    drawString(10, 30, "LCD Driver Test", GREEN, BLACK, 1);
+    fillScreen(.black);
+    drawString(10, 10, "SYCL Badge OS", .white, .black, 2);
+    drawString(10, 30, "LCD Driver Test", .green, .black, 1);
 }
 
 pub fn createDT018BTFTPins() LCDPins {

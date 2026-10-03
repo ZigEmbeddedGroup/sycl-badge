@@ -16,6 +16,7 @@ const rev = @import("drivers/rev.zig");
 const rtt = @import("drivers/rtt.zig");
 const neopixel = @import("drivers/neopixel.zig");
 const console = @import("system/console.zig");
+const settings = @import("system/settings.zig");
 const init = @import("system/init.zig");
 const fps_overlay = @import("system/fps_overlay.zig");
 const storage = @import("loader/storage.zig");
@@ -68,9 +69,9 @@ var cart_display_active: bool = true; // Track if we're showing the cart display
 const CART_CHECK_INTERVAL: u64 = 500_000;
 var next_cart_check: u64 = 0;
 
-// Stop combo: require both START+SELECT held for 500ms before triggering
-const STOP_COMBO_HOLD_US: u64 = 500_000;
-var stop_combo_deadline: u64 = 0; // 0 = not currently held
+// Settings combo: require both START+SELECT held for 500ms before triggering
+const SETTINGS_COMBO_HOLD_US: u64 = 500_000;
+var settings_combo_deadline: u64 = 0; // 0 = not currently held
 
 // Button diagnostic logging: print raw button state every BTN_DIAG_US microseconds
 // while a cart is running.  Uses timer.micros() so it fires at a wall-clock rate
@@ -175,7 +176,7 @@ pub noinline fn main() !void {
         // Check if cart is running - controls both button handling and display updates
         // Check for both .ready and .running states (cart is active from load until stop)
         const cart_state = loader.getState();
-        var cart_running = (cart_state == .running) or (cart_state == .ready);
+        const cart_running = (cart_state == .running) or (cart_state == .ready);
 
         // Check if the cart exited naturally, clean up cart state, and switch back to cart list
         if (!cart_running and !cart_display_active) {
@@ -192,22 +193,22 @@ pub noinline fn main() !void {
         _ = released; // not currently used
         defer last_buttons = buttons;
 
-        // Start + Select combo stops running cart (prevents accidental exit in carts
+        // Start + Select combo opens settings menu (prevents accidental opening in carts
         // that use the Start button for their own purposes).
         // Require both held for 250ms to avoid accidental trigger when pressing START alone.
-        const stop_combo = (buttons.start and buttons.select);
-        if (cart_running and stop_combo) {
-            if (stop_combo_deadline == 0) {
-                stop_combo_deadline = timer.micros() + STOP_COMBO_HOLD_US;
+        if (buttons.start and buttons.select and !settings.isActive()) {
+            if (settings_combo_deadline == 0) {
+                settings_combo_deadline = timer.micros() + SETTINGS_COMBO_HOLD_US;
             }
-            if (timer.micros() > stop_combo_deadline) {
+            if (timer.micros() > settings_combo_deadline) {
                 @branchHint(.unlikely);
 
-                stop_active_cart();
-                cart_running = false;
+                console.println("[BTN] START+SELECT (SETTINGS) pressed");
+                settings.activate(cart_running);
+                force_fullscreen_refresh = true;
             }
         } else {
-            stop_combo_deadline = 0;
+            settings_combo_deadline = 0;
         }
 
         // Joystick click toggles FPS overlay at any time (cart running or not)
@@ -220,15 +221,27 @@ pub noinline fn main() !void {
             console.printf("[BTN] CLICK: FPS overlay {s}\r\n", .{if (new_state) "on" else "off"});
         }
 
-        // Only process navigation buttons when cart is NOT running
-        if (!cart_running) {
-            tick_cart_select(pressed);
-        } else {
+        if (settings.isActive()) {
+            settings.update(pressed, cart_running, force_fullscreen_refresh);
+            force_fullscreen_refresh = false;
+            // Keep the active cart (or the selection UI) running, but don't send it any user input.
+            if (cart_running) {
+                tick_cart_mailbox(.none);
+            } else {
+                tick_cart_select(.none);
+            }
+            if (!settings.isActive()) {
+                // The settings menu was closed, so the screen needs a refresh.
+                force_fullscreen_refresh = true;
+            }
+        } else if (cart_running) {
             tick_cart_mailbox(buttons);
+        } else {
+            tick_cart_select(pressed);
         }
 
         {
-            const light_level: f32 = @floatFromInt(adc.light_level);
+            const light_level: f32 = @floatFromInt(settings.effectiveLightLevel());
             // LCD backlight brightness range is 0--1023. The calculation below isn't based on
             // anything in particular, it just looks okay in practice.
             const brightness: f32 = light_level / 4.0 + 300;
@@ -397,8 +410,7 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
         const buf: [*]const u8 = @volatileCast(&abi.ipc_data.trace_buf);
         console.printf("[CART] {s}\r\n", .{buf[0..len]});
     } else if (msg == abi.CART_VOLUME) {
-        const volume = abi.ipc_data.global_volume;
-        audio.set_global_volume(volume);
+        settings.setGlobalVolume(abi.ipc_data.global_volume);
     } else if (msg == abi.CART_STOP_AUDIO) {
         mailbox.send(abi.OS_ACK_STOP_AUDIO);
         audio.stop_buffered();
@@ -435,20 +447,7 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
         }
 
         // For now, push neopixels on every present.
-        {
-            const light_level: f32 = @floatFromInt(adc.light_level);
-            // The calculation below isn't based on anything in particular, it just looks okay in
-            // practice.
-            const multiplier: f32 = (light_level * light_level / 100_000 + 8) / 255;
-
-            var neopixels align(4) = abi.ipc_data.neopixels;
-            for (&neopixels) |*p| {
-                p.r = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.r))));
-                p.g = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.g))));
-                p.b = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.b))));
-            }
-            neopixel.set_neopixels(@ptrCast(&neopixels));
-        }
+        updateNeopixels();
 
         const app_time = if (flags.has_app_time) abi.ipc_data.app_time else 0;
 
@@ -472,8 +471,23 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
     // Other messages (e.g. CART_FINISHED) handled by loader state machine.
 }
 
-fn stop_active_cart() void {
-    console.println("[BTN] START+SELECT (STOP) pressed");
+pub fn updateNeopixels() void {
+    var pixels align(4) = abi.ipc_data.neopixels;
+    const light_level: f32 = @floatFromInt(settings.effectiveLightLevel());
+    // The calculation below isn't based on anything in particular, it just looks okay in
+    // practice.
+    const multiplier: f32 = (light_level * light_level / 90_000 + 8) / 255;
+
+    for (&pixels) |*p| {
+        p.r = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.r))));
+        p.g = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.g))));
+        p.b = std.math.lossyCast(u8, @ceil(multiplier * @as(f32, @floatFromInt(p.b))));
+    }
+    neopixel.set_neopixels(@ptrCast(&pixels));
+}
+
+pub fn stop_active_cart() void {
+    console.println("cart stop requested");
     reset_after_cart();
 }
 
@@ -483,7 +497,7 @@ fn reset_after_cart() void {
     console.println("[STOP] 2: lcd.reset");
     lcd.reset();
     console.println("[STOP] 3a: resetCartBuzzer");
-    audio.reset();
+    settings.setGlobalVolume(audio.initial_global_volume);
     console.println("[STOP] 3b: resetCartPWM");
     gpio.resetCartPWM();
     console.println("[STOP] 3c: resetCartPIO");
@@ -553,10 +567,10 @@ fn refreshCartDisplay() void {
     const z = terry.core0.fn_zone(@src());
     defer z.end();
 
-    lcd.fillScreen(lcd.BLACK);
+    lcd.fillScreen(.black);
 
     // Header
-    lcd.drawString(0, 2, "Available Carts:", lcd.CYAN, lcd.BLACK, 1);
+    lcd.drawString(0, 2, "Available Carts:", .cyan, .black, 1);
     cart_y_pos = CART_LIST_Y_START; // below header (8px char + 4px gap)
 
     draw_index = 0;
@@ -591,30 +605,30 @@ fn refreshCartDisplay() void {
     storage.listCarts(displayCart);
 
     if (list_top_index > 0) {
-        lcd.drawString(146, CART_LIST_Y_START, "^", lcd.CYAN, lcd.BLACK, 1);
+        lcd.drawString(146, CART_LIST_Y_START, "^", .cyan, .black, 1);
     }
     if (cart_count > list_top_index + CART_LIST_VISIBLE_ROWS) {
         const bottom_y = CART_LIST_Y_START + @as(i16, @intCast((CART_LIST_VISIBLE_ROWS - 1) * CART_LIST_ROW_HEIGHT));
-        lcd.drawString(146, bottom_y, "v", lcd.CYAN, lcd.BLACK, 1);
+        lcd.drawString(146, bottom_y, "v", .cyan, .black, 1);
     }
 
     if (cart_list_truncated) {
-        lcd.drawString(0, 118, "(showing first 64)", lcd.RED, lcd.BLACK, 1);
+        lcd.drawString(0, 118, "(showing first 64)", .red, .black, 1);
     }
 
     if (cart_count == 0) {
-        lcd.drawString(0, 50, "(No Carts)", lcd.YELLOW, lcd.BLACK, 1);
+        lcd.drawString(0, 50, "(No Carts)", .yellow, .black, 1);
     }
 
     // Always show the hardware revision in the bottom right corner
     var rev_buf: [16]u8 = undefined;
     const rev_str = std.fmt.bufPrint(&rev_buf, "SYCL 2026 rev{s}", .{rev.revision.str()}) catch "rev error";
     const gray: lcd.Color16 = .rgb(0x10, 0x10, 0x10);
-    lcd.drawString(@intCast(lcd.width - 8 * rev_str.len), lcd.height - 8, rev_str, gray, lcd.BLACK, 1);
+    lcd.drawString(@intCast(lcd.width - 8 * rev_str.len), lcd.height - 8, rev_str, gray, .black, 1);
 
     if (rev.debug or rev.revision == .unknown) {
         const adc_str = std.fmt.bufPrint(&rev_buf, "ADC:{d}", .{rev.raw_reading}) catch "rev error";
-        lcd.drawString(@intCast(lcd.width - 8 * adc_str.len), lcd.height - 16, adc_str, gray, lcd.BLACK, 1);
+        lcd.drawString(@intCast(lcd.width - 8 * adc_str.len), lcd.height - 16, adc_str, gray, .black, 1);
     }
 
     fps_overlay.redraw();
@@ -664,16 +678,16 @@ fn runSelectedCart() void {
     fps_overlay.reset_for_cart();
 
     // Show loading screen while the UF2 is read from storage and flashed.
-    lcd.fillScreen(lcd.BLACK);
-    lcd.drawString(0, 20, "Loading Cart", lcd.CYAN, lcd.BLACK, 1);
-    lcd.drawString(0, 40, name[0..@min(name.len, 18)], lcd.WHITE, lcd.BLACK, 1);
-    lcd.drawString(0, 60, "Please wait...", lcd.YELLOW, lcd.BLACK, 1);
+    lcd.fillScreen(.black);
+    lcd.drawString(0, 20, "Loading Cart", .cyan, .black, 1);
+    lcd.drawString(0, 40, name[0..@min(name.len, 18)], .white, .black, 1);
+    lcd.drawString(0, 60, "Please wait...", .yellow, .black, 1);
 
     // Load the cart
     console.println("[BTN] calling loadUF2Cart...");
     const entry_point = loader.loadUF2Cart(name) catch |err| {
         // Show error on LCD
-        lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
+        lcd.fillRect(0, 50, lcd.width, 70, .black);
         const error_msg = switch (err) {
             loader.LoadError.FileNotFound => "Cart not found",
             loader.LoadError.FileTooLarge => "UF2 too large",
@@ -684,7 +698,7 @@ fn runSelectedCart() void {
             loader.LoadError.FlashWriteError => "Flash error",
             loader.LoadError.ReadError => "Read error",
         };
-        lcd.drawString(10, 50, error_msg, lcd.RED, lcd.BLACK, 1);
+        lcd.drawString(10, 50, error_msg, .red, .black, 1);
         timer.sleep_ms(2000);
         refreshCartDisplay();
         return;
@@ -723,8 +737,8 @@ fn runSelectedCart() void {
     } else {
         // Execution failed
         console.println("[BTN] executeCart FAILED");
-        lcd.fillRect(0, 50, lcd.width, 70, lcd.BLACK);
-        lcd.drawString(0, 50, "Failed to run", lcd.RED, lcd.BLACK, 1);
+        lcd.fillRect(0, 50, lcd.width, 70, .black);
+        lcd.drawString(0, 50, "Failed to run", .red, .black, 1);
         timer.sleep_ms(2000);
         refreshCartDisplay();
     }
@@ -761,8 +775,8 @@ fn displayCart(name: []const u8, size: u32) void {
     if (draw_index >= list_top_index and draw_index < list_top_index + CART_LIST_VISIBLE_ROWS) {
         const row = draw_index - list_top_index;
         const y = CART_LIST_Y_START + @as(i16, @intCast(row)) * CART_LIST_ROW_HEIGHT;
-        const color = if (draw_index == cursor_index) lcd.YELLOW else lcd.WHITE;
-        lcd.drawString(0, y, text, color, lcd.BLACK, 1);
+        const color: lcd.Color16 = if (draw_index == cursor_index) .yellow else .white;
+        lcd.drawString(0, y, text, color, .black, 1);
     }
 
     draw_index += 1;

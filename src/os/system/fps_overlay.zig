@@ -110,137 +110,27 @@ const debug_pitch = font_width * debug_img_chars;
 var debug_img: [debug_pitch * font_height]lcd.Color16 = undefined;
 
 // Reserved areas to avoid overwriting with cart data
-var reserved_topleft: struct { max_x: u8 = 0, max_y: u8 = 0 } = .{};
-var reserved_topright: struct { min_x: u8 = lcd.width, max_y: u8 = 0 } = .{};
-var reserved_botleft: struct { max_x: u8 = 0, min_y: u8 = lcd.height } = .{};
-var reserved_botright: struct { min_x: u8 = lcd.width, min_y: u8 = lcd.height } = .{};
+var reserved_topleft: Rect8 = .{ .min_x = 0, .max_x = 0, .min_y = 0, .max_y = 0 };
+var reserved_topright: Rect8 = .{ .min_x = lcd.width, .max_x = lcd.width, .min_y = 0, .max_y = 0 };
+var reserved_botleft: Rect8 = .{ .min_x = 0, .max_x = 0, .min_y = lcd.height, .max_y = lcd.height };
+var reserved_botright: Rect8 = .{ .min_x = lcd.width, .max_x = lcd.width, .min_y = lcd.height, .max_y = lcd.height };
 
 fn reset_debug_text() void {
     num_debug_texts = 0;
     curr_debug_text = 0;
-    reserved_topleft = .{};
-    reserved_topright = .{};
-    reserved_botleft = .{};
-    reserved_botright = .{};
+    reserved_topleft = .{ .min_x = 0, .max_x = 0, .min_y = 0, .max_y = 0 };
+    reserved_topright = .{ .min_x = lcd.width, .max_x = lcd.width, .min_y = 0, .max_y = 0 };
+    reserved_botleft = .{ .min_x = 0, .max_x = 0, .min_y = lcd.height, .max_y = lcd.height };
+    reserved_botright = .{ .min_x = lcd.width, .max_x = lcd.width, .min_y = lcd.height, .max_y = lcd.height };
 }
 
-var frame_count: usize = 0;
-
-pub fn clip_draw_rects(in_rect: Rect8, out_rects: *[5]Rect8) usize {
-    out_rects.* = undefined;
-    out_rects[0] = in_rect;
-    if (!enabled) return 1;
-
-    const dbg = frame_count % 1024 == 0;
-    frame_count += 1;
-
-    if (dbg) log.info("Clipping rect: {any}", .{in_rect});
-
-    var rects: std.ArrayList(Rect8) = .fromOwnedSlice(out_rects);
-    rects.items.len = 1;
-
-    if (dbg) log_corner("reserved_botleft");
-    clip_corner(&rects, reserved_botleft);
-    if (dbg) {
-        for (rects.items, 0..) |rect, i| {
-            log.info("Rect {d}: {any}", .{ i, rect });
-        }
-    }
-    if (dbg) log_corner("reserved_topleft");
-    clip_corner(&rects, reserved_topleft);
-    if (dbg) {
-        for (rects.items, 0..) |rect, i| {
-            log.info("Rect {d}: {any}", .{ i, rect });
-        }
-    }
-    if (dbg) log_corner("reserved_topright");
-    clip_corner(&rects, reserved_topright);
-    if (dbg) {
-        for (rects.items, 0..) |rect, i| {
-            log.info("Rect {d}: {any}", .{ i, rect });
-        }
-    }
-    if (dbg) log_corner("reserved_botright");
-    clip_corner(&rects, reserved_botright);
-    if (dbg) {
-        for (rects.items, 0..) |rect, i| {
-            log.info("Rect {d}: {any}", .{ i, rect });
-        }
-    }
-
-    if (dbg) log.info("End Rects", .{});
-
-    return rects.items.len;
-}
-
-fn log_corner(comptime name: []const u8) void {
-    const corner = @field(@This(), name);
-    const fields = @typeInfo(@TypeOf(corner)).@"struct".field_names;
-    log.info("{s}: {s}={d}, {s}={d}", .{ name, fields[0], @field(corner, fields[0]), fields[1], @field(corner, fields[1]) });
-}
-
-inline fn clip_corner(rects: *std.ArrayList(Rect8), corner: anytype) void {
-    const Corner = @TypeOf(corner);
-    var rect_idx = rects.items.len;
-    while (rect_idx > 0) {
-        rect_idx -= 1;
-        const rect = &rects.items[rect_idx];
-        // zig fmt: off
-        const misses_rect: bool =
-               @hasField(Corner, "min_x") and corner.min_x >= rect.max_x
-            or @hasField(Corner, "min_y") and corner.min_y >= rect.max_y
-            or @hasField(Corner, "max_x") and corner.max_x <= rect.min_x
-            or @hasField(Corner, "max_y") and corner.max_y <= rect.min_y;
-        // zig fmt: on
-        if (!misses_rect) {
-            // Check if a rect is split
-            var clip_idx = rect_idx;
-            if (@hasField(Corner, "min_x") and corner.min_x > rect.min_x) {
-                rects.insertAssumeCapacity(clip_idx + 1, rects.items[clip_idx]);
-                rects.items[clip_idx].max_x = corner.min_x;
-                rects.items[clip_idx + 1].min_x = corner.min_x;
-                clip_idx += 1;
-            }
-            if (@hasField(Corner, "max_x") and corner.max_x < rect.max_x) {
-                rects.insertAssumeCapacity(clip_idx + 1, rects.items[clip_idx]);
-                rects.items[clip_idx].max_x = corner.max_x;
-                rects.items[clip_idx + 1].min_x = corner.max_x;
-            }
-
-            if (@hasField(Corner, "min_y") and @hasField(Corner, "max_y")) {
-                @compileError("Splitting the middle of a scanline is unsupported");
-            } else if (@hasField(Corner, "max_y")) {
-                if (corner.max_y >= rect.max_y) {
-                    _ = rects.orderedRemove(clip_idx);
-                } else {
-                    rects.items[clip_idx].min_y = corner.max_y;
-                }
-            } else if (@hasField(Corner, "min_y")) {
-                if (corner.min_y <= rect.min_y) {
-                    _ = rects.orderedRemove(clip_idx);
-                } else {
-                    rects.items[clip_idx].max_y = corner.min_y;
-                }
-            }
-        }
-    }
-}
-
-inline fn expand_corner(corner: anytype, rect: [4]i16) void {
-    const Corner = @typeInfo(@TypeOf(corner)).pointer.child;
-    const rect8: Rect8 = .clip_relative(i16, rect);
-    if (@hasField(Corner, "min_x")) {
-        corner.min_x = @min(corner.min_x, rect8.min_x);
-    }
-    if (@hasField(Corner, "min_y")) {
-        corner.min_y = @min(corner.min_y, rect8.min_y);
-    }
-    if (@hasField(Corner, "max_x")) {
-        corner.max_x = @max(corner.max_x, rect8.max_x);
-    }
-    if (@hasField(Corner, "max_y")) {
-        corner.max_y = @max(corner.max_y, rect8.max_y);
-    }
+pub fn appendClipRects(buf: *std.ArrayList(Rect8)) void {
+    if (enabled) buf.appendSliceAssumeCapacity(&.{
+        reserved_botleft,
+        reserved_topleft,
+        reserved_topright,
+        reserved_botright,
+    });
 }
 
 const DebugTextOptions = struct {
@@ -249,14 +139,18 @@ const DebugTextOptions = struct {
     y: i16,
     alignment: enum { left, center, right },
     color: lcd.Color16,
-    bg_color: lcd.Color16 = lcd.BLACK,
+    bg_color: lcd.Color16 = .black,
 };
-fn add_debug_text(opts: DebugTextOptions, corner: anytype) void {
+fn add_debug_text(opts: DebugTextOptions, corner: *Rect8) void {
     if (opts.text.len == 0) return;
     if (num_debug_texts >= max_debug_texts) return;
 
     const rect = add_debug_text_internal(opts);
-    expand_corner(corner, rect);
+    const rect8: Rect8 = .clip_relative(i16, rect);
+    corner.min_x = @min(corner.min_x, rect8.min_x);
+    corner.min_y = @min(corner.min_y, rect8.min_y);
+    corner.max_x = @max(corner.max_x, rect8.max_x);
+    corner.max_y = @max(corner.max_y, rect8.max_y);
 }
 fn add_debug_text_internal(opts: DebugTextOptions) [4]i16 {
     // For now truncate the text
@@ -481,7 +375,7 @@ fn add_cart_debug_text() void {
     var buf: [debug_img_chars]u8 = undefined;
     const fps_str = fmt_int(buf[0..3], fps_display) catch "???";
     add_debug_text(
-        .{ .text = fps_str, .x = lcd.width, .y = 0, .alignment = .right, .color = lcd.YELLOW },
+        .{ .text = fps_str, .x = lcd.width, .y = 0, .alignment = .right, .color = .yellow },
         &reserved_topright,
     );
 
@@ -489,7 +383,7 @@ fn add_cart_debug_text() void {
     if (app_time == 0) app_time = avg;
     const us_str = fmt_int(buf[0..6], app_time) catch "!!!!!!";
     add_debug_text(
-        .{ .text = us_str, .x = lcd.width - 3*font_width, .y = 0, .alignment = .right, .color = lcd.CYAN },
+        .{ .text = us_str, .x = lcd.width - 3*font_width, .y = 0, .alignment = .right, .color = .cyan },
         &reserved_topright,
     );
 
@@ -503,13 +397,13 @@ fn add_cart_debug_text() void {
         buf[3] = '%';
         audio_avg_str.len = 4;
         add_debug_text(
-            .{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = lcd.GREEN },
+            .{ .text = audio_avg_str, .x = 0, .y = 0, .alignment = .left, .color = .green },
             &reserved_topleft,
         );
 
         const audio_time_str = fmt_int(buf[0..4], audio_mix_avg) catch "!!!!";
         add_debug_text(
-            .{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = lcd.BLUE },
+            .{ .text = audio_time_str, .x = 0, .y = 8, .alignment = .left, .color = .blue },
             &reserved_topleft,
         );
     }
@@ -520,7 +414,7 @@ fn add_cart_debug_text() void {
         buf[3] = '%';
         audio_delay_str.len = 4;
         add_debug_text(
-            .{ .text = audio_delay_str, .x = 4 * font_width, .y = 0, .alignment = .left, .color = lcd.RED },
+            .{ .text = audio_delay_str, .x = 4 * font_width, .y = 0, .alignment = .left, .color = .red },
             &reserved_topleft,
         );
     }
@@ -528,7 +422,7 @@ fn add_cart_debug_text() void {
     if (display_max_audio != 0) {
         const audio_max_str = fmt_int(buf[0..4], display_max_audio) catch "!!!!";
         add_debug_text(
-            .{ .text = audio_max_str, .x = 4 * font_width, .y = font_height, .alignment = .left, .color = lcd.RED },
+            .{ .text = audio_max_str, .x = 4 * font_width, .y = font_height, .alignment = .left, .color = .red },
             &reserved_topleft,
         );
     }
@@ -545,21 +439,21 @@ fn add_os_debug_text() void {
     const poll_max_avg = poll_max_history.average();
     const pps_str = fmt_int(buf[0..4], poll_max_avg) catch "????";
     add_debug_text(
-        .{ .text = pps_str, .x = lcd.width, .y = font_height, .alignment = .right, .color = lcd.MAGENTA },
+        .{ .text = pps_str, .x = lcd.width, .y = font_height, .alignment = .right, .color = .magenta },
         &reserved_topright,
     );
 
     const poll_max_max = poll_max_history.max();
     const max_pps_str = fmt_int(buf[0..5], poll_max_max) catch "?????";
     add_debug_text(
-        .{ .text = max_pps_str, .x = @intCast(lcd.width - (4 * font_width)), .y = 8, .alignment = .right, .color = lcd.RED },
+        .{ .text = max_pps_str, .x = @intCast(lcd.width - (4 * font_width)), .y = 8, .alignment = .right, .color = .red },
         &reserved_topright,
     );
 
     if (xip_hit_rate != 0) {
         const xip_str = fmt_int(buf[0..5], xip_hit_rate) catch "?????";
         add_debug_text(
-            .{ .text = xip_str, .x = lcd.width, .y = 16, .alignment = .right, .color = lcd.GREEN },
+            .{ .text = xip_str, .x = lcd.width, .y = 16, .alignment = .right, .color = .green },
             &reserved_topright,
         );
     }
@@ -567,7 +461,7 @@ fn add_os_debug_text() void {
     if (xip_stall_rate != 0) {
         const xip_str = fmt_int(buf[0..4], xip_stall_rate) catch "????";
         add_debug_text(
-            .{ .text = xip_str, .x = lcd.width - (5 * font_width), .y = 16, .alignment = .right, .color = lcd.RED },
+            .{ .text = xip_str, .x = lcd.width - (5 * font_width), .y = 16, .alignment = .right, .color = .red },
             &reserved_topright,
         );
     }
@@ -577,7 +471,7 @@ fn add_os_debug_text() void {
     if (adc.has_battery_pin()) {
         const battery_str = std.fmt.bufPrint(&buf, "{d:.3} V", .{adc.battery_voltage}) catch "????";
         add_debug_text(
-            .{ .text = battery_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = battery_str, .x = lcd.width, .y = lcd.height - font_height, .alignment = .right, .color = .white },
             &reserved_botright,
         );
         botright_y -= font_height;
@@ -590,14 +484,14 @@ fn add_os_debug_text() void {
 
         const read_str = fmt_int(buf[0..4], reading) catch "!@*?";
         add_debug_text(
-            .{ .text = read_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = read_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = .white },
             &reserved_botright,
         );
         botright_y -= font_height;
 
         const rev_str = fmt_int(buf[0..4], @backingInt(revision)) catch "unkn";
         add_debug_text(
-            .{ .text = rev_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = lcd.WHITE },
+            .{ .text = rev_str, .x = lcd.width, .y = botright_y, .alignment = .right, .color = .white },
             &reserved_botright,
         );
         botright_y -= font_height;

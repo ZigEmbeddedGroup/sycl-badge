@@ -497,6 +497,7 @@ fn reset_after_cart() void {
     console.println("[STOP] 2: lcd.reset");
     lcd.reset();
     console.println("[STOP] 3a: resetCartBuzzer");
+    audio.stop();
     settings.setGlobalVolume(audio.initial_global_volume);
     console.println("[STOP] 3b: resetCartPWM");
     gpio.resetCartPWM();

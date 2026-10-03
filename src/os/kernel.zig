@@ -414,6 +414,7 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
             .has_dirty_rect = false,
             .vsync_updated = false,
             .clear_frame = false,
+            .has_app_time = false,
             .tag = comptime mailbox.MessageType.getType(abi.FRAMEBUFFER_READY),
         };
 
@@ -449,8 +450,10 @@ fn handle_cart_message(msg: u32, sync_time: *bool) void {
             neopixel.set_neopixels(@ptrCast(&neopixels));
         }
 
+        const app_time = if (flags.has_app_time) abi.ipc_data.app_time else 0;
+
         // Flush selected shared-RAM framebuffer.
-        fps_overlay.tick_cart();
+        fps_overlay.tick_cart(app_time);
         ready_framebuffer = @ptrCast(@volatileCast(&abi.ipc_data.framebuffers[flags.framebuffer_index]));
         ready_fb_dirty_rect = .all;
         screen_wait_for.set_state(.lcd, @src());

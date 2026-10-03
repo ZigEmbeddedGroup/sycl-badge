@@ -19191,7 +19191,7 @@
 				)
 				(uuid "b7374c07-10c7-4ce3-aef6-102ab3ba3645")
 			)
-			(table_cell "430"
+			(table_cell "360"
 				(exclude_from_sim no)
 				(at 362.585 157.48 0)
 				(size 12.065 2.54)
@@ -19242,7 +19242,7 @@
 				)
 				(uuid "e1c42afa-4416-47bd-be5d-5d7f129325f0")
 			)
-			(table_cell "595"
+			(table_cell "525"
 				(exclude_from_sim no)
 				(at 362.585 160.02 0)
 				(size 12.065 2.54)

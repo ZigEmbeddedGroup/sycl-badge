@@ -34,7 +34,7 @@ pub fn calc_version_range(r1_scalar: f64) Range {
     // since that's close enough to infinity for me. R2 can stay at 10k forever.
     // And we can alter the value of R1 for every version. Resistors will always
     // have a tolerance of 1%.
-    const rin = Range{ .min = 100_000, .max = 100_000_000 };
+    const rin = Range{ .min = 32_000, .max = 60_000 };
     const r2: Range = .kilo(10, .percent(1));
 
     // The first selection of r1

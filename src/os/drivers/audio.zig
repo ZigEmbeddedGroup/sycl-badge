@@ -212,7 +212,7 @@ const max_sample_rate = 44100;
 /// 1.0 is quite loud, we might want to reduce this to 0.5 by default
 /// and let users turn it up, maybe by having the cart API allow volume
 /// levels 0-2.
-const initial_global_volume = 1.0;
+pub const initial_global_volume = 1.0;
 
 var global_volume: f32 = initial_global_volume;
 var vol_amplitude: f32 = calc_perceptually_linear_amplitude_for_volume(initial_global_volume);
@@ -496,13 +496,6 @@ pub fn stop() void {
         rev1.stop();
     }
     sound_type.set_state(.off, @src());
-}
-
-/// Reset the audio module for a new cart
-pub fn reset() void {
-    stop();
-    global_volume = initial_global_volume;
-    vol_amplitude = comptime calc_perceptually_linear_amplitude_for_volume(initial_global_volume);
 }
 
 const log2_dma_buf_size: u32 = 9; // 512 samples, about 12 mS of audio at 44.1kHz

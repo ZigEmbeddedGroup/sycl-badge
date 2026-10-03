@@ -24,6 +24,7 @@ const neopixel = @import("../drivers/neopixel.zig");
 // System imports
 const console = @import("console.zig");
 const multicore = @import("multicore.zig");
+const settings = @import("settings.zig");
 const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 
@@ -171,6 +172,8 @@ pub fn init(config: InitConfig) !void {
 
     adc.init();
 
+    settings.init();
+
     // 5. Initialize cart storage (FAT16 in romfs) before USB starts
     // This avoids USB timeouts while formatting flash on first boot.
     // Ensure internal flash is connected before any ROM access (improves persistence across power cycles)
@@ -208,13 +211,13 @@ pub fn init(config: InitConfig) !void {
     // 11. Wait for late tracy connection after initialization, with friendly screen message
     if (config.late_wait_for_tracy_time != 0 and terry.client.is_waiting_for_connection()) {
         const deadline = timer.micros() + config.late_wait_for_tracy_time;
-        lcd.clearScreen(lcd.BLACK);
+        lcd.clearScreen(.black);
         while (lcd.is_busy() and terry.client.is_waiting_for_connection()) {
             terry.client.poll();
         }
         while (lcd.is_busy()) {}
         const msg = "Waiting for Tracy";
-        lcd.drawString(@intCast(lcd.width / 2 - (msg.len * 4)), lcd.height / 2 - 4, msg, lcd.CYAN, lcd.BLACK, 1);
+        lcd.drawString(@intCast(lcd.width / 2 - (msg.len * 4)), lcd.height / 2 - 4, msg, .cyan, .black, 1);
         if (terry.client.is_waiting_for_connection()) {
             while (true) {
                 terry.client.poll();

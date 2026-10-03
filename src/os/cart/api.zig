@@ -79,6 +79,8 @@ pub const Controls = packed struct(u16) {
     left: bool,
     right: bool,
     _pad: u7 = 0,
+
+    pub const none: Controls = @fromBackingInt(0);
 };
 
 pub const Unsigned12 = packed struct(u16) {
@@ -140,6 +142,45 @@ pub const Rect8 = extern struct {
             .max_x = r.max_y,
             .max_y = r.max_x,
         };
+    }
+
+    pub fn clipRects(clip_rect: Rect8, rects: *std.ArrayList(Rect8)) void {
+        var rect_idx = rects.items.len;
+        while (rect_idx > 0) {
+            rect_idx -= 1;
+            const r = rects.items[rect_idx];
+
+            if (r.max_x <= clip_rect.min_x) continue;
+            if (r.max_y <= clip_rect.min_y) continue;
+            if (r.min_x >= clip_rect.max_x) continue;
+            if (r.min_y >= clip_rect.max_y) continue;
+
+            // Check if a rect is split
+            var clip_idx = rect_idx;
+            if (r.min_x < clip_rect.min_x) {
+                rects.insertAssumeCapacity(clip_idx + 1, rects.items[clip_idx]);
+                rects.items[clip_idx].max_x = clip_rect.min_x;
+                rects.items[clip_idx + 1].min_x = clip_rect.min_x;
+                clip_idx += 1;
+            }
+            if (r.max_x > clip_rect.max_x) {
+                rects.insertAssumeCapacity(clip_idx + 1, rects.items[clip_idx]);
+                rects.items[clip_idx].max_x = clip_rect.max_x;
+                rects.items[clip_idx + 1].min_x = clip_rect.max_x;
+            }
+
+            if (r.min_y >= clip_rect.min_y and r.max_y <= clip_rect.max_y) {
+                _ = rects.orderedRemove(clip_idx);
+            } else if (r.min_y >= clip_rect.min_y) {
+                rects.items[clip_idx].min_y = clip_rect.max_y;
+            } else if (r.max_y <= clip_rect.max_y) {
+                rects.items[clip_idx].max_y = clip_rect.min_y;
+            } else {
+                rects.insertAssumeCapacity(clip_idx + 1, rects.items[clip_idx]);
+                rects.items[clip_idx].max_y = clip_rect.min_y;
+                rects.items[clip_idx + 1].min_y = clip_rect.max_y;
+            }
+        }
     }
 };
 

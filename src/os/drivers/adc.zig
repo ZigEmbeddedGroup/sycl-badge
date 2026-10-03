@@ -5,6 +5,7 @@ const board = microzig.board;
 const adc = microzig.hal.adc;
 
 const terry = @import("../system/terry.zig");
+const rev = @import("rev.zig");
 
 pub var battery_voltage: f32 = 0.0;
 pub var battery_level: u8 = 0;
@@ -14,9 +15,11 @@ pub var light_level: u12 = std.math.maxInt(u12);
 var waiting_for: terry.core0.TrackedStateMachine(enum { battery, light }) = undefined;
 
 pub fn init() void {
-    board.battery_level_pin.set_direction(.in);
-    board.battery_level_pin.set_pull(.disabled);
-    board.battery_level_pin.set_function(.sio);
+    if (has_battery_pin()) {
+        board.battery_level_pin.set_direction(.in);
+        board.battery_level_pin.set_pull(.disabled);
+        board.battery_level_pin.set_function(.sio);
+    }
 
     board.light_sensor_pin.set_direction(.in);
     board.light_sensor_pin.set_pull(.disabled);
@@ -24,9 +27,13 @@ pub fn init() void {
 
     adc.set_enabled(true);
 
-    adc.select_input(board.battery_level_adc);
+    adc.select_input(board.light_sensor_adc);
     adc.start(.one_shot);
-    waiting_for.register("adc.waiting_for", .battery, @src());
+    waiting_for.register("adc.waiting_for", .light, @src());
+}
+
+pub fn has_battery_pin() bool {
+    return @backingInt(rev.revision) >= 2;
 }
 
 pub fn poll() void {
@@ -48,16 +55,19 @@ pub fn poll() void {
             },
         }
     } else |err| switch (err) {
-        error.Conversion => adc.start(.one_shot), // try again
+        error.Conversion => {} // Just switch back without updating
     }
 
-    switch (waiting_for.state) {
+    kickoff_next: switch (waiting_for.state) {
         .battery => {
             adc.select_input(board.light_sensor_adc);
             adc.start(.one_shot);
             waiting_for.set_state(.light, @src());
         },
         .light => {
+            if (!has_battery_pin()) {
+                continue :kickoff_next .battery;
+            }
             adc.select_input(board.battery_level_adc);
             adc.start(.one_shot);
             waiting_for.set_state(.battery, @src());

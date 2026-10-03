@@ -23,7 +23,7 @@ pub fn init() void {
     int.enable(.IO_IRQ_BANK0);
 }
 
-fn interrupt_IO_BANK0() callconv(.c) void {
+fn interrupt_IO_BANK0() linksection(".data") callconv(.c) void {
     var it: microzig.hal.gpio.IrqEventIter = .{};
     while (it.next()) |trigger| {
         if (trigger.pin == microzig.board.LCD_TE) {

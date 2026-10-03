@@ -68,69 +68,69 @@ pub fn build(b: *Build) void {
     add_cart(b, &dep, .{
         .name = "lcd-text",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/lcd-text/src/main.zig"),
+        .root_source_file = b.path("carts/lcd-text/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "space-shooter",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/space-shooter/src/main.zig"),
+        .root_source_file = b.path("carts/space-shooter/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "blobs",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/blobs/src/blobs.zig"),
+        .root_source_file = b.path("carts/blobs/src/blobs.zig"),
     });
     add_cart(b, &dep, .{
         .name = "plasma",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/plasma/src/plasma.zig"),
+        .root_source_file = b.path("carts/plasma/src/plasma.zig"),
     });
     add_cart(b, &dep, .{
         .name = "metalgear-timer",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/metalgear-timer/src/metalgear-timer.zig"),
+        .root_source_file = b.path("carts/metalgear-timer/src/metalgear-timer.zig"),
     });
     add_cart(b, &dep, .{
         .name = "neopixelpuzzle",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/neopixelpuzzle/src/main.zig"),
+        .root_source_file = b.path("carts/neopixelpuzzle/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "raytracer",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/raytracer/src/main.zig"),
+        .root_source_file = b.path("carts/raytracer/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "audio",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/audio/src/main.zig"),
+        .root_source_file = b.path("carts/audio/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "dvd",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/dvd/src/main.zig"),
-        .custom_builder = &@import("showcase/carts/dvd/build_assets.zig").build_cart,
+        .root_source_file = b.path("carts/dvd/src/main.zig"),
+        .custom_builder = &@import("carts/dvd/build_assets.zig").build_cart,
     });
     add_cart(b, &dep, .{
         .name = "zeroman",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/zeroman/src/main.zig"),
-        .custom_builder = @import("showcase/carts/zeroman/build_assets.zig").build_cart,
+        .root_source_file = b.path("carts/zeroman/src/main.zig"),
+        .custom_builder = @import("carts/zeroman/build_assets.zig").build_cart,
     });
     add_cart(b, &dep, .{
         .name = "vsync",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/vsync/src/main.zig"),
+        .root_source_file = b.path("carts/vsync/src/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "neopixel-test",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/neopixel-test/main.zig"),
+        .root_source_file = b.path("carts/neopixel-test/main.zig"),
     });
     add_cart(b, &dep, .{
         .name = "sensors",
         .optimize = .ReleaseSmall,
-        .root_source_file = b.path("showcase/carts/sensors/main.zig"),
+        .root_source_file = b.path("carts/sensors/main.zig"),
     });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");

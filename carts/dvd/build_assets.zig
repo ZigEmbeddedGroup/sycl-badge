@@ -12,7 +12,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
     const convert = b.addExecutable(.{
         .name = "convert_gfx",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("showcase/carts/dvd/build/convert_gfx.zig"),
+            .root_source_file = b.path("carts/dvd/build/convert_gfx.zig"),
             .target = b.graph.host,
             .optimize = .ReleaseSafe,
             .link_libc = true,
@@ -22,7 +22,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
 
     const gen_gfx = b.addRunArtifact(convert);
     gen_gfx.addArg("-i");
-    gen_gfx.addFileArg(b.path("showcase/carts/dvd/assets/dvd.png"));
+    gen_gfx.addFileArg(b.path("carts/dvd/assets/dvd.png"));
     gen_gfx.addArg(std.fmt.comptimePrint("{}", .{8}));
     gen_gfx.addArg(std.fmt.comptimePrint("{}", .{false}));
     gen_gfx.addArg("-o");
@@ -34,7 +34,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
             .{
                 .name = "packed_int_array",
                 .module = b.createModule(.{
-                    .root_source_file = b.path("showcase/carts/dvd/src/packed_int_array.zig"),
+                    .root_source_file = b.path("carts/dvd/src/packed_int_array.zig"),
                 }),
             },
         },

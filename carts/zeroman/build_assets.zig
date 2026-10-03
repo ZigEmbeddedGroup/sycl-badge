@@ -12,7 +12,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
     const convert = b.addExecutable(.{
         .name = "convert_gfx",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("showcase/carts/zeroman/build/convert_gfx.zig"),
+            .root_source_file = b.path("carts/zeroman/build/convert_gfx.zig"),
             .target = b.graph.host,
             .optimize = .ReleaseSafe,
             .link_libc = true,
@@ -36,7 +36,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
             .{
                 .name = "packed_int_array",
                 .module = b.createModule(.{
-                    .root_source_file = b.path("showcase/carts/zeroman/src/packed_int_array.zig"),
+                    .root_source_file = b.path("carts/zeroman/src/packed_int_array.zig"),
                 }),
             },
         },
@@ -49,16 +49,16 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
 const GfxAsset = struct { path: []const u8, bits: u4, transparency: bool };
 
 const zeroman_assets = [_]GfxAsset{
-    .{ .path = "showcase/carts/zeroman/assets/door.png", .bits = 2, .transparency = false },
-    .{ .path = "showcase/carts/zeroman/assets/effects.png", .bits = 2, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/font.png", .bits = 2, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/gopher.png", .bits = 4, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/healthbar.png", .bits = 4, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/hurt.png", .bits = 1, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/needleman.png", .bits = 4, .transparency = false },
-    .{ .path = "showcase/carts/zeroman/assets/shot.png", .bits = 2, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/spike.png", .bits = 2, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/teleport.png", .bits = 2, .transparency = true },
-    .{ .path = "showcase/carts/zeroman/assets/title.png", .bits = 4, .transparency = false },
-    .{ .path = "showcase/carts/zeroman/assets/zero.png", .bits = 4, .transparency = true },
+    .{ .path = "carts/zeroman/assets/door.png", .bits = 2, .transparency = false },
+    .{ .path = "carts/zeroman/assets/effects.png", .bits = 2, .transparency = true },
+    .{ .path = "carts/zeroman/assets/font.png", .bits = 2, .transparency = true },
+    .{ .path = "carts/zeroman/assets/gopher.png", .bits = 4, .transparency = true },
+    .{ .path = "carts/zeroman/assets/healthbar.png", .bits = 4, .transparency = true },
+    .{ .path = "carts/zeroman/assets/hurt.png", .bits = 1, .transparency = true },
+    .{ .path = "carts/zeroman/assets/needleman.png", .bits = 4, .transparency = false },
+    .{ .path = "carts/zeroman/assets/shot.png", .bits = 2, .transparency = true },
+    .{ .path = "carts/zeroman/assets/spike.png", .bits = 2, .transparency = true },
+    .{ .path = "carts/zeroman/assets/teleport.png", .bits = 2, .transparency = true },
+    .{ .path = "carts/zeroman/assets/title.png", .bits = 4, .transparency = false },
+    .{ .path = "carts/zeroman/assets/zero.png", .bits = 4, .transparency = true },
 };

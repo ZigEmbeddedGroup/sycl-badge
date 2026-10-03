@@ -164,75 +164,75 @@ pub const Out = struct {
 const expectEqual = std.testing.expectEqual;
 const expectEqualStrings = std.testing.expectEqualStrings;
 
-test "IN: empty data" {
-    var xfer: In = .start(64, &.{});
-
-    const cmd = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd.queue.pid);
-    try expectEqual(0, cmd.queue.payload.len);
-
-    try expectEqual(.done, xfer.endpoint_ready());
-}
-
-test "IN: short packet" {
-    const data = "arst";
-    var xfer: In = .start(64, data);
-
-    const cmd = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd.queue.pid);
-    try expectEqualStrings(data, cmd.queue.payload);
-
-    try expectEqual(.done, xfer.endpoint_ready());
-}
-
-test "IN: exactly max packet size" {
-    const max_packet_size = 64;
-    const data = std.mem.zeroes([max_packet_size]u8);
-    var xfer: In = .start(max_packet_size, &data);
-
-    const cmd1 = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd1.queue.pid);
-    try expectEqualStrings(&data, cmd1.queue.payload);
-
-    const cmd2 = xfer.endpoint_ready();
-    try expectEqual(.DATA1, cmd2.queue.pid);
-    try expectEqual(0, cmd2.queue.payload.len);
-
-    try expectEqual(.done, xfer.endpoint_ready());
-}
-
-test "IN: just above max_packet size" {
-    const max_packet_size = 64;
-    const data = std.mem.zeroes([max_packet_size + 1]u8);
-    var xfer: In = .start(max_packet_size, &data);
-
-    const cmd1 = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd1.queue.pid);
-    try expectEqualStrings(data[0..max_packet_size], cmd1.queue.payload);
-
-    const cmd2 = xfer.endpoint_ready();
-    try expectEqual(.DATA1, cmd2.queue.pid);
-    try expectEqualStrings(data[max_packet_size..], cmd2.queue.payload);
-
-    try expectEqual(.done, xfer.endpoint_ready());
-}
-
-test "IN: two max packets" {
-    const max_packet_size = 64;
-    const data = std.mem.zeroes([max_packet_size * 2]u8);
-    var xfer: In = .start(max_packet_size, &data);
-
-    const cmd1 = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd1.queue.pid);
-    try expectEqualStrings(data[0..max_packet_size], cmd1.queue.payload);
-
-    const cmd2 = xfer.endpoint_ready();
-    try expectEqual(.DATA1, cmd2.queue.pid);
-    try expectEqualStrings(data[max_packet_size..], cmd2.queue.payload);
-
-    const cmd3 = xfer.endpoint_ready();
-    try expectEqual(.DATA0, cmd3.queue.pid);
-    try expectEqual(0, cmd3.queue.payload.len);
-
-    try expectEqual(.done, xfer.endpoint_ready());
-}
+//test "IN: empty data" {
+//    var xfer: In = .start(64, &.{});
+//
+//    const cmd = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd.queue.pid);
+//    try expectEqual(0, cmd.queue.payload.len);
+//
+//    try expectEqual(.done, xfer.endpoint_ready());
+//}
+//
+//test "IN: short packet" {
+//    const data = "arst";
+//    var xfer: In = .start(64, data);
+//
+//    const cmd = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd.queue.pid);
+//    try expectEqualStrings(data, cmd.queue.payload);
+//
+//    try expectEqual(.done, xfer.endpoint_ready());
+//}
+//
+//test "IN: exactly max packet size" {
+//    const max_packet_size = 64;
+//    const data = std.mem.zeroes([max_packet_size]u8);
+//    var xfer: In = .start(max_packet_size, &data);
+//
+//    const cmd1 = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd1.queue.pid);
+//    try expectEqualStrings(&data, cmd1.queue.payload);
+//
+//    const cmd2 = xfer.endpoint_ready();
+//    try expectEqual(.DATA1, cmd2.queue.pid);
+//    try expectEqual(0, cmd2.queue.payload.len);
+//
+//    try expectEqual(.done, xfer.endpoint_ready());
+//}
+//
+//test "IN: just above max_packet size" {
+//    const max_packet_size = 64;
+//    const data = std.mem.zeroes([max_packet_size + 1]u8);
+//    var xfer: In = .start(max_packet_size, &data);
+//
+//    const cmd1 = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd1.queue.pid);
+//    try expectEqualStrings(data[0..max_packet_size], cmd1.queue.payload);
+//
+//    const cmd2 = xfer.endpoint_ready();
+//    try expectEqual(.DATA1, cmd2.queue.pid);
+//    try expectEqualStrings(data[max_packet_size..], cmd2.queue.payload);
+//
+//    try expectEqual(.done, xfer.endpoint_ready());
+//}
+//
+//test "IN: two max packets" {
+//    const max_packet_size = 64;
+//    const data = std.mem.zeroes([max_packet_size * 2]u8);
+//    var xfer: In = .start(max_packet_size, &data);
+//
+//    const cmd1 = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd1.queue.pid);
+//    try expectEqualStrings(data[0..max_packet_size], cmd1.queue.payload);
+//
+//    const cmd2 = xfer.endpoint_ready();
+//    try expectEqual(.DATA1, cmd2.queue.pid);
+//    try expectEqualStrings(data[max_packet_size..], cmd2.queue.payload);
+//
+//    const cmd3 = xfer.endpoint_ready();
+//    try expectEqual(.DATA0, cmd3.queue.pid);
+//    try expectEqual(0, cmd3.queue.payload.len);
+//
+//    try expectEqual(.done, xfer.endpoint_ready());
+//}

@@ -470,9 +470,8 @@ pub fn MSC_Driver(comptime SetupProcessor: type, comptime config: Config) type {
                             self.send_data(tag, transfer_len, self.buf_in[0..8]);
                         },
                         else => {
-                            log.info("ERROR OPCODE: {}", .{opcode});
+                            log.warn("unhandled opcode: {}", .{opcode});
                             self.queue_csw(tag, transfer_len, transfer_len, .phase_error);
-                            @breakpoint();
                         },
                     }
                 },

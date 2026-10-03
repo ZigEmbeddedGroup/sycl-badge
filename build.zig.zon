@@ -8,19 +8,19 @@
         "build.zig.zon",
         "src",
     },
-    .minimum_zig_version = "0.17.0-dev.1936+5a625d5f3",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .microzig = .{
-            .url = "https://github.com/ZigEmbeddedGroup/microzig/releases/download/0.17.7/microzig.tar.gz",
-            .hash = "microzig-0.17.7-D20YSb7KAAAdJvjGJpx-9NG8th__5s2OaJbug645qrgM",
+            .url = "https://github.com/ZigEmbeddedGroup/microzig/releases/download/0.17.12/microzig.tar.gz",
+            .hash = "microzig-0.17.12-D20YSbDKAAA_aWCmmydsldbUrhmCUzNFqseEIAE4__5g",
         },
         .zigimg = .{
             .url = "git+https://github.com/SpexGuy/zigimg?ref=sycl_badge#9db3abb43ad18dd45512d83d812816dc8840b7e1",
             .hash = "zigimg-0.1.0-8_eo2tTaFwBecfCKenltx5ud0R_0jZwzC84RQGM-xkpM",
         },
         .sdl = .{
-            .url = "git+https://github.com/MasonRemaley/SDL3/?ref=zig-0.17.0#c45725b325693742dbade9389f4a9b94d60dd3da",
-            .hash = "sdl-1.0.3+3.4.16-i4QD0eoIqgC-UjhiiEfuQX2bmoL3-XQp2lfj05Hr2dvg",
+            .url = "git+https://github.com/MasonRemaley/SDL3?ref=zig-0.17.0#e435ce01ebb0b976ebfb77e6e42e1c51bcb7db60",
+            .hash = "sdl-1.0.3+3.4.16-i4QD0ecIqgDBtEjDt3HOk75vEsDjNkPhw_ZIYMEu-NT_",
         },
     },
 }

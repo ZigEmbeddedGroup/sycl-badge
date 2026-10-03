@@ -56,7 +56,7 @@ they decide to author their own OS. The hardware upgrades include:
 # [Building From Source]($section.id('building-from-source'))
 
 Carts are currently written in Zig, but more languages will be supported in the
-future. The Zig version required is currently `0.17.0-dev.1936+5a625d5f3`. Clone
+future. The Zig version required is currently `0.17.0`. Clone
 the repository with:
 
 ```sh

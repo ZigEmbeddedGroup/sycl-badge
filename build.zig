@@ -10,22 +10,24 @@ const MicroBuild = microzig.MicroBuild(.{
     .rp2xxx = true,
 });
 
+var simulator_target: std.Build.ResolvedTarget = undefined;
+
 pub fn build(b: *Build) void {
     const optimize = b.standardOptimizeOption(.{});
+    simulator_target = b.standardTargetOptions(.{});
 
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    const native_target = b.resolveTargetQuery(.{});
     const sdl = b.dependency("sdl", .{
         .optimize = .ReleaseSafe,
-        .target = native_target,
+        .target = simulator_target,
     });
     const simulator_core = b.addLibrary(.{
         .name = "simulator_core",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/simulator/main.zig"),
-            .target = native_target,
+            .target = simulator_target,
             .optimize = simulator_core_optimize,
             .imports = &.{
                 .{ .name = "sdl3", .module = sdl.module("sdl3") },
@@ -274,12 +276,11 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
 
     // native build for the simulator, for debugging.
     // api.zig detects freestanding at comptime to determine which platform to use.
-    const native_target = b.resolveTargetQuery(.{});
 
     // This is hacky as hell, but necessary since the root module specifies the build target.
     const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
     sim_module.* = fw.exe.root_module.*;
-    sim_module.resolved_target = native_target;
+    sim_module.resolved_target = simulator_target;
 
     const sim_obj = b.addLibrary(.{
         .name = b.fmt("{s}_module", .{options.name}),
@@ -288,7 +289,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
 
     const sim = b.addExecutable(.{
         .name = options.name,
-        .root_module = b.createModule(.{ .target = native_target }),
+        .root_module = b.createModule(.{ .target = simulator_target }),
     });
     sim.root_module.linkLibrary(dep.artifact("simulator_core"));
     sim.root_module.linkLibrary(sim_obj);

@@ -68,7 +68,7 @@ pub const Command = struct {
 };
 
 // Completion providers for specific commands
-fn lcdCompletions(arg_index: usize, partial: []const u8) []const []const u8 {
+fn lcd_completions(arg_index: usize, partial: []const u8) []const []const u8 {
     _ = partial;
     if (arg_index == 0) {
         const options = [_][]const u8{ "test", "red", "green", "blue", "yellow", "cyan", "magenta", "white", "black", "image", "fps" };
@@ -145,18 +145,18 @@ fn cart_completions(arg_index: usize, partial: []const u8) []const []const u8 {
 
 // Command Registry
 const commands = [_]Command{
-    .{ .name = "help", .description = "List available commands", .handler = cmdHelp },
-    .{ .name = "uptime", .description = "Show system uptime", .handler = cmdUptime },
-    .{ .name = "clear", .description = "Clear terminal screen", .handler = cmdClear },
-    .{ .name = "history", .description = "Show command history", .handler = cmdHistory },
-    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmdGpio, .completion_provider = gpio_completions },
-    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmdLcd, .completion_provider = lcdCompletions },
-    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmdCart, .completion_provider = cart_completions },
-    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmdOverlay, .completion_provider = overlay_completions },
-    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
-    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
-    .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
-    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
+    .{ .name = "help", .description = "List available commands", .handler = cmd_help },
+    .{ .name = "uptime", .description = "Show system uptime", .handler = cmd_up_time },
+    .{ .name = "clear", .description = "Clear terminal screen", .handler = cmd_clear },
+    .{ .name = "history", .description = "Show command history", .handler = cmd_history },
+    .{ .name = "gpio", .description = "GPIO operations (read/write/toggle/list)", .handler = cmd_gpio, .completion_provider = gpio_completions },
+    .{ .name = "lcd", .description = "LCD tests (test/red/green/blue/black/white/fps)", .handler = cmd_lcd, .completion_provider = lcd_completions },
+    .{ .name = "cart", .description = "Manage carts (list/run/stop/info/delete/wipeall)", .handler = cmd_cart, .completion_provider = cart_completions },
+    .{ .name = "overlay", .description = "LCD overlay controls (overlay fps [on|off])", .handler = cmd_overlay, .completion_provider = overlay_completions },
+    .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmd_storage },
+    .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmd_wipe },
+    .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmd_menu },
+    .{ .name = "reboot", .description = "Restart the system", .handler = cmd_reboot },
 };
 
 // Unified Console Output (sends to USB CDC)
@@ -184,12 +184,12 @@ pub fn println(text: []const u8) void {
 }
 
 /// Helper to print a debug_log entry with newline
-pub fn consolePrintLog(msg: []const u8) void {
+pub fn console_print_log(msg: []const u8) void {
     printf("  {s}\r\n", .{msg});
 }
 
 /// Show the prompt
-pub fn showPrompt() void {
+pub fn show_prompt() void {
     if (line_length != 0 or cursor_pos != 0) {
         print("\r\n");
     }
@@ -208,7 +208,7 @@ pub fn init() void {
     println("SYCL Badge OS");
     println("=============");
     println("'help' for cmds");
-    showPrompt();
+    show_prompt();
 }
 
 /// Input Processing
@@ -255,7 +255,7 @@ fn process_char(char: u8) void {
 
             // Check if sequence is complete (ends with A-Z or a-z or ~)
             if ((char >= 'A' and char <= 'Z') or (char >= 'a' and char <= 'z') or char == '~') {
-                handleEscapeSequence(escape_buffer[0..escape_length]);
+                handle_escape_sequence(escape_buffer[0..escape_length]);
                 escape_state = .normal;
                 return;
             }
@@ -272,10 +272,10 @@ fn process_char(char: u8) void {
 
             if (line_length > 0) {
                 // Save to history
-                addToHistory(line_buffer[0..line_length]);
+                add_to_history(line_buffer[0..line_length]);
 
                 // Process command
-                processCommand(line_buffer[0..line_length]);
+                process_command(line_buffer[0..line_length]);
 
                 // Reset
                 line_length = 0;
@@ -285,13 +285,13 @@ fn process_char(char: u8) void {
             in_history_mode = false;
             in_completion_mode = false;
             history_index = history_count;
-            showPrompt();
+            show_prompt();
         },
 
         0x7F, 0x08 => {
             // Backspace - delete character before cursor
             if (cursor_pos > 0) {
-                deleteCharAt(cursor_pos - 1);
+                delete_char_at(cursor_pos - 1);
             }
         },
 
@@ -302,42 +302,42 @@ fn process_char(char: u8) void {
             in_history_mode = false;
             in_completion_mode = false;
             print("^C\r\n");
-            showPrompt();
+            show_prompt();
         },
 
         0x04 => {
             // Ctrl+D - delete character at cursor (like Delete key)
             if (cursor_pos < line_length) {
-                deleteCharAt(cursor_pos);
+                delete_char_at(cursor_pos);
             }
         },
 
         0x01 => {
             // Ctrl+A - move to beginning of line
-            moveCursorToStart();
+            move_cursor_to_start();
         },
 
         0x05 => {
             // Ctrl+E - move to end of line
-            moveCursorToEnd();
+            move_cursor_to_end();
         },
 
         0x0C => {
             // Ctrl+L - clear screen
             print("\x1b[2J\x1b[H");
-            showPrompt();
-            redrawLine();
+            show_prompt();
+            redraw_line();
         },
 
         0x09 => {
             // Ctrl + I - command line comletion (TAB)
-            commandLineCompletion();
+            commandline_completion();
         },
 
         0x20...0x7E => {
             // Printable characters
             in_completion_mode = false; // Exit completion mode
-            insertCharAt(cursor_pos, char);
+            insert_char_at(cursor_pos, char);
         },
 
         else => {
@@ -346,16 +346,16 @@ fn process_char(char: u8) void {
     }
 }
 
-fn handleEscapeSequence(seq: []const u8) void {
+fn handle_escape_sequence(seq: []const u8) void {
     if (seq.len == 0) return;
 
     const final_char = seq[seq.len - 1];
 
     switch (final_char) {
-        'A' => handleUpArrow(), // Up arrow
-        'B' => handleDownArrow(), // Down arrow
-        'C' => handleRightArrow(), // Right arrow
-        'D' => handleLeftArrow(), // Left arrow
+        'A' => handle_up_arrow(), // Up arrow
+        'B' => handle_down_arrow(), // Down arrow
+        'C' => handle_right_arrow(), // Right arrow
+        'D' => handle_left_arrow(), // Left arrow
         '~' => {
             // Extended sequences (like Delete key = ESC[3~)
             if (seq.len >= 2) {
@@ -363,17 +363,17 @@ fn handleEscapeSequence(seq: []const u8) void {
                     '3' => {
                         // Delete key - delete character at cursor
                         if (cursor_pos < line_length) {
-                            deleteCharAt(cursor_pos);
+                            delete_char_at(cursor_pos);
                         }
                     },
-                    '1' => handleHome(), // Home key (alternative)
-                    '4' => handleEnd(), // End key (alternative)
+                    '1' => handle_home(), // Home key (alternative)
+                    '4' => handle_end(), // End key (alternative)
                     else => {},
                 }
             }
         },
-        'H' => handleHome(), // Home key
-        'F' => handleEnd(), // End key
+        'H' => handle_home(), // Home key
+        'F' => handle_end(), // End key
         else => {
             // TODO: Handle Ctrl+Left/Right (word jumping) if terminal sends them
             // This varies by terminal - some send ESC[1;5C for Ctrl+Right
@@ -382,7 +382,7 @@ fn handleEscapeSequence(seq: []const u8) void {
 }
 
 // Arrow Key Handlers
-fn handleUpArrow() void {
+fn handle_up_arrow() void {
     if (history_count == 0) return;
 
     if (!in_history_mode) {
@@ -392,55 +392,55 @@ fn handleUpArrow() void {
 
     if (history_index > 0) {
         history_index -= 1;
-        loadHistory(history_index);
+        load_history(history_index);
     }
 }
 
-fn handleDownArrow() void {
+fn handle_down_arrow() void {
     if (!in_history_mode) return;
 
     if (history_index < history_count - 1) {
         history_index += 1;
-        loadHistory(history_index);
+        load_history(history_index);
     } else {
         // At bottom of history - clear line
         in_history_mode = false;
         history_index = history_count;
-        clearCurrentLine();
+        clear_current_line();
     }
 }
 
-fn handleLeftArrow() void {
+fn handle_left_arrow() void {
     if (cursor_pos > 0) {
         cursor_pos -= 1;
         print("\x1b[D"); // Move cursor left
     }
 }
 
-fn handleRightArrow() void {
+fn handle_right_arrow() void {
     if (cursor_pos < line_length) {
         cursor_pos += 1;
         print("\x1b[C"); // Move cursor right
     }
 }
 
-fn handleHome() void {
-    moveCursorToStart();
+fn handle_home() void {
+    move_cursor_to_start();
 }
 
-fn handleEnd() void {
-    moveCursorToEnd();
+fn handle_end() void {
+    move_cursor_to_end();
 }
 
 // Cursor Movement Helpers
-fn moveCursorToStart() void {
+fn move_cursor_to_start() void {
     if (cursor_pos > 0) {
         printf("\x1b[{d}D", .{cursor_pos}); // Move left N times
         cursor_pos = 0;
     }
 }
 
-fn moveCursorToEnd() void {
+fn move_cursor_to_end() void {
     if (cursor_pos < line_length) {
         const distance = line_length - cursor_pos;
         printf("\x1b[{d}C", .{distance}); // Move right N times
@@ -449,7 +449,7 @@ fn moveCursorToEnd() void {
 }
 
 // Line Editing Helpers
-fn insertCharAt(pos: usize, char: u8) void {
+fn insert_char_at(pos: usize, char: u8) void {
     if (line_length >= MAX_LINE_LENGTH - 1) {
         print("\x07"); // Beep
         return;
@@ -479,7 +479,7 @@ fn insertCharAt(pos: usize, char: u8) void {
     }
 }
 
-fn deleteCharAt(pos: usize) void {
+fn delete_char_at(pos: usize) void {
     if (pos >= line_length) return;
 
     // Shift characters left
@@ -509,7 +509,7 @@ fn deleteCharAt(pos: usize) void {
         }
     }
 }
-fn commandLineCompletion() void {
+fn commandline_completion() void {
     // If not in completion mode, save original input and start
     if (!in_completion_mode) {
         if (line_length == 0) {
@@ -671,7 +671,8 @@ fn commandLineCompletion() void {
         }
     }
 }
-fn clearCurrentLine() void {
+
+fn clear_current_line() void {
     // Clear entire line and move cursor to start
     print("\r\x1b[K");
     print(PROMPT);
@@ -679,7 +680,7 @@ fn clearCurrentLine() void {
     cursor_pos = 0;
 }
 
-fn redrawLine() void {
+fn redraw_line() void {
     if (line_length > 0) {
         print(line_buffer[0..line_length]);
         // Move cursor to correct position
@@ -691,7 +692,7 @@ fn redrawLine() void {
 }
 
 // Command History
-fn addToHistory(line: []const u8) void {
+fn add_to_history(line: []const u8) void {
     if (line.len == 0) return;
 
     // Don't add duplicates of last command
@@ -712,7 +713,7 @@ fn addToHistory(line: []const u8) void {
     }
 }
 
-fn loadHistory(idx: usize) void {
+fn load_history(idx: usize) void {
     if (idx >= history_count) return;
 
     const hist_idx = idx % MAX_HISTORY;
@@ -734,7 +735,7 @@ fn loadHistory(idx: usize) void {
 }
 
 // Command Processing
-fn processCommand(line: []const u8) void {
+fn process_command(line: []const u8) void {
     // Trim and tokenize
     const trimmed = std.mem.trim(u8, line, " \t");
     if (trimmed.len == 0) return;
@@ -756,7 +757,7 @@ fn processCommand(line: []const u8) void {
 }
 
 // Command Handlers
-fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_help(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nAvailable commands:");
     for (commands) |cmd| {
@@ -773,7 +774,7 @@ fn cmdHelp(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("");
 }
 
-fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_up_time(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     const uptime_us = timer.micros();
     const uptime_sec = uptime_us / 1_000_000;
@@ -784,13 +785,13 @@ fn cmdUptime(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     printf("\r\nUptime: {d}h {d}m {d}s\r\n\r\n", .{ hours, minutes, seconds });
 }
 
-fn cmdClear(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_clear(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     // ANSI escape codes to clear screen and move cursor to home
     print("\x1b[2J\x1b[H");
 }
 
-fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_history(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     if (history_count == 0) {
         println("\r\nNo commands in history\r\n");
@@ -808,7 +809,7 @@ fn cmdHistory(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // GPIO Command Handler
-fn cmdGpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_gpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next();
     if (subcmd == null) {
         println("\r\nUsage: gpio <read|write|toggle|list> [args]\r\n");
@@ -816,19 +817,19 @@ fn cmdGpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
 
     if (std.mem.eql(u8, subcmd.?, "read")) {
-        cmdGpioRead(iter);
+        cmd_gpio_read(iter);
     } else if (std.mem.eql(u8, subcmd.?, "write")) {
-        cmdGpioWrite(iter);
+        cmd_gpio(iter);
     } else if (std.mem.eql(u8, subcmd.?, "toggle")) {
-        cmdGpioToggle(iter);
+        cmd_gpio_toggle(iter);
     } else if (std.mem.eql(u8, subcmd.?, "list")) {
-        cmdGpioList(iter);
+        cmd_gpio_list(iter);
     } else {
         println("\r\nUsage: gpio <read|write|toggle|list> [args]\r\n");
     }
 }
 
-fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_gpio_read(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const pin_str = iter.next();
     if (pin_str == null) {
         println("\r\nUsage: gpio read <pin>\r\n");
@@ -853,7 +854,9 @@ fn cmdGpioRead(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     printf("\r\nGPIO {d}: {d}\r\n\r\n", .{ pin_num, value });
 }
 
-fn cmdGpioWrite(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+// TODO: what is the difference between this and cmd_gpio? they have the same
+// signature
+fn cmdGpio(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const pin_str = iter.next();
     if (pin_str == null) {
         println("\r\nUsage: gpio write <pin> <value>\r\n");
@@ -889,7 +892,7 @@ fn cmdGpioWrite(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     printf("\r\nGPIO {d} set to {d}\r\n\r\n", .{ pin_num, value });
 }
 
-fn cmdGpioToggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_gpio_toggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const pin_str = iter.next();
     if (pin_str == null) {
         println("\r\nUsage: gpio toggle <pin>\r\n");
@@ -915,7 +918,7 @@ fn cmdGpioToggle(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     printf("\r\nGPIO {d} toggled to {d}\r\n\r\n", .{ pin_num, new_value });
 }
 
-fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_gpio_list(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     var start_pin: u9 = 0;
     var end_pin: u9 = 47;
 
@@ -963,7 +966,7 @@ fn cmdGpioList(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // Storage Statistics Command - Show filesystem details
-fn cmdStorage(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_storage(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
 
     println("\r\n=== Storage Filesystem Statistics ===\r\n");
@@ -1016,7 +1019,7 @@ fn cmdStorage(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // Wipe Command - Erase cart/XIP flash and process RAM
-fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_wipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const confirm = iter.next();
 
     if (confirm == null or !std.mem.eql(u8, confirm.?, "confirm")) {
@@ -1060,7 +1063,7 @@ fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // Reboot Command
-fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_reboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting system...\r\n");
 
@@ -1096,7 +1099,7 @@ fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // Reboot to BootSelect Command
-fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_reboot_bootsel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
     println("\r\nRebooting to BootSelect...\r\n");
 
@@ -1110,7 +1113,7 @@ fn cmdRebootBootSel(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 // Menu Command - Return to cart selection screen
 var menu_y_pos: i16 = 0;
 
-fn menuCartVisitor(name: []const u8, size: u32) void {
+fn menu_cart_visitor(name: []const u8, size: u32) void {
     _ = size;
     if (menu_y_pos < 220) { // Don't draw past screen bottom
         lcd.drawString(20, menu_y_pos, name, .green, .black, 1);
@@ -1118,7 +1121,7 @@ fn menuCartVisitor(name: []const u8, size: u32) void {
     }
 }
 
-fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_menu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     _ = iter;
 
     // Stop any running cart first
@@ -1143,12 +1146,12 @@ fn cmdMenu(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
     // List available carts
     menu_y_pos = 60;
-    storage.listCarts(menuCartVisitor);
+    storage.listCarts(menu_cart_visitor);
 
     println("Menu restored. Use buttons to navigate and select carts.\r\n");
 }
 // LCD Test Command
-fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_lcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const action = iter.next() orelse {
         println("\r\nUsage: lcd <test|red|green|blue|yellow|cyan|magenta|white|black|fps>\r\n");
         return;
@@ -1192,7 +1195,7 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
         println("Done\r\n");
     } else if (std.mem.eql(u8, action, "fps")) {
         println("\r\nRunning FPS benchmark...");
-        lcdFpsBenchmark();
+        lcd_fps_benchmark();
         println("Done\r\n");
     } else {
         printf("\r\nUnknown LCD action: {s}\r\n", .{action});
@@ -1201,7 +1204,7 @@ fn cmdLcd(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 }
 
 // LCD FPS Benchmark
-fn lcdFpsBenchmark() void {
+fn lcd_fps_benchmark() void {
     const colors = [_]lcd.Color16{ .red, .green, .blue, .yellow, .cyan, .magenta };
 
     println("\r\nMeasuring DMA-based screen fill perf...");
@@ -1234,7 +1237,7 @@ var ls_file_count: usize = 0;
 var ls_lcd_y: u16 = 0;
 
 // Overlay Command Handler
-fn cmdOverlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_overlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const feature = iter.next() orelse {
         println("\r\nUsage: overlay fps [on|off]\r\n");
         return;
@@ -1267,14 +1270,14 @@ fn cmdOverlay(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     }
 }
 
-fn lsVisitor(name: []const u8, size: u32) void {
+fn ls_visitor(name: []const u8, size: u32) void {
     ls_file_count += 1;
     printf("  {s}  ({d} bytes)\r\n", .{ name, size });
     lcd.drawString(10, ls_lcd_y, name, .green, .black, 1);
     ls_lcd_y += 15;
 }
 
-fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_load(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const name = iter.next() orelse {
         println("\r\nUsage: load <filename.uf2>\r\n");
         return;
@@ -1300,7 +1303,7 @@ fn cmdLoad(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     println("Use 'run' to execute, or 'cart run <name>' for one-step load+run\r\n");
 }
 
-fn cmdCart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
+fn cmd_cart(iter: *std.mem.TokenIterator(u8, .scalar)) void {
     const subcmd = iter.next() orelse {
         println("\r\nUsage: cart <list|run|stop|status|info|delete|wipeall> [name]\r\n");
         return;

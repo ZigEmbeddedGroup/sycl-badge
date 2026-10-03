@@ -1,3 +1,8 @@
+//! @author_name    Kristoffer Gronlund
+//! @author_handle  krig
+//! @cart_title     space-shooter
+//! @description    A basic bullet hell side scrolling arcade game
+
 const std = @import("std");
 const cart = @import("cart-api");
 comptime {

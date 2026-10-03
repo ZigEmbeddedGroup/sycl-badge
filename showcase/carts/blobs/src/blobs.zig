@@ -1,3 +1,8 @@
+//! @author_name    Jonathan Marler
+//! @author_handle  marler8997
+//! @cart_title     blobs
+//! @description    Little Blob, Eat Blob, Big Blob
+
 const std = @import("std");
 const cart = @import("cart-api");
 const startlogo = @import("startlogo.zig");

@@ -1,3 +1,8 @@
+//! @author_name    Nathan Bourgeois
+//! @author_handle  iridescentrose
+//! @cart_title     Raytracer
+//! @description    Raytracing in One Weekend raytracer on badge!
+
 const std = @import("std");
 const hittable = @import("hit.zig");
 const vec = @import("vec.zig");

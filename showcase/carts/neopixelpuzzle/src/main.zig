@@ -1,3 +1,8 @@
+//! @author_name     Jonathan Marler
+//! @author_handle   marler8997
+//! @cart_title      neopixelpuzzle
+//! @description     Light up all the neo pixels in this simple puzzle game!
+
 const std = @import("std");
 const cart = @import("cart-api");
 comptime {

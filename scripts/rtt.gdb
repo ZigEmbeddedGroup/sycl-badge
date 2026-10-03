@@ -1,6 +1,6 @@
 target extended-remote :3333
 
-file ./zig-out/firmware/sycl-os-kernel.elf
+file ./zig-out/firmware/debug/sycl-os-kernel.elf
 
 set remote memory-read-packet-size 1024
 set remote memory-write-packet-size 1024

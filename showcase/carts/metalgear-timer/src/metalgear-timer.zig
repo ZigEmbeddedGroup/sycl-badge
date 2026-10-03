@@ -1,3 +1,8 @@
+//! @author_name     Fabio Arnold
+//! @author_handle   fabioarnold
+//! @cart_title      metalgear-timer
+//! @description     A helpful kitchen timer in the style of Metal Gear Solid
+
 const cart = @import("cart-api");
 comptime {
     cart.export_start_code();

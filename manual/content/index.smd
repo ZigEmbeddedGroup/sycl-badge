@@ -142,7 +142,7 @@ Make sure you have `gdb-multiarch` or `arm-none-eabi-gdb` installed, you need
 support for ARM:
 
 ```sh
-arm-none-eabi-gdb ./zig-out/firmware/sycl-os
+arm-none-eabi-gdb ./zig-out/firmware/debug/sycl-os-kernel.elf
 ```
 
 The following command tells GDB to speak with OpenOCD on localhost port 3333
@@ -196,7 +196,7 @@ delete 1
 Start off by putting the Badge into the right state with:
 
 ```
-gdb ./zig-out/firmware/sycl-os-kernel.elf
+gdb ./zig-out/firmware/debug/sycl-os-kernel.elf
 ```
 
 Confirm that the control block was found, and that the port has been opened, you

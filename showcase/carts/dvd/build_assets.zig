@@ -7,6 +7,7 @@ pub const cart_title = "dvd";
 pub const description = "Bouncing DVD logo screensaver";
 
 // Thank you to Fabio for the code generation step.
+// This function is connected manually in build.zig
 pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step: *Build.Step) void {
     const convert = b.addExecutable(.{
         .name = "convert_gfx",

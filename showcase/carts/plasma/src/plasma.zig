@@ -1,3 +1,8 @@
+//! @author_name     Fabio Arnold
+//! @author_handle   fabioarnold
+//! @cart_title      plasma
+//! @description     Plasma effect - computes plasma blobs and cycles their hue
+
 const std = @import("std");
 const cart = @import("cart-api");
 

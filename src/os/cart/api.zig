@@ -506,6 +506,8 @@ pub fn oval(options: OvalOptions) void {
         const w = @as(i32, @intCast(options.width));
         const h = @as(i32, @intCast(options.height));
 
+        if (x + w < 0 or y + h < 0) return;
+
         const min_x: usize = @intCast(@max(x, 0));
         const min_y: usize = @intCast(@max(y, 0));
         const max_x: usize = @intCast(@min(x + w, @as(i32, @intCast(screen_width))));

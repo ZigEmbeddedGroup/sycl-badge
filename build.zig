@@ -145,6 +145,11 @@ pub fn build(b: *Build) void {
         .optimize = .ReleaseSmall,
         .root_source_file = b.path("carts/empty-cart/main.zig"),
     });
+    add_cart(b, &dep, .{
+        .name = "demoscene",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("carts/demoscene/main.zig"),    
+    });
 
     const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
     const font_export_exe = b.addExecutable(.{
@@ -288,6 +293,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
         const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
         sim_module.* = fw.exe.root_module.*;
         sim_module.resolved_target = simulator_target;
+        sim_module.optimize = .Debug;
 
         const sim_obj = b.addLibrary(.{
             .name = b.fmt("{s}_module", .{options.name}),

@@ -107,8 +107,11 @@ pub fn update() void {
         doDown();
     }
 
-    if (cart.controls.start) {
+    if (cart.controls.a) {
         game.board = .solved;
+    }
+    if (cart.controls.b) {
+        doScramble();
     }
 
     prev_right = cart.controls.right;
@@ -117,6 +120,16 @@ pub fn update() void {
     prev_down = cart.controls.down;
 
     // cart.framebuffer.* = josh;
+}
+
+pub fn doScramble() void {
+    switch (cart.rand() % 4) {
+        0 => doUp(),
+        1 => doDown(),
+        2 => doRight(),
+        3 => doLeft(),
+        else => unreachable,
+    }
 }
 
 pub fn doUp() void {

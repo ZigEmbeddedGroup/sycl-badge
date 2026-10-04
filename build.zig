@@ -11,34 +11,40 @@ const MicroBuild = microzig.MicroBuild(.{
 });
 
 var simulator_target: std.Build.ResolvedTarget = undefined;
+var enable_simulator: bool = undefined;
 
 pub fn build(b: *Build) void {
     const optimize = b.standardOptimizeOption(.{});
     simulator_target = b.standardTargetOptions(.{});
 
+    enable_simulator = b.option(bool, "simulator", "Build and install the cart simulators") orelse true;
+
     const mz_dep = b.dependency("microzig", .{});
     const mb = MicroBuild.init(b, mz_dep) orelse return;
 
-    const sdl = b.dependency("sdl", .{
-        .optimize = .ReleaseSafe,
-        .target = simulator_target,
-    });
-    const simulator_core = b.addLibrary(.{
-        .name = "simulator_core",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/simulator/main.zig"),
+    if (enable_simulator) {
+        const sdl = b.dependency("sdl", .{
+            .optimize = .ReleaseSafe,
             .target = simulator_target,
-            .optimize = simulator_core_optimize,
-            .imports = &.{
-                .{ .name = "sdl3", .module = sdl.module("sdl3") },
-                .{ .name = "sim_abi", .module = b.createModule(.{
-                    .root_source_file = b.path("src/os/cart/sim_abi.zig"),
-                }) },
-                .{ .name = "zigimg", .module = b.dependency("zigimg", .{}).module("zigimg") },
-            },
-        }),
-    });
-    b.installArtifact(simulator_core);
+        });
+
+        const simulator_core = b.addLibrary(.{
+            .name = "simulator_core",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/simulator/main.zig"),
+                .target = simulator_target,
+                .optimize = simulator_core_optimize,
+                .imports = &.{
+                    .{ .name = "sdl3", .module = sdl.module("sdl3") },
+                    .{ .name = "sim_abi", .module = b.createModule(.{
+                        .root_source_file = b.path("src/os/cart/sim_abi.zig"),
+                    }) },
+                    .{ .name = "zigimg", .module = b.dependency("zigimg", .{}).module("zigimg") },
+                },
+            }),
+        });
+        b.installArtifact(simulator_core);
+    }
 
     // Badge V2 (RP2354B) target setup
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, b);
@@ -274,33 +280,35 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
     b.getInstallStep().dependOn(&install_uf2.step);
     b.getInstallStep().dependOn(&install_elf.step);
 
-    // native build for the simulator, for debugging.
-    // api.zig detects freestanding at comptime to determine which platform to use.
+    if (enable_simulator) {
+        // native build for the simulator, for debugging.
+        // api.zig detects freestanding at comptime to determine which platform to use.
 
-    // This is hacky as hell, but necessary since the root module specifies the build target.
-    const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
-    sim_module.* = fw.exe.root_module.*;
-    sim_module.resolved_target = simulator_target;
+        // This is hacky as hell, but necessary since the root module specifies the build target.
+        const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
+        sim_module.* = fw.exe.root_module.*;
+        sim_module.resolved_target = simulator_target;
 
-    const sim_obj = b.addLibrary(.{
-        .name = b.fmt("{s}_module", .{options.name}),
-        .root_module = sim_module,
-    });
+        const sim_obj = b.addLibrary(.{
+            .name = b.fmt("{s}_module", .{options.name}),
+            .root_module = sim_module,
+        });
 
-    const sim = b.addExecutable(.{
-        .name = options.name,
-        .root_module = b.createModule(.{ .target = simulator_target }),
-    });
-    sim.root_module.linkLibrary(dep.artifact("simulator_core"));
-    sim.root_module.linkLibrary(sim_obj);
+        const sim = b.addExecutable(.{
+            .name = options.name,
+            .root_module = b.createModule(.{ .target = simulator_target }),
+        });
+        sim.root_module.linkLibrary(dep.artifact("simulator_core"));
+        sim.root_module.linkLibrary(sim_obj);
 
-    const sim_install = b.addInstallArtifact(sim, .{
-        .dest_dir = .{ .override = .{ .custom = "sim" } },
-    });
-    b.getInstallStep().dependOn(&sim_install.step);
+        const sim_install = b.addInstallArtifact(sim, .{
+            .dest_dir = .{ .override = .{ .custom = "sim" } },
+        });
+        b.getInstallStep().dependOn(&sim_install.step);
 
-    if (asset_step) |step| {
-        sim.step.dependOn(step);
-        fw.exe.step.dependOn(step);
+        if (asset_step) |step| {
+            sim.step.dependOn(step);
+            fw.exe.step.dependOn(step);
+        }
     }
 }

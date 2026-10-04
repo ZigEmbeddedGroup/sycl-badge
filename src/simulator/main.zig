@@ -2,11 +2,10 @@ const std = @import("std");
 const sdl = @import("sdl3");
 const cart = @import("cart_thread.zig");
 const abi = cart.abi;
-const Image = @import("zigimg").Image;
+const assets = @import("assets.zig");
 
 const log = std.log.scoped(.simulator);
 
-const sim_bg_jpg_data = @embedFile("assets/sim_bg.jpg");
 
 var window: ?*sdl.SDL_Window = null;
 var renderer: ?*sdl.SDL_Renderer = null;
@@ -22,12 +21,6 @@ var running = true;
 
 pub var gpa: std.mem.Allocator = undefined;
 pub var io: std.Io = undefined;
-
-pub fn panic(_: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
-    while (true) {
-        @breakpoint();
-    }
-}
 
 var raw_keyboard_state: []const bool = &.{};
 
@@ -208,6 +201,23 @@ fn calc_perceptually_linear_amplitude_for_volume(volume: f32) f32 {
     return @exp(vol_adjust_exp);
 }
 
+const neopixel_diameter: f32 = 43.5;
+const neo_tex_size: u32 = @intFromFloat(@ceil(neopixel_diameter + 3.0));
+
+const neopixel_positions: [5]sdl.SDL_FPoint = .{
+    fpoint(747, 909),
+    fpoint(855, 909),
+    fpoint(964, 909),
+    fpoint(1072, 909),
+    fpoint(1180, 909),
+};
+
+const led_r_pos = fpoint(-3, 0);
+const led_g_pos = fpoint(0, 0);
+const led_b_pos = fpoint(3, 0);
+
+var neopixel_colors: [5]abi.NeopixelColor = @splat(.{ .r = 0, .g = 0, .b = 0 });
+
 pub fn main(init: std.process.Init) !void {
     gpa = init.gpa;
     io = init.io;
@@ -245,25 +255,7 @@ pub fn main(init: std.process.Init) !void {
 
     init_keyboard_state();
 
-    // Load the background
-    // const sim_bg_stream = sdl.SDL_IOFromConstMem(sim_bg_jpg_data, sim_bg_jpg_data.len);
-    // const sim_bg_surface = sdl.SDL_LoadJPG_IO(sim_bg_stream, false);
-    // const sim_bg_tex = sdl.SDL_CreateTextureFromSurface(renderer, sim_bg_surface);
-    // sdl.SDL_DestroySurface(sim_bg_surface);
-
-    const sim_bg_image = Image.fromMemory(gpa, sim_bg_jpg_data) catch |err| {
-        std.debug.panic("Load sim_bg.jpg failed: {s}", .{@errorName(err)});
-    };
-    std.debug.assert(sim_bg_image.pixels == .rgb24);
-    const sim_bg_surface = sdl.SDL_CreateSurfaceFrom(@intCast(sim_bg_image.width), @intCast(sim_bg_image.height), sdl.SDL_PIXELFORMAT_RGB24, sim_bg_image.pixels.rgb24.ptr, @intCast(sim_bg_image.width * 3));
-    if (sim_bg_surface == null) {
-        std.debug.panic("SDL_CreateSurfaceFrom failed: {s}", .{sdl.SDL_GetError()});
-    }
-    const sim_bg_tex = sdl.SDL_CreateTextureFromSurface(renderer, sim_bg_surface);
-    if (sim_bg_tex == null) {
-        std.debug.panic("SDL_CreateTextureFromSurface failed: {s}", .{sdl.SDL_GetError()});
-    }
-    //sdl.SDL_DestroySurface(sim_bg_surface);
+    assets.load(renderer);
 
     const audio_spec: sdl.SDL_AudioSpec = .{
         .format = sdl.SDL_AUDIO_S16,
@@ -381,6 +373,8 @@ pub fn main(init: std.process.Init) !void {
         if (cart.sim_thread_acquire_framebuffer()) |info| {
             defer cart.sim_thread_release_framebuffer();
 
+            neopixel_colors = info.neopixels;
+
             if (info.dirty_rect.has_area()) {
                 // N.B. texture is transposed, so swap x and y
                 const rect: sdl.SDL_Rect = .{
@@ -423,12 +417,68 @@ pub fn main(init: std.process.Init) !void {
         _ = sdl.SDL_SetRenderDrawColorFloat(renderer, 0.2, 0.2, 0.2, sdl.SDL_ALPHA_OPAQUE_FLOAT);
         _ = sdl.SDL_RenderClear(renderer);
 
-        _ = sdl.SDL_RenderTexture(renderer, sim_bg_tex, null, null);
+        _ = sdl.SDL_RenderTexture(renderer, assets.sim_bg, null, null);
 
-        const app_screen_topleft = fpoint(741, 277);
+        for (neopixel_positions, neopixel_colors) |pos, color| {
+            if (color.r == 0 and color.g == 0 and color.b == 0) continue;
+            // Layers:
+            // 1. background
+            // 2. bloom
+            // 3. dot bloom
+            // 4. circle
+            // 5. dot
+
+            const color_float: [3]f32 = .{
+                @as(f32, @floatFromInt(color.r)) / 255.0,
+                @as(f32, @floatFromInt(color.g)) / 255.0,
+                @as(f32, @floatFromInt(color.b)) / 255.0,
+            };
+            const max = @max(@max(color_float[0], color_float[1]), color_float[2]);
+            const saturated_color = saturate_color(color_float, max);
+            const whiteness = @min(1.0, max * 2.0);
+            const too_bright_color: [3]f32 = .{
+                std.math.lerp(saturated_color[0], 1.0, whiteness),
+                std.math.lerp(saturated_color[1], 1.0, whiteness),
+                std.math.lerp(saturated_color[2], 1.0, whiteness),
+            };
+
+            // Premultiplied alpha in SDL means we need to multiply the color by the alpha mod
+            const bg_alpha = @min(1.0, max * 4.0);
+            _ = sdl.SDL_SetTextureColorModFloat(assets.npx_bg.tex, bg_alpha, bg_alpha, bg_alpha);
+            _ = sdl.SDL_SetTextureAlphaModFloat(assets.npx_bg.tex, bg_alpha);
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_bg.tex, null, &assets.npx_bg.at(pos));
+
+            _ = sdl.SDL_SetTextureColorMod(assets.npx_bloom_small.tex, color.r, color.g, color.b); 
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(pos));
+
+            // Circle
+            const ring_alpha = @min(1.0, 0.25 + max * 2.0);
+            _ = sdl.SDL_SetTextureColorModFloat(assets.npx_ring.tex, too_bright_color[0] * ring_alpha, too_bright_color[1] * ring_alpha, too_bright_color[2] * ring_alpha);
+            _ = sdl.SDL_SetTextureAlphaModFloat(assets.npx_ring.tex, ring_alpha);
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_ring.tex, null, &assets.npx_ring.at(pos));
+
+            // Dot blooms
+            _ = sdl.SDL_SetTextureColorMod(assets.npx_bloom_small.tex, color.r, 0, 0);
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(fp_add(pos, led_r_pos)));
+            _ = sdl.SDL_SetTextureColorMod(assets.npx_bloom_small.tex, 0, color.g, 0);
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(fp_add(pos, led_g_pos)));
+            _ = sdl.SDL_SetTextureColorMod(assets.npx_bloom_small.tex, 0, 0, color.b);
+            _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(fp_add(pos, led_b_pos)));
+
+
+            // const rect: sdl.SDL_FRect = .{ .x = pos.x, .y = pos.y, .w = neo_tex_size, .h = neo_tex_size };
+            // _ = sdl.SDL_RenderTexture(renderer, neopixel_tex, null, &rect);
+        }
+
+        const app_screen_left = 751 - 6;
+        const app_screen_right = 1218 + 4;
+        const app_screen_top = 284 - 6;
+        const app_screen_topleft = fpoint(app_screen_left, app_screen_top);
         // N.B. These are the opposite of what they are named because the texture is transposed.
-        const app_screen_topright = fpoint(742, 686);
-        const app_screen_botleft = fpoint(1253, 275);
+        const app_screen_botleft = fpoint(app_screen_right, app_screen_top);
+        const delta_x = app_screen_botleft.x - app_screen_topleft.x;
+        const delta_y = @as(f32, @floatFromInt(abi.screen_height)) * delta_x / @as(f32, @floatFromInt(abi.screen_width));
+        const app_screen_topright = fpoint(app_screen_left, app_screen_top + delta_y);
         _ = sdl.SDL_RenderTextureAffine(renderer, app_texture, null, &app_screen_topleft, &app_screen_topright, &app_screen_botleft);
 
         if (debug_audio_mode != .none) {
@@ -440,6 +490,22 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
+fn saturate_color(color: [3]f32, max: f32) [3]f32 {
+    if (max == 0) return color;
+    return .{
+        color[0] / max,
+        color[1] / max,
+        color[2] / max,
+    };
+}
+
 fn fpoint(x: f32, y: f32) sdl.SDL_FPoint {
     return .{ .x = x, .y = y };
+}
+
+fn fp_add(a: sdl.SDL_FPoint, b: sdl.SDL_FPoint) sdl.SDL_FPoint {
+    return .{
+        .x = a.x + b.x,
+        .y = a.y + b.y,
+    };
 }

@@ -220,16 +220,17 @@ pub fn Driver(comptime SetupProcessor: type, comptime opts: DriverOptions) type 
         ) void {
             const self: *@This() = @ptrCast(@alignCast(ctx.?));
             log.info("got setup packet: {f}", .{pkt});
+            const dir = pkt.request_type.direction;
             const class_request: ClassRequest = @fromBackingInt(pkt.request);
             switch (class_request) {
                 .set_line_coding => {
                     const p = payload orelse {
-                        setup_processor.stall(.in);
+                        setup_processor.stall(dir);
                         return;
                     };
 
                     if (p.len < @sizeOf(LineCoding)) {
-                        setup_processor.stall(.in);
+                        setup_processor.stall(dir);
                         return;
                     }
 
@@ -250,8 +251,7 @@ pub fn Driver(comptime SetupProcessor: type, comptime opts: DriverOptions) type 
                 },
                 _ => {
                     log.err("Unhandled setup packet request: 0x{X}", .{pkt.request});
-                    @breakpoint();
-                    setup_processor.stall(.in);
+                    setup_processor.stall(dir);
                 },
             }
         }

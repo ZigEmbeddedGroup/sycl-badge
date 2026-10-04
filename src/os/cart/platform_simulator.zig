@@ -140,6 +140,5 @@ pub fn audio_submit_samples(num: usize) void {
 pub extern fn rand() u32;
 
 pub fn trace(x: []const u8) void {
-    _ = x;
-    //std.debug.print("[cart]: {s}\n", .{x});
+    std.debug.print("[cart]: {s}\n", .{x});
 }

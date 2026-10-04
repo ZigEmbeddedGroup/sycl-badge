@@ -57,6 +57,34 @@ const EMPTY_CHAR: GlowyChar = .{
 
 var characters: [CHAR_HEIGHT][CHAR_WIDTH]GlowyChar = undefined;
 
+// the name is written vertically, in its own color, by any cursor that
+// draws over its spot
+const NAME = "NEIL K";
+const NAME_COLOR = cart.DisplayColor{ .r = 31, .g = 0, .b = 0 };
+
+// where the top of the name sits on the character grid
+var name_x: u8 = undefined;
+var name_y: u8 = undefined;
+
+fn name_reset() void {
+    name_x = random.uintLessThan(u8, CHAR_WIDTH);
+    // start high enough that the whole name fits on the screen
+    name_y = random.uintAtMost(u8, CHAR_HEIGHT - NAME.len);
+}
+
+// which letter of the name belongs at this position, or null if the
+// position is outside the name's spot
+fn name_index(x: u8, y: u8) ?usize {
+    if (x != name_x or y < name_y or y >= name_y + NAME.len) return null;
+    return y - name_y;
+}
+
+fn name_erase() void {
+    for (0..NAME.len) |i| {
+        characters[name_y + i][name_x] = EMPTY_CHAR;
+    }
+}
+
 fn cursor_reset(idx: usize) void {
     cursors[idx] = Cursor{
         .x = random.uintLessThan(u8, CHAR_WIDTH),
@@ -72,6 +100,8 @@ fn get_random_character() u8 {
 pub fn start() void {
     prng = std.Random.DefaultPrng.init(cart.rand());
     random = prng.random();
+
+    name_reset();
 
     // reset all cursors (which draw or erase characters)
     for (0..cursor_count) |cursor_idx| {
@@ -125,12 +155,21 @@ pub fn update() void {
                 const c = &cursors[cursor_idx];
                 if (c.y < CHAR_HEIGHT) {
                     if (c.is_draw) {
-                        const glowy_char: GlowyChar = .{
+                        const glowy_char: GlowyChar = if (name_index(c.x, c.y)) |i| .{
+                            .c = NAME[i],
+                            .base_color = NAME_COLOR,
+                            .boost = 16,
+                        } else .{
                             .c = get_random_character(),
                             .base_color = BASE_COLOR,
                             .boost = 16,
                         };
                         characters[c.y][c.x] = glowy_char;
+                    } else if (name_index(c.x, c.y) != null) {
+                        // erasing any part of the name wipes all of it and
+                        // moves it somewhere new
+                        name_erase();
+                        name_reset();
                     } else {
                         characters[c.y][c.x] = EMPTY_CHAR;
                     }

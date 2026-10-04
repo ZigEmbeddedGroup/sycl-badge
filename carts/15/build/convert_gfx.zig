@@ -53,7 +53,7 @@ fn convert(in_path: []const u8, writer: *std.Io.Writer) !void {
     defer image.deinit(allocator);
 
     // frame buffer is [width][height]DisplayColor
-    std.debug.print("image: width {}, height: {}", .{ image.width, image.height });
+    // std.debug.print("image: width {}, height: {}", .{ image.width, image.height });
     var frame_buffer: cart.Framebuffer = undefined;
     if (image.width != frame_buffer.len) std.debug.panic("mismatch image width and frame buffer, {} != {}", .{ image.width, frame_buffer.len });
     if (image.height != frame_buffer[0].len) std.debug.panic("mismatch image height and frame buffer, {} != {}", .{ image.height, frame_buffer[0].len });

@@ -122,8 +122,9 @@ pub fn update() void {
     // cart.framebuffer.* = josh;
 }
 
+var rand = std.Random.DefaultPrng.init(42);
 pub fn doScramble() void {
-    switch (cart.rand() % 4) {
+    switch (rand.random().int(u32) % 4) {
         0 => doUp(),
         1 => doDown(),
         2 => doRight(),

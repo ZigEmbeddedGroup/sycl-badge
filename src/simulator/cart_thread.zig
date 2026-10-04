@@ -103,6 +103,7 @@ pub const FramebufferData = struct {
     framebuffer: *abi.Framebuffer,
     dirty_rect: abi.Rect8,
     clear_color: ?abi.DisplayColor,
+    neopixels: [5]abi.NeopixelColor,
 };
 
 pub fn sim_thread_acquire_framebuffer() ?FramebufferData {
@@ -113,6 +114,7 @@ pub fn sim_thread_acquire_framebuffer() ?FramebufferData {
     const result: FramebufferData = .{
         .framebuffer = &simulator_io_block.framebuffers[simulator_io_block.framebuffer_index],
         .dirty_rect = simulator_io_block.dirty_rect,
+        .neopixels = simulator_io_block.neopixels,
         .clear_color = null,
     };
 

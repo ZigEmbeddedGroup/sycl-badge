@@ -64,6 +64,8 @@ const Blob = struct {
 
 const MultiTone = struct {
     loop: bool,
+    // index of the tone to jump back to when a looping multitone ends
+    loop_tone: usize = 0,
     tones: []const Tone,
     volume: u32,
     flags: cart.mixer.ToneOptions.Flags,
@@ -417,15 +419,30 @@ pub fn start() void {
     mixer.start_audio();
 }
 
+fn toneIndexAt(comptime tones: []const Tone, comptime ticks: u32) usize {
+    var t: u32 = 0;
+    for (tones, 0..) |tone, i| {
+        if (t == ticks) return i;
+        if (t > ticks) break;
+        t += tone.duration;
+    }
+    @compileError(std.fmt.comptimePrint("tick {} is not the start of a tone", .{ticks}));
+}
+
+// loop back to where the melody comes in, skipping the intro
+const start_menu_music_loop_tick = 480;
+
 fn initStartMenuMusic() void {
     global.multitones_buf[0] = .{
-        .loop = false,
+        .loop = true,
+        .loop_tone = comptime toneIndexAt(&music.bass, start_menu_music_loop_tick),
         .tones = &music.bass,
         .volume = 42,
         .flags = .{ .channel = .triangle },
     };
     global.multitones_buf[1] = .{
-        .loop = false,
+        .loop = true,
+        .loop_tone = comptime toneIndexAt(&music.melody, start_menu_music_loop_tick),
         .tones = &music.melody,
         .volume = 20,
         .flags = .{ .channel = .pulse1 },
@@ -635,7 +652,7 @@ fn tickMultitones() void {
             mt.current_tone_frame = 1;
             if (mt.current_tone >= mt.tones.len) {
                 if (mt.loop) {
-                    mt.current_tone = 0;
+                    mt.current_tone = mt.loop_tone;
                 } else {
                     std.mem.copyForwards(
                         MultiTone,

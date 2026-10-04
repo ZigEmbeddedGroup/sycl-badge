@@ -465,7 +465,7 @@ pub fn line(options: LineOptions) void {
     const sy: i32 = if (y0 < y1) 1 else -1;
     var err = dx + dy;
 
-    mark_dirty_rect(@min(options.x1, options.x2), @min(options.y1, options.y2), @abs(options.x2 - options.x1) + 1, @abs(options.y2 - options.y1) + 1);
+    mark_dirty_rect(@min(options.x1, options.x2), @min(options.y1, options.y2), @intCast(@abs(options.x2 - options.x1) + 1), @intCast(@abs(options.y2 - options.y1) + 1));
 
     while (true) {
         if (x0 >= 0 and x0 < screen_width and y0 >= 0 and y0 < screen_height) {

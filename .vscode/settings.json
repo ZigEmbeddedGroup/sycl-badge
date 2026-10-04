@@ -1,0 +1,5 @@
+{
+    "zig.path": "/opt/homebrew/bin/zig",
+    "zig.zls.enabled": "on",
+    "zig.zls.path": "/Users/neilk/Documents/projects/zls/zig-out/bin/zls"
+}

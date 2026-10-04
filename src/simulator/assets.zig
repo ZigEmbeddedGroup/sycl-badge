@@ -7,7 +7,6 @@ const root = @import("root");
 const sim_bg_jpg = @embedFile("assets/sim_bg.jpg");
 const npx_bg_png = @embedFile("assets/npx_bg.png");
 const npx_bloom_small_png = @embedFile("assets/npx_bloom_small.png");
-//const npx_bloom_png = @embedFile("assets/npx_bloom.png");
 const npx_dot_bloom_png = @embedFile("assets/npx_dot_bloom.png");
 const npx_dot_png = @embedFile("assets/npx_dot.png");
 const npx_ring_png = @embedFile("assets/npx_ring.png");
@@ -32,7 +31,6 @@ pub const NpxTexture = struct {
 pub var sim_bg: ?*sdl.SDL_Texture = null;
 pub var npx_bg: NpxTexture = undefined;
 pub var npx_bloom_small: NpxTexture = undefined;
-//pub var npx_bloom: NpxTexture = undefined;
 pub var npx_dot_bloom: NpxTexture = undefined;
 pub var npx_dot: NpxTexture = undefined;
 pub var npx_ring: NpxTexture = undefined;
@@ -47,9 +45,6 @@ pub fn load(renderer: ?*sdl.SDL_Renderer) void {
     _ = sdl.SDL_SetTextureBlendMode(npx_bloom_small.tex, sdl.SDL_BLENDMODE_ADD);
     npx_bloom_small.center_x -= 1;
     npx_bloom_small.center_y += 23;
-
-    //npx_bloom = load_tex(renderer, npx_bloom_png, "npx_bloom.png");
-    //_ = sdl.SDL_SetTextureBlendMode(npx_bloom.tex, sdl.SDL_BLENDMODE_ADD);
 
     npx_dot_bloom = load_tex(renderer, npx_dot_bloom_png, "npx_dot_bloom.png");
     _ = sdl.SDL_SetTextureBlendMode(npx_dot_bloom.tex, sdl.SDL_BLENDMODE_ADD);

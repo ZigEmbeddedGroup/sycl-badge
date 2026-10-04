@@ -15,6 +15,8 @@ var debug_audio_mode: enum {
     none,
     app_audio,
     mixed_audio,
+
+    pub const count = @typeInfo(@This()).@"enum".field_names.len;
 } = .none;
 
 var running = true;
@@ -89,7 +91,7 @@ fn scancode_to_dpad(scancode: u32) ?DpadButton {
     return null;
 }
 
-fn update_cart_controls() void {
+fn update_cart_controls() abi.Controls {
     var controls: abi.Controls = @bitCast(@as(u16, 0));
     controls.a = is_any_key_pressed(&scancodes_a);
     controls.b = is_any_key_pressed(&scancodes_b);
@@ -111,6 +113,8 @@ fn update_cart_controls() void {
     };
 
     cart.sim_thread_update_controls(controls);
+
+    return controls;
 }
 
 const v_width = 1920;
@@ -285,7 +289,13 @@ pub fn main(init: std.process.Init) !void {
                     }
                 },
                 sdl.SDL_EVENT_KEY_UP => {
-                    if (scancode_to_dpad(event.key.scancode)) |button| {
+                    if (event.key.scancode == sdl.SDL_SCANCODE_V) {
+                        var next_audio = @backingInt(debug_audio_mode) +% 1;
+                        if (next_audio >= @TypeOf(debug_audio_mode).count) {
+                            next_audio = 0;
+                        }
+                        debug_audio_mode = @fromBackingInt(next_audio);
+                    } else if (scancode_to_dpad(event.key.scancode)) |button| {
                         if (std.mem.indexOfScalar(DpadButton, dpad_actives.items, button)) |idx|
                             _ = dpad_actives.orderedRemove(idx);
                     }
@@ -297,7 +307,7 @@ pub fn main(init: std.process.Init) !void {
             }
         }
 
-        update_cart_controls();
+        const controls = update_cart_controls();
 
         // TODO graceful shutdown, wait for audio to drain.
         if (cart.sim_thread_check_flags(abi.FLAG_STOP_AUDIO)) {
@@ -421,12 +431,6 @@ pub fn main(init: std.process.Init) !void {
 
         for (neopixel_positions, neopixel_colors) |pos, color| {
             if (color.r == 0 and color.g == 0 and color.b == 0) continue;
-            // Layers:
-            // 1. background
-            // 2. bloom
-            // 3. dot bloom
-            // 4. circle
-            // 5. dot
 
             const color_float: [3]f32 = .{
                 @as(f32, @floatFromInt(color.r)) / 255.0,
@@ -464,10 +468,6 @@ pub fn main(init: std.process.Init) !void {
             _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(fp_add(pos, led_g_pos)));
             _ = sdl.SDL_SetTextureColorMod(assets.npx_bloom_small.tex, 0, 0, color.b);
             _ = sdl.SDL_RenderTexture(renderer, assets.npx_bloom_small.tex, null, &assets.npx_bloom_small.at(fp_add(pos, led_b_pos)));
-
-
-            // const rect: sdl.SDL_FRect = .{ .x = pos.x, .y = pos.y, .w = neo_tex_size, .h = neo_tex_size };
-            // _ = sdl.SDL_RenderTexture(renderer, neopixel_tex, null, &rect);
         }
 
         const app_screen_left = 751 - 6;
@@ -484,6 +484,8 @@ pub fn main(init: std.process.Init) !void {
         if (debug_audio_mode != .none) {
             render_audio_points();
         }
+
+        draw_controls(controls);
 
         // put the newly-cleared rendering on the screen.
         _ = sdl.SDL_RenderPresent(renderer);
@@ -508,4 +510,38 @@ fn fp_add(a: sdl.SDL_FPoint, b: sdl.SDL_FPoint) sdl.SDL_FPoint {
         .x = a.x + b.x,
         .y = a.y + b.y,
     };
+}
+
+const control_text_scale = 8.0;
+fn draw_controls(controls: abi.Controls) void {
+    _ = sdl.SDL_SetRenderScale(renderer, control_text_scale, control_text_scale);
+    defer _ = sdl.SDL_SetRenderScale(renderer, 1, 1);
+
+    control_text(322, 547, "A", controls.left);
+    control_text(510, 541, "D", controls.right);
+    control_text(418, 437, "W", controls.up);
+    control_text(422, 635, "S", controls.down);
+    control_text(419, 544, "E", controls.click);
+
+    control_text(550, 146, "T", controls.select);
+    control_text(1392, 140, "Y", controls.start);
+
+    control_text(1440, 683, "J", controls.b);
+    control_text(1560, 624, "K", controls.a);
+
+    const audio_text = switch (debug_audio_mode) {
+        .none => "V: Audio Debug (off)",
+        .app_audio => "V: Audio Debug (raw)",
+        .mixed_audio => "V: Audio Debug (mix)",
+    };
+    control_text(388, 1022, audio_text, false);
+}
+
+fn control_text(x: f32, y: f32, text: [*:0]const u8, pressed: bool) void {
+    if (pressed) {
+        _ = sdl.SDL_SetRenderDrawColorFloat(renderer, 0.5, 0.0, 1.0, sdl.SDL_ALPHA_OPAQUE_FLOAT);
+    } else {
+        _ = sdl.SDL_SetRenderDrawColorFloat(renderer, 1.0, 0.5, 0.0, sdl.SDL_ALPHA_OPAQUE_FLOAT);
+    }
+    _ = sdl.SDL_RenderDebugText(renderer, x / control_text_scale - 4, y / control_text_scale - 4, text);
 }

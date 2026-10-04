@@ -21,7 +21,7 @@ const LCD_HEIGHT_PIXELS: u8 = @as(u8, @intCast(cart.screen_height));
 const CHAR_WIDTH: u8 = LCD_WIDTH_PIXELS / FONT_WIDTH;
 const CHAR_HEIGHT: u8 = LCD_HEIGHT_PIXELS / FONT_HEIGHT;
 
-const TEXT_COLOR = cart.DisplayColor{ .r = 0, .g = 32, .b = 0 };
+const BASE_COLOR = cart.DisplayColor{ .r = 0, .g = 32, .b = 0 };
 
 // out of 256, what is the chance that a cursor randomly resets while
 // drawing a line
@@ -35,6 +35,12 @@ const Cursor = struct {
     is_draw: bool,
 };
 
+const GlowyChar: type = struct {
+    c: u8,
+    base_color: cart.DisplayColor,
+    boost: u5,
+};
+
 const cursor_count = 3;
 var cursors: [cursor_count]Cursor = undefined;
 
@@ -43,8 +49,13 @@ var random: std.Random = undefined;
 
 // Space character is empty
 const EMPTY = 32;
+const EMPTY_CHAR: GlowyChar = .{
+    .c = EMPTY,
+    .base_color = BASE_COLOR,
+    .boost = 0,
+};
 
-var characters: [CHAR_HEIGHT][CHAR_WIDTH]u8 = undefined;
+var characters: [CHAR_HEIGHT][CHAR_WIDTH]GlowyChar = undefined;
 
 fn cursor_reset(idx: usize) void {
     cursors[idx] = Cursor{
@@ -70,28 +81,61 @@ pub fn start() void {
     // blank out the screen
     for (0..CHAR_HEIGHT) |yc| {
         for (0..CHAR_WIDTH) |xc| {
-            characters[yc][xc] = EMPTY;
+            characters[yc][xc] = EMPTY_CHAR;
         }
     }
 
     draw_page();
 }
 
+pub fn decrease_boosts() void {
+    for (0..CHAR_HEIGHT) |yc| {
+        for (0..CHAR_WIDTH) |xc| {
+            const boost = characters[yc][xc].boost;
+            if (boost > 0) {
+                characters[yc][xc].boost = boost - 1;
+            }
+        }
+    }
+}
+
+// how long between cursor steps: 500ms = 2 per second
+const STEP_MICROS: u64 = 130_000;
+var next_step_time: u64 = 0;
+
+// how long between boost decreases
+const BOOST_STEP_MICROS: u64 = 50_000;
+var next_boost_time: u64 = 0;
+
 pub fn update() void {
-    // advance all cursors
-    for (0..cursor_count) |cursor_idx| {
-        const should_reset = random.int(u8) < RESET_CHANCE;
-        if (should_reset) {
-            cursor_reset(cursor_idx);
-        } else {
-            const c = &cursors[cursor_idx];
-            if (c.y < CHAR_HEIGHT) {
-                if (c.is_draw) {
-                    characters[c.y][c.x] = get_random_character();
-                } else {
-                    characters[c.y][c.x] = EMPTY;
+    const now = cart.micros_since_boot();
+    if (now >= next_boost_time) {
+        next_boost_time = now + BOOST_STEP_MICROS;
+        decrease_boosts();
+    }
+    if (now >= next_step_time) {
+        next_step_time = now + STEP_MICROS;
+
+        // advance all cursors
+        for (0..cursor_count) |cursor_idx| {
+            const should_reset = random.int(u8) < RESET_CHANCE;
+            if (should_reset) {
+                cursor_reset(cursor_idx);
+            } else {
+                const c = &cursors[cursor_idx];
+                if (c.y < CHAR_HEIGHT) {
+                    if (c.is_draw) {
+                        const glowy_char: GlowyChar = .{
+                            .c = get_random_character(),
+                            .base_color = BASE_COLOR,
+                            .boost = 16,
+                        };
+                        characters[c.y][c.x] = glowy_char;
+                    } else {
+                        characters[c.y][c.x] = EMPTY_CHAR;
+                    }
+                    c.y = c.y + 1;
                 }
-                c.y = c.y + 1;
             }
         }
     }
@@ -100,6 +144,17 @@ pub fn update() void {
 
 fn get_character(idx: i8) u8 {
     return MIN_CHAR + @as(u8, @intCast(@mod(idx, CHARACTER_SET_SIZE)));
+}
+
+fn get_color(glowy_char: GlowyChar) cart.DisplayColor {
+    const base = glowy_char.base_color;
+    const boost = glowy_char.boost;
+    // saturate, so a bright base color can't overflow its channel
+    return cart.DisplayColor{
+        .r = base.r +| boost,
+        .g = base.g +| boost,
+        .b = base.b +| boost,
+    };
 }
 
 fn draw_page() void {
@@ -113,16 +168,20 @@ fn draw_page() void {
     });
 
     var y: i32 = 0;
-    const x: i32 = 0; // we're always drawing the str at left
+    var x: i32 = 0;
 
     for (0..CHAR_HEIGHT) |yc| {
         y = @intCast(yc * FONT_HEIGHT);
-        cart.text(.{
-            .str = &characters[yc],
-            .x = x,
-            .y = y,
-            .scale = TEXT_SCALE,
-            .text_color = TEXT_COLOR,
-        });
+        for (0..CHAR_WIDTH) |xc| {
+            x = @intCast(xc * FONT_WIDTH);
+            const text_color = get_color(characters[yc][xc]);
+            cart.text(.{
+                .str = (&characters[yc][xc].c)[0..1],
+                .x = x,
+                .y = y,
+                .scale = TEXT_SCALE,
+                .text_color = text_color,
+            });
+        }
     }
 }

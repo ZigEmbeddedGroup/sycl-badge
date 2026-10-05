@@ -288,6 +288,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
         const sim_module = b.allocator.create(Build.Module) catch @panic("oom");
         sim_module.* = fw.exe.root_module.*;
         sim_module.resolved_target = simulator_target;
+        sim_module.optimize = .Debug;
 
         const sim_obj = b.addLibrary(.{
             .name = b.fmt("{s}_module", .{options.name}),

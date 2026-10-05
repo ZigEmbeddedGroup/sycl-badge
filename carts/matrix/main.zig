@@ -104,12 +104,6 @@ fn name_index(x: u8, y: u8) ?usize {
     return y - name_y;
 }
 
-fn name_erase() void {
-    for (0..NAME.len) |i| {
-        characters[name_y + i][name_x] = EMPTY_CHAR;
-    }
-}
-
 fn cursor_reset(idx: usize) void {
     cursors[idx] = Cursor{
         .x = random.uintLessThan(u8, CHAR_WIDTH),
@@ -177,8 +171,13 @@ pub fn update() void {
             const c = &cursors[cursor_idx];
             // a drawing cursor in the name's column can't stop until it has
             // drawn the whole name
-            const is_writing_name = c.is_draw and c.x == name_x and c.y < name_y + NAME.len;
-            const should_reset = !is_writing_name and random.int(u8) < RESET_CHANCE;
+            const will_write_or_is_writing_name = c.is_draw and c.x == name_x and c.y < name_y + NAME.len;
+            // an erasing cursor that has reached the name can't stop until it
+            // has erased the whole name
+            const is_erasing_name = !c.is_draw and c.x == name_x and c.y >= name_y and c.y < name_y + NAME.len;
+            const can_reset = !(will_write_or_is_writing_name or is_erasing_name);
+            const should_reset = can_reset and random.int(u8) < RESET_CHANCE;
+
             if (should_reset) {
                 cursor_reset(cursor_idx);
             } else {
@@ -194,13 +193,12 @@ pub fn update() void {
                             .boost = BOOST_MAX,
                         };
                         characters[c.y][c.x] = glowy_char;
-                    } else if (name_index(c.x, c.y) != null) {
-                        // erasing any part of the name wipes all of it and
-                        // moves it somewhere new
-                        name_erase();
-                        name_reset();
                     } else {
+                        const name_i = name_index(c.x, c.y);
                         characters[c.y][c.x] = EMPTY_CHAR;
+                        // once the last letter of the name is erased, the
+                        // name moves somewhere new
+                        if (name_i != null and name_i.? == NAME.len - 1) name_reset();
                     }
 
                     var delta_y: u8 = 1;
@@ -244,7 +242,7 @@ fn draw_page() void {
         .width = cart.screen_width,
         .height = cart.screen_height,
         .fill_color = .{ .r = 0, .g = 0, .b = 0 },
-    });
+    }); 
 
     var y: i32 = 0;
     var x: i32 = 0;

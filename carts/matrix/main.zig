@@ -33,6 +33,10 @@ const BOOST_MAX: u5 = 16;
 // drawing a line
 const RESET_CHANCE: u8 = 30;
 
+// out of 256, what is the chance a cursor does not advance by 1
+// The "rain" effect should stutter sometimes, like a raindrop on glass
+const DROP_PAUSE_CHANCE: u8 = 30;
+
 const TEXT_SCALE: u32 = 1;
 
 const Cursor = struct {
@@ -198,7 +202,12 @@ pub fn update() void {
                     } else {
                         characters[c.y][c.x] = EMPTY_CHAR;
                     }
-                    c.y = c.y + 1;
+
+                    var delta_y: u8 = 1;
+                    if (random.int(u8) < DROP_PAUSE_CHANCE) {
+                        delta_y = 0;
+                    }
+                    c.y = c.y + delta_y;
                 }
             }
         }

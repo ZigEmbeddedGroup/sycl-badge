@@ -144,7 +144,7 @@ pub fn start() void {
     draw_page();
 }
 
-pub fn decrease_boosts() void {
+pub fn decrease_glows() void {
     for (0..CHAR_HEIGHT) |yc| {
         for (0..CHAR_WIDTH) |xc| {
             const boost = characters[yc][xc].boost;
@@ -160,14 +160,14 @@ const STEP_MICROS: u64 = 130_000;
 var next_step_time: u64 = 0;
 
 // how long between boost decreases
-const BOOST_STEP_MICROS: u64 = 50_000;
-var next_boost_time: u64 = 0;
+const FADE_GLOW_STEP_MICROS: u64 = 50_000;
+var next_fade_glow_time: u64 = 0;
 
 pub fn update() void {
     const now = cart.micros_since_boot();
-    if (now >= next_boost_time) {
-        next_boost_time = now + BOOST_STEP_MICROS;
-        decrease_boosts();
+    if (now >= next_fade_glow_time) {
+        next_fade_glow_time = now + FADE_GLOW_STEP_MICROS;
+        decrease_glows();
     }
     if (now >= next_step_time) {
         next_step_time = now + STEP_MICROS;

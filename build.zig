@@ -74,6 +74,11 @@ pub fn build(b: *Build) void {
 
     // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
     add_cart(b, &dep, .{
+        .name = "zig-zag-zoe",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("carts/zig-zag-zoe/main.zig"),
+    });
+    add_cart(b, &dep, .{
         .name = "lcd-text",
         .optimize = .ReleaseSmall,
         .root_source_file = b.path("carts/lcd-text/src/main.zig"),

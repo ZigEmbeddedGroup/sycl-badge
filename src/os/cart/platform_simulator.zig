@@ -123,7 +123,7 @@ pub fn audio_submit_samples(num: usize) void {
     const tail = @atomicLoad(u32, &simulator_io_block.audio_buffer_tail, .acquire);
     const head = @atomicLoad(u32, &simulator_io_block.audio_buffer_head, .unordered);
     const available = if (tail <= head) len - 1 - (head - tail) else tail - head - 1;
-    std.debug.assert(len <= available); // audio_submit_samples called with more than could be filled from audio_get_buffer
+    std.debug.assert(num <= available); // audio_submit_samples called with more than could be filled from audio_get_buffer
     var new_head = head + @as(u32, @intCast(num));
     while (new_head >= len) {
         new_head -= len;

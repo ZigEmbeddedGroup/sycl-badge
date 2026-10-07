@@ -54,3 +54,5 @@ To replace the OS,
 ## Documentation
 
 The SYCL Badge V2 User Manual can be found [here](https://zigembeddedgroup.github.io/sycl-badge/).
+
+Carts can also be written in Rust, see [rust/README.md](rust/README.md).

@@ -12,3 +12,6 @@ zig-out/
 kicad/#auto_saved_files#
 kicad/~SYCL Badge 2024.kicad_pcb.lck
 kicad/~SYCL Badge 2024.kicad_sch.lck
+
+# Mount point the scripts in scripts/ use for the badge drives
+mnt/

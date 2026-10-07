@@ -8,17 +8,13 @@ const gpio = @import("../drivers/gpio.zig");
 const lcd = @import("../drivers/lcd.zig");
 const rom = @import("../drivers/rom.zig");
 const rtt = @import("../drivers/rtt.zig");
-const mailbox = @import("../ipc/mailbox.zig");
-const shared_mem = @import("../ipc/shared_mem.zig");
 const storage = @import("../loader/storage.zig");
 const loader = @import("../loader/loader.zig");
 const multicore = @import("multicore.zig");
 const fps_overlay = @import("fps_overlay.zig");
-const badge = microzig.board;
 
 // Console Configuration
 const MAX_LINE_LENGTH = 256; // Maximum length of input line (max chars allowed before hitting enter)
-const MAX_ARGS = 8; // Maximum number of command arguments
 const PROMPT = "SYCL> "; // Text shown before input
 const MAX_HISTORY = 10; // Number of commands to remember
 

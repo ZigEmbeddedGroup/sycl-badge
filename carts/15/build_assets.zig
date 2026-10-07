@@ -23,7 +23,7 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
 
     const gen_gfx = b.addRunArtifact(convert);
     gen_gfx.addArg("-i");
-    gen_gfx.addFileArg(b.path("carts/15/assets/josh.png"));
+    gen_gfx.addFileArg(b.path("carts/15/assets/joshwolfe.png"));
     gen_gfx.addArg("-o");
     const zon_path = gen_gfx.addOutputFileArg("josh.zon");
     step.dependOn(&gen_gfx.step);

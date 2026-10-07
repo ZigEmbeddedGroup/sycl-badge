@@ -1,17 +1,11 @@
-/// Input file is a png.
-/// Output file is a zon of Display Color.
-/// Output is a zig file with constant display buffers.
-const convert_gfx = @This();
+// Input file is a png with resolution matching display.
+// Output file is a zon of Display Color matching Framebuffer.
 
 const std = @import("std");
 const allocator = std.heap.c_allocator;
 const Image = @import("zigimg").Image;
 
 const cart = @import("cart-api");
-
-const ConvertFile = struct {
-    path: []const u8,
-};
 
 var io_mem: std.Io.Threaded = .init_single_threaded;
 const io = io_mem.io();

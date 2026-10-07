@@ -1,6 +1,3 @@
-//! This file is the minimum boilerplate for a cart.
-//! Fill it in with your code!
-
 /// The cart module contains utilities for interacting
 /// with the badge. Check src/os/cart/api.zig for details!
 const cart = @import("cart-api");
@@ -28,6 +25,13 @@ pub const Tile = union(enum) {
 };
 
 pub const Game = struct {
+    state: enum {
+        // show title screen
+        title,
+        // show board
+        play,
+    } = .title,
+
     board: Board = .solved,
 
     pub const Board = struct {
@@ -72,10 +76,12 @@ var game: Game = .{};
 /// This function runs first, to set up the cart.
 pub fn start() void {
     // Run at 60 FPS with vsync
-    cart.set_vsync_enabled(1000.0 / 60.0);
+    cart.set_vsync_enabled(1000.0 / 30.0);
     cart.set_double_buffer_mode(.no_copy_full_frame);
 }
 
+// for button state edge detection
+var prev_start: bool = false;
 var prev_right: bool = false;
 var prev_left: bool = false;
 var prev_up: bool = false;
@@ -86,40 +92,134 @@ var prev_down: bool = false;
 pub fn update() void {
     // Your code here!
 
-    drawBoard();
-    if (cart.controls.select) {
-        drawDebugBoard();
+    switch (game.state) {
+        .title => {
+            drawTitle();
+            if (cart.controls.start and !prev_start) {
+                game.state = .play;
+            }
+        },
+        .play => {
+            drawBoard();
+            if (cart.controls.select) {
+                drawDebugBoard();
+            }
+
+            if (cart.controls.right and !prev_right) {
+                doRight();
+            }
+
+            if (cart.controls.left and !prev_left) {
+                doLeft();
+            }
+
+            if (cart.controls.up and !prev_up) {
+                doUp();
+            }
+
+            if (cart.controls.down and !prev_down) {
+                doDown();
+            }
+
+            if (cart.controls.a) {
+                game.board = .solved;
+            }
+            if (cart.controls.b) {
+                doScramble();
+            }
+            if (cart.controls.start and !prev_start) {
+                game.state = .title;
+            }
+        },
     }
 
-    if (cart.controls.right and !prev_right) {
-        doRight();
-    }
-
-    if (cart.controls.left and !prev_left) {
-        doLeft();
-    }
-
-    if (cart.controls.up and !prev_up) {
-        doUp();
-    }
-
-    if (cart.controls.down and !prev_down) {
-        doDown();
-    }
-
-    if (cart.controls.a) {
-        game.board = .solved;
-    }
-    if (cart.controls.b) {
-        doScramble();
-    }
-
+    prev_start = cart.controls.start;
     prev_right = cart.controls.right;
     prev_left = cart.controls.left;
     prev_up = cart.controls.up;
     prev_down = cart.controls.down;
 
     // cart.framebuffer.* = josh;
+}
+
+pub fn drawTitle() void {
+    const logo_color = cart.DisplayColor.rgb(0xFFFFFF);
+    const logo_color_inv = cart.DisplayColor.rgb(0x000000);
+    cart.rect(.{
+        .x = 0,
+        .y = 0,
+        .width = cart.screen_width,
+        .height = cart.screen_height,
+        .fill_color = .{ .r = 0, .g = 0, .b = 0 },
+    });
+
+    const tile_height: i32 = cart.screen_height / 8;
+    const tile_width: i32 = cart.screen_width / 8;
+    for (0..4) |x| {
+        for (0..4) |y| {
+            if (x == 3 and y == 3) {
+                continue;
+            }
+            cart.rect(.{
+                .x = @intCast((x + 2) * tile_width),
+                .y = @intCast((y + 2) * tile_height),
+                .width = tile_width,
+                .height = tile_height,
+                .fill_color = logo_color,
+            });
+        }
+    }
+    if (cart.micros_since_boot() % 1_000_000 > 500_000) {
+        cart.text(.{
+            .str = "press\nstart",
+            .x = 41,
+            .y = 31,
+            .text_color = logo_color_inv,
+            .scale = 1,
+        });
+    }
+
+    cart.text(.{
+        .str = "a: reset",
+        .x = 41,
+        .y = 49,
+        .text_color = logo_color_inv,
+        .scale = 1,
+    });
+
+    cart.text(.{
+        .str = "b: mix",
+        .x = 41,
+        .y = 58,
+        .text_color = logo_color_inv,
+        .scale = 1,
+    });
+
+    cart.text(.{
+        .str = "by jeff",
+        .x = 41,
+        .y = 87,
+        .text_color = .rgb(0xFFA500),
+        .scale = 1,
+    });
+
+    cart.text(.{
+        .str = "15",
+        .x = 104,
+        .y = 87,
+        .text_color = .{ .r = 31, .g = 63, .b = 31 },
+        .scale = 1,
+    });
+
+    // const bot: i32 = tile_height * 7;
+    // const top: i32 = tile_height;
+    // const right: i32 = tile_width * 7;
+    // const left: i32 = tile_width;
+    // cart.hline(.{ .x = left, .y = top, .len = tile_width * 6, .color = logo_color });
+    // cart.hline(.{ .x = left, .y = bot, .len = tile_width * 6, .color = logo_color });
+    // cart.vline(.{ .x = left, .y = top, .len = tile_height * 6, .color = logo_color });
+    // cart.vline(.{ .x = right, .y = top, .len = tile_height * 5, .color = logo_color });
+    // cart.hline(.{ .x = tile_width * 5, .y = tile_width * 5, .len = tile_width, .color = logo_color });
 }
 
 var rand = std.Random.DefaultPrng.init(42);
@@ -141,8 +241,6 @@ pub fn doUp() void {
                 const bot = game.board.tiles[x][y];
                 game.board.tiles[x][y] = top;
                 game.board.tiles[x][y - 1] = bot;
-                //var buf: [64]u8 = undefined;
-                //cart.trace(std.mem.print(&buf, "x, y: {}, {}", .{ x, y }) catch &buf);
                 return;
             }
         }
@@ -157,8 +255,6 @@ pub fn doDown() void {
                 const bot = game.board.tiles[x][y + 1];
                 game.board.tiles[x][y + 1] = top;
                 game.board.tiles[x][y] = bot;
-                //var buf: [64]u8 = undefined;
-                //cart.trace(std.mem.print(&buf, "x, y: {}, {}", .{ x, y }) catch &buf);
                 return;
             }
         }
@@ -173,8 +269,6 @@ pub fn doLeft() void {
                 const right = game.board.tiles[x][y];
                 game.board.tiles[x - 1][y] = right;
                 game.board.tiles[x][y] = left;
-                //var buf: [64]u8 = undefined;
-                //cart.trace(std.mem.print(&buf, "x, y: {}, {}", .{ x, y }) catch &buf);
                 return;
             }
         }
@@ -189,8 +283,6 @@ pub fn doRight() void {
                 const right = game.board.tiles[x + 1][y];
                 game.board.tiles[x][y] = right;
                 game.board.tiles[x + 1][y] = left;
-                //var buf: [64]u8 = undefined;
-                //cart.trace(std.mem.print(&buf, "x, y: {}, {}", .{ x, y }) catch &buf);
                 return;
             }
         }
@@ -236,7 +328,6 @@ pub fn drawDebugTile(
             writer.print("P{}{}", .{ pos_x, pos_y }) catch {};
             cart.text(.{
                 .str = writer.buffered(),
-                //.str = &.{ @as(u8, full.x) + 30, ' ', @as(u8, full.y) + 30 },
                 .x = @as(i32, pos_x) * tile_width + 1,
                 .y = @as(i32, pos_y) * tile_height + 1,
                 .text_color = .{ .r = 31, .g = 63, .b = 31 },
@@ -248,7 +339,6 @@ pub fn drawDebugTile(
             writer2.print("T{}{}", .{ t.x, t.y }) catch {};
             cart.text(.{
                 .str = writer2.buffered(),
-                //.str = &.{ @as(u8, full.x) + 30, ' ', @as(u8, full.y) + 30 },
                 .x = @as(i32, pos_x) * tile_width + 10,
                 .y = @as(i32, pos_y) * tile_height + 10,
                 .text_color = .{ .r = 31, .g = 63, .b = 31 },
@@ -290,19 +380,10 @@ pub fn drawTile(
                 .height = tile_height,
                 .src_x = bg_x_start,
                 .src_y = bg_y_start,
-                //.flags = .{
-                //    .flip_y = true,
-                //},
             });
         },
     }
 }
-
-const Rgb = struct {
-    r: f32,
-    g: f32,
-    b: f32,
-};
 
 pub const BlitOptions = struct {
     sprite: *const cart.Framebuffer,
@@ -310,13 +391,11 @@ pub const BlitOptions = struct {
     y: i32,
     width: u32,
     height: u32,
-    /// x within the sprite atlas.
     src_x: u32 = 0,
-    /// y within the sprite atlas.
     src_y: u32 = 0,
 };
 
-/// Copies pixels to the framebuffer.
+/// Need my own blit since the
 pub fn blit(options: BlitOptions) void {
     for (options.sprite[options.src_x..][0..options.width], cart.framebuffer[@intCast(options.x)..][0..options.width]) |src_col, *dest_col| {
         @memcpy(dest_col[@intCast(options.y)..][0..options.height], src_col[options.src_y..][0..options.height]);

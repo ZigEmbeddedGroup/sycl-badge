@@ -156,7 +156,7 @@ const commands = [_]Command{
     .{ .name = "storage", .description = "Show storage filesystem statistics", .handler = cmdStorage },
     .{ .name = "wipe", .description = "Erase cart XIP flash and process RAM (wipe confirm)", .handler = cmdWipe },
     .{ .name = "menu", .description = "Return to cart selection screen", .handler = cmdMenu },
-    .{ .name = "reboot", .description = "Restart the system", .handler = cmdReboot },
+    .{ .name = "reboot", .description = "Restart the system (reboot [bootsel])", .handler = cmdReboot, .completion_provider = rebootCompletions },
 };
 
 // Unified Console Output (sends to USB CDC)
@@ -1061,7 +1061,16 @@ fn cmdWipe(iter: *std.mem.TokenIterator(u8, .scalar)) void {
 
 // Reboot Command
 fn cmdReboot(iter: *std.mem.TokenIterator(u8, .scalar)) void {
-    _ = iter;
+    if (iter.next()) |target| {
+        if (std.mem.eql(u8, target, "bootsel")) {
+            cmdRebootBootSel(iter);
+            return;
+        }
+        printf("Unknown reboot target: {s}\r\n", .{target});
+        println("Usage: reboot [bootsel]");
+        return;
+    }
+
     println("\r\nRebooting system...\r\n");
 
     // Small delay to allow message to be sent

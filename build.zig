@@ -151,6 +151,11 @@ pub fn build(b: *Build) void {
         .root_source_file = b.path("carts/empty-cart/main.zig"),
     });
     add_cart(b, &dep, .{
+        .name = "matrix",
+        .optimize = .ReleaseSmall,
+        .root_source_file = b.path("carts/matrix/main.zig"),
+    });
+    add_cart(b, &dep, .{
         .name = "15",
         .optimize = .ReleaseSmall,
         .root_source_file = b.path("carts/15/src/main.zig"),

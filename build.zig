@@ -281,7 +281,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
     const board_mod = fw.core_mod.import_table.get("board").?;
     cart_api_module.addImport("board", board_mod);
     cart_api_module.addImport("tracy_protocol", b.createModule(.{
-        .root_source_file = b.path("src/os/system/tracy_protocol.zig"),
+        .root_source_file = dep.builder.path("src/os/system/tracy_protocol.zig"),
     }));
 
     const install_uf2 = mb.add_install_firmware(fw, .{ .format = .{ .uf2 = .{ .family_id = .RP2350_ARM_S } } });

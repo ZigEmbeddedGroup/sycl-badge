@@ -28,18 +28,4 @@ pub fn build_cart(b: *Build, cart: *Build.Module, cart_api: *Build.Module, step:
     const zon_path = gen_gfx.addOutputFileArg("josh.zon");
     step.dependOn(&gen_gfx.step);
     cart.addAnonymousImport("josh.zon", .{ .root_source_file = zon_path });
-
-    // const gfx_mod = b.createModule(.{
-    //     .root_source_file = gfx_zig,
-    //     .imports = &.{
-    //         .{
-    //             .name = "packed_int_array",
-    //             .module = b.createModule(.{
-    //                 .root_source_file = b.path("carts/15/src/packed_int_array.zig"),
-    //             }),
-    //         },
-    //     },
-    // });
-
-    // cart.addImport("josh", gfx_mod);
 }

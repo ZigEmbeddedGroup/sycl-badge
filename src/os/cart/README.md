@@ -4,11 +4,11 @@ This folder defines the API surface carts use when running on badge OS.
 
 ## Main API File
 
-- [api.zig](api.zig)
+- [cart-api.zig](cart-api.zig)
 
 ## API Surface
 
-`api.zig` provides:
+`cart-api.zig` provides:
 
 - Input controls (start/select/a/b/click/up/down/left/right)
 - Sensor values (light and battery)
@@ -18,7 +18,7 @@ This folder defines the API surface carts use when running on badge OS.
 
 ## Memory Contract
 
-The API maps to a shared memory block populated by Core 0 and consumed by Core 1 cart code. Address details and layout are documented inline in [api.zig](api.zig).
+The API maps to a shared memory block populated by Core 0 and consumed by Core 1 cart code. Address details and layout are documented inline in [cart-api.zig](cart-api.zig).
 
 ## Cart Lifecycle
 

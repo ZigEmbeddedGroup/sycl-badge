@@ -10,20 +10,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+
       - name: Setup Zine
         uses: kristoff-it/setup-zine@v1
         with:
           version: v0.14.0
 
-      - name: Build manual
-        working-directory: manual
-        run: zine release
+      - name: Build docs
+        run: zig build manual
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          # this should match the `pages` option in your adapter-static options
-          path: "manual/public/"
+          path: "zig-out/site/syc-badge/"
 
   deploy:
     if: github.ref == 'refs/heads/main'

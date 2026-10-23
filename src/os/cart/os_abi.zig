@@ -2,7 +2,7 @@
 //! and the OS for cross-communication. The two must be kept in sync!
 
 const std = @import("std");
-const api = @import("api.zig");
+const api = @import("cart-api.zig");
 
 // Carts begin with a Cart Descriptor Table, which tells the OS about
 // the cart contents. All descriptor tables of all versions begin with
@@ -82,6 +82,8 @@ pub const CartIPCData = extern struct {
     _reserved: [3]u32 = @splat(0),     // x150F0..x15100
 
     comptime {
+        if (@sizeOf(CartIPCData) != 0x15100)
+            @compileLog(@sizeOf(CartIPCData));
         // badge_cart.ld reserves 0x15100 bytes for IPC data.
         // If it grows more than that, the linker script needs to be updated.
         std.debug.assert(@sizeOf(CartIPCData) == 0x15100);

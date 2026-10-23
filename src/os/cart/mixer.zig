@@ -7,7 +7,7 @@
 //! point for a custom mixer.
 
 const std = @import("std");
-const cart = @import("api.zig");
+const cart = @import("cart-api.zig");
 
 const ActiveEnvelope = struct {
     mode: enum { inactive, attack, decay, sustain, release, finish_phase } = .inactive,
@@ -79,8 +79,6 @@ const Freq = struct {
         f.delta_phase = @intFromFloat(@as(f64, 0x1_0000_0000) * @as(f64, f.freq) / @as(f64, cart.audio_sample_rate) + 0.5);
     }
 };
-
-const Noise = struct {};
 
 /// Duration of a tone and ADSR envelope around it.
 /// The default tick length is 1/60th of a second.

@@ -22,7 +22,7 @@ The OS kernel runs on Core 0 and manages hardware, storage, display updates, and
 - IPC: [ipc](ipc)
 - Loader and storage: [loader](loader)
 - System services: [system](system)
-- Cart API exposed to cart code: [cart/api.zig](cart/api.zig)
+- Cart API exposed to cart code: [cart/cart-api.zig](cart/cart-api.zig)
 
 ## Button Commands
 

@@ -2,7 +2,7 @@
 //! Fill it in with your code!
 
 /// The cart module contains utilities for interacting
-/// with the badge. Check src/os/cart/api.zig for details!
+/// with the badge. Check src/os/cart/cart-api.zig for details!
 const cart = @import("cart-api");
 
 // This block exports the hooks that the platform

@@ -2,7 +2,7 @@
 //! and the simulator for cross-communication. The two must be kept in sync!
 
 const std = @import("std");
-const cart_api = @import("api.zig");
+const cart_api = @import("cart-api.zig");
 const abi = @import("sim_abi.zig");
 
 const start_code = struct {

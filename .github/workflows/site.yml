@@ -24,7 +24,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "zig-out/site/syc-badge/"
+          path: "zig-out/site/sycl-badge/"
 
   deploy:
     if: github.ref == 'refs/heads/main'

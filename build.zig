@@ -62,6 +62,12 @@ pub fn build(b: *Build) void {
         },
         .stack = .{ .symbol_name = "__stack" }, // Exported by linker script
         .asserts = true,
+        .imports = &.{
+            .{
+                .name = "font",
+                .module = b.createModule(.{ .root_source_file = dep.builder.path("src/os/font.zig") }),
+            },
+        },
     });
 
     // Install both ELF and UF2 formats
@@ -162,20 +168,6 @@ pub fn build(b: *Build) void {
         .custom_builder = @import("carts/15/build_assets.zig").build_cart,
     });
 
-    const font_export_step = b.step("generate-font.ts", "convert src/font.zig to simulator/src/font.ts");
-    const font_export_exe = b.addExecutable(.{
-        .name = "font_export_exe",
-        .root_module = b.createModule(.{
-            .target = b.graph.host,
-            .root_source_file = b.path("src/generate_font_ts.zig"),
-        }),
-    });
-
-    const font_export_run = b.addRunArtifact(font_export_exe);
-    font_export_run.has_side_effects = true;
-
-    font_export_step.dependOn(&font_export_run.step);
-
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/os/test.zig"),
@@ -262,9 +254,16 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
     const mb = MicroBuild.init(b, mz_dep) orelse return;
     const badge_v2_target = sycl_badge_v2_microzig_target(mb, dep.builder);
 
-    // The cart-api module for OS (ARM build)
+    const font = b.createModule(.{
+        .root_source_file = dep.builder.path("src/os/font.zig"),
+    });
+
+    // The user's cart source (must export start() and update())
     const cart_api_module = b.createModule(.{
         .root_source_file = dep.builder.path("src/os/cart/cart-api.zig"),
+        .imports = &.{
+            .{ .name = "font", .module = font },
+        },
     });
 
     // Firmware root is OS cart entry wrapper

@@ -8,7 +8,7 @@ const spi = hal.spi;
 const timer = @import("timer.zig");
 const dma = @import("dma.zig");
 const board = microzig.board;
-const font = board.font;
+const font_data = @import("font").data;
 const terry = @import("../system/terry.zig");
 const fps_overlay = @import("../system/fps_overlay.zig");
 const settings = @import("../system/settings.zig");
@@ -782,9 +782,9 @@ pub fn drawChar(x: i16, y: i16, char: u8, color: Color16, bg_color: Color16, siz
 
     // Get font data for this character (font starts at space ' ')
     const char_index = if (char >= ' ') char - ' ' else 0;
-    if (char_index >= font.font.len) return;
+    if (char_index >= font_data.len) return;
 
-    const glyph = font.font[char_index];
+    const glyph = font_data[char_index];
 
     ensure_ready();
 

@@ -1,13 +1,11 @@
 /// FPS overlay for displaying frame rate information of the LCD display.
 const std = @import("std");
 const microzig = @import("microzig");
-const badge = microzig.board;
 const adc = @import("../drivers/adc.zig");
 const lcd = @import("../drivers/lcd.zig");
 const timer = @import("../drivers/timer.zig");
 const rev = @import("../drivers/rev.zig");
 const terry = @import("terry.zig");
-const log = std.log.scoped(.fps_overlay);
 const abi = @import("../cart/os_abi.zig");
 
 const Rect8 = abi.Rect8;
@@ -82,11 +80,8 @@ var display_max_audio_delay: u32 = 0;
 const PAD: u16 = 2;
 const NUM_CHARS: u16 = 3; // maximum "999"
 const OVERLAY_W: u16 = NUM_CHARS * 8 + PAD * 2; // 28 px
-const OVERLAY_H: u16 = 8 + PAD * 2; // 12 px
 const OVERLAY_X: u16 = lcd.width - OVERLAY_W; // 132
 const OVERLAY_Y: u16 = 0;
-const TEXT_X: u16 = OVERLAY_X + PAD; // 134
-const TEXT_Y: u16 = OVERLAY_Y + PAD; // 2
 
 const font = microzig.board.font;
 const font_width = 8;
@@ -347,7 +342,7 @@ pub fn submit_lcd_work() void {
 
 fn fmt_int(buf: []u8, val: u32) ![]const u8 {
     @memset(buf, ' ');
-    buf[buf.len-1] = '0';
+    buf[buf.len - 1] = '0';
     var remain = val;
     for (0..buf.len) |i| {
         const idx = buf.len - 1 - i;
@@ -383,7 +378,7 @@ fn add_cart_debug_text() void {
     if (app_time == 0) app_time = avg;
     const us_str = fmt_int(buf[0..6], app_time) catch "!!!!!!";
     add_debug_text(
-        .{ .text = us_str, .x = lcd.width - 3*font_width, .y = 0, .alignment = .right, .color = .cyan },
+        .{ .text = us_str, .x = lcd.width - 3 * font_width, .y = 0, .alignment = .right, .color = .cyan },
         &reserved_topright,
     );
 

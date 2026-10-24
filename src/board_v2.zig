@@ -4,9 +4,6 @@ const hal = microzig.hal;
 const gpio = hal.gpio;
 const Pio = hal.pio.Pio;
 
-// Export font for use by drivers
-pub const font = @import("font.zig");
-
 // Crystal oscillator frequency (12 MHz for SYCL Badge V2)
 pub const xosc_freq = 12_000_000;
 

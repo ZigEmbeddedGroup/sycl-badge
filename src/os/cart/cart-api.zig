@@ -648,6 +648,8 @@ pub fn rect(options: RectOptions) void {
     }
 }
 
+pub const font_data = @import("font").data;
+
 pub const TextOptions = struct {
     str: []const u8,
     x: i32,
@@ -662,7 +664,6 @@ pub fn text(options: TextOptions) void {
     // Font bitmap: [char - ' '][row] where each byte is 8 pixels, 0-bit = foreground.
     // Accessed here (not at file scope) so that @import("board") is only resolved
     // for native builds — WASM builds take the branch above and never reach this.
-    const font_data = @import("board").font.font;
     const text_pixel = options.text_color;
     const bg_pixel = options.background_color;
     const scale = @max(options.scale, 1);

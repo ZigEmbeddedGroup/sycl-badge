@@ -88,7 +88,7 @@ const OVERLAY_Y: u16 = 0;
 const TEXT_X: u16 = OVERLAY_X + PAD; // 134
 const TEXT_Y: u16 = OVERLAY_Y + PAD; // 2
 
-const font = microzig.board.font;
+const font_data = @import("font").data;
 const font_width = 8;
 const font_height = 8;
 
@@ -347,7 +347,7 @@ pub fn submit_lcd_work() void {
 
 fn fmt_int(buf: []u8, val: u32) ![]const u8 {
     @memset(buf, ' ');
-    buf[buf.len-1] = '0';
+    buf[buf.len - 1] = '0';
     var remain = val;
     for (0..buf.len) |i| {
         const idx = buf.len - 1 - i;
@@ -383,7 +383,7 @@ fn add_cart_debug_text() void {
     if (app_time == 0) app_time = avg;
     const us_str = fmt_int(buf[0..6], app_time) catch "!!!!!!";
     add_debug_text(
-        .{ .text = us_str, .x = lcd.width - 3*font_width, .y = 0, .alignment = .right, .color = .cyan },
+        .{ .text = us_str, .x = lcd.width - 3 * font_width, .y = 0, .alignment = .right, .color = .cyan },
         &reserved_topright,
     );
 
@@ -509,9 +509,9 @@ fn draw_str(str: []const u8, base: [*]lcd.Color16, pitch: usize, fg_color: lcd.C
 fn draw_char(char: u8, base: [*]lcd.Color16, pitch: usize, fg_color: lcd.Color16, bg_color: lcd.Color16) void {
     // Get font data for this character (font starts at space ' ')
     var char_index = if (char >= ' ') char - ' ' else 0;
-    if (char_index >= font.font.len) char_index = 0;
+    if (char_index >= font_data.len) char_index = 0;
 
-    const glyph = font.font[char_index];
+    const glyph = font_data[char_index];
 
     // Draw the character bitmap
     var row = base;

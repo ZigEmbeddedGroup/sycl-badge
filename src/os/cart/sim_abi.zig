@@ -1,4 +1,4 @@
-const api = @import("api.zig");
+const api = @import("cart-api.zig");
 
 pub const screen_width = api.screen_width;
 pub const screen_height = api.screen_height;

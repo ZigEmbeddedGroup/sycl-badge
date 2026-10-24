@@ -72,7 +72,7 @@ pub fn build(b: *Build) void {
     b.getInstallStep().dependOn(&install_uf2.step);
     b.getInstallStep().dependOn(&install_elf.step);
 
-    // OS cart builds - compiled against the new OS cart API (src/os/cart/api.zig)
+    // OS cart builds - compiled against the new OS cart API (src/os/cart/cart-api.zig)
     add_cart(b, &dep, .{
         .name = "zig-zag-zoe",
         .optimize = .ReleaseSmall,
@@ -204,6 +204,36 @@ pub fn build(b: *Build) void {
     calc_version_step.dependOn(&run_calc_version.step);
 
     b.installArtifact(calc_version);
+
+    const manual_step = b.step("manual", "");
+
+    const zine_run = b.addSystemCommand(&.{ "sh", "-c", "cd manual && zine release -o ../zig-out/site/sycl-badge -f" });
+
+    // Manual website and autodocs
+    const cart_api_module = b.createModule(.{
+        .optimize = .ReleaseSmall,
+        .target = b.resolveTargetQuery(mb.ports.rp2xxx.boards.raspberrypi.pico2_arm.zig_target),
+        .root_source_file = b.path("src/os/cart/cart-api.zig"),
+    });
+
+    const docs = b.addLibrary(.{
+        .name = "cart-api",
+        .root_module = cart_api_module,
+    });
+
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = docs.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "site/sycl-badge/api",
+    });
+    install_docs.step.dependOn(&zine_run.step);
+
+    const install_custom_index = b.addInstallFile(
+        b.path("manual/vendor/index.html"),
+        "site/sycl-badge/api/index.html",
+    );
+    install_custom_index.step.dependOn(&install_docs.step);
+    manual_step.dependOn(&install_custom_index.step);
 }
 
 fn sycl_badge_v2_microzig_target(mb: *MicroBuild, b: *Build) *microzig.Target {
@@ -234,15 +264,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
 
     // The cart-api module for OS (ARM build)
     const cart_api_module = b.createModule(.{
-        .root_source_file = dep.builder.path("src/os/cart/api.zig"),
-    });
-
-    // The user's cart source (must export start() and update())
-    const user_cart_module = b.createModule(.{
-        .root_source_file = options.root_source_file,
-        .imports = &.{
-            .{ .name = "cart-api", .module = cart_api_module },
-        },
+        .root_source_file = dep.builder.path("src/os/cart/cart-api.zig"),
     });
 
     // Firmware root is OS cart entry wrapper
@@ -259,7 +281,6 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
     });
 
     // Inject cart and api modules into the entry wrapper
-    fw.exe.root_module.addImport("user_cart", user_cart_module);
     fw.exe.root_module.addImport("cart-api", cart_api_module);
 
     const asset_step: ?*Build.Step = if (options.custom_builder) |builder| blk: {
@@ -281,7 +302,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
     } else null;
 
     // Share the board module with cart-api so that font.zig belongs to exactly
-    // one module (board). Without this, both board_v2.zig and api.zig would
+    // one module (board). Without this, both board_v2.zig and cart-api.zig would
     // directly import font.zig, which Zig prohibits.
     const board_mod = fw.core_mod.import_table.get("board").?;
     cart_api_module.addImport("board", board_mod);
@@ -298,7 +319,7 @@ pub fn add_cart(b: *Build, dep: *Build.Dependency, options: OsCartOptions) void 
 
     if (enable_simulator) {
         // native build for the simulator, for debugging.
-        // api.zig detects freestanding at comptime to determine which platform to use.
+        // cart-api.zig detects freestanding at comptime to determine which platform to use.
 
         // This is hacky as hell, but necessary since the root module specifies the build target.
         const sim_module = b.allocator.create(Build.Module) catch @panic("oom");

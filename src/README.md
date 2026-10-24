@@ -23,7 +23,7 @@ SYCL Badge V2 firmware is split across two cores:
 
 The repository currently contains three cart build styles:
 
-- OS cart API carts: linked against [os/cart/api.zig](os/cart/api.zig)
+- OS cart API carts: linked against [os/cart/cart-api.zig](os/cart/cart-api.zig)
 - MicroZig carts: built through helpers in [../build.zig](../build.zig)
 - XIP-style runtime carts: minimal runtime path in [cart](cart)
 
